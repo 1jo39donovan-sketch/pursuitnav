@@ -1,0 +1,286 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2299.4">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; min-height: 14.0px}
+  </style>
+</head>
+<body>
+<p class="p1">&lt;!doctype html&gt;</p>
+<p class="p1">&lt;html lang="en"&gt;</p>
+<p class="p1">&lt;head&gt;</p>
+<p class="p1">&lt;meta charset="utf-8" /&gt;</p>
+<p class="p1">&lt;meta name="viewport" content="width=device-width,initial-scale=1" /&gt;</p>
+<p class="p1">&lt;title&gt;PursuitNav — Street · Speed · Next Junction&lt;/title&gt;</p>
+<p class="p1">&lt;style&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>:root{--bg:#071021;--panel:#0b1b2a;--accent:#00d1ff;--text:#e6f7ff}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>body{background:linear-gradient(180deg,#021021 0%, #071a2b 100%);color:var(--text);display:flex;align-items:center;justify-content:center}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>.card{width:460px;max-width:95%;background:var(--panel);border-radius:12px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.03)}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>h1{margin:0 0 8px;font-size:20px;color:var(--accent)}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>.row{display:flex;align-items:center;justify-content:space-between;margin:12px 0;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>.label{font-size:13px;opacity:0.9}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>.value{font-weight:700;font-size:18px}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>.big{font-size:28px}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>.status{font-size:12px;color:#9fb7c7;margin-top:8px}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>.footer{font-size:12px;color:#9fb7c7;margin-top:12px;display:flex;justify-content:space-between;align-items:center}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>button{background:var(--accent);color:#00222b;border:none;padding:8px 12px;border-radius:8px;font-weight:700;cursor:pointer}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>.mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace}</p>
+<p class="p1">&lt;/style&gt;</p>
+<p class="p1">&lt;/head&gt;</p>
+<p class="p1">&lt;body&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;div class="card" role="application" aria-label="Navigation readout"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;h1&gt;PursuitNav&lt;/h1&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="row" id="streetRow"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="label"&gt;Current street&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div id="street" class="value mono"&gt;—&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;div style="text-align:right"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="label"&gt;Speed&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div id="speed" class="value big mono"&gt;0 km/h&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="row" id="limitRow"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="label"&gt;Posted speed limit&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div id="limit" class="value mono"&gt;—&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;div style="text-align:right"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="label"&gt;Closest junction&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div id="junction" class="value mono"&gt;—&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="status" id="status"&gt;Initializing geolocation…&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="footer"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;div&gt;Accuracy: &lt;span id="accuracy"&gt;—&lt;/span&gt;&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>&lt;button id="centerBtn"&gt;Recenter&lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</p>
+<p class="p2"><br></p>
+<p class="p1">&lt;script&gt;</p>
+<p class="p1">// ========== Utilities ==========</p>
+<p class="p1">function toKmH(ms){ return ms==null ? null : Math.round(ms * 3.6); }</p>
+<p class="p1">function distHaversine(lat1, lon1, lat2, lon2) {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const R = 6371000;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const toRad = a =&gt; a*Math.PI/180;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));</p>
+<p class="p1">}</p>
+<p class="p1">// distance from point to segment (lat/lon) — converts to meters using small-distance projection</p>
+<p class="p1">function distancePointToSegment(lat,lon, lat1,lon1, lat2,lon2) {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>// convert to meters using simple equirectangular approximation (good for short distances)</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const R = 6371000;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const x1 = (lon1 - lon) * Math.cos((lat + lat1) * Math.PI/360) * (Math.PI/180) * R;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const y1 = (lat1 - lat) * (Math.PI/180) * R;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const x2 = (lon2 - lon) * Math.cos((lat + lat2) * Math.PI/360) * (Math.PI/180) * R;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const y2 = (lat2 - lat) * (Math.PI/180) * R;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const px = x1, py = y1, qx = x2, qy = y2;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const dx = qx - px, dy = qy - py;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const l2 = dx*dx + dy*dy;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>if (l2 === 0) return Math.hypot(px - qx, py - qy);</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const t = Math.max(0, Math.min(1, ((0 - px)*dx + (0 - py)*dy) / l2));</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const projx = px + t*dx, projy = py + t*dy;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>return Math.hypot(projx, projy);</p>
+<p class="p1">}</p>
+<p class="p2"><br></p>
+<p class="p1">// ========== DOM ==========</p>
+<p class="p1">const el = id =&gt; document.getElementById(id);</p>
+<p class="p1">const streetEl = el('street'), limitEl = el('limit'), junctionEl = el('junction'),</p>
+<p class="p1"><span class="Apple-converted-space">      </span>speedEl = el('speed'), statusEl = el('status'), accuracyEl = el('accuracy'),</p>
+<p class="p1"><span class="Apple-converted-space">      </span>centerBtn = el('centerBtn');</p>
+<p class="p2"><br></p>
+<p class="p1">let lastPos = null;</p>
+<p class="p1">let watchId = null;</p>
+<p class="p1">let lastUpdateAt = 0;</p>
+<p class="p2"><br></p>
+<p class="p1">// ========== OSM / Overpass / Nominatim calls ==========</p>
+<p class="p1">async function reverseGeocode(lat, lon) {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&amp;lat=${lat}&amp;lon=${lon}&amp;addressdetails=1`;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const res = await fetch(url, {headers:{'User-Agent':'PursuitNav/1.0 (your@email)'}});</p>
+<p class="p1"><span class="Apple-converted-space">  </span>if(!res.ok) throw new Error('Nominatim error');</p>
+<p class="p1"><span class="Apple-converted-space">  </span>return res.json();</p>
+<p class="p1">}</p>
+<p class="p2"><br></p>
+<p class="p1">async function fetchNearbyWays(lat, lon, radius = 200) {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>// Overpass query: ways with highway tag within radius (returns geometry)</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const query = `[out:json][timeout:25];</p>
+<p class="p1"><span class="Apple-converted-space">    </span>way(around:${radius},${lat},${lon})[highway];</p>
+<p class="p1"><span class="Apple-converted-space">    </span>out geom;`;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const res = await fetch(url);</p>
+<p class="p1"><span class="Apple-converted-space">  </span>if(!res.ok) throw new Error('Overpass error');</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const data = await res.json();</p>
+<p class="p1"><span class="Apple-converted-space">  </span>return data.elements || [];</p>
+<p class="p1">}</p>
+<p class="p2"><br></p>
+<p class="p1">// ========== Logic: determine current way, posted speed, nearest junction ==========</p>
+<p class="p1">function selectClosestWay(ways, lat, lon) {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>// For each way compute min distance to any segment</p>
+<p class="p1"><span class="Apple-converted-space">  </span>let best = null;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>for (const w of ways) {</p>
+<p class="p1"><span class="Apple-converted-space">    </span>if (!w.geometry || w.geometry.length &lt; 2) continue;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let minD = Infinity;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>for (let i=0;i&lt;w.geometry.length-1;i++){</p>
+<p class="p1"><span class="Apple-converted-space">      </span>const a = w.geometry[i], b = w.geometry[i+1];</p>
+<p class="p1"><span class="Apple-converted-space">      </span>const d = distancePointToSegment(lat, lon, a.lat, a.lon, b.lat, b.lon);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (d &lt; minD) minD = d;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>if (!best || minD &lt; best.dist) best = {way: w, dist: minD};</p>
+<p class="p1"><span class="Apple-converted-space">  </span>}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>return best;</p>
+<p class="p1">}</p>
+<p class="p2"><br></p>
+<p class="p1">function findIntersections(ways) {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>// Build node usage counts</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const nodeCounts = new Map(); // nodeId -&gt; {count, lat, lon, ways:Set}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>for (const w of ways) {</p>
+<p class="p1"><span class="Apple-converted-space">    </span>if (!w.geometry) continue;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>// Overpass returns geometry points but not node ids inside way.geom; we'll use coord string as key</p>
+<p class="p1"><span class="Apple-converted-space">    </span>for (const pt of w.geometry) {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>const key = `${pt.lat.toFixed(7)},${pt.lon.toFixed(7)}`;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>let entry = nodeCounts.get(key);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (!entry) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>entry = {count:0, lat:pt.lat, lon:pt.lon, ways:new Set()};</p>
+<p class="p1"><span class="Apple-converted-space">        </span>nodeCounts.set(key, entry);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>}</p>
+<p class="p1"><span class="Apple-converted-space">      </span>entry.count += 1;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>entry.ways.add(w);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>// intersections = nodes that appear in &gt;=2 different ways</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const intersections = [];</p>
+<p class="p1"><span class="Apple-converted-space">  </span>for (const [key, v] of nodeCounts.entries()) {</p>
+<p class="p1"><span class="Apple-converted-space">    </span>if (v.ways.size &gt;= 2) intersections.push({lat:v.lat, lon:v.lon, ways:Array.from(v.ways)});</p>
+<p class="p1"><span class="Apple-converted-space">  </span>}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>return intersections;</p>
+<p class="p1">}</p>
+<p class="p2"><br></p>
+<p class="p1">function nearestIntersection(intersections, lat, lon) {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>if (!intersections.length) return null;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>let best = null;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>for (const n of intersections) {</p>
+<p class="p1"><span class="Apple-converted-space">    </span>const d = distHaversine(lat, lon, n.lat, n.lon);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>if (!best || d &lt; best.dist) best = {node: n, dist: d};</p>
+<p class="p1"><span class="Apple-converted-space">  </span>}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>return best;</p>
+<p class="p1">}</p>
+<p class="p2"><br></p>
+<p class="p1">// ========== Main update ==========</p>
+<p class="p1">async function updatePosition(pos) {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>try {</p>
+<p class="p1"><span class="Apple-converted-space">    </span>const {latitude:lat, longitude:lon, speed, accuracy, heading} = pos.coords;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>const now = Date.now();</p>
+<p class="p1"><span class="Apple-converted-space">    </span>lastPos = {lat, lon, speed, accuracy, heading, ts: now};</p>
+<p class="p1"><span class="Apple-converted-space">    </span>accuracyEl.textContent = `${Math.round(accuracy)} m`;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>speedEl.textContent = (toKmH(speed) ?? inferSpeedKmh(pos)) + ' km/h';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>statusEl.textContent = `Lat ${lat.toFixed(5)}, Lon ${lon.toFixed(5)} — updating OSM...`;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// 1) reverse geocode for street name (Nominatim)</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let streetName = '—';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>try {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>const rev = await reverseGeocode(lat, lon);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (rev &amp;&amp; rev.address) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>// prefer road, footway, motorway, etc.</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const addr = rev.address;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>streetName = addr.road || addr.pedestrian || addr.cycleway || addr['footway'] || addr['path'] || addr[' motorway'] || rev.display_name || 'Unnamed road';</p>
+<p class="p1"><span class="Apple-converted-space">      </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>} catch(e) {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>console.warn('Reverse geocode failed', e);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>streetName = 'Unknown';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>streetEl.textContent = streetName;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>// 2) query Overpass for nearby ways and decide which is current</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let postedLimit = '—';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>let junctionText = '—';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>try {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>const ways = await fetchNearbyWays(lat, lon, 200);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (ways.length) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const best = selectClosestWay(ways, lat, lon);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (best &amp;&amp; best.way) {</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const w = best.way;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>// use maxspeed tag if present</p>
+<p class="p1"><span class="Apple-converted-space">          </span>if (w.tags &amp;&amp; w.tags.maxspeed) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>postedLimit = w.tags.maxspeed;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>postedLimit = 'unknown';</p>
+<p class="p1"><span class="Apple-converted-space">          </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>// find intersections among retrieved ways</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const intersections = findIntersections(ways);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const nearest = nearestIntersection(intersections, lat, lon);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (nearest &amp;&amp; nearest.node) {</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const node = nearest.node;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>// produce junction text using names of the first two ways meeting here</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const wayNames = node.ways.map(w =&gt; (w.tags &amp;&amp; (w.tags.name || w.tags.ref)) || 'unnamed').slice(0,3);</p>
+<p class="p1"><span class="Apple-converted-space">          </span>junctionText = `${wayNames.join(' / ')} (${Math.round(nearest.dist)} m)`;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">          </span>junctionText = 'none within 200 m';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">      </span>} else {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>postedLimit = 'no ways found';</p>
+<p class="p1"><span class="Apple-converted-space">        </span>junctionText = 'no junctions found';</p>
+<p class="p1"><span class="Apple-converted-space">      </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>} catch(e) {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>console.warn('OSM fetch failed', e);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>postedLimit = 'error';</p>
+<p class="p1"><span class="Apple-converted-space">      </span>junctionText = 'error';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>limitEl.textContent = postedLimit;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>junctionEl.textContent = junctionText;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>statusEl.textContent = `Updated ${new Date().toLocaleTimeString()}`;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>lastUpdateAt = now;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>} catch (err) {</p>
+<p class="p1"><span class="Apple-converted-space">    </span>console.error(err);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>statusEl.textContent = 'Update failed: ' + (err.message || err);</p>
+<p class="p1"><span class="Apple-converted-space">  </span>}</p>
+<p class="p1">}</p>
+<p class="p2"><br></p>
+<p class="p1">function inferSpeedKmh(pos) {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>// fallback compute from lastPos if coords.speed not supplied</p>
+<p class="p1"><span class="Apple-converted-space">  </span>if (!lastPos) return 0;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const now = Date.now();</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const dt = (now - lastPos.ts)/1000;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>if (dt &lt;= 0) return 0;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const d = distHaversine(lastPos.lat, lastPos.lon, pos.coords.latitude, pos.coords.longitude);</p>
+<p class="p1"><span class="Apple-converted-space">  </span>const mps = d / dt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>return Math.round(mps * 3.6);</p>
+<p class="p1">}</p>
+<p class="p2"><br></p>
+<p class="p1">// ========== Start geolocation ==========</p>
+<p class="p1">function startWatch() {</p>
+<p class="p1"><span class="Apple-converted-space">  </span>if (!navigator.geolocation) {</p>
+<p class="p1"><span class="Apple-converted-space">    </span>statusEl.textContent = 'Geolocation not supported by this browser';</p>
+<p class="p1"><span class="Apple-converted-space">    </span>return;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>}</p>
+<p class="p1"><span class="Apple-converted-space">  </span>watchId = navigator.geolocation.watchPosition(updatePosition, (err) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">    </span>statusEl.textContent = 'Geolocation error: ' + err.message;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>},{</p>
+<p class="p1"><span class="Apple-converted-space">    </span>enableHighAccuracy: true,</p>
+<p class="p1"><span class="Apple-converted-space">    </span>maximumAge: 1000,</p>
+<p class="p1"><span class="Apple-converted-space">    </span>timeout: 20000</p>
+<p class="p1"><span class="Apple-converted-space">  </span>});</p>
+<p class="p1"><span class="Apple-converted-space">  </span>statusEl.textContent = 'Watching position…';</p>
+<p class="p1"><span class="Apple-converted-space">  </span>centerBtn.onclick = () =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">    </span>if (lastPos) window.scrollTo(0,0);</p>
+<p class="p1"><span class="Apple-converted-space">  </span>};</p>
+<p class="p1">}</p>
+<p class="p2"><br></p>
+<p class="p1">startWatch();</p>
+<p class="p1">&lt;/script&gt;</p>
+<p class="p1">&lt;/body&gt;</p>
+<p class="p1">&lt;/html&gt;</p>
+</body>
+</html>
