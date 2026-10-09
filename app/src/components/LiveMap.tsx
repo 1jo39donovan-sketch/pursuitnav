@@ -28,6 +28,7 @@ interface Props {
 export function LiveMap({ headingUp = false, followZoom = 15, compact = false }: Props) {
   const { fix } = useLocation();
   const [following, setFollowing] = useState(true);
+  const [mapFailed, setMapFailed] = useState(false);
 
   const position: LngLat | null = fix ? [fix.lng, fix.lat] : null;
 
@@ -62,6 +63,8 @@ export function LiveMap({ headingUp = false, followZoom = 15, compact = false }:
         attribution
         attributionPosition={{ bottom: 8, left: 8 }}
         touchRotate={!headingUp}
+        onDidFailLoadingMap={() => setMapFailed(true)}
+        onDidFinishLoadingStyle={() => setMapFailed(false)}
         onRegionWillChange={(e) => {
           if (e.nativeEvent.userInteraction) setFollowing(false);
         }}
@@ -92,6 +95,12 @@ export function LiveMap({ headingUp = false, followZoom = 15, compact = false }:
         )}
       </Map>
 
+      {mapFailed && (
+        <View style={styles.failed} pointerEvents="none">
+          <Text style={styles.failedTitle}>Map couldn’t load</Text>
+          <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
+        </View>
+      )}
       {!following && position && (
         <Pressable
           accessibilityRole="button"
@@ -117,6 +126,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   pressed: { opacity: 0.8 },
+  failed: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    top: 16,
+    backgroundColor: colors.panel,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    gap: 4,
+  },
+  failedTitle: { color: colors.amber, fontFamily: fonts.displaySemiBold, fontSize: 20 },
+  failedBody: { color: colors.muted, fontFamily: fonts.body, fontSize: 14 },
   recentreText: {
     color: "#1a1200",
     fontFamily: fonts.displayBold,
