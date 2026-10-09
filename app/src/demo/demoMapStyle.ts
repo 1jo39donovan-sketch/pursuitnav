@@ -2,7 +2,7 @@ import type { StyleSpecification } from "maplibre-gl";
 
 import { colors } from "../theme";
 import labels from "./borough-labels.json";
-import boroughs from "./london-boroughs.json";
+import boroughs from "../area/london-boroughs.json";
 
 // Offline map for demo builds: London's 33 borough outlines on the app's
 // navy. No street detail; the real app uses OpenFreeMap tiles.

@@ -39,14 +39,15 @@ def way(cluster, cells, name, **extra):
     wid = next_id["w"]
     next_id["w"] += 1
     tags = {**TAGS, "name": name, **{k.replace("__", ":"): v for k, v in extra.items()}}
+    tags = {k: v for k, v in tags.items() if v is not None}  # maxspeed=None: no limit signed
     ways.append((wid, [nid(cluster, r, c) for r, c in cells], tags))
     return wid
 
 
-def point(name, cluster, r, c):
+def point(name, cluster, r, c, dlat=0.0, dlng=0.0):
     nid(cluster, r, c)
     _, lat, lng = nodes[(cluster, r, c)]
-    points[name] = {"lat": lat, "lng": lng}
+    points[name] = {"lat": lat + dlat, "lng": lng + dlng}
 
 
 def grid(cluster, skip=()):
@@ -101,6 +102,17 @@ point("turn_end", 3, 2, 1)
 grid(4)
 point("plain_start", 4, 0, 0)
 point("plain_end", 4, 2, 2)
+
+
+# Cluster 5: for pursuit mode. Unsigned Road runs east with no speed limit
+# tagged, split into two ways at column 1 (not a junction), and is crossed
+# by Cross Street (30 mph) at column 2.
+way(5, [(1, 0), (1, 1)], "Unsigned Road", maxspeed=None, surface="asphalt")
+way(5, [(1, 1), (1, 2), (1, 3)], "Unsigned Road", maxspeed=None)
+way(5, [(0, 2), (1, 2), (2, 2)], "Cross Street", maxspeed="30 mph")
+point("unsigned_west", 5, 1, 0)
+point("unsigned_near_split", 5, 1, 0, dlng=0.0025)  # just before column 1
+point("cross_south", 5, 2, 2)
 
 
 def main(pbf_path, points_path):

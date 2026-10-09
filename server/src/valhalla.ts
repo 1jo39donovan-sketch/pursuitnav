@@ -58,6 +58,34 @@ export interface Router {
   traceEdges(shape: LngLat[], costing: Costing): Promise<TraceEdge[]>;
 }
 
+/** The road a GPS trace was on at its last point. */
+export interface MatchedRoad {
+  names: string[];
+  /** Signed limit in km/h from OSM maxspeed; undefined when not tagged. */
+  speedLimitKph?: number;
+}
+
+/** A road edge at or near a point, from Valhalla's /locate. */
+export interface LocatedEdge {
+  names: string[];
+  /** Direction of travel along the edge at the point, degrees. */
+  heading: number;
+  /** 0 at the edge's start node, 1 at its end node. */
+  percentAlong: number;
+  lengthM: number;
+  /** Edge geometry in travel order, start node to end node. */
+  shape: LngLat[];
+  car: boolean;
+  /** Valhalla's road use: "road", "service_road", "footway", … */
+  use: string;
+  speedLimitKph?: number;
+}
+
+export interface Matcher {
+  matchRoad(points: LngLat[]): Promise<MatchedRoad | null>;
+  locate(point: LngLat, heading?: number): Promise<LocatedEdge[]>;
+}
+
 const location = (w: Waypoint) => ({
   lat: w.point[1],
   lon: w.point[0],
@@ -92,8 +120,25 @@ interface ValhallaTraceResponse {
   }>;
 }
 
+interface ValhallaLocateResponse {
+  edges?: Array<{
+    heading: number;
+    percent_along: number;
+    edge_info: { names?: string[]; shape: string; speed_limit?: number };
+    edge: {
+      forward: boolean;
+      access: { car: boolean };
+      classification: { use: string };
+      geo_attributes: { length: number };
+    };
+  }> | null;
+}
+
+/** Valhalla reports 0 for "not tagged" and 255 for "no limit"; neither is a number to show. */
+const signedLimit = (kph?: number) => (kph && kph > 0 && kph < 255 ? kph : undefined);
+
 /** Talks to a Valhalla server over HTTP. */
-export class ValhallaClient implements Router {
+export class ValhallaClient implements Router, Matcher {
   constructor(
     private readonly baseUrl: string,
     private readonly timeoutMs = 15000,
@@ -146,6 +191,55 @@ export class ValhallaClient implements Router {
         endShapeIndex: m.end_shape_index,
       })),
     };
+  }
+
+  /** Map-matches a short GPS trace; the road at its last point. Null if it can't be matched. */
+  async matchRoad(points: LngLat[]): Promise<MatchedRoad | null> {
+    try {
+      const data = await this.post<{
+        edges?: Array<{ names?: string[]; speed_limit?: number }>;
+        matched_points?: Array<{ edge_index?: number; type: string }>;
+      }>("/trace_attributes", {
+        shape: points.map(([lon, lat]) => ({ lat, lon })),
+        // Match whatever the car actually drives, against the flow or not.
+        costing: "auto",
+        costing_options: { auto: { ignore_oneways: true, ignore_restrictions: true } },
+        shape_match: "map_snap",
+        trace_options: { search_radius: 35, gps_accuracy: 15 },
+        filters: { attributes: ["edge.names", "edge.speed_limit", "matched.edge_index", "matched.type"], action: "include" },
+      });
+      const last = [...(data.matched_points ?? [])].reverse().find((m) => m.type !== "unmatched");
+      const edge = last?.edge_index !== undefined ? data.edges?.[last.edge_index] : undefined;
+      if (!edge) return null;
+      return { names: edge.names ?? [], speedLimitKph: signedLimit(edge.speed_limit) };
+    } catch (err) {
+      if (err instanceof ValhallaError && err.httpStatus < 500) return null;
+      throw err;
+    }
+  }
+
+  /** Road edges at a point; with a heading, only those running that way. */
+  async locate(point: LngLat, heading?: number): Promise<LocatedEdge[]> {
+    const data = await this.post<ValhallaLocateResponse[]>("/locate", {
+      locations: [location({ point, heading })],
+      costing: "auto",
+      costing_options: { auto: { ignore_oneways: true } },
+      verbose: true,
+    });
+    return (data[0]?.edges ?? []).map((e) => {
+      const shape = decodePolyline6(e.edge_info.shape);
+      return {
+        names: e.edge_info.names ?? [],
+        heading: e.heading,
+        percentAlong: e.percent_along,
+        lengthM: e.edge.geo_attributes.length,
+        // Shapes are stored once per road; a reverse-direction edge reads them backwards.
+        shape: e.edge.forward ? shape : shape.reverse(),
+        car: e.edge.access.car,
+        use: e.edge.classification.use,
+        speedLimitKph: signedLimit(e.edge_info.speed_limit),
+      };
+    });
   }
 
   /** The road edges a route shape runs along, in order. */

@@ -154,6 +154,11 @@ export class SearchIndex {
     return this.pois.filter((p) => boroughs.has(p.item.borough) && groups.has(p.item.group)).map((p) => p.item);
   }
 
+  /** Named neighbourhoods and areas (Brixton, Angel…), for "generally towards". */
+  namedAreas(): { name: string; lat: number; lng: number }[] {
+    return this.pois.filter((p) => p.item.group === "area").map(({ item }) => ({ name: item.name, lat: item.lat, lng: item.lng }));
+  }
+
   get pointOfInterestCount(): number {
     return this.pois.length;
   }

@@ -8,7 +8,8 @@ import type { ServerConfig } from "./config.js";
 import type { LngLat } from "./geo.js";
 import { PlacesError, type PlacesClient } from "./places.js";
 import { planRoutes } from "./plan.js";
-import { ValhallaError, type Router } from "./valhalla.js";
+import { pursuitInfo } from "./pursuit.js";
+import { ValhallaError, type Matcher, type Router } from "./valhalla.js";
 
 const point = {
   type: "object",
@@ -26,7 +27,12 @@ interface RoutesBody {
   to: { lat: number; lng: number };
 }
 
-export function buildApp(config: ServerConfig, router: Router, places?: PlacesClient): FastifyInstance {
+export function buildApp(
+  config: ServerConfig,
+  router: Router,
+  places?: PlacesClient,
+  matcher?: Matcher,
+): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
   const app = Fastify({
@@ -111,6 +117,41 @@ export function buildApp(config: ServerConfig, router: Router, places?: PlacesCl
         if (err instanceof PlacesError) {
           req.log.error({ status: err.status }, "OS Places error");
           return reply.code(err.status).send({ error: "addresses-unavailable", message: "Address search is unavailable." });
+        }
+        throw err;
+      }
+    },
+  );
+
+  // Pursuit mode: the road the car is on, its speed limit and the next
+  // junction, from the last few GPS points. Positions are never logged.
+  app.post<{ Body: { points: { lat: number; lng: number }[]; heading?: number } }>(
+    "/v1/pursuit",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["points"],
+          additionalProperties: false,
+          properties: {
+            points: { type: "array", minItems: 1, maxItems: 20, items: point },
+            heading: { type: "number", minimum: 0, maximum: 360 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (!matcher) return reply.code(503).send({ error: "pursuit-unavailable" });
+      const { points, heading } = req.body;
+      if (!points.every(inBounds)) {
+        return reply.code(422).send({ error: "outside-area", message: "Outside the area Blue Route covers." });
+      }
+      try {
+        return await pursuitInfo(matcher, points.map((p) => [p.lng, p.lat] as LngLat), heading);
+      } catch (err) {
+        if (err instanceof ValhallaError) {
+          req.log.error({ status: err.httpStatus, code: err.code }, "routing engine error");
+          return reply.code(503).send({ error: "routing-unavailable" });
         }
         throw err;
       }

@@ -5,7 +5,8 @@ import { ValhallaClient } from "./valhalla.js";
 
 const config = loadConfig();
 const places = config.osPlacesKey ? new OsPlacesClient(config.osPlacesKey) : undefined;
-const app = buildApp(config, new ValhallaClient(config.valhallaUrl), places);
+const valhalla = new ValhallaClient(config.valhallaUrl);
+const app = buildApp(config, valhalla, places, valhalla);
 
 app.listen({ port: config.port, host: config.host }).catch((err) => {
   app.log.error(err);
