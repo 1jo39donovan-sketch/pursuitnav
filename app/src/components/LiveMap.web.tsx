@@ -11,18 +11,32 @@ import { DEMO_MODE, MAP_STYLE_URL, region } from "../config";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
 import { colors, fonts } from "../theme";
-
-interface Props {
-  headingUp?: boolean;
-  followZoom?: number;
-  compact?: boolean;
-}
+import { boundsOf, FIT_PADDING, pointGeoJSON, routesGeoJSON, type LiveMapProps } from "./mapShared";
 
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
-export function LiveMap({ headingUp = false, followZoom = 15, compact = false }: Props) {
+export function LiveMap({
+  headingUp = false,
+  followZoom = 15,
+  compact = false,
+  routes = [],
+  destination,
+  onLongPress,
+  fitTo,
+}: LiveMapProps) {
   const { fix } = useLocation();
   const [following, setFollowing] = useState(true);
+  const longPress = useRef(onLongPress);
+  useEffect(() => {
+    longPress.current = onLongPress;
+  }, [onLongPress]);
+
+  // New points to show: stop following so the camera can frame them.
+  const [lastFitTo, setLastFitTo] = useState(fitTo);
+  if (fitTo !== lastFitTo) {
+    setLastFitTo(fitTo);
+    if (fitTo?.length) setFollowing(false);
+  }
   const container = useRef<View>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -45,6 +59,35 @@ export function LiveMap({ headingUp = false, followZoom = 15, compact = false }:
     });
     if (!compact) m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "top-right");
     m.on("load", () => {
+      m.addSource("routes", { type: "geojson", data: EMPTY });
+      m.addLayer({
+        id: "route-solid",
+        type: "line",
+        source: "routes",
+        filter: ["==", ["get", "dashed"], false],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": ["get", "color"], "line-width": 5 },
+      });
+      m.addLayer({
+        id: "route-dashed",
+        type: "line",
+        source: "routes",
+        filter: ["==", ["get", "dashed"], true],
+        layout: { "line-join": "round" },
+        paint: { "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] },
+      });
+      m.addSource("destination", { type: "geojson", data: EMPTY });
+      m.addLayer({
+        id: "destination-dot",
+        type: "circle",
+        source: "destination",
+        paint: {
+          "circle-radius": 9,
+          "circle-color": colors.amber,
+          "circle-stroke-color": colors.bg,
+          "circle-stroke-width": 3,
+        },
+      });
       m.addSource("me", { type: "geojson", data: EMPTY });
       m.addLayer({
         id: "me-halo",
@@ -89,12 +132,37 @@ export function LiveMap({ headingUp = false, followZoom = 15, compact = false }:
       if (!m.isStyleLoaded()) setMapFailed(true);
     });
     m.on("dragstart", () => setFollowing(false));
+    // Right-click stands in for a long press with a mouse.
+    const pressAt = (e: maplibregl.MapMouseEvent) => longPress.current?.([e.lngLat.lng, e.lngLat.lat]);
+    m.on("contextmenu", pressAt);
+    let pressTimer: ReturnType<typeof setTimeout> | undefined;
+    m.on("touchstart", (e) => {
+      if (e.originalEvent.touches.length !== 1) return;
+      pressTimer = setTimeout(() => pressAt(e as unknown as maplibregl.MapMouseEvent), 600);
+    });
+    for (const cancel of ["touchend", "touchmove", "touchcancel"] as const) {
+      m.on(cancel, () => clearTimeout(pressTimer));
+    }
     map.current = m;
     return () => {
       m.remove();
       map.current = null;
     };
   }, [headingUp, compact]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !loaded) return;
+    (m.getSource("routes") as maplibregl.GeoJSONSource).setData(routesGeoJSON(routes));
+    (m.getSource("destination") as maplibregl.GeoJSONSource).setData(pointGeoJSON(destination));
+  }, [routes, destination, loaded]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !loaded || !fitTo?.length) return;
+    const [w, s, e, n] = boundsOf(fitTo);
+    m.fitBounds([[w, s], [e, n]], { padding: FIT_PADDING, duration: 600 });
+  }, [fitTo, loaded]);
 
   useEffect(() => {
     const m = map.current;

@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import Fastify, { LogController, type FastifyInstance } from "fastify";
 
 import type { ServerConfig } from "./config.js";
@@ -27,6 +28,10 @@ export function buildApp(config: ServerConfig, router: Router): FastifyInstance 
     logger: { level: "warn" },
     logController: new LogController({ disableRequestLogging: true }),
   });
+
+  // The phone app doesn't need CORS; the browser preview of the app does.
+  // There are no cookies or credentials to protect.
+  app.register(cors, { origin: true, methods: ["GET", "POST"] });
 
   const inBounds = ({ lat, lng }: { lat: number; lng: number }) => {
     const [west, south, east, north] = config.bounds;

@@ -3,31 +3,43 @@ import {
   GeoJSONSource,
   Layer,
   Map,
+  type CameraRef,
   type LngLat,
 } from "@maplibre/maplibre-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MAP_STYLE_URL, region } from "../config";
 import { useLocation } from "../location/LocationProvider";
 import { colors, fonts } from "../theme";
-
-interface Props {
-  /** Rotate the map so the direction of travel points up (pursuit mini map). */
-  headingUp?: boolean;
-  /** Zoom used while following the officer's position. */
-  followZoom?: number;
-  /** Hide map controls for small embedded maps. */
-  compact?: boolean;
-}
+import { boundsOf, FIT_PADDING, pointGeoJSON, routesGeoJSON, type LiveMapProps } from "./mapShared";
 
 /**
  * Dark map that follows the phone's GPS position. Panning the map stops
  * following; the Recentre button picks it back up.
  */
-export function LiveMap({ headingUp = false, followZoom = 15, compact = false }: Props) {
+export function LiveMap({
+  headingUp = false,
+  followZoom = 15,
+  compact = false,
+  routes = [],
+  destination,
+  onLongPress,
+  fitTo,
+}: LiveMapProps) {
   const { fix } = useLocation();
   const [following, setFollowing] = useState(true);
+  const camera = useRef<CameraRef>(null);
+
+  // New points to show: stop following so the camera can frame them.
+  const [lastFitTo, setLastFitTo] = useState(fitTo);
+  if (fitTo !== lastFitTo) {
+    setLastFitTo(fitTo);
+    if (fitTo?.length) setFollowing(false);
+  }
+  useEffect(() => {
+    if (fitTo?.length) camera.current?.fitBounds(boundsOf(fitTo), { padding: FIT_PADDING, duration: 600 });
+  }, [fitTo]);
   const [mapFailed, setMapFailed] = useState(false);
 
   const position: LngLat | null = fix ? [fix.lng, fix.lat] : null;
@@ -65,15 +77,45 @@ export function LiveMap({ headingUp = false, followZoom = 15, compact = false }:
         touchRotate={!headingUp}
         onDidFailLoadingMap={() => setMapFailed(true)}
         onDidFinishLoadingStyle={() => setMapFailed(false)}
+        onLongPress={(e) => onLongPress?.(e.nativeEvent.lngLat)}
         onRegionWillChange={(e) => {
           if (e.nativeEvent.userInteraction) setFollowing(false);
         }}
       >
         <Camera
+          ref={camera}
           initialViewState={{ center: region.defaultCentre, zoom: region.defaultZoom }}
           maxBounds={region.maxBounds}
           {...followCamera}
         />
+        <GeoJSONSource id="routes" data={routesGeoJSON(routes)}>
+          <Layer
+            type="line"
+            id="route-solid"
+            filter={["==", ["get", "dashed"], false]}
+            layout={{ "line-cap": "round", "line-join": "round" }}
+            paint={{ "line-color": ["get", "color"], "line-width": 5 }}
+          />
+          <Layer
+            type="line"
+            id="route-dashed"
+            filter={["==", ["get", "dashed"], true]}
+            layout={{ "line-join": "round" }}
+            paint={{ "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] }}
+          />
+        </GeoJSONSource>
+        <GeoJSONSource id="destination" data={pointGeoJSON(destination)}>
+          <Layer
+            type="circle"
+            id="destination-dot"
+            paint={{
+              "circle-radius": 9,
+              "circle-color": colors.amber,
+              "circle-stroke-color": colors.bg,
+              "circle-stroke-width": 3,
+            }}
+          />
+        </GeoJSONSource>
         {puck && (
           <GeoJSONSource id="me" data={puck}>
             <Layer

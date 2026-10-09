@@ -30,3 +30,7 @@ export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
 // online map with bundled borough outlines, so the app can be shown from a
 // link with no phone build and no network. Never set for real use.
 export const DEMO_MODE = process.env.EXPO_PUBLIC_DEMO === "1";
+
+// The Blue Route server (see server/README.md). Set EXPO_PUBLIC_API_URL when
+// building, e.g. https://route.example.org. Empty means routing is off.
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(/\/+$/, "");

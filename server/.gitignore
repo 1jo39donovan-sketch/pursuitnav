@@ -3,3 +3,4 @@ dist/
 test/.valhalla/
 data/
 .env
+__pycache__/
