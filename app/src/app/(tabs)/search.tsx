@@ -6,15 +6,22 @@ import { fetchRoutes, RouteError } from "../../api/routes";
 import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
-import type { MapRoute } from "../../components/mapShared";
+import type { MapRoute, MarkerProperties } from "../../components/mapShared";
+import { MarkerCard } from "../../components/MarkerCard";
+import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
 import { SearchResultsList } from "../../components/SearchResultsList";
+import { formatDistance } from "../../format";
+import { distanceM } from "../../geo";
 import { useLocation } from "../../location/LocationProvider";
 import type { SearchResult } from "../../search/engine";
 import { mergeAddresses } from "../../search/merge";
+import { DEFAULT_MARKER_GROUPS, GROUP_COLOR, MARKER_GROUPS } from "../../search/placeGroups";
+import type { PlaceGroup } from "../../search/places";
 import { useSearch } from "../../search/SearchProvider";
 import { useAddressLookup } from "../../search/useAddressLookup";
 import { useSession } from "../../session/SessionProvider";
+import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
 
 interface Destination {
@@ -28,12 +35,18 @@ interface Destination {
 export default function SearchScreen() {
   const { fix } = useLocation();
   const { boroughs } = useSession();
-  const { data, search } = useSearch();
+  const { data, search, places } = useSearch();
   const [query, setQuery] = useState("");
   const [showOutside, setShowOutside] = useState(false);
   const [destination, setDestination] = useState<Destination | null>(null);
   const [state, setState] = useState<PlanState | null>(null);
   const request = useRef<AbortController | null>(null);
+  const [markerGroups, setMarkerGroupsState] = useState<PlaceGroup[]>(() => loadMarkerGroups());
+  const [tapped, setTapped] = useState<{ marker: MarkerProperties; point: LngLat } | null>(null);
+  const setMarkerGroups = (groups: PlaceGroup[]) => {
+    setMarkerGroupsState(groups);
+    store.setSetting("markerGroups", JSON.stringify(groups));
+  };
 
   // Searching 40,000 roads on every keystroke can lag a little; let typing win.
   const deferredQuery = useDeferredValue(query);
@@ -102,6 +115,26 @@ export default function SearchScreen() {
     setShowOutside(false);
   };
 
+  // Place markers for the chosen kinds of place, across the selected boroughs.
+  const markers = useMemo<GeoJSON.FeatureCollection | null>(() => {
+    if (data.status !== "ready" || places.status !== "ready" || !markerGroups.length) return null;
+    const pois = data.index.pointsOfInterestIn(area, new Set(markerGroups));
+    return {
+      type: "FeatureCollection",
+      features: pois.map((p) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+        properties: {
+          name: p.name,
+          type: p.type,
+          address: p.address,
+          borough: p.borough,
+          color: GROUP_COLOR[p.group] ?? GROUP_COLOR.other,
+        } satisfies MarkerProperties,
+      })),
+    };
+  }, [data, places, area, markerGroups]);
+
   const plan = state?.status === "ready" ? state.plan : null;
   const routes = useMemo<MapRoute[]>(() => {
     if (!plan) return [];
@@ -167,8 +200,30 @@ export default function SearchScreen() {
           destination={destination?.point}
           onLongPress={(point) => routeTo({ point, title: "Point on the map" })}
           fitTo={fitTo}
+          markers={showResults ? null : markers}
+          onMarkerPress={(marker, point) => setTapped({ marker, point })}
         />
-        {!destination && !showResults && (
+        {!showResults && !destination && (
+          <PlacesControl
+            groups={markerGroups}
+            onChange={setMarkerGroups}
+            shownCount={places.status === "ready" ? (markers?.features.length ?? 0) : null}
+          />
+        )}
+        {tapped && !destination && !showResults && (
+          <MarkerCard
+            marker={tapped.marker}
+            away={fix ? formatDistance(distanceM(fix, { lat: tapped.point[1], lng: tapped.point[0] })) : undefined}
+            onClose={() => setTapped(null)}
+            onRoute={() => {
+              const { marker, point } = tapped;
+              setTapped(null);
+              setQuery(marker.name);
+              routeTo({ point, title: marker.name });
+            }}
+          />
+        )}
+        {!destination && !showResults && !tapped && (
           <View style={styles.hint} pointerEvents="none">
             <Text style={styles.hintText}>Type an address above, or press and hold on the map.</Text>
           </View>
@@ -242,3 +297,14 @@ const styles = StyleSheet.create({
   },
   hintText: { color: colors.muted, fontFamily: fonts.body, fontSize: 14, textAlign: "center" },
 });
+
+function loadMarkerGroups(): PlaceGroup[] {
+  const saved = store.getSetting("markerGroups");
+  if (saved === null) return DEFAULT_MARKER_GROUPS;
+  try {
+    const known = new Set(MARKER_GROUPS.map((g) => g.key));
+    return (JSON.parse(saved) as PlaceGroup[]).filter((g) => known.has(g));
+  } catch {
+    return DEFAULT_MARKER_GROUPS;
+  }
+}

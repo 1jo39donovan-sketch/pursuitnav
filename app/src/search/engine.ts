@@ -148,6 +148,12 @@ export class SearchIndex {
     this.poiTypes = new Set(pois.map((p) => p.type));
   }
 
+  /** Named places in the given boroughs and groups, for map markers. */
+  pointsOfInterestIn(boroughs: ReadonlySet<Borough>, groups: ReadonlySet<PlaceGroup>): PointOfInterest[] {
+    if (!boroughs.size || !groups.size) return [];
+    return this.pois.filter((p) => boroughs.has(p.item.borough) && groups.has(p.item.group)).map((p) => p.item);
+  }
+
   get pointOfInterestCount(): number {
     return this.pois.length;
   }

@@ -11,7 +11,19 @@ import { DEMO_MODE, MAP_STYLE_URL, region } from "../config";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
 import { colors, fonts } from "../theme";
-import { boundsOf, FIT_DELAY_MS, FIT_PADDING, pointGeoJSON, routesGeoJSON, type LiveMapProps } from "./mapShared";
+import {
+  boundsOf,
+  EMPTY_COLLECTION,
+  FIT_DELAY_MS,
+  FIT_PADDING,
+  MARKER_CIRCLE_PAINT,
+  MARKER_LABEL_LAYOUT,
+  MARKER_LABEL_PAINT,
+  pointGeoJSON,
+  routesGeoJSON,
+  type LiveMapProps,
+  type MarkerProperties,
+} from "./mapShared";
 
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -23,13 +35,17 @@ export function LiveMap({
   destination,
   onLongPress,
   fitTo,
+  markers,
+  onMarkerPress,
 }: LiveMapProps) {
   const { fix } = useLocation();
   const [following, setFollowing] = useState(true);
   const longPress = useRef(onLongPress);
+  const markerPress = useRef(onMarkerPress);
   useEffect(() => {
     longPress.current = onLongPress;
-  }, [onLongPress]);
+    markerPress.current = onMarkerPress;
+  }, [onLongPress, onMarkerPress]);
 
   // New points to show: stop following so the camera can frame them.
   const [lastFitTo, setLastFitTo] = useState(fitTo);
@@ -59,6 +75,27 @@ export function LiveMap({
     });
     if (!compact) m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "top-right");
     m.on("load", () => {
+      m.addSource("places", { type: "geojson", data: EMPTY });
+      m.addLayer({ id: "places-dot", type: "circle", source: "places", minzoom: 11, paint: MARKER_CIRCLE_PAINT });
+      // The offline demo style has no glyphs to draw labels with.
+      if (!DEMO_MODE) {
+        m.addLayer({
+          id: "places-label",
+          type: "symbol",
+          source: "places",
+          minzoom: 16,
+          layout: MARKER_LABEL_LAYOUT,
+          paint: MARKER_LABEL_PAINT,
+        });
+      }
+      m.on("click", "places-dot", (e) => {
+        const f = e.features?.[0];
+        if (f?.geometry.type === "Point") {
+          markerPress.current?.(f.properties as MarkerProperties, f.geometry.coordinates as [number, number]);
+        }
+      });
+      m.on("mouseenter", "places-dot", () => (m.getCanvas().style.cursor = "pointer"));
+      m.on("mouseleave", "places-dot", () => (m.getCanvas().style.cursor = ""));
       m.addSource("routes", { type: "geojson", data: EMPTY });
       m.addLayer({
         id: "route-solid",
@@ -155,7 +192,8 @@ export function LiveMap({
     if (!m || !loaded) return;
     (m.getSource("routes") as maplibregl.GeoJSONSource).setData(routesGeoJSON(routes));
     (m.getSource("destination") as maplibregl.GeoJSONSource).setData(pointGeoJSON(destination));
-  }, [routes, destination, loaded]);
+    (m.getSource("places") as maplibregl.GeoJSONSource).setData(markers ?? EMPTY_COLLECTION);
+  }, [routes, destination, markers, loaded]);
 
   useEffect(() => {
     const m = map.current;

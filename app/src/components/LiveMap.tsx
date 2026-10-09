@@ -12,7 +12,19 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MAP_STYLE_URL, region } from "../config";
 import { useLocation } from "../location/LocationProvider";
 import { colors, fonts } from "../theme";
-import { boundsOf, FIT_DELAY_MS, FIT_PADDING, pointGeoJSON, routesGeoJSON, type LiveMapProps } from "./mapShared";
+import {
+  boundsOf,
+  EMPTY_COLLECTION,
+  FIT_DELAY_MS,
+  FIT_PADDING,
+  MARKER_CIRCLE_PAINT,
+  MARKER_LABEL_LAYOUT,
+  MARKER_LABEL_PAINT,
+  pointGeoJSON,
+  routesGeoJSON,
+  type LiveMapProps,
+  type MarkerProperties,
+} from "./mapShared";
 
 /**
  * Dark map that follows the phone's GPS position. Panning the map stops
@@ -26,6 +38,8 @@ export function LiveMap({
   destination,
   onLongPress,
   fitTo,
+  markers,
+  onMarkerPress,
 }: LiveMapProps) {
   const { fix } = useLocation();
   const [following, setFollowing] = useState(true);
@@ -94,6 +108,26 @@ export function LiveMap({
           maxBounds={region.maxBounds}
           {...followCamera}
         />
+        <GeoJSONSource
+          id="places"
+          data={markers ?? EMPTY_COLLECTION}
+          hitbox={{ top: 12, right: 12, bottom: 12, left: 12 }}
+          onPress={(e) => {
+            const f = e.nativeEvent.features[0];
+            if (f?.geometry.type === "Point" && f.properties) {
+              onMarkerPress?.(f.properties as MarkerProperties, f.geometry.coordinates as LngLat);
+            }
+          }}
+        >
+          <Layer type="circle" id="places-dot" minzoom={11} paint={MARKER_CIRCLE_PAINT} />
+          <Layer
+            type="symbol"
+            id="places-label"
+            minzoom={16}
+            layout={MARKER_LABEL_LAYOUT}
+            paint={MARKER_LABEL_PAINT}
+          />
+        </GeoJSONSource>
         <GeoJSONSource id="routes" data={routesGeoJSON(routes)}>
           <Layer
             type="line"

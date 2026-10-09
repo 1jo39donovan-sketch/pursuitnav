@@ -1,11 +1,24 @@
 // Pieces shared by the phone (LiveMap.tsx) and browser (LiveMap.web.tsx) maps.
-import type { LngLat } from "@maplibre/maplibre-react-native";
+import type {
+  CircleLayerSpecification,
+  LngLat,
+  SymbolLayerSpecification,
+} from "@maplibre/maplibre-react-native";
 
 export interface MapRoute {
   id: string;
   shape: LngLat[];
   color: string;
   dashed?: boolean;
+}
+
+/** Properties carried by each place marker feature. */
+export interface MarkerProperties {
+  name: string;
+  type: string;
+  address: string;
+  borough: string;
+  color: string;
 }
 
 export interface LiveMapProps {
@@ -20,7 +33,40 @@ export interface LiveMapProps {
   onLongPress?: (point: LngLat) => void;
   /** When this changes to a set of points, stop following and show them all. */
   fitTo?: LngLat[] | null;
+  /** Place markers (points with MarkerProperties). */
+  markers?: GeoJSON.FeatureCollection | null;
+  onMarkerPress?: (marker: MarkerProperties, point: LngLat) => void;
 }
+
+/** Glyph font for marker labels; OpenFreeMap's styles serve Noto Sans. */
+export const LABEL_FONT = ["Noto Sans Regular"];
+
+export const EMPTY_COLLECTION: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+
+// Shared layer settings for place markers, so phone and browser look alike.
+export const MARKER_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
+  "circle-color": ["get", "color"],
+  "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 2.5, 15, 5, 18, 8],
+  "circle-stroke-color": "#0c1220",
+  "circle-stroke-width": 1.5,
+  "circle-opacity": 0.95,
+};
+
+export const MARKER_LABEL_LAYOUT: SymbolLayerSpecification["layout"] = {
+  "text-field": ["get", "name"],
+  "text-font": LABEL_FONT,
+  "text-size": 12,
+  "text-offset": [0, 1.1],
+  "text-anchor": "top",
+  "text-max-width": 9,
+  "text-optional": true,
+};
+
+export const MARKER_LABEL_PAINT: SymbolLayerSpecification["paint"] = {
+  "text-color": "#e7ecf5",
+  "text-halo-color": "#0c1220",
+  "text-halo-width": 1.5,
+};
 
 export function routesGeoJSON(routes: MapRoute[]): GeoJSON.FeatureCollection {
   return {
