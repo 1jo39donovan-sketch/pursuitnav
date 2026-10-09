@@ -1,0 +1,17 @@
+import { buildApp } from "./app.js";
+import { loadConfig } from "./config.js";
+import { ValhallaClient } from "./valhalla.js";
+
+const config = loadConfig();
+const app = buildApp(config, new ValhallaClient(config.valhallaUrl));
+
+app.listen({ port: config.port, host: config.host }).catch((err) => {
+  app.log.error(err);
+  process.exit(1);
+});
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => {
+    app.close().then(() => process.exit(0));
+  });
+}

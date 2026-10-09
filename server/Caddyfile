@@ -1,0 +1,6 @@
+# HTTPS with an automatic Let's Encrypt certificate. Access logging is off
+# (Caddy's default): requests carry officers' positions.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy api:3000
+}
