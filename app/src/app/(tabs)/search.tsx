@@ -12,6 +12,7 @@ import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
 import { SearchResultsList } from "../../components/SearchResultsList";
+import { DEMO_MODE } from "../../config";
 import { formatDistance } from "../../format";
 import { distanceM } from "../../geo";
 import { routeOrigin, useLocation } from "../../location/LocationProvider";
@@ -70,6 +71,13 @@ export default function SearchScreen() {
           : lookup.state.status === "not-configured"
             ? "Road-level search only: full address lookup isn't set up."
             : null;
+  // Say plainly when shops, cafés and other places can't be searched yet.
+  const placesNote =
+    showResults && places.status !== "ready"
+      ? DEMO_MODE
+        ? "This demo has no shops, cafés or other places: they come from the Blue Route server."
+        : "Shops, cafés and other places aren't on this phone yet. They download from the Blue Route server."
+      : null;
 
   const routeTo = useCallback(
     async (dest: Destination) => {
@@ -195,6 +203,7 @@ export default function SearchScreen() {
       </View>
       {dataNote && <Text style={styles.dataNote}>{dataNote}</Text>}
       {lookupNote && <Text style={styles.dataNote}>{lookupNote}</Text>}
+      {placesNote && <Text style={styles.dataNote}>{placesNote}</Text>}
       <GpsStatus />
 
       <View style={styles.body}>
