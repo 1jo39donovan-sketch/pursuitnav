@@ -32,7 +32,16 @@
           "locationAlwaysAndWhenInUsePermission": false
         }
       ],
-      "@maplibre/maplibre-react-native"
+      "@maplibre/maplibre-react-native",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#0c1220"
+        }
+      ]
     ]
   }
 }
