@@ -1,10 +1,14 @@
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 
 export function Header() {
   const insets = useSafeAreaInsets();
+  const { callsign, boroughs } = useSession();
+  const area =
+    boroughs.length === 0 ? "No boroughs" : boroughs.length <= 2 ? boroughs.join(" · ") : `${boroughs[0]} +${boroughs.length - 1}`;
   return (
     <View
       style={[
@@ -15,8 +19,14 @@ export function Header() {
       <Text style={styles.brand}>
         Blue<Text style={styles.brandAccent}>Route</Text>
       </Text>
-      {/* The callsign and boroughs land here once the Session tab saves them. */}
-      <Text style={styles.callsign}>No session</Text>
+      <View style={styles.session}>
+        <Text style={styles.callsignStrong} numberOfLines={1}>
+          {callsign || "No callsign"}
+        </Text>
+        <Text style={styles.callsign} numberOfLines={1}>
+          {area}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -39,5 +49,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   brandAccent: { color: colors.blue },
+  session: { alignItems: "flex-end", flexShrink: 1, marginLeft: 12 },
+  callsignStrong: { color: colors.amber, fontFamily: fonts.mono, fontSize: 12 },
   callsign: { color: colors.muted, fontFamily: fonts.mono, fontSize: 12 },
 });

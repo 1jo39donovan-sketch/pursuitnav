@@ -10,13 +10,16 @@
     "@maplibre/maplibre-react-native": "^11.5.0",
     "@types/geojson": "^7946.0.16",
     "expo": "~57.0.27",
+    "expo-asset": "~57.0.19",
     "expo-constants": "~57.0.21",
     "expo-dev-client": "~57.0.19",
+    "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-keep-awake": "~57.0.2",
     "expo-linking": "~57.0.12",
     "expo-location": "~57.0.20",
     "expo-router": "~57.0.25",
+    "expo-sqlite": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
     "maplibre-gl": "^5.24.0",
@@ -33,7 +36,8 @@
     "@types/react": "~19.2.2",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
   },
   "scripts": {
     "start": "expo start --dev-client",
@@ -41,7 +45,8 @@
     "ios": "expo run:ios",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "build:demo": "EXPO_PUBLIC_DEMO=1 expo export --platform web --output-dir dist-demo && node scripts/build-demo-page.mjs dist-demo dist-demo/blue-route-demo.html"
+    "build:demo": "EXPO_PUBLIC_DEMO=1 expo export --platform web --output-dir dist-demo && node scripts/build-demo-page.mjs dist-demo dist-demo/blue-route-demo.html",
+    "test": "vitest run"
   },
   "private": true
 }

@@ -49,7 +49,11 @@ export function boundsOf(points: LngLat[]): [number, number, number, number] {
     s = Math.min(s, lat);
     n = Math.max(n, lat);
   }
-  return [w, s, e, n];
+  // Never frame less than ~300 m, or a single point zooms all the way in.
+  const MIN_SPAN = 0.003;
+  const padLng = Math.max(0, MIN_SPAN - (e - w)) / 2;
+  const padLat = Math.max(0, MIN_SPAN - (n - s)) / 2;
+  return [w - padLng, s - padLat, e + padLng, n + padLat];
 }
 
 export const FIT_PADDING = { top: 60, right: 40, bottom: 60, left: 40 };

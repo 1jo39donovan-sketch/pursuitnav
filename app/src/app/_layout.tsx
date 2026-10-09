@@ -16,6 +16,8 @@ import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { LocationProvider } from "../location/LocationProvider";
+import { SearchProvider } from "../search/SearchProvider";
+import { SessionProvider } from "../session/SessionProvider";
 import { colors } from "../theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -41,10 +43,14 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <LocationProvider>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
-      </LocationProvider>
+      <SessionProvider>
+        <SearchProvider>
+          <LocationProvider>
+            <StatusBar style="light" />
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+          </LocationProvider>
+        </SearchProvider>
+      </SessionProvider>
     </SafeAreaProvider>
   );
 }

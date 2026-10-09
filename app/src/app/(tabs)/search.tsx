@@ -1,27 +1,47 @@
 import type { LngLat } from "@maplibre/maplibre-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { fetchRoutes, RouteError } from "../../api/routes";
+import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import type { MapRoute } from "../../components/mapShared";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
+import { SearchResultsList } from "../../components/SearchResultsList";
 import { useLocation } from "../../location/LocationProvider";
+import type { SearchResult } from "../../search/engine";
+import { useSearch } from "../../search/SearchProvider";
+import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
 
-// Until address search arrives (build step 3), a long press on the map sets
-// the destination. Routes always start from the phone's current position.
+interface Destination {
+  point: LngLat;
+  title?: string;
+  note?: string;
+}
+
+// Type what the control room gave, pick the match, get both routes from
+// where the phone is now. A long press on the map also sets a destination.
 export default function SearchScreen() {
   const { fix } = useLocation();
-  const [destination, setDestination] = useState<LngLat | null>(null);
+  const { boroughs } = useSession();
+  const { data, search } = useSearch();
+  const [query, setQuery] = useState("");
+  const [showOutside, setShowOutside] = useState(false);
+  const [destination, setDestination] = useState<Destination | null>(null);
   const [state, setState] = useState<PlanState | null>(null);
   const request = useRef<AbortController | null>(null);
 
+  // Searching 40,000 roads on every keystroke can lag a little; let typing win.
+  const deferredQuery = useDeferredValue(query);
+  const results = useMemo(() => search(deferredQuery), [search, deferredQuery]);
+  const showResults = query.trim().length >= 2 && !destination;
+
   const routeTo = useCallback(
-    async (to: LngLat) => {
+    async (dest: Destination) => {
       request.current?.abort();
-      setDestination(to);
+      setDestination(dest);
       if (!fix) {
         setState({ status: "error", message: "Waiting for a GPS position to route from." });
         return;
@@ -30,7 +50,8 @@ export default function SearchScreen() {
       request.current = controller;
       setState({ status: "loading" });
       try {
-        const plan = await fetchRoutes({ lat: fix.lat, lng: fix.lng }, { lat: to[1], lng: to[0] }, controller.signal);
+        const to = { lat: dest.point[1], lng: dest.point[0] };
+        const plan = await fetchRoutes({ lat: fix.lat, lng: fix.lng }, to, controller.signal);
         if (!controller.signal.aborted) setState({ status: "ready", plan });
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -43,10 +64,25 @@ export default function SearchScreen() {
 
   useEffect(() => () => request.current?.abort(), []);
 
+  const pick = (r: SearchResult) => {
+    Keyboard.dismiss();
+    setQuery(r.label);
+    const numbered = /\d/.test(r.label) && r.kind !== "postcode";
+    const note =
+      r.precision === "road" && numbered
+        ? "Routes to a point on the road, not the door. On a long road, check which end the number is."
+        : r.precision === "postcode" && r.kind !== "postcode"
+          ? "Routes to the postcode, which may cover several doors."
+          : undefined;
+    routeTo({ point: [r.lng, r.lat], title: r.label, note });
+  };
+
   const clear = () => {
     request.current?.abort();
     setDestination(null);
     setState(null);
+    setQuery("");
+    setShowOutside(false);
   };
 
   const plan = state?.status === "ready" ? state.plan : null;
@@ -56,23 +92,97 @@ export default function SearchScreen() {
     if (plan.police) out.push({ id: "police", shape: plan.police.shape, color: colors.amber, dashed: true });
     return out;
   }, [plan]);
-  const fitTo = useMemo(() => (routes.length ? routes.flatMap((r) => r.shape) : null), [routes]);
+  // Frame the routes once they arrive; until then, the destination and where we are.
+  const here = fix ? ([fix.lng, fix.lat] as LngLat) : null;
+  const hasHere = here !== null;
+  const fitTo = useMemo(() => {
+    if (routes.length) return routes.flatMap((r) => r.shape);
+    if (!destination) return null;
+    return here ? [destination.point, here] : [destination.point];
+    // Only reframe when the destination or routes change, not on every GPS fix.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routes, destination, hasHere]);
+
+  const dataNote =
+    data.status === "loading"
+      ? "Loading London roads…"
+      : data.status === "error"
+        ? `Search data didn't load: ${data.message}`
+        : boroughs.length === 0
+          ? "No boroughs picked: every match shows as outside your area. Pick them on the Session tab."
+          : null;
 
   return (
     <View style={styles.screen}>
+      <View style={styles.searchBar}>
+        <TextInput
+          value={query}
+          onChangeText={(t) => {
+            setQuery(t);
+            setShowOutside(false);
+            if (destination) {
+              request.current?.abort();
+              setDestination(null);
+              setState(null);
+            }
+          }}
+          placeholder="54 Caledonian Road, N7 8LA or Bemerton Estate"
+          placeholderTextColor={colors.muted}
+          autoCorrect={false}
+          autoCapitalize="words"
+          returnKeyType="search"
+          accessibilityLabel="Address from the control room"
+          style={styles.input}
+        />
+        {query.length > 0 && (
+          <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={clear} style={styles.clear}>
+            <Text style={styles.clearText}>✕</Text>
+          </Pressable>
+        )}
+      </View>
+      {dataNote && <Text style={styles.dataNote}>{dataNote}</Text>}
       <GpsStatus />
-      <View style={styles.map}>
-        <LiveMap routes={routes} destination={destination} onLongPress={routeTo} fitTo={fitTo} />
-        {!destination && (
+
+      <View style={styles.body}>
+        <LiveMap
+          routes={routes}
+          destination={destination?.point}
+          onLongPress={(point) => routeTo({ point, title: "Point on the map" })}
+          fitTo={fitTo}
+        />
+        {!destination && !showResults && (
           <View style={styles.hint} pointerEvents="none">
-            <Text style={styles.hintText}>Press and hold on the map to get routes there.</Text>
+            <Text style={styles.hintText}>Type an address above, or press and hold on the map.</Text>
+          </View>
+        )}
+        {showResults && (
+          <View style={styles.results}>
+            <SearchResultsList
+              results={results}
+              showOutside={showOutside}
+              onToggleOutside={() => setShowOutside((v) => !v)}
+              onPick={pick}
+              emptyText={
+                data.status === "ready"
+                  ? "No matches in your area. Check the spelling, or add it below if it's a block or estate."
+                  : "Search data is still loading."
+              }
+              footer={
+                data.status === "ready" ? (
+                  <AddPlaceForm initialName={query.replace(/^\d+\s*/, "")} onSaved={(name) => setQuery(name)} />
+                ) : null
+              }
+            />
           </View>
         )}
       </View>
+
       {destination && state && (
         <RoutePanel
           state={state}
-          destination={{ lat: destination[1], lng: destination[0] }}
+          destination={{ lat: destination.point[1], lng: destination.point[0] }}
+          title={destination.title}
+          note={destination.note}
           onClose={clear}
         />
       )}
@@ -82,7 +192,24 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  map: { flex: 1 },
+  searchBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 10, gap: 8 },
+  input: {
+    flex: 1,
+    backgroundColor: colors.panel,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    color: colors.fg,
+    fontFamily: fonts.body,
+    fontSize: 17,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  clear: { padding: 10 },
+  clearText: { color: colors.muted, fontSize: 18 },
+  dataNote: { color: colors.muted, fontFamily: fonts.mono, fontSize: 12, paddingHorizontal: 16, paddingTop: 6 },
+  body: { flex: 1 },
+  results: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.bg },
   hint: {
     position: "absolute",
     left: 12,

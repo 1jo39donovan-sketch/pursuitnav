@@ -12,6 +12,10 @@ export type PlanState =
 interface Props {
   state: PlanState;
   destination: { lat: number; lng: number };
+  /** What was picked, e.g. "54 Caledonian Road". */
+  title?: string;
+  /** A caution about the destination, e.g. that it's the road, not the door. */
+  note?: string;
   onClose: () => void;
 }
 
@@ -22,7 +26,7 @@ const NO_POLICE: Record<NoPoliceReason, string> = {
 };
 
 /** The two routes side by side, for the operator to choose between. */
-export function RoutePanel({ state, destination, onClose }: Props) {
+export function RoutePanel({ state, destination, title, note, onClose }: Props) {
   const { lat, lng } = destination;
   return (
     <View style={styles.panel}>
@@ -33,6 +37,12 @@ export function RoutePanel({ state, destination, onClose }: Props) {
         </Pressable>
       </View>
 
+      {title && (
+        <Text style={styles.title} numberOfLines={2}>
+          {title}
+        </Text>
+      )}
+      {note && <Text style={styles.note}>{note}</Text>}
       {state.status === "loading" && <Text style={styles.status}>Working out routes…</Text>}
       {state.status === "error" && <Text style={[styles.status, styles.error]}>{state.message}</Text>}
       {state.status === "ready" && (
@@ -128,6 +138,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: "uppercase",
   },
+  title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 24, lineHeight: 26 },
+  note: { color: colors.amber, fontFamily: fonts.body, fontSize: 13 },
   close: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 15 },
   status: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, paddingVertical: 12 },
   error: { color: colors.amber },
