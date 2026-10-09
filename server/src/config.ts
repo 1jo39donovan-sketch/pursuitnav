@@ -14,6 +14,8 @@ export interface ServerConfig {
   restrictionCheckBudget: number;
   /** OS Places API key; door-level address search is off without it. */
   osPlacesKey: string | undefined;
+  /** Gzipped places file written by places/extract_places.py. */
+  placesFile: string;
 }
 
 // Greater London with a margin, matching the app's region config.
@@ -43,5 +45,6 @@ export function loadConfig(): ServerConfig {
     minSavingFraction: num("MIN_SAVING_FRACTION", 0.05),
     restrictionCheckBudget: num("RESTRICTION_CHECK_BUDGET", 150),
     osPlacesKey: process.env.OS_PLACES_KEY || undefined,
+    placesFile: process.env.PLACES_FILE ?? "/data/places/places.txt.gz",
   };
 }

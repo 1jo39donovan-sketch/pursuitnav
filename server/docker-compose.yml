@@ -23,10 +23,19 @@ services:
     restart: unless-stopped
     depends_on:
       - valhalla
+    volumes:
+      - ./data/places:/data/places:ro
     environment:
       VALHALLA_URL: http://valhalla:8002
       # Door-level address search; leave empty to run with road-level search only.
       OS_PLACES_KEY: ${OS_PLACES_KEY:-}
+
+  # Run by scripts/build-places.sh, not by `docker compose up`.
+  places:
+    build: ./places
+    profiles: ["tools"]
+    volumes:
+      - ./data:/data
 
   caddy:
     image: caddy:2.10-alpine

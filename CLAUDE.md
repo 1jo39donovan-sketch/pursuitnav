@@ -40,6 +40,14 @@ Data sources:
 - **OS Open Names** (free, Open Government Licence) as an offline fallback for road-level search, so search still works with no signal. The prototype bundled this, assigned to boroughs by point-in-polygon against London borough boundaries.
 - **Officer-saved places:** officers can add a block or estate and the road it's on. Stored on the phone, included in search.
 
+## Places
+
+Officers can also search for any named place: businesses (coffee shops, corner shops, takeaways, pubs, bookmakers…), schools, parks, health services, police and fire stations, stations, places of worship, hotels, named blocks and estates, and areas. Everything OpenStreetMap has a name for, where possible.
+
+- Search by name (misspellings forgiven), or list a kind of place in the selected boroughs ("coffee shops", "schools", "corner shops").
+- Source: OpenStreetMap, extracted on the server from the same weekly Geofabrik London file as the routing tiles, each place assigned to its borough. The app downloads the file and keeps it, so place search works with no signal.
+- OS Places results also show business names where OS has them.
+
 Results in the selected boroughs show first. Matches outside the area are hidden behind a "Show N outside your area" option, because roads like Stroud Green Road cross borough boundaries.
 
 ## Routing

@@ -20,6 +20,7 @@ const config: ServerConfig = {
   minSavingFraction: 0.05,
   restrictionCheckBudget: 150,
   osPlacesKey: undefined,
+  placesFile: "/nonexistent",
 };
 const app = buildApp(config, client);
 

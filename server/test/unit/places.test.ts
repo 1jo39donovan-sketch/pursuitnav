@@ -41,6 +41,12 @@ describe("labels", () => {
     ).toBe("Flat 12, Smith House, Holloway Road");
   });
 
+  it("puts a business name first", () => {
+    expect(labelFor(dpa({ ORGANISATION_NAME: "TESCO STORES LTD", BUILDING_NUMBER: "380", THOROUGHFARE_NAME: "HOLLOWAY ROAD" }).DPA as never)).toBe(
+      "Tesco Stores Ltd, 380 Holloway Road",
+    );
+  });
+
   it("title-cases without breaking flat letters", () => {
     expect(titleCase("FLAT 3A, ST JOHN'S ROAD")).toBe("Flat 3a, St John's Road");
   });

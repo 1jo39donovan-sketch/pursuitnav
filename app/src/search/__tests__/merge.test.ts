@@ -40,6 +40,6 @@ describe("mergeAddresses", () => {
       [{ uprn: "1", label: "1 High Street", postcode: "AB1 2CD", borough: "Somewhere", lat: 0, lng: 0, match: 1 }],
       new Set<Borough>(["Islington"]),
     );
-    expect(merged).toEqual({ inArea: [], outside: [] });
+    expect(merged).toEqual({ inArea: [], outside: [], outsideCount: 0 });
   });
 });

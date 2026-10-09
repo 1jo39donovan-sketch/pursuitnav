@@ -30,5 +30,9 @@ export function mergeAddresses(offline: SearchResults, addresses: Address[], are
   );
   const inArea = results.filter((r) => area.has(r.borough)).slice(0, MAX_ADDRESSES);
   const outside = results.filter((r) => !area.has(r.borough));
-  return { inArea: [...inArea, ...offline.inArea], outside: [...outside, ...offline.outside] };
+  return {
+    inArea: [...inArea, ...offline.inArea],
+    outside: [...outside, ...offline.outside],
+    outsideCount: outside.length + (offline.outsideCount ?? offline.outside.length),
+  };
 }

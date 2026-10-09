@@ -8,7 +8,7 @@ import { colors, fonts } from "../../theme";
 
 export default function SessionScreen() {
   const { callsign, setCallsign, boroughs, toggleBorough } = useSession();
-  const { savedPlaces, deletePlace } = useSearch();
+  const { savedPlaces, deletePlace, places } = useSearch();
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -84,9 +84,14 @@ export default function SessionScreen() {
       )}
 
       <Text style={styles.attribution}>
+        {places.status === "ready"
+          ? `Places: ${places.count.toLocaleString("en-GB")} shops, cafés, schools, parks and more, from ${places.builtOn}.`
+          : "Places (shops, cafés, schools, parks…) download from the Blue Route server when it’s connected."}
+      </Text>
+      <Text style={styles.attribution}>
         Search data: contains OS data © Crown copyright and database right; Royal Mail data © Royal Mail copyright and
         database right; National Statistics data © Crown copyright and database right. Map data © OpenStreetMap
-        contributors.
+        contributors (places and map).
       </Text>
     </ScrollView>
   );

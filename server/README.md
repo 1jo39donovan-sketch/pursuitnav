@@ -13,7 +13,13 @@ Each route has `durationS`, `distanceM`, `shape` (`[lng, lat]` points) and turn-
 
 `POST /v1/addresses` with `{"query": "Flat 3, 54 Caledonian Road"}` returns `{"addresses": [...]}`: door-level addresses from the OS Places API, each with `uprn`, `label`, `postcode`, `borough` and `lat`/`lng`. Only London addresses are returned; the app sorts them into the officer's boroughs and the rest. Without `OS_PLACES_KEY` this returns 503 `addresses-not-configured` and the app uses its offline road search alone.
 
+`GET /v1/places-data` returns every named place in London (shops, cafés, schools, parks, blocks, estates…) as a gzipped text file for the app to keep offline. It has an ETag, so the app only downloads it when it changes. It's public OpenStreetMap data and the request carries nothing about the officer.
+
 `GET /health` returns `{"ok": true}`.
+
+### Places
+
+`places/extract_places.py` reads the London OSM extract and writes `data/places/places.txt.gz`: one line per named place with its type ("Coffee shop", "Corner shop", "School"…), group, borough (point-in-polygon against `places/london-boroughs.geojson`), a point inside it and its address where OSM has one. `places/categories.py` decides what counts as a place and what to call it. `scripts/build-places.sh` runs it in Docker; `rebuild-tiles.sh` runs it weekly after the tiles. Tests: `pytest places` (needs `pip install -r places/requirements.txt`).
 
 ### OS Places
 
@@ -60,6 +66,7 @@ On a VPS with Docker and at least 4 GB RAM (the tile build needs it; serving nee
 git clone <repo> /opt/blue-route && cd /opt/blue-route/server
 cp .env.example .env            # set DOMAIN to a domain pointing at this server
 docker compose up -d            # first start downloads London and builds tiles (~15–30 min)
+scripts/build-places.sh         # once the tiles are built: extract shops, cafés, schools, parks…
 docker compose logs -f api      # Valhalla's own logs are off by design
 curl https://$DOMAIN/health
 ```

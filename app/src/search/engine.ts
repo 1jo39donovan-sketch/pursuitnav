@@ -1,8 +1,10 @@
 // Offline address search over bundled OS Open Names roads, ONS postcodes,
-// a starter list of estates and the officer's own saved places.
+// a starter list of estates, the officer's own saved places, and named
+// places from OpenStreetMap (shops, cafés, schools, parks, blocks…).
 
 import type { Borough } from "./boroughs";
 import { formatPostcode, parseQuery } from "./parse";
+import { typesForQuery, type PlaceGroup, type PointOfInterest } from "./places";
 import { matchScore, normalise } from "./text";
 
 export interface Road {
@@ -32,7 +34,7 @@ export interface Place {
   kind: "estate" | "saved";
 }
 
-export type ResultKind = "road" | "postcode" | "estate" | "saved" | "address";
+export type ResultKind = "road" | "postcode" | "estate" | "saved" | "address" | "poi";
 
 export interface SearchResult {
   key: string;
@@ -48,13 +50,18 @@ export interface SearchResult {
    * How exact the point is. A road from Open Names is one point somewhere
    * along it, so a house number on a long road may be some way off.
    */
-  precision: "door" | "postcode" | "road";
+  precision: "door" | "postcode" | "road" | "place";
   score: number;
+  /** For named places: their type, e.g. "Coffee shop", shown as the tag. */
+  placeType?: string;
+  placeGroup?: PlaceGroup;
 }
 
 export interface SearchResults {
   inArea: SearchResult[];
   outside: SearchResult[];
+  /** How many matches are outside the area, when that's more than `outside` holds. */
+  outsideCount?: number;
 }
 
 interface Indexed<T> {
@@ -63,8 +70,11 @@ interface Indexed<T> {
 }
 
 const MAX_RESULTS = 30;
-// "N7" means "show me the roads in N7", so list them all.
-const MAX_OUTWARD_RESULTS = 1000;
+// "N7" means "show me the roads in N7", and "coffee shops" every coffee
+// shop in the area, so list them all.
+const MAX_LIST_RESULTS = 1000;
+// A named place near the road given with it ("Costa, Upper Street") ranks higher.
+const NEAR_ROAD_KM = 0.6;
 
 /** The parts of the query that aren't the road or place itself. */
 interface Prefix {
@@ -91,6 +101,12 @@ export class SearchIndex {
   private roads: Indexed<Road>[];
   private places: Indexed<Place>[] = [];
   private postcodes: Map<string, PostcodePoint>;
+  private pois: { item: PointOfInterest; norms: string[]; address: string }[] = [];
+  private poiTypes = new Set<string>();
+  /** Places by the first two letters of each word in their names, so a search checks a few thousand, not all. */
+  private poiByWordStart = new Map<string, number[]>();
+  /** Outside-area name matches counted but not built during the current search. */
+  private lastPoiOutsideRest = 0;
 
   constructor(roads: Road[], postcodes: PostcodePoint[], places: Place[] = []) {
     this.roads = roads.map((item) => ({ item, norm: normalise(item.name) }));
@@ -101,6 +117,39 @@ export class SearchIndex {
   /** Replace the estates and saved places (call after the officer adds one). */
   setPlaces(places: Place[]) {
     this.places = places.map((item) => ({ item, norm: normalise(item.name) }));
+  }
+
+  /**
+   * Replace the named places (when a newer places file arrives). Works in
+   * batches, yielding between them, so the screen stays responsive while
+   * a couple of hundred thousand names are indexed.
+   */
+  async setPointsOfInterest(pois: PointOfInterest[], batch = 5000): Promise<void> {
+    const indexed: typeof this.pois = [];
+    const byWordStart = new Map<string, number[]>();
+    for (let start = 0; start < pois.length; start += batch) {
+      for (let i = start; i < Math.min(start + batch, pois.length); i++) {
+        const item = pois[i]!;
+        const norms = [item.name, ...item.otherNames].map(normalise);
+        indexed.push({ item, norms, address: normalise(item.address) });
+        const starts = new Set<string>();
+        for (const n of norms) for (const w of n.split(" ")) if (w.length >= 2) starts.add(w.slice(0, 2));
+        for (const st of starts) {
+          const list = byWordStart.get(st);
+          if (list) list.push(i);
+          else byWordStart.set(st, [i]);
+        }
+      }
+      if (start + batch < pois.length) await new Promise((r) => setTimeout(r, 0));
+    }
+    // Swap in all at once, so a search never sees half an index.
+    this.pois = indexed;
+    this.poiByWordStart = byWordStart;
+    this.poiTypes = new Set(pois.map((p) => p.type));
+  }
+
+  get pointOfInterestCount(): number {
+    return this.pois.length;
   }
 
   /** The bundled point for a road in a borough, for anchoring estates and saved places. */
@@ -119,26 +168,32 @@ export class SearchIndex {
 
   search(raw: string, area: ReadonlySet<Borough>): SearchResults {
     if (raw.trim().length < 2) return { inArea: [], outside: [] };
-    const hits = this.collect(raw);
-    const limit = parseQuery(raw).outwardCode ? MAX_OUTWARD_RESULTS : MAX_RESULTS;
+    const types = typesForQuery(raw, this.poiTypes);
+    const listed = this.listOfType(types, area);
+    this.lastPoiOutsideRest = 0;
+    const hits = [...this.collect(raw, area), ...listed.inArea];
+    const limit = parseQuery(raw).outwardCode || types.length ? MAX_LIST_RESULTS : MAX_RESULTS;
 
     const seen = new Set<string>();
     const unique = hits
       .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
       .filter((h) => {
-        const k = `${h.label}|${h.borough}`;
+        const k = h.kind === "poi" ? h.key : `${h.label}|${h.borough}`;
         if (seen.has(k)) return false;
         seen.add(k);
         return true;
       });
 
+    const outside = unique.filter((h) => !area.has(h.borough));
+    for (const h of listed.outsideSample) if (!seen.has(h.key)) outside.push(h);
     return {
       inArea: unique.filter((h) => area.has(h.borough)).slice(0, limit),
-      outside: unique.filter((h) => !area.has(h.borough)),
+      outside,
+      outsideCount: outside.length + listed.outsideRest + this.lastPoiOutsideRest,
     };
   }
 
-  private collect(raw: string): SearchResult[] {
+  private collect(raw: string, area: ReadonlySet<Borough>): SearchResult[] {
     const q = parseQuery(raw);
 
     if (q.fullPostcode) {
@@ -195,6 +250,8 @@ export class SearchIndex {
     const hits = best.map(([item, score]) =>
       "kind" in item ? this.placeResult(item, prefix, score) : this.roadResult(item, prefix, score),
     );
+    // Named places can be any part ("Costa, Upper Street"; "Smith House, Holloway Road").
+    if (!q.number && !q.flat) hits.push(...this.matchPointsOfInterest(q.parts, area));
 
     // A postcode on the end pins the right one of several same-named roads,
     // and gives a closer point than the road's own.
@@ -213,6 +270,74 @@ export class SearchIndex {
       }
     }
     return hits;
+  }
+
+  private matchPointsOfInterest(parts: string[], area: ReadonlySet<Borough>): SearchResult[] {
+    const norms = parts.map(normalise).filter((n) => n.length >= 2);
+    // Score as plain numbers first; only the best become full results.
+    const scored: { idx: number; score: number }[] = [];
+    norms.forEach((norm, i) => {
+      const others = norms.filter((_, j) => j !== i);
+      // Points of roads named in the other parts, to rank places near them.
+      const nearRoads = others.flatMap((o) => this.roads.filter((r) => matchScore(r.norm, o) >= 90).map((r) => r.item));
+      for (const idx of this.poiByWordStart.get(norm.slice(0, 2)) ?? []) {
+        const p = this.pois[idx]!;
+        let score = 0;
+        for (const n of p.norms) score = Math.max(score, matchScore(n, norm));
+        if (!score) continue;
+        if (others.some((o) => p.address.includes(o)) || nearRoads.some((r) => distanceKm(r, p.item) < NEAR_ROAD_KM)) {
+          score += 8;
+        }
+        scored.push({ idx, score });
+      }
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const out: SearchResult[] = [];
+    let inArea = 0;
+    let outside = 0;
+    for (const { idx, score } of scored) {
+      const p = this.pois[idx]!.item;
+      const mine = area.has(p.borough);
+      if (mine ? inArea++ < MAX_RESULTS * 2 : outside++ < MAX_RESULTS) out.push(this.poiResult(p, score));
+    }
+    this.lastPoiOutsideRest = Math.max(0, outside - MAX_RESULTS);
+    return out;
+  }
+
+  /**
+   * Every place of the given types in the area ("coffee shops" → all of them).
+   * Outside the area only a sample is built; the rest are just counted.
+   */
+  private listOfType(
+    types: string[],
+    area: ReadonlySet<Borough>,
+  ): { inArea: SearchResult[]; outsideSample: SearchResult[]; outsideRest: number } {
+    const out = { inArea: [] as SearchResult[], outsideSample: [] as SearchResult[], outsideRest: 0 };
+    if (!types.length) return out;
+    const wanted = new Set(types);
+    for (const { item } of this.pois) {
+      if (!wanted.has(item.type)) continue;
+      if (area.has(item.borough)) out.inArea.push(this.poiResult(item, 60));
+      else if (out.outsideSample.length < MAX_RESULTS) out.outsideSample.push(this.poiResult(item, 60));
+      else out.outsideRest++;
+    }
+    return out;
+  }
+
+  private poiResult(p: PointOfInterest, score: number): SearchResult {
+    return {
+      key: `poi:${p.name}|${p.type}|${p.lat}|${p.lng}`,
+      label: p.name,
+      detail: [p.type, p.borough, p.address].filter(Boolean).join(" · "),
+      borough: p.borough,
+      lat: p.lat,
+      lng: p.lng,
+      kind: "poi",
+      precision: "place",
+      score,
+      placeType: p.type,
+      placeGroup: p.group,
+    };
   }
 
   private roadResult(r: Road, prefix: Prefix, score: number): SearchResult {

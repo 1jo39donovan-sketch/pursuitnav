@@ -37,7 +37,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pyvalhalla==3.9.1 osmium
+      - run: pip install pyvalhalla==3.9.1 -r places/requirements.txt
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: python -m pytest places -q

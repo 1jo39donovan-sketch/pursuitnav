@@ -34,3 +34,6 @@ mv data/valhalla data/valhalla-prev
 mv data/valhalla-next data/valhalla
 docker compose restart valhalla
 echo "$(date -Is) done (previous tiles kept in data/valhalla-prev)"
+
+# Places come from the same OSM extract, so they stay in step with the roads.
+"$(dirname "$0")/build-places.sh"

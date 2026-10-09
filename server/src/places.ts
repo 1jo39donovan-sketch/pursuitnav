@@ -4,7 +4,7 @@ import { LONDON_CUSTODIANS } from "./boroughs.js";
 
 export interface Address {
   uprn: string;
-  /** "Flat 3, 54 Caledonian Road". */
+  /** "Flat 3, 54 Caledonian Road", or with a business first: "Tesco, 380 Holloway Road". */
   label: string;
   postcode: string;
   borough: string;
@@ -17,6 +17,7 @@ export interface Address {
 /** The fields of an OS Places DPA record we use (output_srs=EPSG:4326). */
 interface DpaRecord {
   UPRN: string;
+  ORGANISATION_NAME?: string;
   SUB_BUILDING_NAME?: string;
   BUILDING_NAME?: string;
   BUILDING_NUMBER?: string;
@@ -55,6 +56,7 @@ export function titleCase(s: string): string {
 export function labelFor(r: DpaRecord): string {
   const street = r.DEPENDENT_THOROUGHFARE_NAME ?? r.THOROUGHFARE_NAME;
   const parts = [
+    r.ORGANISATION_NAME,
     r.SUB_BUILDING_NAME,
     r.BUILDING_NAME,
     street ? [r.BUILDING_NUMBER, street].filter(Boolean).join(" ") : r.BUILDING_NUMBER,

@@ -143,7 +143,7 @@ export default function SearchScreen() {
               setState(null);
             }
           }}
-          placeholder="54 Caledonian Road, N7 8LA or Bemerton Estate"
+          placeholder="Address, postcode, or a place like Costa"
           placeholderTextColor={colors.muted}
           autoCorrect={false}
           autoCapitalize="words"
@@ -180,6 +180,7 @@ export default function SearchScreen() {
               showOutside={showOutside}
               onToggleOutside={() => setShowOutside((v) => !v)}
               onPick={pick}
+              from={fix}
               emptyText={
                 data.status === "ready"
                   ? "No matches in your area. Check the spelling, or add it below if it's a block or estate."

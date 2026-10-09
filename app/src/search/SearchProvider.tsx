@@ -17,11 +17,17 @@ import { parsePostcodes, parseRoads } from "./data";
 import { SearchIndex, type Place, type SearchResults } from "./engine";
 import { starterEstatePlaces } from "./estates";
 import { loadText } from "./loadText";
+import { parsePlacesFile } from "./places";
+import { fetchNewerPlaces, loadCachedPlaces } from "./placesData";
 
 type DataState = { status: "loading" } | { status: "ready"; index: SearchIndex } | { status: "error"; message: string };
 
+/** Named places (shops, cafés, schools…) from the server's weekly file. */
+export type PlacesInfo = { status: "none" } | { status: "ready"; count: number; builtOn: string };
+
 interface SearchContextValue {
   data: DataState;
+  places: PlacesInfo;
   search: (query: string) => SearchResults;
   savedPlaces: SavedPlace[];
   addPlace: (place: Omit<SavedPlace, "id">) => void;
@@ -41,6 +47,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const { boroughs } = useSession();
   const [data, setData] = useState<DataState>({ status: "loading" });
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>(() => store.listPlaces());
+  const [places, setPlaces] = useState<PlacesInfo>({ status: "none" });
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +68,29 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Named places: the copy kept on the phone first, then any newer one.
+  useEffect(() => {
+    if (data.status !== "ready") return;
+    let cancelled = false;
+    const use = async (text: string | null) => {
+      if (!text || cancelled) return;
+      try {
+        const file = parsePlacesFile(text);
+        await data.index.setPointsOfInterest(file.places);
+        if (!cancelled) setPlaces({ status: "ready", count: file.places.length, builtOn: file.builtOn });
+      } catch {
+        // A bad file is ignored; search carries on with roads and addresses.
+      }
+    };
+    (async () => {
+      await use(await loadCachedPlaces());
+      await use(await fetchNewerPlaces());
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
+
   // Estates and saved places are matched alongside roads.
   useEffect(() => {
     if (data.status === "ready") {
@@ -71,9 +101,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const area = useMemo(() => new Set(boroughs), [boroughs]);
   const search = useCallback(
     (query: string) => (data.status === "ready" ? data.index.search(query, area) : EMPTY),
-    // savedPlaces: results change when a place is added, even though the index object doesn't.
+    // savedPlaces, places: results change when places are added or arrive, though the index object doesn't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, area, savedPlaces],
+    [data, area, savedPlaces, places],
   );
 
   const addPlace = useCallback((place: Omit<SavedPlace, "id">) => {
@@ -86,8 +116,8 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ data, search, savedPlaces, addPlace, deletePlace }),
-    [data, search, savedPlaces, addPlace, deletePlace],
+    () => ({ data, places, search, savedPlaces, addPlace, deletePlace }),
+    [data, places, search, savedPlaces, addPlace, deletePlace],
   );
   return <SearchContext.Provider value={value}>{children}</SearchContext.Provider>;
 }
