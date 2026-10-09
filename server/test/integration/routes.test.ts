@@ -153,6 +153,21 @@ describe("standard route", () => {
   });
 });
 
+describe("direction of travel", () => {
+  it("starts the route the way the car is heading instead of a U-turn", async () => {
+    // Heading east along Turn Street, past the junction, going back to Column 1 Road.
+    const at = { lat: points.turn_start!.lat, lng: points.turn_start!.lng + 0.0045 };
+    const headingEast = await app.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: { ...at, heading: 90 }, to: points.turn_end },
+    });
+    const shape = (headingEast.json() as Plan).standard.shape;
+    // The first step goes east (longitude increases), not back west.
+    expect(shape[1]![0]).toBeGreaterThan(shape[0]![0]);
+  });
+});
+
 describe("request checks", () => {
   it("refuses points outside the covered area", async () => {
     const res = await app.inject({

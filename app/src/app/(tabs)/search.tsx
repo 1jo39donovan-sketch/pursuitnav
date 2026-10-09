@@ -1,4 +1,5 @@
 import type { LngLat } from "@maplibre/maplibre-react-native";
+import { router } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -13,7 +14,8 @@ import { RoutePanel, type PlanState } from "../../components/RoutePanel";
 import { SearchResultsList } from "../../components/SearchResultsList";
 import { formatDistance } from "../../format";
 import { distanceM } from "../../geo";
-import { useLocation } from "../../location/LocationProvider";
+import { routeOrigin, useLocation } from "../../location/LocationProvider";
+import { useNavigation } from "../../navigation/NavigationProvider";
 import type { SearchResult } from "../../search/engine";
 import { mergeAddresses } from "../../search/merge";
 import { DEFAULT_MARKER_GROUPS, GROUP_COLOR, MARKER_GROUPS } from "../../search/placeGroups";
@@ -36,6 +38,7 @@ export default function SearchScreen() {
   const { fix } = useLocation();
   const { boroughs } = useSession();
   const { data, search, places } = useSearch();
+  const navigation = useNavigation();
   const [query, setQuery] = useState("");
   const [showOutside, setShowOutside] = useState(false);
   const [destination, setDestination] = useState<Destination | null>(null);
@@ -81,7 +84,7 @@ export default function SearchScreen() {
       setState({ status: "loading" });
       try {
         const to = { lat: dest.point[1], lng: dest.point[0] };
-        const plan = await fetchRoutes({ lat: fix.lat, lng: fix.lng }, to, controller.signal);
+        const plan = await fetchRoutes(routeOrigin(fix), to, controller.signal);
         if (!controller.signal.aborted) setState({ status: "ready", plan });
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -258,6 +261,15 @@ export default function SearchScreen() {
           title={destination.title}
           note={destination.note}
           onClose={clear}
+          onGo={(kind) => {
+            if (state.status !== "ready") return;
+            navigation.start(kind, state.plan, {
+              lat: destination.point[1],
+              lng: destination.point[0],
+              title: destination.title ?? "Destination",
+            });
+            router.push("/navigate");
+          }}
         />
       )}
     </View>

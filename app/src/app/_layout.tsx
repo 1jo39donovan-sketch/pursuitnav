@@ -16,6 +16,7 @@ import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { LocationProvider } from "../location/LocationProvider";
+import { NavigationProvider } from "../navigation/NavigationProvider";
 import { SearchProvider } from "../search/SearchProvider";
 import { SessionProvider } from "../session/SessionProvider";
 import { colors } from "../theme";
@@ -46,8 +47,13 @@ export default function RootLayout() {
       <SessionProvider>
         <SearchProvider>
           <LocationProvider>
-            <StatusBar style="light" />
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+            <NavigationProvider>
+              <StatusBar style="light" />
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="navigate" options={{ gestureEnabled: false, animation: "slide_from_bottom" }} />
+              </Stack>
+            </NavigationProvider>
           </LocationProvider>
         </SearchProvider>
       </SessionProvider>

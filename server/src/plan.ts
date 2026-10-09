@@ -34,10 +34,18 @@ export interface Plan {
 // enough; a few more cover routes that find a second contraflow lane.
 const MAX_REROUTES = 3;
 
-export async function planRoutes(router: Router, from: LngLat, to: LngLat, opts: PlanOptions): Promise<Plan> {
+export async function planRoutes(
+  router: Router,
+  from: LngLat,
+  to: LngLat,
+  opts: PlanOptions,
+  /** Direction of travel, so a moving car isn't sent on a U-turn first. */
+  heading?: number,
+): Promise<Plan> {
+  const start = { point: from, heading };
   const [standard, firstPolice] = await Promise.all([
-    router.route({ costing: STANDARD, from: { point: from }, to: { point: to } }),
-    router.route({ costing: POLICE, from: { point: from }, to: { point: to } }),
+    router.route({ costing: STANDARD, from: start, to: { point: to } }),
+    router.route({ costing: POLICE, from: start, to: { point: to } }),
   ]);
 
   const worthIt = (r: Route) => {
@@ -71,7 +79,7 @@ export async function planRoutes(router: Router, from: LngLat, to: LngLat, opts:
 
     // Never against the flow of a one-way street: block those sections and try again.
     for (const r of wrongWay) exclude.push(...r.excludePoints);
-    police = await router.route({ costing: POLICE, from: { point: from }, to: { point: to }, exclude });
+    police = await router.route({ costing: POLICE, from: start, to: { point: to }, exclude });
   }
   return { standard, police: null, noPoliceReason: "wrong-way-unavoidable" };
 }

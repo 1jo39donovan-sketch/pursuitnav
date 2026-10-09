@@ -51,7 +51,8 @@ const MESSAGES: Record<string, string> = {
 };
 
 export async function fetchRoutes(
-  from: { lat: number; lng: number },
+  /** heading: direction of travel when moving, so the route doesn't start with a U-turn. */
+  from: { lat: number; lng: number; heading?: number },
   to: { lat: number; lng: number },
   signal?: AbortSignal,
 ): Promise<RoutePlan> {

@@ -145,6 +145,15 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
 }
 
+// GPS course is noise when standing still or walking.
+const MOVING_MS = 2;
+
+/** The fix as a route origin, with its direction of travel when moving. */
+export function routeOrigin(fix: Fix): { lat: number; lng: number; heading?: number } {
+  const moving = fix.course != null && fix.speed != null && fix.speed >= MOVING_MS;
+  return moving ? { lat: fix.lat, lng: fix.lng, heading: Math.round(fix.course!) % 360 } : { lat: fix.lat, lng: fix.lng };
+}
+
 export function useLocation(): LocationState {
   const ctx = useContext(LocationContext);
   if (!ctx) throw new Error("useLocation must be used inside LocationProvider");

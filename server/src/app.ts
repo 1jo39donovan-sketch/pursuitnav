@@ -21,7 +21,8 @@ const point = {
 } as const;
 
 interface RoutesBody {
-  from: { lat: number; lng: number };
+  /** heading: direction of travel in degrees, when moving, so the route starts that way. */
+  from: { lat: number; lng: number; heading?: number };
   to: { lat: number; lng: number };
 }
 
@@ -52,7 +53,13 @@ export function buildApp(config: ServerConfig, router: Router, places?: PlacesCl
           type: "object",
           required: ["from", "to"],
           additionalProperties: false,
-          properties: { from: point, to: point },
+          properties: {
+            from: {
+              ...point,
+              properties: { ...point.properties, heading: { type: "number", minimum: 0, maximum: 360 } },
+            },
+            to: point,
+          },
         },
       },
     },
@@ -63,7 +70,7 @@ export function buildApp(config: ServerConfig, router: Router, places?: PlacesCl
       }
       const toLngLat = (p: { lat: number; lng: number }): LngLat => [p.lng, p.lat];
       try {
-        return await planRoutes(router, toLngLat(from), toLngLat(to), config);
+        return await planRoutes(router, toLngLat(from), toLngLat(to), config, from.heading);
       } catch (err) {
         if (err instanceof ValhallaError) {
           if (err.code === 442) {

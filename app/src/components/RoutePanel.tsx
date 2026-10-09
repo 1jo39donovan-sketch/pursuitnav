@@ -17,6 +17,8 @@ interface Props {
   /** A caution about the destination, e.g. that it's the road, not the door. */
   note?: string;
   onClose: () => void;
+  /** Start turn-by-turn on the chosen route. */
+  onGo: (kind: "standard" | "police") => void;
 }
 
 const NO_POLICE: Record<NoPoliceReason, string> = {
@@ -26,7 +28,7 @@ const NO_POLICE: Record<NoPoliceReason, string> = {
 };
 
 /** The two routes side by side, for the operator to choose between. */
-export function RoutePanel({ state, destination, title, note, onClose }: Props) {
+export function RoutePanel({ state, destination, title, note, onClose, onGo }: Props) {
   const { lat, lng } = destination;
   return (
     <View style={styles.panel}>
@@ -47,8 +49,8 @@ export function RoutePanel({ state, destination, title, note, onClose }: Props) 
       {state.status === "error" && <Text style={[styles.status, styles.error]}>{state.message}</Text>}
       {state.status === "ready" && (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.cards}>
-          <StandardCard route={state.plan.standard} />
-          <PoliceCard route={state.plan.police} reason={state.plan.noPoliceReason} />
+          <StandardCard route={state.plan.standard} onGo={() => onGo("standard")} />
+          <PoliceCard route={state.plan.police} reason={state.plan.noPoliceReason} onGo={() => onGo("police")} />
         </ScrollView>
       )}
 
@@ -63,7 +65,19 @@ export function RoutePanel({ state, destination, title, note, onClose }: Props) 
   );
 }
 
-function StandardCard({ route }: { route: Route }) {
+function GoButton({ onPress, color }: { onPress: () => void; color: string }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.go, { backgroundColor: color }, pressed && { opacity: 0.85 }]}
+    >
+      <Text style={styles.goText}>Go</Text>
+    </Pressable>
+  );
+}
+
+function StandardCard({ route, onGo }: { route: Route; onGo: () => void }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHead}>
@@ -73,11 +87,20 @@ function StandardCard({ route }: { route: Route }) {
       <Text style={styles.eta}>{formatDuration(route.durationS)}</Text>
       <Text style={styles.meta}>{formatDistance(route.distanceM)} · follows all restrictions</Text>
       <View style={[styles.swatch, { backgroundColor: colors.blue }]} />
+      <GoButton onPress={onGo} color={colors.blue} />
     </View>
   );
 }
 
-function PoliceCard({ route, reason }: { route: PoliceRoute | null; reason?: NoPoliceReason }) {
+function PoliceCard({
+  route,
+  reason,
+  onGo,
+}: {
+  route: PoliceRoute | null;
+  reason?: NoPoliceReason;
+  onGo: () => void;
+}) {
   if (!route) {
     return (
       <View style={[styles.card, styles.cardMuted]}>
@@ -103,6 +126,7 @@ function PoliceCard({ route, reason }: { route: PoliceRoute | null; reason?: NoP
         </Text>
       ))}
       <View style={[styles.swatch, styles.swatchDashed]} />
+      <GoButton onPress={onGo} color={colors.amber} />
     </View>
   );
 }
@@ -188,6 +212,8 @@ const styles = StyleSheet.create({
   restriction: { color: colors.fg, fontFamily: fonts.body, fontSize: 13, lineHeight: 18, marginTop: 4 },
   swatch: { height: 4, borderRadius: 2, marginTop: 10 },
   swatchDashed: { borderTopWidth: 4, borderStyle: "dashed", borderColor: colors.amber, height: 0 },
+  go: { borderRadius: 8, paddingVertical: 10, alignItems: "center", marginTop: 10 },
+  goText: { color: "#0c1220", fontFamily: fonts.displayBold, fontSize: 18, letterSpacing: 1.5, textTransform: "uppercase" },
   links: { flexDirection: "row", gap: 10 },
   link: {
     flex: 1,
