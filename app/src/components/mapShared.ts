@@ -57,3 +57,4 @@ export function boundsOf(points: LngLat[]): [number, number, number, number] {
 }
 
 export const FIT_PADDING = { top: 60, right: 40, bottom: 60, left: 40 };
+export const FIT_DELAY_MS = 150;

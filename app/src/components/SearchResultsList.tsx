@@ -13,6 +13,7 @@ interface Props {
 }
 
 const TAGS: Partial<Record<SearchResult["kind"], { text: string; color: string }>> = {
+  road: { text: "ROAD", color: colors.muted },
   postcode: { text: "POSTCODE", color: colors.blue },
   estate: { text: "ESTATE", color: colors.amber },
   saved: { text: "SAVED", color: colors.amber },

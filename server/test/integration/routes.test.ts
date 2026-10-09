@@ -19,6 +19,7 @@ const config: ServerConfig = {
   minSavingSeconds: 30,
   minSavingFraction: 0.05,
   restrictionCheckBudget: 150,
+  osPlacesKey: undefined,
 };
 const app = buildApp(config, client);
 

@@ -3,8 +3,8 @@
 // a demo link; not part of the phone app.
 //
 // Usage: node scripts/build-demo-page.mjs <export-dir> <out.html>
-import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 
 const [dir, out] = process.argv.slice(2);
 if (!dir || !out) {
@@ -51,6 +51,17 @@ if (fontsInlined !== usedFonts.length) {
   throw new Error(`Expected ${usedFonts.length} fonts in the bundle, inlined ${fontsInlined}`);
 }
 
+// Search data is too big to inline: publish it next to the page (as
+// roads.dat, postcodes.dat) and point the bundle at it, relative to the page.
+const outDir = dirname(out);
+const dataFiles = [];
+bundle = bundle.replace(/"\/assets\/assets\/data\/([a-z]+)\.[0-9a-f]+\.dat"/g, (whole, name) => {
+  const src = join(dir, whole.slice(2, -1));
+  copyFileSync(src, join(outDir, `${name}.dat`));
+  dataFiles.push(`${name}.dat`);
+  return `(window.__blueRouteBase+"${name}.dat")`;
+});
+
 // Keep "</script" inside the bundle from closing the inline script tag.
 const inlineJs = bundle.replace(/<\/script/gi, "<\\/script");
 
@@ -64,8 +75,9 @@ ${css.join("\n")}
 </style>
 <div id="root"></div>
 <script>
-// Expo Router reads the page path; start it on the first tab whatever URL
-// the page is served from.
+// Remember where the page lives (data files sit next to it), then start
+// Expo Router on the first tab whatever URL the page is served from.
+window.__blueRouteBase = new URL(".", location.href).href;
 try { history.replaceState(null, "", "/"); } catch (e) {}
 </script>
 <script>
@@ -74,3 +86,4 @@ ${inlineJs}
 `;
 writeFileSync(out, page);
 console.log(`Wrote ${out} (${(page.length / 1024 / 1024).toFixed(1)} MB)`);
+if (dataFiles.length) console.log(`Publish alongside it: ${dataFiles.map((f) => basename(f)).join(", ")}`);

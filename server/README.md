@@ -11,7 +11,15 @@ A small TypeScript API (Fastify) in front of a [Valhalla](https://github.com/val
 
 Each route has `durationS`, `distanceM`, `shape` (`[lng, lat]` points) and turn-by-turn `maneuvers`. The police route also has `savingS` and `restrictions`, one entry per restricted manoeuvre or bus-only section it relies on, e.g. `{"kind": "turn", "description": "No right turn: Upper Street into Islington Green", "location": {...}}`. If `restrictionsComplete` is false, the list is a lower bound.
 
+`POST /v1/addresses` with `{"query": "Flat 3, 54 Caledonian Road"}` returns `{"addresses": [...]}`: door-level addresses from the OS Places API, each with `uprn`, `label`, `postcode`, `borough` and `lat`/`lng`. Only London addresses are returned; the app sorts them into the officer's boroughs and the rest. Without `OS_PLACES_KEY` this returns 503 `addresses-not-configured` and the app uses its offline road search alone.
+
 `GET /health` returns `{"ok": true}`.
+
+### OS Places
+
+- Get a key from the [OS Data Hub](https://osdatahub.os.uk/) and set `OS_PLACES_KEY` in `.env`. Check the current free allowance and licence terms there before relying on it.
+- Boroughs are matched by local custodian code (`src/boroughs.ts`). Confirm the codes against the Data Hub's current list before v1.
+- Queries go to OS and the results come back; neither is stored or logged.
 
 ### How the police route works
 
@@ -63,6 +71,6 @@ crontab -e
 15 3 * * 0  /opt/blue-route/server/scripts/rebuild-tiles.sh >> /var/log/blue-route-tiles.log 2>&1
 ```
 
-Settings (environment variables on the `api` service): `VALHALLA_URL`, `PORT`, `REGION_BOUNDS` (`west,south,east,north`, London by default), `MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`, `RESTRICTION_CHECK_BUDGET`.
+Settings (environment variables on the `api` service): `VALHALLA_URL`, `OS_PLACES_KEY`, `PORT`, `REGION_BOUNDS` (`west,south,east,north`, London by default), `MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`, `RESTRICTION_CHECK_BUDGET`.
 
 Map data © OpenStreetMap contributors, under the Open Database License.

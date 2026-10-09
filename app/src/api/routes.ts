@@ -1,7 +1,7 @@
 // Client for the server's POST /v1/routes. Types mirror server/src/plan.ts.
 import type { LngLat } from "@maplibre/maplibre-react-native";
 
-import { API_URL } from "../config";
+import { API_URL, DEMO_MODE } from "../config";
 
 export interface Maneuver {
   type: number;
@@ -55,7 +55,13 @@ export async function fetchRoutes(
   to: { lat: number; lng: number },
   signal?: AbortSignal,
 ): Promise<RoutePlan> {
-  if (!API_URL) throw new RouteError("Routing server not set up in this build.");
+  if (!API_URL) {
+    throw new RouteError(
+      DEMO_MODE
+        ? "This demo has no routing server, so it can't work out routes. Search works fully."
+        : "Routing server not set up in this build.",
+    );
+  }
   let res: Response;
   try {
     res = await fetch(`${API_URL}/v1/routes`, {

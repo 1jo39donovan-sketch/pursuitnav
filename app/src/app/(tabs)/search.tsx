@@ -11,7 +11,9 @@ import { RoutePanel, type PlanState } from "../../components/RoutePanel";
 import { SearchResultsList } from "../../components/SearchResultsList";
 import { useLocation } from "../../location/LocationProvider";
 import type { SearchResult } from "../../search/engine";
+import { mergeAddresses } from "../../search/merge";
 import { useSearch } from "../../search/SearchProvider";
+import { useAddressLookup } from "../../search/useAddressLookup";
 import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
 
@@ -35,8 +37,23 @@ export default function SearchScreen() {
 
   // Searching 40,000 roads on every keystroke can lag a little; let typing win.
   const deferredQuery = useDeferredValue(query);
-  const results = useMemo(() => search(deferredQuery), [search, deferredQuery]);
   const showResults = query.trim().length >= 2 && !destination;
+  const lookup = useAddressLookup(query, showResults);
+  const area = useMemo(() => new Set(boroughs), [boroughs]);
+  const results = useMemo(() => {
+    const offline = search(deferredQuery);
+    return lookup.state.status === "ok" ? mergeAddresses(offline, lookup.state.addresses, area) : offline;
+  }, [search, deferredQuery, lookup, area]);
+  const lookupNote =
+    !showResults || lookup.state.status === "idle"
+      ? null
+      : lookup.state.status === "searching"
+        ? "Checking full addresses…"
+        : lookup.state.status === "unavailable"
+          ? "Full addresses unavailable (no signal?). Showing roads from the phone."
+          : lookup.state.status === "not-configured"
+            ? "Road-level search only: full address lookup isn't set up."
+            : null;
 
   const routeTo = useCallback(
     async (dest: Destination) => {
@@ -141,6 +158,7 @@ export default function SearchScreen() {
         )}
       </View>
       {dataNote && <Text style={styles.dataNote}>{dataNote}</Text>}
+      {lookupNote && <Text style={styles.dataNote}>{lookupNote}</Text>}
       <GpsStatus />
 
       <View style={styles.body}>

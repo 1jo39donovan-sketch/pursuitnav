@@ -11,7 +11,7 @@ import { DEMO_MODE, MAP_STYLE_URL, region } from "../config";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
 import { colors, fonts } from "../theme";
-import { boundsOf, FIT_PADDING, pointGeoJSON, routesGeoJSON, type LiveMapProps } from "./mapShared";
+import { boundsOf, FIT_DELAY_MS, FIT_PADDING, pointGeoJSON, routesGeoJSON, type LiveMapProps } from "./mapShared";
 
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -161,7 +161,12 @@ export function LiveMap({
     const m = map.current;
     if (!m || !loaded || !fitTo?.length) return;
     const [w, s, e, n] = boundsOf(fitTo);
-    m.fitBounds([[w, s], [e, n]], { padding: FIT_PADDING, duration: 600 });
+    // Wait for the layout to settle (the route panel opening shrinks the map).
+    const timer = setTimeout(() => {
+      m.resize();
+      m.fitBounds([[w, s], [e, n]], { padding: FIT_PADDING, duration: 600 });
+    }, FIT_DELAY_MS);
+    return () => clearTimeout(timer);
   }, [fitTo, loaded]);
 
   useEffect(() => {

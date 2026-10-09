@@ -25,6 +25,8 @@ services:
       - valhalla
     environment:
       VALHALLA_URL: http://valhalla:8002
+      # Door-level address search; leave empty to run with road-level search only.
+      OS_PLACES_KEY: ${OS_PLACES_KEY:-}
 
   caddy:
     image: caddy:2.10-alpine

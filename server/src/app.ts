@@ -3,6 +3,7 @@ import Fastify, { LogController, type FastifyInstance } from "fastify";
 
 import type { ServerConfig } from "./config.js";
 import type { LngLat } from "./geo.js";
+import { PlacesError, type PlacesClient } from "./places.js";
 import { planRoutes } from "./plan.js";
 import { ValhallaError, type Router } from "./valhalla.js";
 
@@ -21,7 +22,7 @@ interface RoutesBody {
   to: { lat: number; lng: number };
 }
 
-export function buildApp(config: ServerConfig, router: Router): FastifyInstance {
+export function buildApp(config: ServerConfig, router: Router, places?: PlacesClient): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
   const app = Fastify({
@@ -70,6 +71,36 @@ export function buildApp(config: ServerConfig, router: Router): FastifyInstance 
           }
           req.log.error({ status: err.httpStatus, code: err.code }, "routing engine error");
           return reply.code(503).send({ error: "routing-unavailable", message: "Routing is unavailable. Try again." });
+        }
+        throw err;
+      }
+    },
+  );
+
+  app.post<{ Body: { query: string } }>(
+    "/v1/addresses",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["query"],
+          additionalProperties: false,
+          properties: { query: { type: "string", minLength: 2, maxLength: 200 } },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (!places) {
+        return reply
+          .code(503)
+          .send({ error: "addresses-not-configured", message: "Full address search isn't set up on this server." });
+      }
+      try {
+        return { addresses: await places.search(req.body.query) };
+      } catch (err) {
+        if (err instanceof PlacesError) {
+          req.log.error({ status: err.status }, "OS Places error");
+          return reply.code(err.status).send({ error: "addresses-unavailable", message: "Address search is unavailable." });
         }
         throw err;
       }

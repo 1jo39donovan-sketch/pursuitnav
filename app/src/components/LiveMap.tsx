@@ -12,7 +12,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MAP_STYLE_URL, region } from "../config";
 import { useLocation } from "../location/LocationProvider";
 import { colors, fonts } from "../theme";
-import { boundsOf, FIT_PADDING, pointGeoJSON, routesGeoJSON, type LiveMapProps } from "./mapShared";
+import { boundsOf, FIT_DELAY_MS, FIT_PADDING, pointGeoJSON, routesGeoJSON, type LiveMapProps } from "./mapShared";
 
 /**
  * Dark map that follows the phone's GPS position. Panning the map stops
@@ -38,7 +38,13 @@ export function LiveMap({
     if (fitTo?.length) setFollowing(false);
   }
   useEffect(() => {
-    if (fitTo?.length) camera.current?.fitBounds(boundsOf(fitTo), { padding: FIT_PADDING, duration: 600 });
+    if (!fitTo?.length) return;
+    // Wait for the layout to settle (the route panel opening shrinks the map).
+    const timer = setTimeout(
+      () => camera.current?.fitBounds(boundsOf(fitTo), { padding: FIT_PADDING, duration: 600 }),
+      FIT_DELAY_MS,
+    );
+    return () => clearTimeout(timer);
   }, [fitTo]);
   const [mapFailed, setMapFailed] = useState(false);
 

@@ -12,6 +12,8 @@ export interface ServerConfig {
   minSavingFraction: number;
   /** Most Valhalla calls one request may spend finding restrictions. */
   restrictionCheckBudget: number;
+  /** OS Places API key; door-level address search is off without it. */
+  osPlacesKey: string | undefined;
 }
 
 // Greater London with a margin, matching the app's region config.
@@ -40,5 +42,6 @@ export function loadConfig(): ServerConfig {
     minSavingSeconds: num("MIN_SAVING_SECONDS", 30),
     minSavingFraction: num("MIN_SAVING_FRACTION", 0.05),
     restrictionCheckBudget: num("RESTRICTION_CHECK_BUDGET", 150),
+    osPlacesKey: process.env.OS_PLACES_KEY || undefined,
   };
 }
