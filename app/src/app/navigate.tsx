@@ -1,4 +1,4 @@
-import { useKeepAwake } from "expo-keep-awake";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
@@ -26,7 +26,14 @@ const RETRY_MS = 10000;
 
 /** Turn-by-turn guidance, readable at a glance by the operator. */
 export default function NavigateScreen() {
-  useKeepAwake();
+  // Screen stays on while navigating. Ending quickly can release the lock
+  // before it has taken hold; that's harmless, so it isn't an error.
+  useEffect(() => {
+    activateKeepAwakeAsync("navigate").catch(() => {});
+    return () => {
+      deactivateKeepAwake("navigate").catch(() => {});
+    };
+  }, []);
   const { active, replan, stop } = useNavigation();
   const { fix } = useLocation();
   const insets = useSafeAreaInsets();

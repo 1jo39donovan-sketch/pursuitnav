@@ -1,5 +1,5 @@
 import type { LngLat } from "@maplibre/maplibre-react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -12,7 +12,9 @@ import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
 import { SearchResultsList } from "../../components/SearchResultsList";
+import { boroughAt } from "../../area/area";
 import { DEMO_MODE } from "../../config";
+import { useLog } from "../../log/LogProvider";
 import { formatDistance } from "../../format";
 import { distanceM } from "../../geo";
 import { routeOrigin, useLocation } from "../../location/LocationProvider";
@@ -31,6 +33,8 @@ interface Destination {
   point: LngLat;
   title?: string;
   note?: string;
+  /** The log entry for this pick, to add the route chosen. */
+  logId?: number;
 }
 
 // Type what the control room gave, pick the match, get both routes from
@@ -40,6 +44,7 @@ export default function SearchScreen() {
   const { boroughs } = useSession();
   const { data, search, places } = useSearch();
   const navigation = useNavigation();
+  const log = useLog();
   const [query, setQuery] = useState("");
   const [showOutside, setShowOutside] = useState(false);
   const [destination, setDestination] = useState<Destination | null>(null);
@@ -105,6 +110,32 @@ export default function SearchScreen() {
 
   useEffect(() => () => request.current?.abort(), []);
 
+  /** Logs what was typed and what was chosen, then works out routes there. */
+  const choose = (dest: Destination, typed: string, borough: string | null) => {
+    const logId = log.record({
+      query: typed,
+      chosen: dest.title ?? "Destination",
+      borough,
+      lat: dest.point[1],
+      lng: dest.point[0],
+    });
+    routeTo({ ...dest, logId });
+  };
+
+  // "Route there again" from the Log tab arrives as params.
+  const params = useLocalSearchParams<{ lat?: string; lng?: string; title?: string; from?: string }>();
+  const handledParams = useRef<string | null>(null);
+  useEffect(() => {
+    if (!params.from || !params.lat || !params.lng || handledParams.current === params.from) return;
+    handledParams.current = params.from;
+    const title = params.title ?? "Destination";
+    setQuery(title);
+    choose({ point: [Number(params.lng), Number(params.lat)], title }, "", boroughAt(Number(params.lat), Number(params.lng)));
+    // choose() is recreated each render; only new params should trigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.from, params.lat, params.lng, params.title]);
+
+
   const pick = (r: SearchResult) => {
     Keyboard.dismiss();
     setQuery(r.label);
@@ -115,7 +146,7 @@ export default function SearchScreen() {
         : r.precision === "postcode" && r.kind !== "postcode"
           ? "Routes to the postcode, which may cover several doors."
           : undefined;
-    routeTo({ point: [r.lng, r.lat], title: r.label, note });
+    choose({ point: [r.lng, r.lat], title: r.label, note }, query, r.borough);
   };
 
   const clear = () => {
@@ -210,7 +241,13 @@ export default function SearchScreen() {
         <LiveMap
           routes={routes}
           destination={destination?.point}
-          onLongPress={(point) => routeTo({ point, title: "Point on the map" })}
+          onLongPress={(point) =>
+            choose(
+              { point, title: `Point on the map (${point[1].toFixed(5)}, ${point[0].toFixed(5)})` },
+              "",
+              boroughAt(point[1], point[0]),
+            )
+          }
           fitTo={fitTo}
           markers={showResults ? null : markers}
           onMarkerPress={(marker, point) => setTapped({ marker, point })}
@@ -231,7 +268,7 @@ export default function SearchScreen() {
               const { marker, point } = tapped;
               setTapped(null);
               setQuery(marker.name);
-              routeTo({ point, title: marker.name });
+              choose({ point, title: marker.name }, "", marker.borough);
             }}
           />
         )}
@@ -270,8 +307,10 @@ export default function SearchScreen() {
           title={destination.title}
           note={destination.note}
           onClose={clear}
+          onOpenExternal={(app) => destination.logId && log.setRoute(destination.logId, app)}
           onGo={(kind) => {
             if (state.status !== "ready") return;
+            if (destination.logId) log.setRoute(destination.logId, kind);
             navigation.start(kind, state.plan, {
               lat: destination.point[1],
               lng: destination.point[0],

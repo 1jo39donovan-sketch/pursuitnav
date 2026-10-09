@@ -19,6 +19,8 @@ interface Props {
   onClose: () => void;
   /** Start turn-by-turn on the chosen route. */
   onGo: (kind: "standard" | "police") => void;
+  /** Handing over to another app (logged as the route picked). */
+  onOpenExternal?: (app: "google-maps" | "waze") => void;
 }
 
 const NO_POLICE: Record<NoPoliceReason, string> = {
@@ -28,7 +30,7 @@ const NO_POLICE: Record<NoPoliceReason, string> = {
 };
 
 /** The two routes side by side, for the operator to choose between. */
-export function RoutePanel({ state, destination, title, note, onClose, onGo }: Props) {
+export function RoutePanel({ state, destination, title, note, onClose, onGo, onOpenExternal }: Props) {
   const { lat, lng } = destination;
   return (
     <View style={styles.panel}>
@@ -58,8 +60,13 @@ export function RoutePanel({ state, destination, title, note, onClose, onGo }: P
         <LinkButton
           label="Open in Google Maps"
           url={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`}
+          onPress={() => onOpenExternal?.("google-maps")}
         />
-        <LinkButton label="Open in Waze" url={`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`} />
+        <LinkButton
+          label="Open in Waze"
+          url={`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`}
+          onPress={() => onOpenExternal?.("waze")}
+        />
       </View>
     </View>
   );
@@ -131,11 +138,14 @@ function PoliceCard({
   );
 }
 
-function LinkButton({ label, url }: { label: string; url: string }) {
+function LinkButton({ label, url, onPress }: { label: string; url: string; onPress?: () => void }) {
   return (
     <Pressable
       accessibilityRole="link"
-      onPress={() => Linking.openURL(url)}
+      onPress={() => {
+        onPress?.();
+        Linking.openURL(url);
+      }}
       style={({ pressed }) => [styles.link, pressed && { opacity: 0.7 }]}
     >
       <Text style={styles.linkText}>{label}</Text>

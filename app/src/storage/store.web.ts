@@ -1,6 +1,6 @@
 // Browser preview: the same store in localStorage. SQLite in the browser
 // needs cross-origin isolation headers that preview pages can't count on.
-import type { SavedPlace, Store } from "./types";
+import type { LogEntry, SavedPlace, Store } from "./types";
 
 const PREFIX = "blueroute:";
 
@@ -21,7 +21,11 @@ function write(key: string, value: unknown) {
   }
 }
 
-const memory = { settings: read<Record<string, string>>("settings", {}), places: read<SavedPlace[]>("places", []) };
+const memory = {
+  settings: read<Record<string, string>>("settings", {}),
+  places: read<SavedPlace[]>("places", []),
+  log: read<LogEntry[]>("log", []),
+};
 
 export const store: Store = {
   getSetting: (key) => memory.settings[key] ?? null,
@@ -39,5 +43,20 @@ export const store: Store = {
   deletePlace(id) {
     memory.places = memory.places.filter((p) => p.id !== id);
     write("places", memory.places);
+  },
+  addLogEntry(e) {
+    const entry: LogEntry = { ...e, id: Math.max(0, ...memory.log.map((x) => x.id)) + 1, route: null };
+    memory.log.push(entry);
+    write("log", memory.log);
+    return entry;
+  },
+  setLogRoute(id, route) {
+    memory.log = memory.log.map((e) => (e.id === id ? { ...e, route } : e));
+    write("log", memory.log);
+  },
+  listLog: () => [...memory.log].sort((a, b) => b.at.localeCompare(a.at) || b.id - a.id),
+  clearLog() {
+    memory.log = [];
+    write("log", memory.log);
   },
 };

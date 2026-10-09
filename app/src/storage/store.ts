@@ -1,7 +1,7 @@
 // On-phone storage in SQLite. Nothing here leaves the phone.
 import { openDatabaseSync, type SQLiteDatabase } from "expo-sqlite";
 
-import type { SavedPlace, Store } from "./types";
+import type { LogEntry, LoggedRoute, SavedPlace, Store } from "./types";
 
 // Each entry upgrades the database by one version. Append; never edit.
 const MIGRATIONS = [
@@ -15,6 +15,17 @@ const MIGRATIONS = [
      lng REAL NOT NULL,
      created_at TEXT NOT NULL DEFAULT (datetime('now'))
    );`,
+  `CREATE TABLE log (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     at TEXT NOT NULL,
+     query TEXT NOT NULL,
+     chosen TEXT NOT NULL,
+     borough TEXT,
+     lat REAL NOT NULL,
+     lng REAL NOT NULL,
+     route TEXT
+   );
+   CREATE INDEX log_at ON log (at);`,
 ];
 
 function migrate(db: SQLiteDatabase) {
@@ -64,5 +75,28 @@ export const store: Store = {
   },
   deletePlace(id) {
     open().runSync("DELETE FROM places WHERE id = ?", id);
+  },
+  addLogEntry(e) {
+    const { lastInsertRowId } = open().runSync(
+      "INSERT INTO log (at, query, chosen, borough, lat, lng) VALUES (?, ?, ?, ?, ?, ?)",
+      e.at,
+      e.query,
+      e.chosen,
+      e.borough,
+      e.lat,
+      e.lng,
+    );
+    return { ...e, id: lastInsertRowId, route: null };
+  },
+  setLogRoute(id, route: LoggedRoute) {
+    open().runSync("UPDATE log SET route = ? WHERE id = ?", route, id);
+  },
+  listLog() {
+    return open().getAllSync<LogEntry>(
+      "SELECT id, at, query, chosen, borough, lat, lng, route FROM log ORDER BY at DESC, id DESC",
+    );
+  },
+  clearLog() {
+    open().runSync("DELETE FROM log");
   },
 };
