@@ -1,5 +1,6 @@
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { DEMO_MODE } from "../config";
 import { useLocation } from "../location/LocationProvider";
 import { colors, fonts } from "../theme";
 
@@ -27,6 +28,9 @@ export function GpsStatus() {
         <Action label="Settings" onPress={() => Linking.openSettings()} />
       </Banner>
     );
+  }
+  if (DEMO_MODE) {
+    return <Banner tone="warn" text="DEMO · scripted drive, not real GPS" />;
   }
   if (status === "checking" || !fix) {
     return <Banner tone="muted" text="Waiting for GPS…" />;

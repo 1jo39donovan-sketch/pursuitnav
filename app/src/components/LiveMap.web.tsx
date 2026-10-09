@@ -1,12 +1,14 @@
 // Browser version of LiveMap, so the app can be previewed without a phone
 // build. Same props and behaviour as LiveMap.tsx, using maplibre-gl.
 import "maplibre-gl/dist/maplibre-gl.css";
+import "./mapControls.web.css";
 
 import maplibregl from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { MAP_STYLE_URL, region } from "../config";
+import { DEMO_MODE, MAP_STYLE_URL, region } from "../config";
+import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
 import { colors, fonts } from "../theme";
 
@@ -25,11 +27,13 @@ export function LiveMap({ headingUp = false, followZoom = 15, compact = false }:
   const map = useRef<maplibregl.Map | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
+  // The demo map only has borough outlines, which say nothing at street zoom.
+  const zoom = DEMO_MODE ? 12 : followZoom;
 
   useEffect(() => {
     const m = new maplibregl.Map({
       container: container.current as unknown as HTMLElement,
-      style: MAP_STYLE_URL,
+      style: DEMO_MODE ? demoMapStyle : MAP_STYLE_URL,
       center: region.defaultCentre,
       zoom: region.defaultZoom,
       maxBounds: [
@@ -59,6 +63,24 @@ export function LiveMap({ headingUp = false, followZoom = 15, compact = false }:
           "circle-stroke-width": 2,
         },
       });
+      if (DEMO_MODE) {
+        // The offline demo style has no font glyphs, so names are HTML markers.
+        for (const { name, lngLat } of demoBoroughLabels) {
+          const el = document.createElement("div");
+          el.textContent = name;
+          Object.assign(el.style, {
+            color: colors.muted,
+            fontFamily: fonts.mono,
+            fontSize: "10px",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            textAlign: "center",
+            maxWidth: "90px",
+            pointerEvents: "none",
+          });
+          new maplibregl.Marker({ element: el }).setLngLat(lngLat).addTo(m);
+        }
+      }
       setLoaded(true);
       setMapFailed(false);
     });
@@ -85,16 +107,17 @@ export function LiveMap({ headingUp = false, followZoom = 15, compact = false }:
     if (following) {
       m.easeTo({
         center: [fix.lng, fix.lat],
-        zoom: followZoom,
+        zoom,
         bearing: headingUp && fix.course != null ? fix.course : 0,
         duration: 800,
       });
     }
-  }, [fix, loaded, following, followZoom, headingUp]);
+  }, [fix, loaded, following, zoom, headingUp]);
 
   return (
     <View style={styles.container}>
-      <View ref={container} style={StyleSheet.absoluteFill} />
+      {/* flex rather than absoluteFill: maplibre-gl's CSS sets position: relative on this element. */}
+      <View ref={container} style={styles.map} />
       {mapFailed && (
         <View style={styles.failed} pointerEvents="none">
           <Text style={styles.failedTitle}>Map couldn’t load</Text>
@@ -116,6 +139,7 @@ export function LiveMap({ headingUp = false, followZoom = 15, compact = false }:
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, overflow: "hidden" },
+  map: { flex: 1 },
   recentre: {
     position: "absolute",
     right: 12,

@@ -11,6 +11,9 @@ import {
 } from "react";
 import { AppState } from "react-native";
 
+import { DEMO_MODE } from "../config";
+import { demoFixAt } from "../demo/demoDrive";
+
 export type LocationStatus =
   | "checking"
   | "granted"
@@ -62,7 +65,7 @@ function toFix(loc: Location.LocationObject): Fix {
  * phone actually is.
  */
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<LocationStatus>("checking");
+  const [status, setStatus] = useState<LocationStatus>(DEMO_MODE ? "granted" : "checking");
   const [fix, setFix] = useState<Fix | null>(null);
   const subscription = useRef<Location.LocationSubscription | null>(null);
 
@@ -108,6 +111,15 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    if (!DEMO_MODE) return;
+    const started = Date.now();
+    const tick = () => setFix(demoFixAt((Date.now() - started) / 1000));
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (DEMO_MODE) return;
     // refresh() only sets state after awaiting the permission check, so this
     // subscribes to an external system rather than updating state in the effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect

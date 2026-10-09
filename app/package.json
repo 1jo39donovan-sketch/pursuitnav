@@ -40,7 +40,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:demo": "EXPO_PUBLIC_DEMO=1 expo export --platform web --output-dir dist-demo && node scripts/build-demo-page.mjs dist-demo dist-demo/blue-route-demo.html"
   },
   "private": true
 }

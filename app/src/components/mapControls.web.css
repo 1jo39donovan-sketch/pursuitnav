@@ -1,0 +1,11 @@
+/* Dark map controls to match the app (maplibre-gl ships them white). */
+.maplibregl-ctrl-group,
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background: #141c2e !important;
+  color: #8c98b0;
+}
+.maplibregl-ctrl-attrib a { color: #8c98b0; }
+.maplibregl-ctrl-group button + button { border-top-color: #26324a; }
+.maplibregl-ctrl button .maplibregl-ctrl-icon,
+.maplibregl-ctrl-attrib-button { filter: invert(0.85); }
