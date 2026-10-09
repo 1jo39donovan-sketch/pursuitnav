@@ -60,6 +60,14 @@ To run against a local Valhalla: `VALHALLA_URL=http://localhost:8002 npm run dev
 
 ## Deploying (one small VPS)
 
+Quickest: on a fresh Ubuntu 22.04/24.04 VPS with the domain already pointing at it, as root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/1jo39donovan-sketch/pursuitnav/main/server/scripts/install.sh | bash
+```
+
+`scripts/install.sh` does everything below (Docker, firewall, swap for the build, code, `.env`, start, places, weekly cron, HTTPS check) and is safe to re-run to update. By hand:
+
 On a VPS with Docker and at least 4 GB RAM (the tile build needs it; serving needs much less):
 
 ```bash

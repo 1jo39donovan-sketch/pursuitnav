@@ -4,17 +4,13 @@ Everything here has been tested on a synthetic street network and in a browser. 
 
 ## 1. Server (once)
 
-On a VPS with Docker, at least 4 GB RAM and a domain name pointing at it (see `server/README.md`):
+On a fresh Ubuntu VPS (at least 4 GB RAM) with a domain name pointing at it, as root:
 
 ```bash
-git clone <repo> /opt/blue-route && cd /opt/blue-route/server
-cp .env.example .env          # set DOMAIN, and OS_PLACES_KEY if you have one
-docker compose up -d          # builds London routing tiles (~15–30 min)
-scripts/build-places.sh       # shops, cafés, schools, parks… (after the tiles)
-curl https://$DOMAIN/health   # {"ok":true}
+curl -fsSL https://raw.githubusercontent.com/1jo39donovan-sketch/pursuitnav/main/server/scripts/install.sh | bash
 ```
 
-Add the weekly rebuild to cron (in `server/README.md`).
+It asks for the domain and an optional OS Places key, then installs Docker, sets up the firewall, builds London's routing map (15–30 min), extracts places, schedules the weekly refresh and checks HTTPS. Details and manual steps: `server/README.md`.
 
 ## 2. App on an Android phone
 
