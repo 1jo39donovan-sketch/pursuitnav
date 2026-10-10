@@ -27,6 +27,8 @@ const NO_POLICE: Record<NoPoliceReason, string> = {
   "not-faster": "No meaningfully faster route using bus lanes or restricted turns.",
   "no-restrictions-found": "A faster route exists but its restrictions couldn't be identified, so it isn't offered.",
   "wrong-way-unavoidable": "The only faster route goes against a one-way street, so it isn't offered.",
+  "not-declared":
+    "A faster route using bus lanes or restricted turns exists. Police routes are only shown to police drivers: turn them on in Session.",
 };
 
 /** The two routes side by side, for the operator to choose between. */

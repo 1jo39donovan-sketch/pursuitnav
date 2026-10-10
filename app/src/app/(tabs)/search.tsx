@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { fetchRoutes, RouteError } from "../../api/routes";
+import { fetchRoutes, RouteError, withoutPolice } from "../../api/routes";
 import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
@@ -41,7 +41,7 @@ interface Destination {
 // where the phone is now. A long press on the map also sets a destination.
 export default function SearchScreen() {
   const { fix } = useLocation();
-  const { boroughs } = useSession();
+  const { boroughs, policeRoutes } = useSession();
   const { data, search, places } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
@@ -177,7 +177,12 @@ export default function SearchScreen() {
     };
   }, [data, places, area, markerGroups]);
 
-  const plan = state?.status === "ready" ? state.plan : null;
+  // Police routes only for someone who has said they're a police driver.
+  const shown = useMemo<PlanState | null>(
+    () => (state?.status === "ready" && !policeRoutes ? { status: "ready", plan: withoutPolice(state.plan) } : state),
+    [state, policeRoutes],
+  );
+  const plan = shown?.status === "ready" ? shown.plan : null;
   const routes = useMemo<MapRoute[]>(() => {
     if (!plan) return [];
     const out: MapRoute[] = [{ id: "standard", shape: plan.standard.shape, color: colors.blue }];
@@ -300,18 +305,18 @@ export default function SearchScreen() {
         )}
       </View>
 
-      {destination && state && (
+      {destination && shown && (
         <RoutePanel
-          state={state}
+          state={shown}
           destination={{ lat: destination.point[1], lng: destination.point[0] }}
           title={destination.title}
           note={destination.note}
           onClose={clear}
           onOpenExternal={(app) => destination.logId && log.setRoute(destination.logId, app)}
           onGo={(kind) => {
-            if (state.status !== "ready") return;
+            if (shown.status !== "ready") return;
             if (destination.logId) log.setRoute(destination.logId, kind);
-            navigation.start(kind, state.plan, {
+            navigation.start(kind, shown.plan, {
               lat: destination.point[1],
               lng: destination.point[0],
               title: destination.title ?? "Destination",

@@ -11,6 +11,9 @@ interface Session {
   /** Simulated drive in London instead of GPS (store reviewers, trying it out). */
   demoDrive: boolean;
   setDemoDrive: (on: boolean) => void;
+  /** The user has confirmed they drive under the emergency-vehicle exemptions; until then, standard routes only. */
+  policeRoutes: boolean;
+  setPoliceRoutes: (on: boolean) => void;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -34,6 +37,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     store.setSetting("demoDrive", on ? "1" : "0");
   }, []);
 
+  const [policeRoutes, setPoliceRoutesState] = useState(() => store.getSetting("policeRoutes") === "1");
+  const setPoliceRoutes = useCallback((on: boolean) => {
+    setPoliceRoutesState(on);
+    store.setSetting("policeRoutes", on ? "1" : "0");
+  }, []);
+
   const setCallsign = useCallback((value: string) => {
     setCallsignState(value);
     store.setSetting("callsign", value);
@@ -48,8 +57,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive }),
-    [callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive],
+    () => ({ callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive, policeRoutes, setPoliceRoutes }),
+    [callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive, policeRoutes, setPoliceRoutes],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

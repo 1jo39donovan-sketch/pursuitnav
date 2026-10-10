@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { DEMO_MODE } from "../../config";
@@ -9,7 +10,9 @@ import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
 
 export default function SessionScreen() {
-  const { callsign, setCallsign, boroughs, toggleBorough, demoDrive, setDemoDrive } = useSession();
+  const { callsign, setCallsign, boroughs, toggleBorough, demoDrive, setDemoDrive, policeRoutes, setPoliceRoutes } =
+    useSession();
+  const [confirmingPolice, setConfirmingPolice] = useState(false);
   const { savedPlaces, deletePlace, places } = useSearch();
 
   return (
@@ -56,6 +59,60 @@ export default function SessionScreen() {
             );
           })}
         </View>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Police routes · {policeRoutes ? "on" : "off"}</Text>
+        {policeRoutes ? (
+          <View style={styles.toggleRow}>
+            <Text style={[styles.placeMeta, styles.placeText]}>
+              Shown beside the standard route when meaningfully faster, with every bus lane, bus gate and turn
+              restriction it uses listed.
+            </Text>
+            <Pressable accessibilityRole="button" onPress={() => setPoliceRoutes(false)} hitSlop={8}>
+              <Text style={styles.remove}>Turn off</Text>
+            </Pressable>
+          </View>
+        ) : confirmingPolice ? (
+          <View style={styles.confirm}>
+            <Text style={styles.confirmText}>
+              Police routes use bus lanes, bus gates and bus-only roads, and ignore turn restrictions such as no right
+              turn. They never go the wrong way down a one-way street. Only a police driver using the emergency
+              exemptions may follow them; anyone else would be breaking the law.
+            </Text>
+            <Text style={styles.confirmText}>
+              I’m a police officer, and I’ll only follow a police route when the exemptions apply and it’s safe to.
+            </Text>
+            <View style={styles.confirmButtons}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setPoliceRoutes(true);
+                  setConfirmingPolice(false);
+                }}
+                style={[styles.smallButton, { backgroundColor: colors.amber }]}
+              >
+                <Text style={styles.smallButtonText}>I confirm</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setConfirmingPolice(false)}
+                style={[styles.smallButton, styles.smallButtonOutline]}
+              >
+                <Text style={[styles.smallButtonText, { color: colors.fg }]}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.toggleRow}>
+            <Text style={[styles.placeMeta, styles.placeText]}>
+              Off: you’ll get standard, fully legal routes only.
+            </Text>
+            <Pressable accessibilityRole="button" onPress={() => setConfirmingPolice(true)} hitSlop={8}>
+              <Text style={[styles.remove, { color: colors.amber }]}>Turn on</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       <Pressable
@@ -166,6 +223,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   placeText: { flex: 1, minWidth: 0 },
+  confirm: { gap: 10, borderColor: colors.amber, borderWidth: 1, borderRadius: 10, padding: 12 },
+  confirmText: { color: colors.fg, fontFamily: fonts.body, fontSize: 15, lineHeight: 21 },
+  confirmButtons: { flexDirection: "row", gap: 10 },
+  smallButton: { borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16 },
+  smallButtonOutline: { borderColor: colors.line, borderWidth: 1 },
+  smallButtonText: { color: "#1a1200", fontFamily: fonts.displayBold, fontSize: 16, letterSpacing: 0.5 },
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   placeName: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   placeMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },

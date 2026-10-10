@@ -33,7 +33,12 @@ export interface PoliceRoute extends Route {
   restrictionsComplete: boolean;
 }
 
-export type NoPoliceReason = "not-faster" | "no-restrictions-found" | "wrong-way-unavoidable";
+export type NoPoliceReason = "not-faster" | "no-restrictions-found" | "wrong-way-unavoidable" | "not-declared";
+
+/** The plan as shown to someone who hasn't confirmed they're a police driver: standard only. */
+export function withoutPolice(plan: RoutePlan): RoutePlan {
+  return plan.police ? { ...plan, police: null, noPoliceReason: "not-declared" } : plan;
+}
 
 export interface RoutePlan {
   standard: Route;
