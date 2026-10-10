@@ -1,0 +1,119 @@
+# Builds the installable Android app (APK) on GitHub's machines: no Expo
+# account or Android Studio needed. On main it's published to the
+# "Android app" release, a page you open on the phone to install it.
+# Setup (one secret, one variable) is in DEPLOY.md.
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", ".github/workflows/android.yml"]
+  pull_request:
+    paths: ["app/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        working-directory: app
+    env:
+      SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
+      KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+      PUBLISH: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: npm ci
+
+      - name: Generate the Android project
+        run: |
+          if [ -n "$SERVER_DOMAIN" ]; then
+            export EXPO_PUBLIC_API_URL="https://${SERVER_DOMAIN}"
+            echo "Server: $EXPO_PUBLIC_API_URL"
+          else
+            echo "::warning::No SERVER_DOMAIN variable: the app is built without a server (search works, routing doesn't)."
+          fi
+          echo "EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-}" >> "$GITHUB_ENV"
+          CI=1 npx expo prebuild --platform android --no-install
+
+      # Updates only install over the previous version if they're signed with
+      # the same key. The key lives encrypted (with ANDROID_KEYSTORE_PASSWORD)
+      # on the "android-signing-key" release; the first main build creates it.
+      # The project signs with android/app/debug.keystore (alias
+      # androiddebugkey, password android), so ours replaces that file.
+      - name: Signing key
+        run: |
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::warning::No ANDROID_KEYSTORE_PASSWORD secret: signed with Expo's public development key. Fine for a test, not for officers' phones."
+            exit 0
+          fi
+          if gh release download android-signing-key --pattern blue-route.keystore.enc --dir "$RUNNER_TEMP" 2>/dev/null; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEYSTORE_PASSWORD \
+              -in "$RUNNER_TEMP/blue-route.keystore.enc" -out android/app/debug.keystore ||
+              { echo "::error::Couldn't decrypt the signing key: ANDROID_KEYSTORE_PASSWORD has changed."; exit 1; }
+            echo "Using the Blue Route signing key."
+          elif [ "$PUBLISH" = "true" ]; then
+            keytool -genkeypair -v -keystore android/app/debug.keystore -alias androiddebugkey \
+              -storepass android -keypass android -keyalg RSA -keysize 4096 -validity 10000 \
+              -dname "CN=Blue Route, O=Blue Route" >/dev/null
+            openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:KEYSTORE_PASSWORD \
+              -in android/app/debug.keystore -out "$RUNNER_TEMP/blue-route.keystore.enc"
+            gh release create android-signing-key "$RUNNER_TEMP/blue-route.keystore.enc" --prerelease \
+              --title "Signing key (encrypted)" \
+              --notes "Encrypted with the ANDROID_KEYSTORE_PASSWORD secret. Don't delete: app updates need it."
+            echo "Created the Blue Route signing key."
+          else
+            echo "No signing key yet (the first build on main creates it); this test build uses the development key."
+          fi
+
+      - name: Build the APK
+        working-directory: app/android
+        # 64-bit ARM covers practically every phone in use; one architecture
+        # halves the build time and the download.
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Keep the APK with this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: blue-route-apk
+          path: app/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
+
+      - name: Publish to the "Android app" release
+        if: env.PUBLISH == 'true'
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/blue-route.apk"
+          notes=$(printf 'Built from %s on %s UTC. Server: %s.\n\nTo install: open this page on the Android phone, tap blue-route.apk, and allow installing from your browser when asked.' \
+            "${GITHUB_SHA::7}" "$(date -u +'%d %b %Y %H:%M')" "${EXPO_PUBLIC_API_URL:-none}")
+          if gh release view android-latest >/dev/null 2>&1; then
+            gh release upload android-latest "$RUNNER_TEMP/blue-route.apk" --clobber
+            gh release edit android-latest --notes "$notes"
+          else
+            gh release create android-latest "$RUNNER_TEMP/blue-route.apk" --title "Android app" --notes "$notes"
+          fi
+          {
+            echo "## Android app built"
+            echo ""
+            echo "Install it from https://github.com/${GITHUB_REPOSITORY}/releases/tag/android-latest"
+          } >> "$GITHUB_STEP_SUMMARY"

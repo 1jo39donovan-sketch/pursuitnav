@@ -1,0 +1,122 @@
+# Builds the app for the App Store and Google Play on Expo's build service
+# (EAS) and, when asked, sends it to TestFlight and a Play testing track.
+# Run it from the Actions tab. One-off setup (accounts, keys) is in STORE.md.
+name: Store builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Which app to build"
+        type: choice
+        options: [all, ios, android]
+        default: all
+      submit:
+        description: "Send the builds to TestFlight / Google Play when they finish"
+        type: boolean
+        default: true
+      android_track:
+        description: "Play track: alpha is closed testing (counts towards Google's 14-day test), internal is instant"
+        type: choice
+        options: [alpha, internal, production]
+        default: alpha
+      android_release:
+        description: "Play release status: draft until the app has been through Google's first review, then completed"
+        type: choice
+        options: [draft, completed]
+        default: draft
+
+permissions:
+  contents: read
+
+concurrency: store-builds
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: app
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+      ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
+      ASC_APP_ID: ${{ vars.ASC_APP_ID }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+      PLATFORM: ${{ inputs.platform }}
+      SUBMIT: ${{ inputs.submit }}
+      TRACK: ${{ inputs.android_track }}
+      RELEASE: ${{ inputs.android_release }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+
+      - name: Check settings
+        run: |
+          missing=0
+          [ -n "$EXPO_TOKEN" ] || { echo "::error::Add the EXPO_TOKEN secret (STORE.md, Expo)."; missing=1; }
+          [ -n "$SERVER_DOMAIN" ] || { echo "::error::Add the SERVER_DOMAIN variable: store builds need the server address."; missing=1; }
+          if [ "$SUBMIT" = "true" ] && [ "$PLATFORM" != "android" ]; then
+            for v in ASC_API_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID ASC_APP_ID; do
+              [ -n "${!v}" ] || { echo "::error::Sending to TestFlight needs $v (STORE.md, Apple)."; missing=1; }
+            done
+          fi
+          if [ "$SUBMIT" = "true" ] && [ "$PLATFORM" != "ios" ]; then
+            [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ] || { echo "::error::Sending to Google Play needs the PLAY_SERVICE_ACCOUNT_JSON secret (STORE.md, Google)."; missing=1; }
+          fi
+          exit $missing
+
+      # Keys go into files in the runner's temp folder, never into the repo.
+      - name: Point the app at the server and add the store keys
+        run: |
+          cfg=$(jq --arg url "https://${SERVER_DOMAIN}" '.build.production.env.EXPO_PUBLIC_API_URL = $url' eas.json)
+          if [ -n "$ASC_API_KEY_P8" ]; then
+            printf '%s\n' "$ASC_API_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+            cfg=$(jq --arg p "$RUNNER_TEMP/asc.p8" --arg k "$ASC_KEY_ID" --arg i "$ASC_ISSUER_ID" --arg a "$ASC_APP_ID" \
+              '.submit.production.ios += {ascApiKeyPath: $p, ascApiKeyId: $k, ascApiKeyIssuerId: $i, ascAppId: $a}' <<<"$cfg")
+            {
+              echo "EXPO_ASC_API_KEY_PATH=$RUNNER_TEMP/asc.p8"
+              echo "EXPO_ASC_KEY_ID=$ASC_KEY_ID"
+              echo "EXPO_ASC_ISSUER_ID=$ASC_ISSUER_ID"
+              [ -n "$APPLE_TEAM_ID" ] && echo "EXPO_APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            } >> "$GITHUB_ENV"
+          fi
+          if [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            printf '%s\n' "$PLAY_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/play.json"
+            cfg=$(jq --arg p "$RUNNER_TEMP/play.json" --arg t "$TRACK" --arg r "$RELEASE" \
+              '.submit.production.android += {serviceAccountKeyPath: $p, track: $t, releaseStatus: $r}' <<<"$cfg")
+          fi
+          printf '%s\n' "$cfg" > eas.json
+          echo "Server: https://${SERVER_DOMAIN}"
+
+      - name: Link the Expo project
+        run: npx --yes eas-cli@latest init --non-interactive --force
+
+      - name: Build${{ inputs.submit && ' and send to the stores' || '' }}
+        run: |
+          args=(--platform "$PLATFORM" --profile production --non-interactive)
+          [ "$SUBMIT" = "true" ] && args+=(--auto-submit)
+          npx --yes eas-cli@latest build "${args[@]}"
+
+      - name: Summary
+        if: success()
+        run: |
+          {
+            echo "## Store builds finished ($PLATFORM)"
+            echo ""
+            if [ "$SUBMIT" = "true" ]; then
+              echo "- iOS goes to TestFlight; Apple takes a few minutes to process it, then add testers in App Store Connect."
+              echo "- Android goes to the Play **$TRACK** track as **$RELEASE**."
+            else
+              echo "- Download the builds from your project on expo.dev."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

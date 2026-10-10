@@ -1,0 +1,59 @@
+# Blue Route server: Valhalla routing for London, the API, and Caddy for HTTPS.
+# See README.md for first-time setup.
+
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:3.9.1
+    restart: unless-stopped
+    volumes:
+      - ./data/valhalla:/custom_files
+    environment:
+      tile_urls: https://download.geofabrik.de/europe/united-kingdom/england/greater-london-latest.osm.pbf
+      # Serve the tiles already built; scripts/rebuild-tiles.sh refreshes them weekly.
+      use_tiles_ignore_pbf: "True"
+      build_admins: "True"
+      build_time_zones: "True"
+      server_threads: "2"
+    # Valhalla logs slow requests in full, coordinates included. Keep no logs.
+    logging:
+      driver: none
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - valhalla
+    volumes:
+      - ./data/places:/data/places:ro
+    environment:
+      VALHALLA_URL: http://valhalla:8002
+      # Door-level address search; leave empty to run with road-level search only.
+      OS_PLACES_KEY: ${OS_PLACES_KEY:-}
+      # Contact address on the /privacy and /support pages.
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+
+  # Run by scripts/build-places.sh, not by `docker compose up`.
+  places:
+    build: ./places
+    profiles: ["tools"]
+    volumes:
+      - ./data:/data
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env to the server's domain name}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
