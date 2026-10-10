@@ -34,6 +34,7 @@ Add secret `ANDROID_KEYSTORE_PASSWORD`: a long random password (a password manag
 ## 5. Optional
 
 - Secret `OS_PLACES_KEY`: door-level addresses (needed for "54 Caledonian Road" to route to the door). From [osdatahub.os.uk](https://osdatahub.os.uk): create a project with the OS Places API. Check the free allowance and licence terms there.
+- Variable `CONTACT_EMAIL`: shown on the privacy and support pages the app stores link to (STORE.md).
 - Secret `SSH_PUBLIC_KEY`: your SSH public key, to log into the server yourself. Without it Hetzner emails you a root password.
 
 ## 6. Run it
@@ -48,3 +49,5 @@ Add secret `ANDROID_KEYSTORE_PASSWORD`: a long random password (a password manag
 - Every change to the app on `main` builds a new APK on the same release page; install it over the old one and the log is kept.
 
 Changing the OS key later: update the secret, then run **Deploy server** with **recreate** ticked. Nothing officers rely on is stored on the server, so a fresh one is safe.
+
+Putting the app on the App Store and Google Play: see STORE.md.

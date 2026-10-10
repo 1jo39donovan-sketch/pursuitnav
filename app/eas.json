@@ -1,6 +1,6 @@
 {
   "cli": {
-    "appVersionSource": "local"
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -22,7 +22,17 @@
     "production": {
       "env": {
         "EXPO_PUBLIC_API_URL": "https://route.example.org"
-      }
+      },
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      },
+      "ios": {}
     }
   }
 }
