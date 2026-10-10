@@ -8,6 +8,9 @@ interface Session {
   boroughs: Borough[];
   setCallsign: (callsign: string) => void;
   toggleBorough: (borough: Borough) => void;
+  /** Simulated drive in London instead of GPS (store reviewers, trying it out). */
+  demoDrive: boolean;
+  setDemoDrive: (on: boolean) => void;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -25,6 +28,11 @@ function loadBoroughs(): Borough[] {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [callsign, setCallsignState] = useState(() => store.getSetting("callsign") ?? "");
   const [boroughs, setBoroughs] = useState<Borough[]>(loadBoroughs);
+  const [demoDrive, setDemoDriveState] = useState(() => store.getSetting("demoDrive") === "1");
+  const setDemoDrive = useCallback((on: boolean) => {
+    setDemoDriveState(on);
+    store.setSetting("demoDrive", on ? "1" : "0");
+  }, []);
 
   const setCallsign = useCallback((value: string) => {
     setCallsignState(value);
@@ -40,8 +48,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ callsign, boroughs, setCallsign, toggleBorough }),
-    [callsign, boroughs, setCallsign, toggleBorough],
+    () => ({ callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive }),
+    [callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

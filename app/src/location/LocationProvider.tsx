@@ -13,6 +13,7 @@ import { AppState } from "react-native";
 
 import { DEMO_MODE } from "../config";
 import { demoFixAt } from "../demo/demoDrive";
+import { useSession } from "../session/SessionProvider";
 
 export type LocationStatus =
   | "checking"
@@ -38,6 +39,8 @@ export interface Fix {
 
 interface LocationState {
   status: LocationStatus;
+  /** True when positions come from the demo drive, not the phone's GPS. */
+  simulated: boolean;
   /** The most recent position, or null before the first fix. */
   fix: Fix | null;
   requestPermission: () => Promise<void>;
@@ -65,8 +68,13 @@ function toFix(loc: Location.LocationObject): Fix {
  * phone actually is.
  */
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<LocationStatus>(DEMO_MODE ? "granted" : "checking");
-  const [fix, setFix] = useState<Fix | null>(null);
+  // The demo drive replaces GPS: always in demo builds, and when switched on
+  // in the app (for store reviewers, or trying it away from London).
+  const { demoDrive } = useSession();
+  const simulated = DEMO_MODE || demoDrive;
+  const [status, setStatus] = useState<LocationStatus>("checking");
+  const [gpsFix, setFix] = useState<Fix | null>(null);
+  const [demoFix, setDemoFix] = useState<Fix | null>(null);
   const subscription = useRef<Location.LocationSubscription | null>(null);
 
   const startWatching = useCallback(async () => {
@@ -111,15 +119,15 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (!DEMO_MODE) return;
+    if (!simulated) return;
     const started = Date.now();
-    const tick = () => setFix(demoFixAt((Date.now() - started) / 1000));
+    const tick = () => setDemoFix(demoFixAt((Date.now() - started) / 1000));
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [simulated]);
 
   useEffect(() => {
-    if (DEMO_MODE) return;
+    if (simulated) return;
     // refresh() only sets state after awaiting the permission check, so this
     // subscribes to an external system rather than updating state in the effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -133,13 +141,16 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       appState.remove();
       stopWatching();
     };
-  }, [refresh, stopWatching]);
+  }, [simulated, refresh, stopWatching]);
 
   const requestPermission = useCallback(() => refresh(true), [refresh]);
 
   const value = useMemo(
-    () => ({ status, fix, requestPermission }),
-    [status, fix, requestPermission],
+    () =>
+      simulated
+        ? { status: "granted" as const, simulated, fix: demoFix, requestPermission }
+        : { status, simulated, fix: gpsFix, requestPermission },
+    [simulated, status, demoFix, gpsFix, requestPermission],
   );
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;

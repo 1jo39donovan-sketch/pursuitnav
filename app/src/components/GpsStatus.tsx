@@ -2,11 +2,13 @@ import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DEMO_MODE } from "../config";
 import { useLocation } from "../location/LocationProvider";
+import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 
 /** One line saying whether the GPS position can be trusted, with a fix when it can't. */
 export function GpsStatus() {
-  const { status, fix, requestPermission } = useLocation();
+  const { status, fix, requestPermission, simulated } = useLocation();
+  const { setDemoDrive } = useSession();
 
   if (status === "needs-permission") {
     return (
@@ -31,6 +33,13 @@ export function GpsStatus() {
   }
   if (DEMO_MODE) {
     return <Banner tone="warn" text="DEMO · scripted drive, not real GPS" />;
+  }
+  if (simulated) {
+    return (
+      <Banner tone="warn" text="DEMO DRIVE · simulated position in London, not your GPS">
+        <Action label="Turn off" onPress={() => setDemoDrive(false)} />
+      </Banner>
+    );
   }
   if (status === "checking" || !fix) {
     return <Banner tone="muted" text="Waiting for GPS…" />;

@@ -1,5 +1,7 @@
 import { router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+
+import { DEMO_MODE } from "../../config";
 
 import { CHIP_ORDER } from "../../search/boroughs";
 import { useSearch } from "../../search/SearchProvider";
@@ -7,7 +9,7 @@ import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
 
 export default function SessionScreen() {
-  const { callsign, setCallsign, boroughs, toggleBorough } = useSession();
+  const { callsign, setCallsign, boroughs, toggleBorough, demoDrive, setDemoDrive } = useSession();
   const { savedPlaces, deletePlace, places } = useSearch();
 
   return (
@@ -83,6 +85,26 @@ export default function SessionScreen() {
         </View>
       )}
 
+      {!DEMO_MODE && (
+        <View style={styles.toggleRow}>
+          <View style={styles.placeText}>
+            <Text style={styles.placeName} nativeID="demo-drive-label">
+              Demo drive
+            </Text>
+            <Text style={styles.placeMeta}>
+              Simulates a drive from Holloway Road to Whitechapel, so you can try routes, navigation and pursuit mode
+              away from London. Your real GPS is ignored while it’s on.
+            </Text>
+          </View>
+          <Switch
+            accessibilityLabelledBy="demo-drive-label"
+            value={demoDrive}
+            onValueChange={setDemoDrive}
+            trackColor={{ false: colors.line, true: colors.amber }}
+          />
+        </View>
+      )}
+
       <Text style={styles.attribution}>
         {places.status === "ready"
           ? `Places: ${places.count.toLocaleString("en-GB")} shops, cafés, schools, parks and more, from ${places.builtOn}.`
@@ -144,6 +166,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   placeText: { flex: 1, minWidth: 0 },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   placeName: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   placeMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
   remove: { color: colors.warn, fontFamily: fonts.bodyMedium, fontSize: 14 },
