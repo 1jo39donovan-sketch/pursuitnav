@@ -74,9 +74,11 @@ jobs:
               { echo "::error::Couldn't decrypt the signing key: ANDROID_KEYSTORE_PASSWORD has changed."; exit 1; }
             echo "Using the Blue Route signing key."
           elif [ "$PUBLISH" = "true" ]; then
+            # Replace the template's development key rather than adding to it.
+            rm -f android/app/debug.keystore
             keytool -genkeypair -v -keystore android/app/debug.keystore -alias androiddebugkey \
               -storepass android -keypass android -keyalg RSA -keysize 4096 -validity 10000 \
-              -dname "CN=Blue Route, O=Blue Route" >/dev/null
+              -dname "CN=Blue Route, O=Blue Route"
             openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:KEYSTORE_PASSWORD \
               -in android/app/debug.keystore -out "$RUNNER_TEMP/blue-route.keystore.enc"
             gh release create android-signing-key "$RUNNER_TEMP/blue-route.keystore.enc" --prerelease \
