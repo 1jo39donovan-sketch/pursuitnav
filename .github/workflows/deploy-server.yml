@@ -46,6 +46,19 @@ jobs:
           sudo mv hcloud /usr/local/bin/
           hcloud version
 
+      - name: Check the Hetzner token
+        run: |
+          if ! hcloud server-type list -o noheader -o columns=name > types.txt 2> check.log; then
+            cat check.log
+            if grep -qiE 'unauthorized|unable to authenticate|invalid token|token' check.log; then
+              echo "::error::Hetzner refused the HCLOUD_TOKEN secret. Make a new API token (Read & Write) in the Blue Route project and paste it into the secret again (DEPLOY.md, step 2)."
+            else
+              echo "::error::Couldn't reach Hetzner with HCLOUD_TOKEN (message above)."
+            fi
+            exit 1
+          fi
+          echo "Token works. Server types on offer: $(tr '\n' ' ' < types.txt)"
+
       - name: Create the server
         id: server
         run: |
@@ -83,7 +96,19 @@ jobs:
                   echo "Created $type in $location"
                   break 2
                 fi
-                grep -iE 'error|unavailable|not available' create.log | head -n 2 || true
+                cat create.log
+                # Sold out or not offered there: try the next one. Anything
+                # else (account, permissions, limits) won't fix itself.
+                if ! grep -qiE 'unavailable|not available|resource_unavailable|unsupported|not supported|not found|placement|deprecated' create.log; then
+                  if grep -qiE 'forbidden|read.only|permission' create.log; then
+                    echo "::error::The HCLOUD_TOKEN is read-only. Make a new token with Read & Write permission (DEPLOY.md, step 2)."
+                  elif grep -qiE 'limit' create.log; then
+                    echo "::error::Hetzner's limit for new accounts stopped this (message above). Check the Hetzner console for a notice, or ask Hetzner support to raise it."
+                  else
+                    echo "::error::Hetzner refused to create the server (message above). New accounts sometimes need their verification or payment method finished first: check the Hetzner console."
+                  fi
+                  exit 1
+                fi
               done
             done
             [ "$created" = 1 ] || { echo "::error::Hetzner had no suitable server available. Try again later."; exit 1; }
