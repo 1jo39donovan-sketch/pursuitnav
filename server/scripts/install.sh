@@ -7,6 +7,9 @@
 # It asks for the domain name (already pointing at this server) and,
 # optionally, an OS Places API key. Safe to run again: it updates the code
 # and restarts.
+#
+# Unattended (the GitHub "Deploy server" workflow does this): set DOMAIN, and
+# optionally OS_PLACES_KEY, in the environment and nothing is asked.
 set -euo pipefail
 
 REPO=https://github.com/1jo39donovan-sketch/pursuitnav.git
@@ -21,11 +24,14 @@ fail() { printf '\n\033[1;31m%s\033[0m\n' "$*" >&2; exit 1; }
 
 EXISTING_DOMAIN=""
 [ -f "$DIR/server/.env" ] && EXISTING_DOMAIN=$(grep -E '^DOMAIN=' "$DIR/server/.env" | cut -d= -f2- || true)
-# Questions come from the keyboard (/dev/tty) even when this script is piped from curl.
-read -rp "Domain name for the server${EXISTING_DOMAIN:+ [$EXISTING_DOMAIN]} (e.g. route.example.org): " DOMAIN </dev/tty
-DOMAIN=${DOMAIN:-$EXISTING_DOMAIN}
+if [ -z "${DOMAIN:-}" ]; then
+  # Questions come from the keyboard (/dev/tty) even when this script is piped from curl.
+  read -rp "Domain name for the server${EXISTING_DOMAIN:+ [$EXISTING_DOMAIN]} (e.g. route.example.org): " DOMAIN </dev/tty
+  DOMAIN=${DOMAIN:-$EXISTING_DOMAIN}
+  read -rp "OS Places API key (press Enter to skip; road-level search still works): " OS_PLACES_KEY </dev/tty
+fi
 [ -n "$DOMAIN" ] || fail "A domain name is needed for HTTPS."
-read -rp "OS Places API key (press Enter to skip; road-level search still works): " OS_PLACES_KEY </dev/tty
+OS_PLACES_KEY=${OS_PLACES_KEY:-}
 
 say "Installing Docker and basics"
 apt-get update -qq
@@ -37,7 +43,12 @@ systemctl enable --now docker cron >/dev/null
 
 say "Checking $DOMAIN points at this server"
 MY_IP=$(curl -fsS https://api.ipify.org || true)
-DNS_IP=$(dig +short A "$DOMAIN" | tail -n 1)
+# A just-updated record can take a minute or two to show.
+for i in $(seq 1 20); do
+  DNS_IP=$(dig +short A "$DOMAIN" @1.1.1.1 | tail -n 1)
+  if [ -n "$DNS_IP" ] && { [ -z "$MY_IP" ] || [ "$DNS_IP" = "$MY_IP" ]; }; then break; fi
+  [ "$i" -lt 20 ] && sleep 15
+done
 if [ -z "$DNS_IP" ]; then
   fail "$DOMAIN doesn't resolve yet. Add an A record for it pointing at ${MY_IP:-the IP address of this server}, wait a few minutes, and run this again."
 elif [ -n "$MY_IP" ] && [ "$DNS_IP" != "$MY_IP" ]; then
@@ -94,9 +105,10 @@ done
 say "Extracting shops, cafés, schools, parks and other places"
 scripts/build-places.sh
 
-say "Weekly refresh of map and places (Sundays 03:15)"
+say "Weekly map and places refresh (Sundays 03:15); nightly code update from $BRANCH (04:30)"
 cat >/etc/cron.d/blue-route <<EOF
 15 3 * * 0 root $DIR/server/scripts/rebuild-tiles.sh >> /var/log/blue-route-tiles.log 2>&1
+30 4 * * * root BRANCH=$BRANCH $DIR/server/scripts/update.sh >> /var/log/blue-route-update.log 2>&1
 EOF
 chmod 644 /etc/cron.d/blue-route
 

@@ -2,27 +2,9 @@
 
 Everything here has been tested on a synthetic street network and in a browser. This is the checklist for the first runs on real London streets. Do it as a passenger: the operator uses the app, the driver drives.
 
-## 1. Server (once)
+## 1–2. Server and app
 
-On a fresh Ubuntu VPS (at least 4 GB RAM) with a domain name pointing at it, as root:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/1jo39donovan-sketch/pursuitnav/main/server/scripts/install.sh | bash
-```
-
-It asks for the domain and an optional OS Places key, then installs Docker, sets up the firewall, builds London's routing map (15–30 min), extracts places, schedules the weekly refresh and checks HTTPS. Details and manual steps: `server/README.md`.
-
-## 2. App on an Android phone
-
-1. In `app/eas.json`, replace `https://route.example.org` with your server's address (all three profiles).
-2. Create a free Expo account, then from `app/`:
-   ```bash
-   npx eas-cli@latest login
-   npx eas-cli@latest build --profile preview --platform android
-   ```
-3. Open the link EAS gives you on the phone and install the APK. Allow location "While using the app".
-
-iPhone needs an Apple developer account ($99/year) and `--platform ios`; ask before going that way.
+Follow `DEPLOY.md`: GitHub sets up the server and builds the Android app; you install it from the release page.
 
 ## 3. Checklist
 

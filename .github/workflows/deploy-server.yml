@@ -1,0 +1,142 @@
+# Rents and sets up the Blue Route server on Hetzner Cloud, then waits until
+# it answers over HTTPS. Run it from the Actions tab ("Run workflow").
+# One-off setup (accounts, secrets) is in DEPLOY.md.
+name: Deploy server
+
+on:
+  workflow_dispatch:
+    inputs:
+      recreate:
+        description: "Delete the existing server and build a fresh one (nothing officers rely on is stored on it)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency: deploy-server
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    env:
+      HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+      DUCKDNS_TOKEN: ${{ secrets.DUCKDNS_TOKEN }}
+      OS_PLACES_KEY: ${{ secrets.OS_PLACES_KEY }}
+      SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+      DOMAIN: ${{ vars.SERVER_DOMAIN }}
+      NAME: blue-route
+      BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: Check settings
+        run: |
+          missing=0
+          [ -n "$HCLOUD_TOKEN" ] || { echo "::error::Add the HCLOUD_TOKEN secret (DEPLOY.md, step 2)."; missing=1; }
+          [ -n "$DOMAIN" ] || { echo "::error::Add the SERVER_DOMAIN variable, e.g. blueroute-yourname.duckdns.org (DEPLOY.md, step 3)."; missing=1; }
+          case "$DOMAIN" in
+            *.duckdns.org) [ -n "$DUCKDNS_TOKEN" ] || { echo "::error::SERVER_DOMAIN is a DuckDNS name: add the DUCKDNS_TOKEN secret."; missing=1; } ;;
+          esac
+          exit $missing
+
+      - name: Install the Hetzner command-line tool
+        run: |
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz | tar -xz hcloud
+          sudo mv hcloud /usr/local/bin/
+          hcloud version
+
+      - name: Create the server
+        id: server
+        run: |
+          if [ "${{ inputs.recreate }}" = "true" ] && hcloud server describe "$NAME" >/dev/null 2>&1; then
+            echo "Deleting the old server"
+            hcloud server delete "$NAME"
+          fi
+
+          if hcloud server describe "$NAME" >/dev/null 2>&1; then
+            echo "Server $NAME already exists; leaving it as it is (it updates itself nightly)."
+          else
+            # First boot runs the installer unattended. Only the domain and the
+            # OS key go to the server; the DuckDNS token stays here.
+            {
+              echo '#!/bin/bash'
+              printf 'export DOMAIN=%q OS_PLACES_KEY=%q BRANCH=%q\n' "$DOMAIN" "$OS_PLACES_KEY" "$BRANCH"
+              echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/server/scripts/install.sh | bash > /var/log/blue-route-install.log 2>&1"
+            } > user-data.sh
+
+            ssh_args=()
+            if [ -n "$SSH_PUBLIC_KEY" ]; then
+              hcloud ssh-key describe blue-route-admin >/dev/null 2>&1 ||
+                hcloud ssh-key create --name blue-route-admin --public-key "$SSH_PUBLIC_KEY"
+              ssh_args=(--ssh-key blue-route-admin)
+            fi
+
+            # Cheapest first; small plans sell out at times, so try a few.
+            created=0
+            for type in cx23 cax11 cx33 cax21; do
+              for location in nbg1 fsn1 hel1; do
+                echo "Trying $type in $location"
+                if hcloud server create --name "$NAME" --type "$type" --image ubuntu-24.04 --location "$location" \
+                     --user-data-from-file user-data.sh "${ssh_args[@]}" > create.log 2>&1; then
+                  created=1
+                  echo "Created $type in $location"
+                  break 2
+                fi
+                grep -iE 'error|unavailable|not available' create.log | head -n 2 || true
+              done
+            done
+            [ "$created" = 1 ] || { echo "::error::Hetzner had no suitable server available. Try again later."; exit 1; }
+          fi
+
+          IP=$(hcloud server ip "$NAME")
+          echo "ip=$IP" >> "$GITHUB_OUTPUT"
+          echo "Server IP: $IP"
+
+      - name: Point the domain at the server
+        env:
+          IP: ${{ steps.server.outputs.ip }}
+        run: |
+          case "$DOMAIN" in
+            *.duckdns.org)
+              SUB=${DOMAIN%.duckdns.org}
+              result=$(curl -fsS "https://www.duckdns.org/update?domains=${SUB}&token=${DUCKDNS_TOKEN}&ip=${IP}")
+              [ "$result" = "OK" ] || { echo "::error::DuckDNS refused the update. Check DUCKDNS_TOKEN and that ${SUB} is one of your DuckDNS domains."; exit 1; }
+              echo "$DOMAIN now points at $IP"
+              ;;
+            *)
+              echo "Make sure $DOMAIN has an A record pointing at $IP. Waiting for it…"
+              for _ in $(seq 1 40); do
+                [ "$(dig +short A "$DOMAIN" @1.1.1.1 | tail -n 1)" = "$IP" ] && { echo "OK"; exit 0; }
+                sleep 30
+              done
+              echo "::error::$DOMAIN doesn't point at $IP. Add the A record and run this again."
+              exit 1
+              ;;
+          esac
+
+      - name: Wait for the server to be ready
+        run: |
+          echo "Installing and building London's routing map: usually 20–40 minutes."
+          for i in $(seq 1 90); do
+            if curl -fsS "https://${DOMAIN}/health" 2>/dev/null | grep -q '"ok":true'; then
+              echo "https://${DOMAIN} is up."
+              exit 0
+            fi
+            [ $((i % 10)) -eq 0 ] && echo "Still building ($i minutes)…"
+            sleep 60
+          done
+          echo "::error::Not answering after 90 minutes. Log into the server and check /var/log/blue-route-install.log"
+          exit 1
+
+      - name: Summary
+        if: success()
+        env:
+          IP: ${{ steps.server.outputs.ip }}
+        run: |
+          {
+            echo "## Blue Route server is up"
+            echo ""
+            echo "- Address: https://${DOMAIN}"
+            echo "- Server IP: ${IP}"
+            echo "- Next: run the **Android app** workflow to build the app pointed at it."
+          } >> "$GITHUB_STEP_SUMMARY"
