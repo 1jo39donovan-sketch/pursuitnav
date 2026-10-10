@@ -16,6 +16,8 @@ export interface ServerConfig {
   osPlacesKey: string | undefined;
   /** Gzipped places file written by places/extract_places.py. */
   placesFile: string;
+  /** Shown on the privacy and support pages; without it they point at GitHub issues. */
+  contactEmail?: string;
 }
 
 // Greater London with a margin, matching the app's region config.
@@ -46,5 +48,6 @@ export function loadConfig(): ServerConfig {
     restrictionCheckBudget: num("RESTRICTION_CHECK_BUDGET", 150),
     osPlacesKey: process.env.OS_PLACES_KEY || undefined,
     placesFile: process.env.PLACES_FILE ?? "/data/places/places.txt.gz",
+    contactEmail: process.env.CONTACT_EMAIL || undefined,
   };
 }

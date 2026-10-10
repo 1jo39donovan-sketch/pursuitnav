@@ -6,6 +6,7 @@ import Fastify, { LogController, type FastifyInstance } from "fastify";
 
 import type { ServerConfig } from "./config.js";
 import type { LngLat } from "./geo.js";
+import { privacyPage, supportPage } from "./pages.js";
 import { PlacesError, type PlacesClient } from "./places.js";
 import { planRoutes } from "./plan.js";
 import { pursuitInfo } from "./pursuit.js";
@@ -50,6 +51,13 @@ export function buildApp(
   };
 
   app.get("/health", async () => ({ ok: true }));
+
+  // Linked from the app and the store listings.
+  const privacy = privacyPage(config.contactEmail);
+  const support = supportPage(config.contactEmail);
+  app.get("/privacy", async (_req, reply) => reply.type("text/html; charset=utf-8").send(privacy));
+  app.get("/support", async (_req, reply) => reply.type("text/html; charset=utf-8").send(support));
+  app.get("/", async (_req, reply) => reply.redirect("/support"));
 
   app.post<{ Body: RoutesBody }>(
     "/v1/routes",

@@ -29,6 +29,8 @@ services:
       VALHALLA_URL: http://valhalla:8002
       # Door-level address search; leave empty to run with road-level search only.
       OS_PLACES_KEY: ${OS_PLACES_KEY:-}
+      # Contact address on the /privacy and /support pages.
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
 
   # Run by scripts/build-places.sh, not by `docker compose up`.
   places:

@@ -9,7 +9,7 @@
 # and restarts.
 #
 # Unattended (the GitHub "Deploy server" workflow does this): set DOMAIN, and
-# optionally OS_PLACES_KEY, in the environment and nothing is asked.
+# optionally OS_PLACES_KEY and CONTACT_EMAIL, in the environment and nothing is asked.
 set -euo pipefail
 
 REPO=https://github.com/1jo39donovan-sketch/pursuitnav.git
@@ -32,6 +32,11 @@ if [ -z "${DOMAIN:-}" ]; then
 fi
 [ -n "$DOMAIN" ] || fail "A domain name is needed for HTTPS."
 OS_PLACES_KEY=${OS_PLACES_KEY:-}
+# Contact address for the /privacy and /support pages (the app stores need one).
+if [ -z "${CONTACT_EMAIL:-}" ] && [ -f "$DIR/server/.env" ]; then
+  CONTACT_EMAIL=$(grep -E '^CONTACT_EMAIL=' "$DIR/server/.env" | cut -d= -f2- || true)
+fi
+CONTACT_EMAIL=${CONTACT_EMAIL:-}
 
 say "Installing Docker and basics"
 apt-get update -qq
@@ -85,7 +90,7 @@ cd "$DIR/server"
 [ -f docker-compose.yml ] || fail "No server code on branch $BRANCH. Merge the pull request into main first, or run with BRANCH=<branch>."
 
 umask 077
-printf 'DOMAIN=%s\nOS_PLACES_KEY=%s\n' "$DOMAIN" "$OS_PLACES_KEY" >.env
+printf 'DOMAIN=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" >.env
 umask 022
 
 say "Starting Valhalla, the API and HTTPS"

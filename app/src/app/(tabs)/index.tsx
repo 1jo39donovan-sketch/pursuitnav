@@ -1,8 +1,8 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
-import { DEMO_MODE } from "../../config";
+import { API_URL, DEMO_MODE } from "../../config";
 
 import { CHIP_ORDER } from "../../search/boroughs";
 import { useSearch } from "../../search/SearchProvider";
@@ -162,6 +162,17 @@ export default function SessionScreen() {
         </View>
       )}
 
+      {API_URL !== "" && (
+        <View style={styles.confirmButtons}>
+          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${API_URL}/privacy`)} hitSlop={8}>
+            <Text style={styles.link}>Privacy</Text>
+          </Pressable>
+          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${API_URL}/support`)} hitSlop={8}>
+            <Text style={styles.link}>Help and support</Text>
+          </Pressable>
+        </View>
+      )}
+
       <Text style={styles.attribution}>
         {places.status === "ready"
           ? `Places: ${places.count.toLocaleString("en-GB")} shops, cafés, schools, parks and more, from ${places.builtOn}.`
@@ -233,5 +244,6 @@ const styles = StyleSheet.create({
   placeName: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   placeMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
   remove: { color: colors.warn, fontFamily: fonts.bodyMedium, fontSize: 14 },
+  link: { color: colors.amber, fontFamily: fonts.bodyMedium, fontSize: 14, textDecorationLine: "underline" },
   attribution: { color: colors.muted, fontFamily: fonts.body, fontSize: 11, lineHeight: 16, opacity: 0.8 },
 });
