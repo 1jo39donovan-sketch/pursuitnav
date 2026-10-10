@@ -50,7 +50,17 @@ export function buildApp(
     return lng >= west && lng <= east && lat >= south && lat <= north;
   };
 
-  app.get("/health", async () => ({ ok: true }));
+  // ok: the API is up. routing and places say whether the map data is built
+  // yet (on a new server that takes 20–40 minutes after the API starts).
+  app.get("/health", async () => {
+    const routing = await fetch(`${config.valhallaUrl}/status`, { signal: AbortSignal.timeout(2000) })
+      .then((res) => res.ok)
+      .catch(() => false);
+    const places = await stat(config.placesFile)
+      .then(() => true)
+      .catch(() => false);
+    return { ok: true, routing, places };
+  });
 
   // Linked from the app and the store listings.
   const privacy = privacyPage(config.contactEmail);

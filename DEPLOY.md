@@ -10,11 +10,38 @@ Open the pull request on GitHub and click **Merge pull request**. The workflows 
 
 ## 2. Hetzner (the server)
 
-1. Sign up at [hetzner.com/cloud](https://www.hetzner.com/cloud) and add a payment method (they may ask for ID).
-2. In the Cloud Console, create a project called **Blue Route**.
-3. In the project: **Security → API tokens → Generate API token**, permission **Read & Write**. Copy it.
-4. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**:
-   - Name `HCLOUD_TOKEN`, value: the token.
+Hetzner is a German hosting company. Use only its own websites: **hetzner.com** for sign-up and **console.hetzner.cloud** for managing servers (it may forward you to console.hetzner.com, which is also Hetzner's). Ignore adverts and emails pointing anywhere else.
+
+**Create the account**
+
+1. Go to [hetzner.com/cloud](https://www.hetzner.com/cloud) and click **Sign up** (top right).
+2. Enter your email address and a password, then confirm the email Hetzner sends you.
+3. Fill in your name and address, and choose **Private customer** (not company).
+4. Add a payment method (card or PayPal). Hetzner may also ask for ID, such as a photo of your passport or driving licence. Approval is usually quick, but can take up to a day.
+
+**Create a project**
+
+5. Go to [console.hetzner.cloud](https://console.hetzner.cloud) and log in.
+6. Click **+ New project**, name it `Blue Route`, and click **Add project**.
+7. Click the **Blue Route** project to open it. You don't need to create a server; the workflow does that.
+
+**Make the API token** (it lets GitHub create the server for you)
+
+8. In the project, open **Security** in the left-hand menu, then the **API tokens** tab.
+9. Click **Generate API token**.
+   - Description: `GitHub deploy`
+   - Permissions: **Read & Write**
+10. Click **Generate API token** and **copy the token straight away**. Hetzner only shows it once. If you lose it, delete it and make a new one.
+
+**Give the token to GitHub**
+
+11. Open the repository on GitHub and go to **Settings → Secrets and variables → Actions**.
+12. On the **Secrets** tab, click **New repository secret**.
+    - Name: `HCLOUD_TOKEN`
+    - Secret: paste the token.
+13. Click **Add secret**.
+
+**What you'll be charged:** about €6–7 a month for the smallest server (CX23) and its IP address, billed monthly by the hour it exists. If the cheapest size is sold out, the workflow picks the next size up, which costs a few euros more; it says which one in its log. To stop paying, delete the server in the console (the project's **Servers** page → the server → **Delete**).
 
 ## 3. DuckDNS (a free domain name for HTTPS)
 

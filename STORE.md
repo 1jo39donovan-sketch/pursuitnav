@@ -199,6 +199,67 @@ Day 1 is Saturday 10 October.
 | **12–14 (Wed 21–Fri 23)** | **App Store live**: send iPhone users the App Store link. Android officers are on the Play closed test. | |
 | **~20–25** | After 14 days with 12+ testers, apply for production access in Play Console. Once Google approves it, release to production; it then appears in Play search. | Run **Store builds** with track *production*. |
 
+## Later: a subscription (£3–5 a month)
+
+Launch free, so the 14-day plan isn't held up and officers join the test. Add the subscription as an update once you've decided what it unlocks. Nothing in the free launch has to change to allow it.
+
+### How it works
+
+- **You must use the stores' payment systems.** Anything unlocked inside the app has to be sold through Apple's and Google's in-app purchase. In the UK you can't send people to your own website to pay instead. The UK competition regulator (CMA) is still consulting on whether to allow that.
+- **What you'd keep.** Apple and Google each take 15%:
+  - Apple takes 15% if you join its free Small Business Program (for earnings under US$1m a year).
+  - Google takes 15% on subscriptions from the first payment.
+
+  UK prices include 20% VAT, which comes off first:
+
+  | Price | After VAT | You keep (about) |
+  |---|---|---|
+  | £2.99 | £2.49 | £2.12 |
+  | £3.99 | £3.33 | £2.83 |
+  | £4.99 | £4.16 | £3.53 |
+
+- **Free trials and yearly plans** are both supported.
+- **No accounts needed.** The subscription is tied to the officer's Apple ID or Google account. RevenueCat checks who has paid; it's free until about US$2,500 a month in revenue, then takes 1%.
+- **Store rules:**
+  - The subscription must give ongoing value.
+  - The app must show the price and renewal terms before purchase.
+  - It needs a "Restore purchases" button and a link to terms of use.
+  - The privacy policy and privacy answers must cover purchases.
+- **Your details become public.**
+  - Google has required sellers to show a physical address on the store listing. A PO box or virtual office may do; check the current Play Console rules.
+  - Apple shows your address and phone number if you sell in the EU. Selling in the UK only avoids that.
+- **Tax.** Earnings go on a Self Assessment tax return. The first £1,000 a year is covered by the trading allowance.
+- **If you're a serving officer, check with your force first.** Police Regulations require business interests to be declared, and selling an app to colleagues for use on duty is likely to count.
+
+### Ideas for what it could unlock
+
+Collect feedback during the test before deciding. Good candidates are things that cost money to run or that heavy users value most:
+
+- door-level address search beyond the OS Places free allowance
+- extra areas beyond London, when UK-wide coverage comes
+- longer or exportable logs
+- live traffic-aware journey times
+
+Keep safety features free: the one-way protection, the "—" for unknown speed limits, and listing every restriction a police route uses.
+
+### Steps
+
+1. **Decide what the subscription unlocks**, using officers' feedback from the test.
+2. **Check with your force** about declaring a business interest.
+3. **Set up to get paid:**
+   1. Apple: in App Store Connect, go to **Business**, sign the **Paid Apps agreement**, and add bank and tax details.
+   2. Apple: join the **Small Business Program** for the 15% rate.
+   3. Google: in Play Console, go to **Settings → Payments profile** and set it up.
+
+   Verification can take several days.
+4. **Create the subscription in both stores.** For example "Blue Route Plus", £3.99 a month, one-month free trial, sold in the UK only.
+5. **Create a RevenueCat account** (free) and connect it to App Store Connect and Play Console. Its setup screens walk you through this.
+6. **Ask Claude to build it.** Claude adds RevenueCat, the subscribe and restore screens, a terms of use page, and the privacy policy changes, then locks the chosen features. If any of them run on the server, the server checks the subscription too.
+7. **Update the privacy answers:**
+   - Apple: "Purchases", used for app functionality and not linked to identity.
+   - Google: "Purchase history".
+8. **Release it** through **Store builds** as a normal update. Apple and Google review the first subscription together with that version.
+
 ## If something goes wrong
 
 - **Apple rejects it under guideline 1.4 (physical harm) or 5 (legal) because of the police route.** Reply in Resolution Center explaining that police routes are off by default and only appear after the user declares they're a police driver under the emergency exemptions, and point to the reviewer notes. If Apple still says no, ask Claude to leave police routes out of the iOS store build only (a small change). Officers still get search, standard routes, navigation, pursuit mode and the log, and TestFlight can carry the full version.

@@ -19,7 +19,7 @@ concurrency: deploy-server
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 100
+    timeout-minutes: 130
     env:
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
       DUCKDNS_TOKEN: ${{ secrets.DUCKDNS_TOKEN }}
@@ -45,6 +45,19 @@ jobs:
           curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz | tar -xz hcloud
           sudo mv hcloud /usr/local/bin/
           hcloud version
+
+      - name: Check the Hetzner token
+        run: |
+          if ! hcloud server-type list -o noheader -o columns=name > types.txt 2> check.log; then
+            cat check.log
+            if grep -qiE 'unauthorized|unable to authenticate|invalid token|token' check.log; then
+              echo "::error::Hetzner refused the HCLOUD_TOKEN secret. Make a new API token (Read & Write) in the Blue Route project and paste it into the secret again (DEPLOY.md, step 2)."
+            else
+              echo "::error::Couldn't reach Hetzner with HCLOUD_TOKEN (message above)."
+            fi
+            exit 1
+          fi
+          echo "Token works. Server types on offer: $(tr '\n' ' ' < types.txt)"
 
       - name: Create the server
         id: server
@@ -83,7 +96,19 @@ jobs:
                   echo "Created $type in $location"
                   break 2
                 fi
-                grep -iE 'error|unavailable|not available' create.log | head -n 2 || true
+                cat create.log
+                # Sold out or not offered there: try the next one. Anything
+                # else (account, permissions, limits) won't fix itself.
+                if ! grep -qiE 'unavailable|not available|resource_unavailable|unsupported|not supported|not found|placement|deprecated' create.log; then
+                  if grep -qiE 'forbidden|read.only|permission' create.log; then
+                    echo "::error::The HCLOUD_TOKEN is read-only. Make a new token with Read & Write permission (DEPLOY.md, step 2)."
+                  elif grep -qiE 'limit' create.log; then
+                    echo "::error::Hetzner's limit for new accounts stopped this (message above). Check the Hetzner console for a notice, or ask Hetzner support to raise it."
+                  else
+                    echo "::error::Hetzner refused to create the server (message above). New accounts sometimes need their verification or payment method finished first: check the Hetzner console."
+                  fi
+                  exit 1
+                fi
               done
             done
             [ "$created" = 1 ] || { echo "::error::Hetzner had no suitable server available. Try again later."; exit 1; }
@@ -117,16 +142,22 @@ jobs:
 
       - name: Wait for the server to be ready
         run: |
-          echo "Installing and building London's routing map: usually 20–40 minutes."
-          for i in $(seq 1 90); do
-            if curl -fsS "https://${DOMAIN}/health" 2>/dev/null | grep -q '"ok":true'; then
-              echo "https://${DOMAIN} is up."
+          echo "Installing and building London's routing map and places: usually 20–40 minutes."
+          for i in $(seq 1 110); do
+            health=$(curl -fsS "https://${DOMAIN}/health" 2>/dev/null || true)
+            if grep -q '"routing":true' <<<"$health" && grep -q '"places":true' <<<"$health"; then
+              echo "https://${DOMAIN} is up, with routing and places."
               exit 0
             fi
-            [ $((i % 10)) -eq 0 ] && echo "Still building ($i minutes)…"
+            # A server still on older code only reports ok; it updates itself overnight.
+            if grep -q '"ok":true' <<<"$health" && ! grep -q '"routing"' <<<"$health"; then
+              echo "https://${DOMAIN} is up (older version: it can't report whether the map is built yet)."
+              exit 0
+            fi
+            [ $((i % 5)) -eq 0 ] && echo "Still building ($i minutes): ${health:-not answering yet}"
             sleep 60
           done
-          echo "::error::Not answering after 90 minutes. Log into the server and check /var/log/blue-route-install.log"
+          echo "::error::Not fully ready after 110 minutes (last answer: ${health:-none}). Log into the server and check /var/log/blue-route-install.log"
           exit 1
 
       - name: Summary
