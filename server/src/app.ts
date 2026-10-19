@@ -5,10 +5,11 @@ import cors from "@fastify/cors";
 import Fastify, { LogController, type FastifyInstance } from "fastify";
 
 import type { ServerConfig } from "./config.js";
+import { VEHICLE_TYPES, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
 import { privacyPage, supportPage } from "./pages.js";
 import { PlacesError, type PlacesClient } from "./places.js";
-import { planRoutes } from "./plan.js";
+import { NoSafeRouteError, planRoutes } from "./plan.js";
 import { pursuitInfo } from "./pursuit.js";
 import { ValhallaError, type Matcher, type Router } from "./valhalla.js";
 
@@ -26,6 +27,8 @@ interface RoutesBody {
   /** heading: direction of travel in degrees, when moving, so the route starts that way. */
   from: { lat: number; lng: number; heading?: number };
   to: { lat: number; lng: number };
+  /** What's being driven; routes avoid limits it can't take. Defaults to a car. */
+  vehicle?: VehicleType;
 }
 
 export function buildApp(
@@ -83,19 +86,23 @@ export function buildApp(
               properties: { ...point.properties, heading: { type: "number", minimum: 0, maximum: 360 } },
             },
             to: point,
+            vehicle: { type: "string", enum: [...VEHICLE_TYPES] },
           },
         },
       },
     },
     async (req, reply) => {
-      const { from, to } = req.body;
+      const { from, to, vehicle } = req.body;
       if (!inBounds(from) || !inBounds(to)) {
         return reply.code(422).send({ error: "outside-area", message: "Both points must be in the covered area." });
       }
       const toLngLat = (p: { lat: number; lng: number }): LngLat => [p.lng, p.lat];
       try {
-        return await planRoutes(router, toLngLat(from), toLngLat(to), config, from.heading);
+        return await planRoutes(router, toLngLat(from), toLngLat(to), config, from.heading, vehicle);
       } catch (err) {
+        if (err instanceof NoSafeRouteError) {
+          return reply.code(422).send({ error: "no-safe-route", message: err.message });
+        }
         if (err instanceof ValhallaError) {
           if (err.code === 442) {
             return reply.code(422).send({ error: "no-route", message: "No route between these points." });

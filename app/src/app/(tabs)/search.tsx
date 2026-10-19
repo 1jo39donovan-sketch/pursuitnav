@@ -1,5 +1,5 @@
 import type { LngLat } from "@maplibre/maplibre-react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -41,11 +41,12 @@ interface Destination {
 // where the phone is now. A long press on the map also sets a destination.
 export default function SearchScreen() {
   const { fix } = useLocation();
-  const { boroughs, policeRoutes } = useSession();
+  const { boroughs, policeRoutes, vehicle } = useSession();
   const { data, search, places } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
   const [query, setQuery] = useState("");
+  const input = useRef<TextInput>(null);
   const [showOutside, setShowOutside] = useState(false);
   const [destination, setDestination] = useState<Destination | null>(null);
   const [state, setState] = useState<PlanState | null>(null);
@@ -97,7 +98,7 @@ export default function SearchScreen() {
       setState({ status: "loading" });
       try {
         const to = { lat: dest.point[1], lng: dest.point[0] };
-        const plan = await fetchRoutes(routeOrigin(fix), to, controller.signal);
+        const plan = await fetchRoutes(routeOrigin(fix), to, vehicle, controller.signal);
         if (!controller.signal.aborted) setState({ status: "ready", plan });
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -105,7 +106,7 @@ export default function SearchScreen() {
         setState({ status: "error", message });
       }
     },
-    [fix],
+    [fix, vehicle],
   );
 
   useEffect(() => () => request.current?.abort(), []);
@@ -177,7 +178,7 @@ export default function SearchScreen() {
     };
   }, [data, places, area, markerGroups]);
 
-  // Police routes only for someone who has said they're a police driver.
+  // Blue-light routes only for someone who has said they drive for an emergency service.
   const shown = useMemo<PlanState | null>(
     () => (state?.status === "ready" && !policeRoutes ? { status: "ready", plan: withoutPolice(state.plan) } : state),
     [state, policeRoutes],
@@ -209,10 +210,35 @@ export default function SearchScreen() {
           ? "No boroughs picked: every match shows as outside your area. Pick them on the Session tab."
           : null;
 
+  // Ready to type the moment the screen opens, unless a route is already up.
+  useFocusEffect(
+    useCallback(() => {
+      if (!destination && !query) input.current?.focus();
+      // Only on arriving at the screen, not on every keystroke.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
+
+  // The last few places routed to, one tap away.
+  const entries = log.entries;
+  const recent = useMemo(() => {
+    const seen = new Set<string>();
+    const out: typeof entries = [];
+    for (const e of entries) {
+      const key = `${e.chosen}|${e.lat.toFixed(5)}|${e.lng.toFixed(5)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(e);
+      if (out.length === 3) break;
+    }
+    return out;
+  }, [entries]);
+
   return (
     <View style={styles.screen}>
       <View style={styles.searchBar}>
         <TextInput
+          ref={input}
           value={query}
           onChangeText={(t) => {
             setQuery(t);
@@ -277,7 +303,29 @@ export default function SearchScreen() {
             }}
           />
         )}
-        {!destination && !showResults && !tapped && (
+        {!destination && !showResults && !tapped && recent.length > 0 && (
+          <View style={styles.recent}>
+            <Text style={styles.recentLabel}>Recent</Text>
+            {recent.map((e) => (
+              <Pressable
+                key={e.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Route to ${e.chosen} again`}
+                onPress={() => {
+                  setQuery(e.chosen);
+                  choose({ point: [e.lng, e.lat], title: e.chosen }, "", e.borough);
+                }}
+                style={({ pressed }) => [styles.recentRow, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.recentText} numberOfLines={1}>
+                  ↻ {e.chosen}
+                </Text>
+                {e.borough && <Text style={styles.recentMeta}>{e.borough}</Text>}
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {!destination && !showResults && !tapped && recent.length === 0 && (
           <View style={styles.hint} pointerEvents="none">
             <Text style={styles.hintText}>Type an address above, or press and hold on the map.</Text>
           </View>
@@ -361,6 +409,35 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   hintText: { color: colors.muted, fontFamily: fonts.body, fontSize: 14, textAlign: "center" },
+  recent: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    backgroundColor: colors.panel,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  recentLabel: {
+    color: colors.muted,
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 12,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  recentRow: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderTopColor: colors.line,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  recentText: { flex: 1, color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 17 },
+  recentMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
 });
 
 function loadMarkerGroups(): PlaceGroup[] {

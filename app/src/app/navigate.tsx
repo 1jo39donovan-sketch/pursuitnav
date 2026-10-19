@@ -1,5 +1,6 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
+import * as Speech from "expo-speech";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +12,9 @@ import type { MapRoute } from "../components/mapShared";
 import { formatDistance, formatDuration } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation } from "../navigation/NavigationProvider";
+import { nextCallout } from "../navigation/voice";
+import { useSession } from "../session/SessionProvider";
+import { store } from "../storage/store";
 import {
   maneuverArrow,
   OFF_ROUTE_FIXES,
@@ -36,6 +40,7 @@ export default function NavigateScreen() {
   }, []);
   const { active, replan, stop } = useNavigation();
   const { fix } = useLocation();
+  const { vehicle } = useSession();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
@@ -73,7 +78,7 @@ export default function NavigateScreen() {
     lastAttempt.current = Date.now();
     const controller = new AbortController();
     inFlight.current = controller;
-    fetchRoutes(routeOrigin(fix), active.destination, controller.signal)
+    fetchRoutes(routeOrigin(fix), active.destination, vehicle, controller.signal)
       .then((plan) => {
         setFailed(false);
         replan(plan);
@@ -84,13 +89,44 @@ export default function NavigateScreen() {
       .finally(() => {
         if (inFlight.current === controller) inFlight.current = null;
       });
-  }, [active, fix, offRoute, replan]);
+  }, [active, fix, offRoute, replan, vehicle]);
   useEffect(() => () => inFlight.current?.abort(), []);
 
   const end = () => {
     stop();
     router.back();
   };
+
+  // Spoken directions, so the crew can keep their eyes on the road.
+  const [voiceOn, setVoiceOn] = useState(() => store.getSetting("voice") !== "0");
+  const toggleVoice = () => {
+    const on = !voiceOn;
+    setVoiceOn(on);
+    store.setSetting("voice", on ? "1" : "0");
+    if (!on) Speech.stop();
+  };
+  const said = useRef<{ route: unknown; keys: Set<string> }>({ route: null, keys: new Set() });
+  useEffect(() => {
+    if (!progress || !prepared || offRoute) return;
+    // A new route (after a re-route) starts its callouts afresh.
+    if (said.current.route !== prepared) said.current = { route: prepared, keys: new Set() };
+    const callout = nextCallout(progress, said.current.keys);
+    if (!callout) return;
+    said.current.keys.add(callout.key);
+    if (voiceOn) {
+      Speech.stop();
+      Speech.speak(callout.text, { language: "en-GB" });
+    }
+  }, [progress, prepared, offRoute, voiceOn]);
+  useEffect(() => () => void Speech.stop(), []);
+
+  // Ending takes a second tap, so a bump on the way doesn't drop the route.
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  useEffect(() => {
+    if (!confirmEnd) return;
+    const t = setTimeout(() => setConfirmEnd(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirmEnd]);
 
   if (!active || !prepared) {
     return (
@@ -167,12 +203,29 @@ export default function NavigateScreen() {
       <View style={styles.side}>
         <Text style={[styles.badge, { color: routeColor, borderColor: routeColor }]}>
           {isPolice
-            ? `POLICE · ${"restrictions" in active.route ? active.route.restrictions.length : 0} RESTR.`
+            ? `BLUE LIGHT · ${"restrictions" in active.route ? active.route.restrictions.length : 0} RESTR.`
             : "STANDARD"}
         </Text>
-        <Pressable accessibilityRole="button" onPress={end} style={styles.endButton}>
-          <Text style={styles.endText}>End</Text>
-        </Pressable>
+        <View style={styles.buttons}>
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityState={{ checked: voiceOn }}
+            accessibilityLabel="Spoken directions"
+            onPress={toggleVoice}
+            hitSlop={8}
+            style={[styles.voiceButton, !voiceOn && styles.voiceOff]}
+          >
+            <Text style={styles.voiceText}>{voiceOn ? "🔊" : "🔇"}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint="Tap twice to end navigation"
+            onPress={() => (confirmEnd || progress?.arrived ? end() : setConfirmEnd(true))}
+            style={[styles.endButton, confirmEnd && styles.endConfirm]}
+          >
+            <Text style={styles.endText}>{confirmEnd ? "Tap to end" : "End"}</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -242,6 +295,25 @@ const styles = StyleSheet.create({
   road: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, marginTop: 2 },
   side: { alignItems: "flex-end", gap: 8 },
   badge: { fontFamily: fonts.mono, fontSize: 11, borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  endButton: { backgroundColor: colors.warn, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 22 },
+  buttons: { flexDirection: "row", gap: 10, alignItems: "center" },
+  voiceButton: {
+    minWidth: 52,
+    minHeight: 52,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  voiceOff: { borderColor: colors.warn },
+  voiceText: { fontSize: 24 },
+  endButton: {
+    backgroundColor: colors.warn,
+    borderRadius: 8,
+    minHeight: 52,
+    justifyContent: "center",
+    paddingHorizontal: 22,
+  },
+  endConfirm: { backgroundColor: "#ff3b30" },
   endText: { color: "#ffffff", fontFamily: fonts.displayBold, fontSize: 18, letterSpacing: 1, textTransform: "uppercase" },
 });

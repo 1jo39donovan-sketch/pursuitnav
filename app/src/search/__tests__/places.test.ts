@@ -103,4 +103,12 @@ describe("listing a kind of place", () => {
     expect(typesForQuery("offie", types)).toEqual(["Off-licence", "Corner shop"]);
     expect(typesForQuery("Holloway Road", types)).toEqual([]);
   });
+
+  it("finds hospitals that take emergencies for 'A&E'", () => {
+    const types = new Set(["Hospital", "Hospital with A&E", "A&E entrance"]);
+    for (const q of ["A&E", "a&e", "A and E", "accident and emergency"]) {
+      expect(typesForQuery(q, types)).toEqual(["Hospital with A&E", "A&E entrance"]);
+    }
+    expect(typesForQuery("hospitals", types)).toEqual(["Hospital"]);
+  });
 });

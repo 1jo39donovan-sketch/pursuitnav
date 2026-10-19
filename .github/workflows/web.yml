@@ -1,0 +1,65 @@
+# Publishes the web version of the app to GitHub Pages, connected to the
+# live server, so it can be tried on any phone's browser (iPhone included)
+# with real GPS, search and routes. Not a replacement for the store apps:
+# a browser can't keep GPS running with the screen off.
+#
+# One-off setup: Settings → Pages → Build and deployment → Source: GitHub Actions.
+name: Web app
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", ".github/workflows/web.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    env:
+      SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+
+      - name: Build
+        run: |
+          [ -n "$SERVER_DOMAIN" ] || { echo "::error::Add the SERVER_DOMAIN variable (DEPLOY.md, step 3)."; exit 1; }
+          # Pages serves the site under /<repository name>/.
+          base="/${GITHUB_REPOSITORY#*/}"
+          jq --arg base "$base" '.expo.experiments = ((.expo.experiments // {}) + {baseUrl: $base})' app.json > app.json.tmp
+          mv app.json.tmp app.json
+          EXPO_PUBLIC_API_URL="https://${SERVER_DOMAIN}" npx expo export --platform web --output-dir dist-web
+          # Links straight to a tab (…/search) load the app too.
+          cp dist-web/index.html dist-web/404.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/dist-web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

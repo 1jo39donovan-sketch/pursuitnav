@@ -2,11 +2,13 @@
 
 ## What this is
 
-A phone app for Met Police officers on patrol and in pursuits. Officers currently use Google Maps, which doesn't understand borough boundaries, police routing or pursuit needs. Blue Route fixes that.
+**Key aim: get the officer or crew from A to B quickly and safely.** Every feature and screen is judged against that, and against being usable in the heat of going to a call: few taps, big targets, glanceable text, spoken directions.
+
+A phone app for Met Police officers on patrol and in pursuits, widening to fire and ambulance crews. Officers currently use Google Maps, which doesn't understand borough boundaries, police routing or pursuit needs. Blue Route fixes that.
 
 Officers install it on their own phones and use it off their own back. It is not a force system. In a pursuit the **operator** (passenger) uses it and relays directions to the driver, so screens can be information-dense.
 
-Scope for v1 is **London only**. UK-wide comes later, so don't hard-code London where a config value would do.
+Scope for v1 is **London only**. The whole UK comes next, then Ireland and beyond, so don't hard-code London where a config value would do. The plan is in `docs/ROADMAP.md`.
 
 The clickable prototype (design reference only, not code to reuse) is at https://claude.ai/artifact/Lu3d7jjV51VvAv5eHs2Lz6. Keep its look: dark navy background, amber accent, condensed display font for big numbers, bottom tab bar (Session / Search / Pursuit / Log).
 
@@ -59,11 +61,15 @@ Origin is always the phone's **current GPS position**. Every search returns two 
 **Police route:** Valhalla `bus` costing with:
 - `ignore_restrictions: true` (turn restrictions such as no right turn and left turn only are ignored)
 - `ignore_oneways: false`
-- vehicle dimensions set to a car, not a bus (height, width, length, weight), so it doesn't avoid low bridges or narrow roads a car fits through
+- vehicle dimensions from the chosen vehicle profile, not a bus
+
+**Vehicle profile.** Chosen on Session: car, SUV, van, carrier, ambulance or fire appliance. Both routes must never use a bridge too low, a road too narrow, or a bridge too weak for it. Valhalla's `ignore_restrictions` drops these limits along with turn restrictions, so the server checks every road on a route against its signed limits and re-routes; tests prove it.
+
+**Main roads.** Blue-light drives are quicker on main roads (width, traffic pulling over, bus lanes) than on side streets with the same signed limit. The map build adds realistic travel speeds per road type (`maxspeed:practical`), which learned speeds will replace.
 
 This allows bus lanes, bus-only roads and bus gates. **The police route must never travel the wrong way down a one-way street.** Check the Valhalla docs for the current option names and behaviour, and write tests that prove one-ways are respected.
 
-The police route is only shown when it is meaningfully faster. It shows the time saved and lists each restricted manoeuvre or bus-only section it uses, with location (e.g. "No right turn: Upper Street into Islington Green"). Work out the best way to detect these, for example by matching the police route against `auto` costing. At minimum it must say how many restrictions it relies on. The operator chooses; the app never silently routes through a restriction.
+The police route (shown as "Blue light") is only shown when it is meaningfully faster, and only after the user declares on Session that they drive for the police, fire or ambulance service. It shows the time saved and lists each restricted manoeuvre or bus-only section it uses, with location (e.g. "No right turn: Upper Street into Islington Green"). Work out the best way to detect these, for example by matching the police route against `auto` costing. At minimum it must say how many restrictions it relies on. The operator chooses; the app never silently routes through a restriction.
 
 Both routes also offer "Open in Google Maps" and "Open in Waze".
 
@@ -93,6 +99,10 @@ Every search and the route picked is saved on the phone (SQLite): time, what was
 ## Data handling
 
 Addresses from the control room stay on the phone. The server must not store request logs containing addresses or locations. Use HTTPS throughout.
+
+## Learning (planned)
+
+Blue Route should learn from real drives: opt-in, anonymised, totals per road only, never raw GPS or addresses. The rules and build steps are in `docs/ROADMAP.md`. Learned speeds feed the map build through `data/learned/practical_speeds.csv`.
 
 ## Out of scope for v1
 

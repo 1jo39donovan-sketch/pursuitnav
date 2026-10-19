@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { API_URL, DEMO_MODE } from "../../config";
@@ -8,10 +8,32 @@ import { CHIP_ORDER } from "../../search/boroughs";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
+import { VEHICLES } from "../../vehicles";
+
+// Once a shift is set up, the app opens on Search: the job is usually to type
+// an address straight away. Only on the first screen shown after launch.
+let openedThisLaunch = false;
 
 export default function SessionScreen() {
-  const { callsign, setCallsign, boroughs, toggleBorough, demoDrive, setDemoDrive, policeRoutes, setPoliceRoutes } =
-    useSession();
+  const {
+    callsign,
+    setCallsign,
+    boroughs,
+    toggleBorough,
+    demoDrive,
+    setDemoDrive,
+    policeRoutes,
+    setPoliceRoutes,
+    vehicle,
+    setVehicle,
+  } = useSession();
+  useEffect(() => {
+    if (openedThisLaunch) return;
+    openedThisLaunch = true;
+    if (callsign && boroughs.length > 0) router.navigate("/search");
+    // Only on launch: later edits to the session shouldn't jump screens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [confirmingPolice, setConfirmingPolice] = useState(false);
   const { savedPlaces, deletePlace, places } = useSearch();
 
@@ -62,7 +84,29 @@ export default function SessionScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Police routes · {policeRoutes ? "on" : "off"}</Text>
+        <Text style={styles.label}>Vehicle</Text>
+        <Text style={styles.placeMeta}>Routes avoid low bridges and weight limits it can’t take.</Text>
+        <View style={styles.chips}>
+          {VEHICLES.map((v) => {
+            const on = vehicle === v.id;
+            return (
+              <Pressable
+                key={v.id}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                accessibilityHint={v.detail}
+                onPress={() => setVehicle(v.id)}
+                style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{v.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Blue-light routes · {policeRoutes ? "on" : "off"}</Text>
         {policeRoutes ? (
           <View style={styles.toggleRow}>
             <Text style={[styles.placeMeta, styles.placeText]}>
@@ -76,12 +120,13 @@ export default function SessionScreen() {
         ) : confirmingPolice ? (
           <View style={styles.confirm}>
             <Text style={styles.confirmText}>
-              Police routes use bus lanes, bus gates and bus-only roads, and ignore turn restrictions such as no right
-              turn. They never go the wrong way down a one-way street. Only a police driver using the emergency
-              exemptions may follow them; anyone else would be breaking the law.
+              Blue-light routes use bus lanes, bus gates and bus-only roads, and ignore turn restrictions such as no
+              right turn. They never go the wrong way down a one-way street. Only a police, fire or ambulance driver
+              using the emergency exemptions may follow them; anyone else would be breaking the law.
             </Text>
             <Text style={styles.confirmText}>
-              I’m a police officer, and I’ll only follow a police route when the exemptions apply and it’s safe to.
+              I drive for the police, fire or ambulance service, and I’ll only follow a blue-light route when the
+              exemptions apply and it’s safe to.
             </Text>
             <View style={styles.confirmButtons}>
               <Pressable
@@ -217,6 +262,7 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { color: colors.fg, fontFamily: fonts.body, fontSize: 14 },
   chipTextOn: { color: "#ffffff", fontFamily: fonts.bodyMedium },
+  vehicleChip: { paddingHorizontal: 16, paddingVertical: 12 },
   button: { backgroundColor: colors.amber, borderRadius: 8, paddingVertical: 14, alignItems: "center" },
   buttonText: {
     color: "#1a1200",

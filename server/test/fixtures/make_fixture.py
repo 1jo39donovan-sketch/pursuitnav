@@ -115,6 +115,34 @@ point("unsigned_near_split", 5, 1, 0, dlng=0.0025)  # just before column 1
 point("cross_south", 5, 2, 2)
 
 
+# Cluster 6: a low bridge (2.0 m) and a weak bridge (3.5 t) on the direct
+# routes. A car fits under and over both; a van must go round the low one
+# and a fire appliance round the weak one, on the police route too.
+# Coordinates can go to -1 here for the approach roads.
+grid(6, skip={"row1", "col1"})
+way(6, [(1, 0), (1, 1)], "Bridge Street", maxheight="2.0")
+way(6, [(1, 1), (1, 2)], "Bridge Street")
+way(6, [(0, 1), (1, 1)], "Weak Bridge Road", maxweight="3.5")
+way(6, [(1, 1), (2, 1)], "Weak Bridge Road")
+# Approach roads, so the bridges are mid-route rather than where it starts.
+way(6, [(1, -1), (1, 0)], "West Approach")
+way(6, [(-1, 1), (0, 1)], "North Approach")
+point("bridge_west", 6, 1, -1)
+point("bridge_east", 6, 1, 2)
+point("weak_north", 6, -1, 1)
+point("weak_south", 6, 2, 1)
+
+# Cluster 7: a main road against a slightly shorter back street, both signed
+# 20 mph. The main road is quicker in practice (wider, traffic can pull over,
+# bus lanes), which the travel speeds places/practical_speeds.py adds before
+# the real map is built say; here they're tagged directly.
+way(7, [(1, 0), (1, 1), (1, 2), (1, 3)], "Back Street", maxspeed__practical="13 mph")
+way(7, [(1, 0), (0.8, 0)], "Link West")
+way(7, [(0.8, 0), (0.8, 1), (0.8, 2), (0.8, 3)], "High Road", highway="primary", maxspeed__practical="20 mph")
+way(7, [(0.8, 3), (1, 3)], "Link East")
+point("main_west", 7, 1, 0)
+point("main_east", 7, 1, 3)
+
 def main(pbf_path, points_path):
     writer = osmium.SimpleWriter(pbf_path, overwrite=True)
     for node_id, lat, lng in sorted(nodes.values()):

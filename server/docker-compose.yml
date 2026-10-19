@@ -1,4 +1,4 @@
-# Blue Route server: Valhalla routing for London, the API, and Caddy for HTTPS.
+# Blue Route server: Valhalla routing, the API, and Caddy for HTTPS.
 # See README.md for first-time setup.
 
 services:
@@ -8,8 +8,8 @@ services:
     volumes:
       - ./data/valhalla:/custom_files
     environment:
-      tile_urls: https://download.geofabrik.de/europe/united-kingdom/england/greater-london-latest.osm.pbf
-      # Serve the tiles already built; scripts/rebuild-tiles.sh refreshes them weekly.
+      # Serve the tiles scripts/build-map.sh built (it adds travel speeds
+      # first, so Valhalla never downloads the map itself).
       use_tiles_ignore_pbf: "True"
       build_admins: "True"
       build_time_zones: "True"
@@ -32,7 +32,8 @@ services:
       # Contact address on the /privacy and /support pages.
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
 
-  # Run by scripts/build-places.sh, not by `docker compose up`.
+  # Map tools (places list, travel speeds), run by scripts/build-map.sh and
+  # scripts/build-places.sh, not by `docker compose up`.
   places:
     build: ./places
     profiles: ["tools"]

@@ -27,8 +27,9 @@ const NO_POLICE: Record<NoPoliceReason, string> = {
   "not-faster": "No meaningfully faster route using bus lanes or restricted turns.",
   "no-restrictions-found": "A faster route exists but its restrictions couldn't be identified, so it isn't offered.",
   "wrong-way-unavoidable": "The only faster route goes against a one-way street, so it isn't offered.",
+  "vehicle-limit-unavoidable": "The only faster route has a bridge or limit your vehicle can't take, so it isn't offered.",
   "not-declared":
-    "A faster route using bus lanes or restricted turns exists. Police routes are only shown to police drivers: turn them on in Session.",
+    "A faster route using bus lanes or restricted turns exists. Blue-light routes are only shown to emergency-service drivers: turn them on in Session.",
 };
 
 /** The two routes side by side, for the operator to choose between. */
@@ -53,8 +54,18 @@ export function RoutePanel({ state, destination, title, note, onClose, onGo, onO
       {state.status === "error" && <Text style={[styles.status, styles.error]}>{state.message}</Text>}
       {state.status === "ready" && (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.cards}>
-          <StandardCard route={state.plan.standard} onGo={() => onGo("standard")} />
-          <PoliceCard route={state.plan.police} reason={state.plan.noPoliceReason} onGo={() => onGo("police")} />
+          {/* The quicker route first: a blue-light route is only offered when it's quicker. */}
+          {state.plan.police ? (
+            <>
+              <PoliceCard route={state.plan.police} onGo={() => onGo("police")} />
+              <StandardCard route={state.plan.standard} onGo={() => onGo("standard")} />
+            </>
+          ) : (
+            <>
+              <StandardCard route={state.plan.standard} fastest onGo={() => onGo("standard")} />
+              <PoliceCard route={null} reason={state.plan.noPoliceReason} onGo={() => onGo("police")} />
+            </>
+          )}
         </ScrollView>
       )}
 
@@ -86,9 +97,10 @@ function GoButton({ onPress, color }: { onPress: () => void; color: string }) {
   );
 }
 
-function StandardCard({ route, onGo }: { route: Route; onGo: () => void }) {
+function StandardCard({ route, fastest, onGo }: { route: Route; fastest?: boolean; onGo: () => void }) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, fastest && styles.cardFastest]}>
+      {fastest && <Text style={styles.fastest}>Fastest</Text>}
       <View style={styles.cardHead}>
         <Text style={styles.cardTitle}>Standard</Text>
         <Text style={[styles.tag, { color: colors.ok, borderColor: colors.ok }]}>LEGAL</Text>
@@ -113,7 +125,7 @@ function PoliceCard({
   if (!route) {
     return (
       <View style={[styles.card, styles.cardMuted]}>
-        <Text style={styles.cardTitle}>Police</Text>
+        <Text style={styles.cardTitle}>Blue light</Text>
         <Text style={styles.meta}>{NO_POLICE[reason ?? "not-faster"]}</Text>
       </View>
     );
@@ -121,21 +133,25 @@ function PoliceCard({
   const count = route.restrictions.length;
   const countText = `${route.restrictionsComplete ? "" : "at least "}${count} restriction${count === 1 ? "" : "s"}`;
   return (
-    <View style={[styles.card, styles.cardPolice]}>
+    <View style={[styles.card, styles.cardPolice, styles.cardFastest]}>
+      <Text style={styles.fastest}>Fastest</Text>
       <View style={styles.cardHead}>
-        <Text style={styles.cardTitle}>Police</Text>
+        <Text style={styles.cardTitle}>Blue light</Text>
         <Text style={styles.tag}>{countText.toUpperCase()}</Text>
       </View>
       <Text style={styles.eta}>{formatDuration(route.durationS)}</Text>
       <Text style={[styles.meta, styles.saving]}>Saves {formatDuration(route.savingS)}</Text>
-      <Text style={styles.meta}>{formatDistance(route.distanceM)} · relies on {countText}:</Text>
+      <View style={[styles.swatch, styles.swatchDashed]} />
+      {/* Go before the list, so it's in reach without scrolling. */}
+      <GoButton onPress={onGo} color={colors.amber} />
+      <Text style={[styles.meta, styles.reliesOn]}>
+        {formatDistance(route.distanceM)} · relies on {countText}:
+      </Text>
       {route.restrictions.map((r, i) => (
         <Text key={i} style={styles.restriction}>
           • {r.description}
         </Text>
       ))}
-      <View style={[styles.swatch, styles.swatchDashed]} />
-      <GoButton onPress={onGo} color={colors.amber} />
     </View>
   );
 }
@@ -224,8 +240,17 @@ const styles = StyleSheet.create({
   restriction: { color: colors.fg, fontFamily: fonts.body, fontSize: 13, lineHeight: 18, marginTop: 4 },
   swatch: { height: 4, borderRadius: 2, marginTop: 10 },
   swatchDashed: { borderTopWidth: 4, borderStyle: "dashed", borderColor: colors.amber, height: 0 },
-  go: { borderRadius: 8, paddingVertical: 10, alignItems: "center", marginTop: 10 },
-  goText: { color: "#0c1220", fontFamily: fonts.displayBold, fontSize: 18, letterSpacing: 1.5, textTransform: "uppercase" },
+  go: { borderRadius: 10, minHeight: 56, justifyContent: "center", alignItems: "center", marginTop: 10 },
+  goText: { color: "#0c1220", fontFamily: fonts.displayBold, fontSize: 24, letterSpacing: 2, textTransform: "uppercase" },
+  cardFastest: { borderWidth: 2 },
+  fastest: {
+    color: colors.ok,
+    fontFamily: fonts.displayBold,
+    fontSize: 12,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  reliesOn: { marginTop: 8 },
   links: { flexDirection: "row", gap: 10 },
   link: {
     flex: 1,

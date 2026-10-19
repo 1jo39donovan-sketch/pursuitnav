@@ -53,9 +53,22 @@ export interface RouteRequest {
   distanceOnly?: boolean;
 }
 
+/** Signed size and weight limits on the road at a point (metres, tonnes). */
+export interface SizeLimits {
+  height?: number;
+  width?: number;
+  length?: number;
+  weight?: number;
+}
+
 export interface Router {
   route(req: RouteRequest): Promise<Route>;
   traceEdges(shape: LngLat[], costing: Costing): Promise<TraceEdge[]>;
+  /**
+   * For each point, the strictest limits on roads there with one of the
+   * given names (any road if no names). Optional: test doubles leave it out.
+   */
+  sizeLimitsAt?(points: Array<{ point: LngLat; names: string[] }>): Promise<SizeLimits[]>;
 }
 
 /** The road a GPS trace was on at its last point. */
@@ -120,8 +133,16 @@ interface ValhallaTraceResponse {
   }>;
 }
 
+const LIMIT_TYPES: Record<string, keyof SizeLimits> = {
+  max_height: "height",
+  max_width: "width",
+  max_length: "length",
+  max_weight: "weight",
+};
+
 interface ValhallaLocateResponse {
   edges?: Array<{
+    access_restrictions?: Array<{ type: string; value: number; car?: boolean; bus?: boolean; truck?: boolean }>;
     heading: number;
     percent_along: number;
     edge_info: { names?: string[]; shape: string; speed_limit?: number };
@@ -242,6 +263,34 @@ export class ValhallaClient implements Router, Matcher {
     });
   }
 
+  async sizeLimitsAt(points: Array<{ point: LngLat; names: string[] }>): Promise<SizeLimits[]> {
+    const out: SizeLimits[] = [];
+    // Batched: one request per hundred points.
+    for (let i = 0; i < points.length; i += 100) {
+      const batch = points.slice(i, i + 100);
+      const data = await this.post<ValhallaLocateResponse[]>("/locate", {
+        locations: batch.map((p) => location({ point: p.point })),
+        costing: "auto",
+        costing_options: { auto: { ignore_oneways: true, ignore_restrictions: true } },
+        verbose: true,
+      });
+      batch.forEach((p, k) => {
+        const limits: SizeLimits = {};
+        for (const edge of data[k]?.edges ?? []) {
+          const names = edge.edge_info.names ?? [];
+          if (p.names.length && !names.some((n) => p.names.includes(n))) continue;
+          for (const r of edge.access_restrictions ?? []) {
+            const key = LIMIT_TYPES[r.type];
+            if (!key || !(r.car || r.bus || r.truck) || !(r.value > 0)) continue;
+            limits[key] = Math.min(limits[key] ?? Infinity, r.value);
+          }
+        }
+        out.push(limits);
+      });
+    }
+    return out;
+  }
+
   /** The road edges a route shape runs along, in order. */
   async traceEdges(shape: LngLat[], costing: Costing): Promise<TraceEdge[]> {
     const data = await this.post<ValhallaTraceResponse>("/trace_attributes", {
@@ -260,10 +309,13 @@ export class ValhallaClient implements Router, Matcher {
         action: "include",
       },
     });
+    // Indices are into Valhalla's matched shape, which can have a point more
+    // than the one sent (where it snaps the end); keep them in our shape.
+    const last = shape.length - 1;
     return (data.edges ?? []).map((e) => ({
       names: e.names ?? [],
-      beginShapeIndex: e.begin_shape_index,
-      endShapeIndex: e.end_shape_index,
+      beginShapeIndex: Math.min(e.begin_shape_index, last),
+      endShapeIndex: Math.min(e.end_shape_index, last),
       beginHeading: e.begin_heading,
       endHeading: e.end_heading,
     }));

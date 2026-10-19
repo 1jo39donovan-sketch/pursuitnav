@@ -84,7 +84,11 @@ const SYNONYMS: Record<string, string[]> = {
   gp: ["GP surgery"],
   doctor: ["GP surgery"],
   surgery: ["GP surgery"],
-  "a&e": ["Hospital"],
+  "a&e": ["Hospital with A&E", "A&E entrance"],
+  "a and e": ["Hospital with A&E", "A&E entrance"],
+  "accident and emergency": ["Hospital with A&E", "A&E entrance"],
+  "emergency department": ["Hospital with A&E", "A&E entrance"],
+  hospital: ["Hospital", "Hospital with A&E"],
   "police": ["Police station"],
   nick: ["Police station"],
   church: ["Place of worship"],
@@ -114,6 +118,9 @@ function singulars(q: string): string[] {
   return out;
 }
 
+// Keyed the way queries are normalised ("A&E" becomes "a e").
+const SYNONYMS_BY_FORM = new Map(Object.entries(SYNONYMS).map(([k, v]) => [normalise(k), v]));
+
 /**
  * If the query names a kind of place ("coffee shops", "schools", "corner
  * shop"), the type labels it means. Empty if it doesn't.
@@ -126,7 +133,7 @@ export function typesForQuery(query: string, knownTypes: ReadonlySet<string>): s
   for (const form of singulars(q)) {
     const exact = byNorm.get(form);
     if (exact) return [exact];
-    const syn = SYNONYMS[form];
+    const syn = SYNONYMS_BY_FORM.get(form);
     if (syn) return syn.filter((t) => knownTypes.has(t));
   }
   return [];

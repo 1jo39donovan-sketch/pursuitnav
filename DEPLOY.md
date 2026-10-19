@@ -69,6 +69,14 @@ Add secret `ANDROID_KEYSTORE_PASSWORD`: a long random password (a password manag
 1. **Actions → Deploy server → Run workflow.** It rents the server, points the domain at it, installs everything and waits until `https://SERVER_DOMAIN` answers: usually 20–40 minutes.
 2. **Actions → Android app → Run workflow.** About 20–30 minutes. Then open the **Android app** release page (Code → Releases) on the phone and install `blue-route.apk`.
 
+## 7. Try it on any phone (optional, free)
+
+The web version runs in a phone's browser (Safari on iPhone too) with real GPS, search and routes, connected to your server. It's handy for testing without an Android phone; officers should still use the store apps.
+
+1. In GitHub, go to **Settings → Pages**. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+2. Go to **Actions → Web app → Run workflow**. It takes about 5 minutes.
+3. Open `https://<your GitHub username>.github.io/pursuitnav/` on the phone and allow location when asked.
+
 ## After that, it looks after itself
 
 - Map and places refresh from OpenStreetMap every Sunday night.
