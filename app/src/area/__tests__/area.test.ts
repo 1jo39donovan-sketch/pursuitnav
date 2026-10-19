@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { boroughAt, cardinal, generallyTowards, projectAhead } from "../area";
+import { boroughAt, cardinal, generallyTowards, nearBoroughs, projectAhead } from "../area";
 
 describe("boroughAt", () => {
   it("names the borough at well-known spots", () => {
@@ -46,5 +46,24 @@ describe("generallyTowards", () => {
 
   it("says so when there's nothing to name", () => {
     expect(generallyTowards(51.372, -0.1, 0, [])).toBeNull();
+  });
+});
+
+describe("nearBoroughs", () => {
+  // Along latitude 51.54 the Camden–Islington boundary is at about -0.1245.
+  const nearIslington = nearBoroughs(new Set(["Islington"] as const), 400);
+
+  it("counts the selected borough itself", () => {
+    expect(nearIslington(51.54, -0.12)).toBe(true);
+  });
+
+  it("counts a road a couple of hundred metres over the line", () => {
+    expect(boroughAt(51.54, -0.127)).toBe("Camden");
+    expect(nearIslington(51.54, -0.127)).toBe(true);
+  });
+
+  it("doesn't count somewhere well into the next borough", () => {
+    expect(boroughAt(51.54, -0.134)).toBe("Camden");
+    expect(nearIslington(51.54, -0.134)).toBe(false);
   });
 });

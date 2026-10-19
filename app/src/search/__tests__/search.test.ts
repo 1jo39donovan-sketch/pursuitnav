@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { nearBoroughs } from "../../area/area";
 import type { Borough } from "../boroughs";
 import { parsePostcodes, parseRoads } from "../data";
 import { SearchIndex } from "../engine";
@@ -137,5 +138,20 @@ describe("matchScore", () => {
 
   it("doesn't guess wildly", () => {
     expect(matchScore(normalise("Bemerton Estate"), "xyz")).toBe(0);
+  });
+});
+
+describe("roads just over the borough line", () => {
+  // Officers are often told the wrong borough for roads near a boundary.
+  const islingtonAndNear = { has: (b: Borough) => b === "Islington", near: nearBoroughs(ISLINGTON, 400) };
+
+  it("shows a Camden road just over the Islington line with Islington's results", () => {
+    expect(index.search("Agar Grove", ISLINGTON).inArea.map((r) => r.borough)).not.toContain("Camden");
+    const found = index.search("Agar Grove", islingtonAndNear).inArea.find((r) => r.label === "Agar Grove");
+    expect(found?.borough).toBe("Camden");
+  });
+
+  it("still keeps roads well into the next borough outside", () => {
+    expect(index.search("Kentish Town Road", islingtonAndNear).inArea).toEqual([]);
   });
 });

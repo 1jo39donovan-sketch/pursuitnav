@@ -10,11 +10,13 @@ import {
 
 import postcodesAsset from "../../assets/data/postcodes.dat";
 import roadsAsset from "../../assets/data/roads.dat";
+import { nearBoroughs } from "../area/area";
 import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import type { SavedPlace } from "../storage/types";
+import type { Borough } from "./boroughs";
 import { parsePostcodes, parseRoads } from "./data";
-import { SearchIndex, type Place, type SearchResults } from "./engine";
+import { SearchIndex, type AreaFilter, type Place, type SearchResults } from "./engine";
 import { starterEstatePlaces } from "./estates";
 import { loadText } from "./loadText";
 import { parsePlacesFile } from "./places";
@@ -29,10 +31,15 @@ interface SearchContextValue {
   data: DataState;
   places: PlacesInfo;
   search: (query: string) => SearchResults;
+  /** The officer's boroughs, and anywhere just over their boundaries. */
+  area: AreaFilter;
   savedPlaces: SavedPlace[];
   addPlace: (place: Omit<SavedPlace, "id">) => void;
   deletePlace: (id: number) => void;
 }
+
+/** How far over a boundary a road or place still counts as in the officer's area. */
+const NEAR_AREA_M = 400;
 
 const EMPTY: SearchResults = { inArea: [], outside: [] };
 const SearchContext = createContext<SearchContextValue | null>(null);
@@ -98,7 +105,12 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     }
   }, [data, savedPlaces]);
 
-  const area = useMemo(() => new Set(boroughs), [boroughs]);
+  // A road or place just over the line from a chosen borough counts too:
+  // officers are often told the wrong borough for roads near a boundary.
+  const area = useMemo(() => {
+    const set = new Set(boroughs);
+    return { has: (b: Borough) => set.has(b), near: nearBoroughs(set, NEAR_AREA_M) };
+  }, [boroughs]);
   const search = useCallback(
     (query: string) => (data.status === "ready" ? data.index.search(query, area) : EMPTY),
     // savedPlaces, places: results change when places are added or arrive, though the index object doesn't.
@@ -116,8 +128,8 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ data, places, search, savedPlaces, addPlace, deletePlace }),
-    [data, places, search, savedPlaces, addPlace, deletePlace],
+    () => ({ data, places, search, area, savedPlaces, addPlace, deletePlace }),
+    [data, places, search, area, savedPlaces, addPlace, deletePlace],
   );
   return <SearchContext.Provider value={value}>{children}</SearchContext.Provider>;
 }

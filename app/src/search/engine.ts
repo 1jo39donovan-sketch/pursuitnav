@@ -57,6 +57,18 @@ export interface SearchResult {
   placeGroup?: PlaceGroup;
 }
 
+/**
+ * The officer's area: their boroughs, plus (optionally) anywhere near them,
+ * so a road just over a boundary still counts. A plain Set of boroughs works.
+ */
+export interface AreaFilter {
+  has(borough: Borough): boolean;
+  near?(lat: number, lng: number): boolean;
+}
+
+const within = (area: AreaFilter, x: { borough: Borough; lat: number; lng: number }) =>
+  area.has(x.borough) || (area.near?.(x.lat, x.lng) ?? false);
+
 export interface SearchResults {
   inArea: SearchResult[];
   outside: SearchResult[];
@@ -177,7 +189,7 @@ export class SearchIndex {
     return this.postcodes.get(compact.replace(/\s/g, "").toUpperCase());
   }
 
-  search(raw: string, area: ReadonlySet<Borough>): SearchResults {
+  search(raw: string, area: AreaFilter): SearchResults {
     if (raw.trim().length < 2) return { inArea: [], outside: [] };
     const types = typesForQuery(raw, this.poiTypes);
     const listed = this.listOfType(types, area);
@@ -195,16 +207,16 @@ export class SearchIndex {
         return true;
       });
 
-    const outside = unique.filter((h) => !area.has(h.borough));
+    const outside = unique.filter((h) => !within(area, h));
     for (const h of listed.outsideSample) if (!seen.has(h.key)) outside.push(h);
     return {
-      inArea: unique.filter((h) => area.has(h.borough)).slice(0, limit),
+      inArea: unique.filter((h) => within(area, h)).slice(0, limit),
       outside,
       outsideCount: outside.length + listed.outsideRest + this.lastPoiOutsideRest,
     };
   }
 
-  private collect(raw: string, area: ReadonlySet<Borough>): SearchResult[] {
+  private collect(raw: string, area: AreaFilter): SearchResult[] {
     const q = parseQuery(raw);
 
     if (q.fullPostcode) {
@@ -283,7 +295,7 @@ export class SearchIndex {
     return hits;
   }
 
-  private matchPointsOfInterest(parts: string[], area: ReadonlySet<Borough>): SearchResult[] {
+  private matchPointsOfInterest(parts: string[], area: AreaFilter): SearchResult[] {
     const norms = parts.map(normalise).filter((n) => n.length >= 2);
     // Score as plain numbers first; only the best become full results.
     const scored: { idx: number; score: number }[] = [];
@@ -308,7 +320,7 @@ export class SearchIndex {
     let outside = 0;
     for (const { idx, score } of scored) {
       const p = this.pois[idx]!.item;
-      const mine = area.has(p.borough);
+      const mine = within(area, p);
       if (mine ? inArea++ < MAX_RESULTS * 2 : outside++ < MAX_RESULTS) out.push(this.poiResult(p, score));
     }
     this.lastPoiOutsideRest = Math.max(0, outside - MAX_RESULTS);
@@ -321,14 +333,14 @@ export class SearchIndex {
    */
   private listOfType(
     types: string[],
-    area: ReadonlySet<Borough>,
+    area: AreaFilter,
   ): { inArea: SearchResult[]; outsideSample: SearchResult[]; outsideRest: number } {
     const out = { inArea: [] as SearchResult[], outsideSample: [] as SearchResult[], outsideRest: 0 };
     if (!types.length) return out;
     const wanted = new Set(types);
     for (const { item } of this.pois) {
       if (!wanted.has(item.type)) continue;
-      if (area.has(item.borough)) out.inArea.push(this.poiResult(item, 60));
+      if (within(area, item)) out.inArea.push(this.poiResult(item, 60));
       else if (out.outsideSample.length < MAX_RESULTS) out.outsideSample.push(this.poiResult(item, 60));
       else out.outsideRest++;
     }
