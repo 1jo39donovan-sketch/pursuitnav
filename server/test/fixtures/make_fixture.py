@@ -115,6 +115,23 @@ point("unsigned_near_split", 5, 1, 0, dlng=0.0025)  # just before column 1
 point("cross_south", 5, 2, 2)
 
 
+# Cluster 6: a low bridge (2.0 m) and a weak bridge (3.5 t) on the direct
+# routes. A car fits under and over both; a van must go round the low one
+# and a fire appliance round the weak one, on the police route too.
+# Coordinates can go to -1 here for the approach roads.
+grid(6, skip={"row1", "col1"})
+way(6, [(1, 0), (1, 1)], "Bridge Street", maxheight="2.0")
+way(6, [(1, 1), (1, 2)], "Bridge Street")
+way(6, [(0, 1), (1, 1)], "Weak Bridge Road", maxweight="3.5")
+way(6, [(1, 1), (2, 1)], "Weak Bridge Road")
+# Approach roads, so the bridges are mid-route rather than where it starts.
+way(6, [(1, -1), (1, 0)], "West Approach")
+way(6, [(-1, 1), (0, 1)], "North Approach")
+point("bridge_west", 6, 1, -1)
+point("bridge_east", 6, 1, 2)
+point("weak_north", 6, -1, 1)
+point("weak_south", 6, 2, 1)
+
 def main(pbf_path, points_path):
     writer = osmium.SimpleWriter(pbf_path, overwrite=True)
     for node_id, lat, lng in sorted(nodes.values()):

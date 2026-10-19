@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 
 import { buildApp } from "../../src/app.js";
 import type { ServerConfig } from "../../src/config.js";
-import { POLICE, STANDARD } from "../../src/costing.js";
+import { POLICE, policeFor, STANDARD } from "../../src/costing.js";
 import type { LngLat } from "../../src/geo.js";
 import type { Plan } from "../../src/plan.js";
 import { ValhallaClient } from "../../src/valhalla.js";
@@ -30,8 +30,8 @@ afterAll(() => app.close());
 const at = (name: string) => points[name]!;
 const lngLat = (name: string): LngLat => [at(name).lng, at(name).lat];
 
-async function plan(from: string, to: string): Promise<Plan> {
-  const res = await app.inject({ method: "POST", url: "/v1/routes", payload: { from: at(from), to: at(to) } });
+async function plan(from: string, to: string, vehicle?: string): Promise<Plan> {
+  const res = await app.inject({ method: "POST", url: "/v1/routes", payload: { from: at(from), to: at(to), vehicle } });
   expect(res.statusCode, res.body).toBe(200);
   return res.json() as Plan;
 }
@@ -120,6 +120,82 @@ describe("turn restrictions", () => {
     // The turn is at the junction of Turn Street and Column 1 Road.
     const junction = at("turn_start");
     expect(police.restrictions[0]!.location.lat).toBeCloseTo(junction.lat, 4);
+  });
+});
+
+describe("vehicle size and weight", () => {
+  // Bridge Street passes under a 2.0 m bridge between columns 0 and 1 of its
+  // row; Weak Bridge Road crosses a 3.5 t bridge between rows 0 and 1.
+  const DLNG = 0.003;
+  const DLAT = -0.002;
+  const lowBridge = (): [LngLat, LngLat] => {
+    const w = at("bridge_west");
+    return [[w.lng + DLNG, w.lat], [w.lng + 2 * DLNG, w.lat]];
+  };
+  const weakBridge = (): [LngLat, LngLat] => {
+    const n = at("weak_north");
+    return [[n.lng, n.lat + DLAT], [n.lng, n.lat + 2 * DLAT]];
+  };
+  /** True if the shape runs along the straight segment a–b. */
+  function uses(shape: LngLat[], [a, b]: [LngLat, LngLat]): boolean {
+    const on = (p: LngLat) => {
+      const cross = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+      const within =
+        p[0] >= Math.min(a[0], b[0]) - 1e-6 && p[0] <= Math.max(a[0], b[0]) + 1e-6 &&
+        p[1] >= Math.min(a[1], b[1]) - 1e-6 && p[1] <= Math.max(a[1], b[1]) + 1e-6;
+      return Math.abs(cross) < 1e-9 && within;
+    };
+    return shape.some((p, i) => i > 0 && on(p) && on(shape[i - 1]!) && (p[0] !== shape[i - 1]![0] || p[1] !== shape[i - 1]![1]));
+  }
+
+  it("a car takes both bridges", async () => {
+    expect(uses((await plan("bridge_west", "bridge_east", "car")).standard.shape, lowBridge())).toBe(true);
+    expect(uses((await plan("weak_north", "weak_south", "car")).standard.shape, weakBridge())).toBe(true);
+  });
+
+  it("police costing on its own would send a van under the low bridge (why the check exists)", async () => {
+    const route = await client.route({
+      costing: policeFor("van"),
+      from: { point: lngLat("bridge_west") },
+      to: { point: lngLat("bridge_east") },
+    });
+    expect(uses(route.shape, lowBridge())).toBe(true);
+  });
+
+  for (const vehicle of ["van", "carrier", "ambulance", "fire"]) {
+    it(`neither route sends a ${vehicle} under the 2.0 m bridge`, async () => {
+      const result = await plan("bridge_west", "bridge_east", vehicle);
+      expect(uses(result.standard.shape, lowBridge())).toBe(false);
+      if (result.police) expect(uses(result.police.shape, lowBridge())).toBe(false);
+    });
+  }
+
+  it("neither route sends a fire appliance over the 3.5 t bridge", async () => {
+    const result = await plan("weak_north", "weak_south", "fire");
+    expect(uses(result.standard.shape, weakBridge())).toBe(false);
+    if (result.police) expect(uses(result.police.shape, weakBridge())).toBe(false);
+  });
+
+  it("the police route check finds the bridge and goes round it", async () => {
+    // Called directly so the check is seen to run: the first police route
+    // goes under the bridge, so planRoutes must have rerouted.
+    const result = await plan("bridge_west", "bridge_east", "van");
+    expect(result.police).toBeNull();
+    expect(result.noPoliceReason).toBe("not-faster");
+  });
+
+  it("a van still gets the police route through a bus gate", async () => {
+    const result = await plan("gate_west_end", "gate_east_end", "van");
+    expect(result.police?.restrictions[0]).toMatchObject({ kind: "bus-only" });
+  });
+
+  it("refuses an unknown vehicle", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: at("plain_start"), to: at("plain_end"), vehicle: "tank" },
+    });
+    expect(res.statusCode).toBe(400);
   });
 });
 

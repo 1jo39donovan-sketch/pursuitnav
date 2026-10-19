@@ -10,7 +10,7 @@
 // turn). Clean stretches are never split, so a route with two restrictions
 // costs a few dozen checks, not one per edge.
 
-import { STANDARD } from "./costing.js";
+import { STANDARD, UNSIZED, type Costing } from "./costing.js";
 import { cumulativeDistances, pointAlong, turnAngle, type LngLat } from "./geo.js";
 import { ValhallaError, type Router, type TraceEdge, type Waypoint } from "./valhalla.js";
 
@@ -25,7 +25,13 @@ export type RestrictionKind =
    * Against the flow of a one-way street, e.g. in a contraflow bus lane.
    * Never acceptable: planRoutes() reroutes to avoid these.
    */
-  | "wrong-way";
+  | "wrong-way"
+  /**
+   * Under a bridge too low, or over one too weak, for the vehicle (or a road
+   * too narrow). Found by planRoutes() from signed limits, which reroutes
+   * round them; never offered.
+   */
+  | "vehicle-limit";
 
 export interface Restriction {
   kind: RestrictionKind;
@@ -36,7 +42,7 @@ export interface Restriction {
 }
 
 export interface DetectedRestriction extends Restriction {
-  /** Points on the offending road(s), used to reroute around wrong-way sections. */
+  /** Points on the offending road(s), used to reroute around unacceptable sections. */
   excludePoints: LngLat[];
 }
 
@@ -66,6 +72,8 @@ export async function detectRestrictions(
   shape: LngLat[],
   edges: TraceEdge[],
   budget: number,
+  /** Legal routing for the vehicle being driven, with its size and weight. */
+  legal: Costing = STANDARD,
 ): Promise<DetectionResult> {
   const cumulative = cumulativeDistances(shape);
   let checks = 0;
@@ -85,14 +93,19 @@ export async function detectRestrictions(
    * Can a car get from a to b about as directly as the police route does?
    * Undefined once the check budget is spent.
    */
-  async function carCanDo(a: Waypoint, b: Waypoint, routeDistance: number): Promise<boolean | undefined> {
+  async function carCanDo(
+    a: Waypoint,
+    b: Waypoint,
+    routeDistance: number,
+    costing: Costing = legal,
+  ): Promise<boolean | undefined> {
     if (checks >= budget) {
       complete = false;
       return undefined;
     }
     checks++;
     try {
-      const car = await router.route({ costing: STANDARD, from: a, to: b, distanceOnly: true });
+      const car = await router.route({ costing, from: a, to: b, distanceOnly: true });
       return car.distanceM <= routeDistance * SLACK_FRACTION + SLACK_METRES;
     } catch (err) {
       // No legal car route at all is the clearest possible "no".
@@ -118,15 +131,21 @@ export async function detectRestrictions(
   async function recordEdge(k: number) {
     const name = streetName(edges[k]!);
     const mid = waypoint(alongEdge(k, 0.5));
-    // Bus-only one way, or a one-way street driven backwards? If a car could
-    // legally drive this edge in the opposite direction, it's the latter.
+    // A one-way street driven backwards? If a car could legally drive this
+    // edge in the opposite direction, yes. Checked with a car too small for
+    // any size limit, so a low bridge can't hide a one-way street.
     const back = waypoint(alongEdge(k, 0.75), true);
     const forward = waypoint(alongEdge(k, 0.25), true);
     // If that can't be checked, assume the worse case so the section is avoided.
-    const wrongWay = (await carCanDo(back, forward, back.along - forward.along)) ?? true;
+    const wrongWay = (await carCanDo(back, forward, back.along - forward.along, UNSIZED)) ?? true;
+    const kind: RestrictionKind = wrongWay ? "wrong-way" : "bus-only";
+    const descriptions: Record<string, string> = {
+      "wrong-way": `Wrong way along one-way street: ${name}`,
+      "bus-only": `Bus-only section: ${name}`,
+    };
     record(`edge:${k}`, k, k, {
-      kind: wrongWay ? "wrong-way" : "bus-only",
-      description: wrongWay ? `Wrong way along one-way street: ${name}` : `Bus-only section: ${name}`,
+      kind,
+      description: descriptions[kind]!,
       location: { lat: mid.point[1], lng: mid.point[0] },
       streets: [name],
       excludePoints: [mid.point],
