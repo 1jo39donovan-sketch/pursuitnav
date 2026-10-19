@@ -19,7 +19,9 @@ Each route has `durationS`, `distanceM`, `shape` (`[lng, lat]` points) and turn-
 
 ### Places
 
-`places/extract_places.py` reads the London OSM extract and writes `data/places/places.txt.gz`: one line per named place with its type ("Coffee shop", "Corner shop", "School"…), group, borough (point-in-polygon against `places/london-boroughs.geojson`), a point inside it and its address where OSM has one. `places/categories.py` decides what counts as a place and what to call it. `scripts/build-places.sh` runs it in Docker; `rebuild-tiles.sh` runs it weekly after the tiles. Tests: `pytest places` (needs `pip install -r places/requirements.txt`).
+**Map build.** `scripts/build-map.sh` downloads the OSM extract named by `PBF_URL` in `.env` (Greater London by default), adds travel speeds with `places/practical_speeds.py`, builds Valhalla's tiles and swaps them in. Travel speeds go in `maxspeed:practical`, which Valhalla uses for timing while `maxspeed` stays the signed limit: main roads are timed near their limit, side streets slower, so routes favour main roads as blue-light drives do. Learned speeds in `data/learned/practical_speeds.csv` (`way_id,mph`) override the model road by road. Cron runs it weekly as `rebuild-tiles.sh`.
+
+`places/extract_places.py` reads the London OSM extract and writes `data/places/places.txt.gz`: one line per named place with its type ("Coffee shop", "Corner shop", "School"…), group, borough (point-in-polygon against `places/london-boroughs.geojson`), a point inside it and its address where OSM has one. `places/categories.py` decides what counts as a place and what to call it. `scripts/build-places.sh` runs it in Docker; `build-map.sh` runs it after each map build. Tests: `pytest places` (needs `pip install -r places/requirements.txt`).
 
 ### OS Places
 

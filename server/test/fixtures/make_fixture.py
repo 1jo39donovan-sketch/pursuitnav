@@ -132,6 +132,17 @@ point("bridge_east", 6, 1, 2)
 point("weak_north", 6, -1, 1)
 point("weak_south", 6, 2, 1)
 
+# Cluster 7: a main road against a slightly shorter back street, both signed
+# 20 mph. The main road is quicker in practice (wider, traffic can pull over,
+# bus lanes), which the travel speeds places/practical_speeds.py adds before
+# the real map is built say; here they're tagged directly.
+way(7, [(1, 0), (1, 1), (1, 2), (1, 3)], "Back Street", maxspeed__practical="13 mph")
+way(7, [(1, 0), (0.8, 0)], "Link West")
+way(7, [(0.8, 0), (0.8, 1), (0.8, 2), (0.8, 3)], "High Road", highway="primary", maxspeed__practical="20 mph")
+way(7, [(0.8, 3), (1, 3)], "Link East")
+point("main_west", 7, 1, 0)
+point("main_east", 7, 1, 3)
+
 def main(pbf_path, points_path):
     writer = osmium.SimpleWriter(pbf_path, overwrite=True)
     for node_id, lat, lng in sorted(nodes.values()):

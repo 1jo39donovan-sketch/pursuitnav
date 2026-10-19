@@ -199,6 +199,15 @@ describe("vehicle size and weight", () => {
   });
 });
 
+describe("main roads", () => {
+  it("takes the main road over a slightly shorter back street", async () => {
+    const result = await plan("main_west", "main_east");
+    const streets = result.standard.maneuvers.flatMap((m) => m.streetNames);
+    expect(streets).toContain("High Road");
+    expect(streets).not.toContain("Back Street");
+  });
+});
+
 describe("no restrictions to gain from", () => {
   it("doesn't offer a police route when it's no faster", async () => {
     const result = await plan("plain_start", "plain_end");

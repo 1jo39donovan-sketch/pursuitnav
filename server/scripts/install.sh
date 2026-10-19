@@ -37,6 +37,11 @@ if [ -z "${CONTACT_EMAIL:-}" ] && [ -f "$DIR/server/.env" ]; then
   CONTACT_EMAIL=$(grep -E '^CONTACT_EMAIL=' "$DIR/server/.env" | cut -d= -f2- || true)
 fi
 CONTACT_EMAIL=${CONTACT_EMAIL:-}
+# Which OpenStreetMap extract to build the map from (Greater London if unset).
+if [ -z "${PBF_URL:-}" ] && [ -f "$DIR/server/.env" ]; then
+  PBF_URL=$(grep -E '^PBF_URL=' "$DIR/server/.env" | cut -d= -f2- || true)
+fi
+PBF_URL=${PBF_URL:-}
 
 say "Installing Docker and basics"
 apt-get update -qq
@@ -90,25 +95,26 @@ cd "$DIR/server"
 [ -f docker-compose.yml ] || fail "No server code on branch $BRANCH. Merge the pull request into main first, or run with BRANCH=<branch>."
 
 umask 077
-printf 'DOMAIN=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" >.env
+printf 'DOMAIN=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" >.env
 umask 022
+
+say "Building the routing map and places list. This takes 20–40 minutes the first time."
+if [ -s data/valhalla/valhalla_tiles.tar ]; then
+  echo "Map already built; the weekly refresh keeps it current."
+else
+  scripts/build-map.sh
+fi
 
 say "Starting Valhalla, the API and HTTPS"
 docker compose up -d --build
-
-say "Building London's routing map. This takes 15–30 minutes the first time."
-for i in $(seq 1 120); do
+for i in $(seq 1 60); do
   if docker compose exec -T api wget -qO- http://valhalla:8002/status >/dev/null 2>&1; then
-    echo "Routing map ready."
+    echo "Routing ready."
     break
   fi
-  [ "$i" -eq 120 ] && fail "Valhalla still isn't up after an hour. Check: docker compose ps"
-  printf '.'
-  sleep 30
+  [ "$i" -eq 60 ] && fail "Valhalla isn't answering. Check: docker compose ps"
+  sleep 5
 done
-
-say "Extracting shops, cafés, schools, parks and other places"
-scripts/build-places.sh
 
 say "Weekly map and places refresh (Sundays 03:15); nightly code update from $BRANCH (04:30)"
 cat >/etc/cron.d/blue-route <<EOF
