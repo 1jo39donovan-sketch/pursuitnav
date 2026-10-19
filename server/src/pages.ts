@@ -44,7 +44,7 @@ export function privacyPage(email?: string): string {
     "Privacy policy",
     `<p class="muted">Blue Route · last updated ${UPDATED}</p>
 
-<p>Blue Route is a navigation app for police officers on patrol in London. It’s an independent app, not a police force
+<p>Blue Route is a navigation app for police, fire and ambulance crews. It’s an independent app, not a police force or emergency service
 system. It has no accounts, no adverts, no analytics and no tracking.</p>
 
 <h2>Kept on your phone only</h2>
@@ -83,7 +83,7 @@ has no database of users. Connections use HTTPS.</p>
 are. It doesn’t use location in the background.</p>
 
 <h2>Children</h2>
-<p>Blue Route is meant for police officers and isn’t directed at children.</p>
+<p>Blue Route is meant for emergency-service crews and isn’t directed at children.</p>
 
 <h2>Questions</h2>
 <p>To ask about this policy, ${contact(email)}. If this policy changes, the date above changes and the new version is
@@ -95,7 +95,7 @@ export function supportPage(email?: string): string {
   return page(
     "Support",
     `<p>Blue Route gives officers on patrol in London address and place search filtered to their boroughs, a standard
-route and (for police drivers) a faster police route, turn-by-turn navigation, and a pursuit screen.</p>
+route and (for emergency-service drivers) a faster blue-light route, sized to their vehicle, turn-by-turn navigation with spoken directions, and a pursuit screen.</p>
 
 <h2>Getting help or reporting a problem</h2>
 <p>${contact(email).replace(/^./, (c) => c.toUpperCase())}. Say what you searched for or tapped, what you expected,
@@ -103,8 +103,8 @@ and what happened, but please don’t send real addresses from jobs.</p>
 
 <h2>Common questions</h2>
 <ul>
-  <li><strong>No police route showing?</strong> Police routes are off until you turn them on in the Session tab and
-    confirm you’re a police driver. Even then, one is only shown when it’s meaningfully faster.</li>
+  <li><strong>No blue-light route showing?</strong> Blue-light routes are off until you turn them on in the Session tab and
+    confirm you drive for the police, fire or ambulance service. Even then, one is only shown when it’s meaningfully faster.</li>
   <li><strong>Not in London?</strong> Turn on <em>Demo drive</em> in the Session tab to try the app with a simulated
     drive through London.</li>
   <li><strong>Search can’t find a block or estate?</strong> Save it in the Search tab with the road it’s on.</li>

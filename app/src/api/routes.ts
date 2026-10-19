@@ -41,7 +41,7 @@ export type NoPoliceReason =
   | "vehicle-limit-unavoidable"
   | "not-declared";
 
-/** The plan as shown to someone who hasn't confirmed they're a police driver: standard only. */
+/** The plan as shown to someone who hasn't confirmed they drive for an emergency service: standard only. */
 export function withoutPolice(plan: RoutePlan): RoutePlan {
   return plan.police ? { ...plan, police: null, noPoliceReason: "not-declared" } : plan;
 }

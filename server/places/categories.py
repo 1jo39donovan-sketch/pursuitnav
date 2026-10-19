@@ -100,6 +100,7 @@ TYPES = {
     ("amenity", "police"): ("Police station", "emergency"),
     ("amenity", "fire_station"): ("Fire station", "emergency"),
     ("emergency", "ambulance_station"): ("Ambulance station", "emergency"),
+    ("emergency", "emergency_ward_entrance"): ("A&E entrance", "health"),
     ("amenity", "courthouse"): ("Court", "emergency"),
     ("amenity", "prison"): ("Prison", "emergency"),
     # Transport
@@ -203,6 +204,10 @@ KEY_ORDER = [
 
 def classify(tags) -> tuple[str, str] | None:
     """(type label, group) for a feature's tags, or None to leave it out."""
+    # Ambulance crews need the hospitals that take emergencies.
+    if tags.get("amenity") == "hospital" or tags.get("healthcare") == "hospital":
+        if tags.get("emergency") == "yes":
+            return "Hospital with A&E", "health"
     for key in KEY_ORDER:
         value = tags.get(key)
         if not value:

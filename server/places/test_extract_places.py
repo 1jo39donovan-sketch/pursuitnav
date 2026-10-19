@@ -108,3 +108,11 @@ def test_station_drawn_twice_appears_once(rows):
 
 def test_separate_branches_both_stay(rows):
     assert sum(1 for r in rows if r[0] == "Costa") == 2
+
+
+def test_hospitals_that_take_emergencies_are_marked():
+    from categories import classify
+
+    assert classify({"amenity": "hospital", "emergency": "yes"}) == ("Hospital with A&E", "health")
+    assert classify({"amenity": "hospital", "emergency": "no"}) == ("Hospital", "health")
+    assert classify({"emergency": "emergency_ward_entrance"}) == ("A&E entrance", "health")

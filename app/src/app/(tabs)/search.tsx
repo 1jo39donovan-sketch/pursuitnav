@@ -178,7 +178,7 @@ export default function SearchScreen() {
     };
   }, [data, places, area, markerGroups]);
 
-  // Police routes only for someone who has said they're a police driver.
+  // Blue-light routes only for someone who has said they drive for an emergency service.
   const shown = useMemo<PlanState | null>(
     () => (state?.status === "ready" && !policeRoutes ? { status: "ready", plan: withoutPolice(state.plan) } : state),
     [state, policeRoutes],
