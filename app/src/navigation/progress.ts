@@ -171,3 +171,18 @@ export function maneuverArrow(type: number): string {
       return "↑";
   }
 }
+
+/** Valhalla's arrival manoeuvres: destination ahead, on the right, on the left. */
+const ARRIVAL: Record<number, string> = {
+  4: "Destination ahead",
+  5: "Destination ahead on the right",
+  6: "Destination ahead on the left",
+};
+
+/**
+ * What to show and say for the next manoeuvre. Valhalla words the arrival
+ * as "You have arrived…", which reads wrong while it's still ahead.
+ */
+export function upcomingInstruction(m: Maneuver): string {
+  return ARRIVAL[m.type] ?? m.instruction;
+}

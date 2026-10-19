@@ -24,7 +24,13 @@ export const region = LONDON;
 
 // Free vector tiles from OpenFreeMap (OpenStreetMap data). Swap for a
 // self-hosted Protomaps extract later without touching the map component.
-export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
+// Night is the dark style the app is designed around; day is a light one
+// for bright sunshine. Chosen on the map or on Session, and remembered.
+export const MAP_STYLES = {
+  night: "https://tiles.openfreemap.org/styles/dark",
+  day: "https://tiles.openfreemap.org/styles/liberty",
+} as const;
+export const MAP_STYLE_URL = MAP_STYLES.night;
 
 // Demo builds (npm run build:demo) replace GPS with a scripted drive and the
 // online map with bundled borough outlines, so the app can be shown from a

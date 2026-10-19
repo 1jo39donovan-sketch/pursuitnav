@@ -9,11 +9,13 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { MAP_STYLE_URL, region } from "../config";
+import { MAP_STYLES, region } from "../config";
 import { useLocation } from "../location/LocationProvider";
+import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 import {
   boundsOf,
+  cameraFor,
   EMPTY_COLLECTION,
   FIT_DELAY_MS,
   FIT_PADDING,
@@ -21,17 +23,25 @@ import {
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
   pointGeoJSON,
+  pointsGeoJSON,
+  RESTRICTION_CIRCLE_PAINT,
+  RESTRICTION_LABEL_LAYOUT,
+  RESTRICTION_LABEL_PAINT,
   routesGeoJSON,
   type LiveMapProps,
   type MarkerProperties,
 } from "./mapShared";
+import { MapButtons } from "./MapButtons";
 
 /**
- * Dark map that follows the phone's GPS position. Panning the map stops
+ * Map (night or day style) that follows the phone's GPS position. Panning the map stops
  * following; the Recentre button picks it back up.
  */
 export function LiveMap({
   headingUp = false,
+  view: viewProp,
+  viewControl = false,
+  restrictions,
   followZoom = 15,
   compact = false,
   routes = [],
@@ -42,6 +52,8 @@ export function LiveMap({
   onMarkerPress,
 }: LiveMapProps) {
   const { fix } = useLocation();
+  const { mapTheme } = useSession();
+  const view = viewProp ?? (headingUp ? "heading" : "north");
   const [following, setFollowing] = useState(true);
   const camera = useRef<CameraRef>(null);
 
@@ -79,7 +91,7 @@ export function LiveMap({
       ? {
           center: position,
           zoom: followZoom,
-          bearing: headingUp && fix?.course != null ? fix.course : 0,
+          ...cameraFor(view, fix?.course ?? null),
           duration: 800,
           easing: "ease" as const,
         }
@@ -89,12 +101,12 @@ export function LiveMap({
     <View style={styles.container}>
       <Map
         style={StyleSheet.absoluteFill}
-        mapStyle={MAP_STYLE_URL}
+        mapStyle={MAP_STYLES[mapTheme]}
         logo={false}
         compass={!compact}
         attribution
         attributionPosition={{ bottom: 8, left: 8 }}
-        touchRotate={!headingUp}
+        touchRotate={view === "north"}
         onDidFailLoadingMap={() => setMapFailed(true)}
         onDidFinishLoadingStyle={() => setMapFailed(false)}
         onLongPress={(e) => onLongPress?.(e.nativeEvent.lngLat)}
@@ -144,6 +156,15 @@ export function LiveMap({
             paint={{ "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] }}
           />
         </GeoJSONSource>
+        <GeoJSONSource id="restrictions" data={pointsGeoJSON(restrictions)}>
+          <Layer type="circle" id="restriction-dot" paint={RESTRICTION_CIRCLE_PAINT} />
+          <Layer
+            type="symbol"
+            id="restriction-label"
+            layout={RESTRICTION_LABEL_LAYOUT}
+            paint={RESTRICTION_LABEL_PAINT}
+          />
+        </GeoJSONSource>
         <GeoJSONSource id="destination" data={pointGeoJSON(destination)}>
           <Layer
             type="circle"
@@ -183,6 +204,7 @@ export function LiveMap({
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>
       )}
+      <MapButtons showView={viewControl} top={compact ? 12 : 56} />
       {!following && position && (
         <Pressable
           accessibilityRole="button"

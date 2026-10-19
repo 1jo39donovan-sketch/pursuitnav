@@ -14,9 +14,9 @@ import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation } from "../navigation/NavigationProvider";
 import { nextCallout } from "../navigation/voice";
 import { useSession } from "../session/SessionProvider";
-import { store } from "../storage/store";
 import {
   maneuverArrow,
+  upcomingInstruction,
   OFF_ROUTE_FIXES,
   offRouteCount,
   prepare,
@@ -40,7 +40,7 @@ export default function NavigateScreen() {
   }, []);
   const { active, replan, stop } = useNavigation();
   const { fix } = useLocation();
-  const { vehicle } = useSession();
+  const { vehicle, voice: voiceOn, setVoice, mapView } = useSession();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
@@ -98,12 +98,10 @@ export default function NavigateScreen() {
   };
 
   // Spoken directions, so the crew can keep their eyes on the road.
-  const [voiceOn, setVoiceOn] = useState(() => store.getSetting("voice") !== "0");
+  // Remembered between routes (and set on Session), so a muted app stays muted.
   const toggleVoice = () => {
-    const on = !voiceOn;
-    setVoiceOn(on);
-    store.setSetting("voice", on ? "1" : "0");
-    if (!on) Speech.stop();
+    setVoice(!voiceOn);
+    if (voiceOn) Speech.stop();
   };
   const said = useRef<{ route: unknown; keys: Set<string> }>({ route: null, keys: new Set() });
   useEffect(() => {
@@ -143,6 +141,8 @@ export default function NavigateScreen() {
   const routeColor = isPolice ? colors.amber : colors.blue;
   const routes: MapRoute[] = [{ id: "nav", shape: active.route.shape, color: routeColor, dashed: isPolice }];
   const destination: [number, number] = [active.destination.lng, active.destination.lat];
+  const restrictionPoints: [number, number][] =
+    "restrictions" in active.route ? active.route.restrictions.map((r) => [r.location.lng, r.location.lat]) : [];
 
   const turnPanel = (
     <View style={[styles.turn, offRoute && styles.turnOff]}>
@@ -169,11 +169,11 @@ export default function NavigateScreen() {
             <Text style={styles.distance}>{formatDistance(progress.distanceToNextM)}</Text>
           </View>
           <Text style={styles.instruction} numberOfLines={3}>
-            {progress.next?.instruction ?? "Continue to your destination."}
+            {progress.next ? upcomingInstruction(progress.next) : "Continue to your destination."}
           </Text>
           {progress.after && (
             <Text style={styles.then} numberOfLines={1}>
-              Then {maneuverArrow(progress.after.type)} {progress.after.instruction}
+              Then {maneuverArrow(progress.after.type)} {upcomingInstruction(progress.after)}
             </Text>
           )}
         </>
@@ -210,6 +210,7 @@ export default function NavigateScreen() {
           <Pressable
             accessibilityRole="switch"
             accessibilityState={{ checked: voiceOn }}
+            aria-checked={voiceOn}
             accessibilityLabel="Spoken directions"
             onPress={toggleVoice}
             hitSlop={8}
@@ -241,14 +242,30 @@ export default function NavigateScreen() {
             {etaPanel}
           </View>
           <View style={styles.map}>
-            <LiveMap headingUp followZoom={17} routes={routes} destination={destination} compact />
+            <LiveMap
+              view={mapView}
+              viewControl
+              followZoom={17}
+              routes={routes}
+              destination={destination}
+              restrictions={restrictionPoints}
+              compact
+            />
           </View>
         </View>
       ) : (
         <>
           {turnPanel}
           <View style={styles.map}>
-            <LiveMap headingUp followZoom={17} routes={routes} destination={destination} compact />
+            <LiveMap
+              view={mapView}
+              viewControl
+              followZoom={17}
+              routes={routes}
+              destination={destination}
+              restrictions={restrictionPoints}
+              compact
+            />
           </View>
           {etaPanel}
         </>

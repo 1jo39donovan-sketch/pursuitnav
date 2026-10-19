@@ -10,6 +10,7 @@ import { LiveMap } from "../../components/LiveMap";
 import { formatDistance } from "../../format";
 import { useLocation, type Fix } from "../../location/LocationProvider";
 import { useSearch } from "../../search/SearchProvider";
+import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
 
 const POLL_MS = 1000;
@@ -38,6 +39,7 @@ export default function PursuitScreen() {
     };
   }, [focused]);
   const { fix } = useLocation();
+  const { mapView } = useSession();
   const { data, places } = useSearch();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
@@ -204,7 +206,7 @@ export default function PursuitScreen() {
 
   const map = (
     <View style={styles.map}>
-      <LiveMap headingUp followZoom={16} compact />
+      <LiveMap view={mapView} viewControl followZoom={16} compact />
     </View>
   );
 

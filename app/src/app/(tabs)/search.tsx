@@ -271,6 +271,7 @@ export default function SearchScreen() {
       <View style={styles.body}>
         <LiveMap
           routes={routes}
+          restrictions={plan?.police?.restrictions.map((r) => [r.location.lng, r.location.lat] as LngLat)}
           destination={destination?.point}
           onLongPress={(point) =>
             choose(
