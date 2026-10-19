@@ -7,12 +7,14 @@ import maplibregl from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DEMO_MODE, MAP_STYLE_URL, region } from "../config";
+import { DEMO_MODE, MAP_STYLES, region } from "../config";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
+import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 import {
   boundsOf,
+  cameraFor,
   EMPTY_COLLECTION,
   FIT_DELAY_MS,
   FIT_PADDING,
@@ -20,15 +22,23 @@ import {
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
   pointGeoJSON,
+  pointsGeoJSON,
+  RESTRICTION_CIRCLE_PAINT,
+  RESTRICTION_LABEL_LAYOUT,
+  RESTRICTION_LABEL_PAINT,
   routesGeoJSON,
   type LiveMapProps,
   type MarkerProperties,
 } from "./mapShared";
+import { MapButtons } from "./MapButtons";
 
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 export function LiveMap({
   headingUp = false,
+  view: viewProp,
+  viewControl = false,
+  restrictions,
   followZoom = 15,
   compact = false,
   routes = [],
@@ -39,6 +49,9 @@ export function LiveMap({
   onMarkerPress,
 }: LiveMapProps) {
   const { fix } = useLocation();
+  const { mapTheme } = useSession();
+  const view = viewProp ?? (headingUp ? "heading" : "north");
+  const rotates = view !== "north";
   const [following, setFollowing] = useState(true);
   const longPress = useRef(onLongPress);
   const markerPress = useRef(onMarkerPress);
@@ -63,7 +76,7 @@ export function LiveMap({
   useEffect(() => {
     const m = new maplibregl.Map({
       container: container.current as unknown as HTMLElement,
-      style: DEMO_MODE ? demoMapStyle : MAP_STYLE_URL,
+      style: DEMO_MODE ? demoMapStyle : MAP_STYLES[mapTheme],
       center: region.defaultCentre,
       zoom: region.defaultZoom,
       maxBounds: [
@@ -71,7 +84,7 @@ export function LiveMap({
         [region.maxBounds[2], region.maxBounds[3]],
       ],
       attributionControl: { compact: true },
-      dragRotate: !headingUp,
+      dragRotate: !rotates,
     });
     if (!compact) m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "top-right");
     m.on("load", () => {
@@ -113,6 +126,17 @@ export function LiveMap({
         layout: { "line-join": "round" },
         paint: { "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] },
       });
+      m.addSource("restrictions", { type: "geojson", data: EMPTY });
+      m.addLayer({ id: "restriction-dot", type: "circle", source: "restrictions", paint: RESTRICTION_CIRCLE_PAINT });
+      if (!DEMO_MODE) {
+        m.addLayer({
+          id: "restriction-label",
+          type: "symbol",
+          source: "restrictions",
+          layout: RESTRICTION_LABEL_LAYOUT,
+          paint: RESTRICTION_LABEL_PAINT,
+        });
+      }
       m.addSource("destination", { type: "geojson", data: EMPTY });
       m.addLayer({
         id: "destination-dot",
@@ -184,16 +208,20 @@ export function LiveMap({
     return () => {
       m.remove();
       map.current = null;
+      // A new map (different style or view) has to load before it's drawn on.
+      setLoaded(false);
     };
-  }, [headingUp, compact]);
+  }, [rotates, compact, mapTheme]);
 
   useEffect(() => {
     const m = map.current;
     if (!m || !loaded) return;
-    (m.getSource("routes") as maplibregl.GeoJSONSource).setData(routesGeoJSON(routes));
-    (m.getSource("destination") as maplibregl.GeoJSONSource).setData(pointGeoJSON(destination));
-    (m.getSource("places") as maplibregl.GeoJSONSource).setData(markers ?? EMPTY_COLLECTION);
-  }, [routes, destination, markers, loaded]);
+    const set = (id: string, data: GeoJSON.GeoJSON) => (m.getSource(id) as maplibregl.GeoJSONSource | undefined)?.setData(data);
+    set("routes", routesGeoJSON(routes));
+    set("destination", pointGeoJSON(destination));
+    set("places", markers ?? EMPTY_COLLECTION);
+    set("restrictions", pointsGeoJSON(restrictions));
+  }, [routes, destination, markers, restrictions, loaded]);
 
   useEffect(() => {
     const m = map.current;
@@ -210,20 +238,15 @@ export function LiveMap({
   useEffect(() => {
     const m = map.current;
     if (!m || !loaded || !fix) return;
-    (m.getSource("me") as maplibregl.GeoJSONSource).setData({
+    (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData({
       type: "Feature",
       geometry: { type: "Point", coordinates: [fix.lng, fix.lat] },
       properties: {},
     });
     if (following) {
-      m.easeTo({
-        center: [fix.lng, fix.lat],
-        zoom,
-        bearing: headingUp && fix.course != null ? fix.course : 0,
-        duration: 800,
-      });
+      m.easeTo({ center: [fix.lng, fix.lat], zoom, ...cameraFor(view, fix.course), duration: 800 });
     }
-  }, [fix, loaded, following, zoom, headingUp]);
+  }, [fix, loaded, following, zoom, view]);
 
   return (
     <View style={styles.container}>
@@ -235,6 +258,7 @@ export function LiveMap({
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>
       )}
+      {!DEMO_MODE && <MapButtons showView={viewControl} top={compact ? 12 : 56} />}
       {!following && fix && (
         <Pressable
           accessibilityRole="button"

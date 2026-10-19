@@ -1,4 +1,3 @@
-import * as Location from "expo-location";
 import {
   createContext,
   useCallback,
@@ -14,6 +13,7 @@ import { AppState } from "react-native";
 import { DEMO_MODE } from "../config";
 import { demoFixAt } from "../demo/demoDrive";
 import { useSession } from "../session/SessionProvider";
+import { checkLocation, watchLocation } from "./locationSource";
 
 export type LocationStatus =
   | "checking"
@@ -48,20 +48,6 @@ interface LocationState {
 
 const LocationContext = createContext<LocationState | null>(null);
 
-function toFix(loc: Location.LocationObject): Fix {
-  const { latitude, longitude, accuracy, speed, heading } = loc.coords;
-  // Platforms report "unknown" as -1 or null; normalise both to null so
-  // screens can show "—" instead of a made-up number.
-  return {
-    lat: latitude,
-    lng: longitude,
-    accuracy: accuracy != null && accuracy >= 0 ? accuracy : null,
-    speed: speed != null && speed >= 0 ? speed : null,
-    course: heading != null && heading >= 0 ? heading : null,
-    timestamp: loc.timestamp,
-  };
-}
-
 /**
  * One GPS subscription for the whole app. The map, routing and pursuit mode
  * all read the same position, so journey times are always from where the
@@ -75,45 +61,27 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<LocationStatus>("checking");
   const [gpsFix, setFix] = useState<Fix | null>(null);
   const [demoFix, setDemoFix] = useState<Fix | null>(null);
-  const subscription = useRef<Location.LocationSubscription | null>(null);
-
-  const startWatching = useCallback(async () => {
-    if (subscription.current) return;
-    const last = await Location.getLastKnownPositionAsync();
-    if (last) setFix((current) => current ?? toFix(last));
-    subscription.current = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 1000,
-        distanceInterval: 0,
-      },
-      (loc) => setFix(toFix(loc)),
-    );
-  }, []);
+  const subscription = useRef<(() => void) | null>(null);
 
   const stopWatching = useCallback(() => {
-    subscription.current?.remove();
+    subscription.current?.();
     subscription.current = null;
   }, []);
 
+  const startWatching = useCallback(async () => {
+    if (subscription.current) return;
+    subscription.current = await watchLocation(setFix, () => {
+      stopWatching();
+      setStatus("denied");
+    });
+  }, [stopWatching]);
+
   const refresh = useCallback(
     async (ask: boolean) => {
-      let permission = await Location.getForegroundPermissionsAsync();
-      if (!permission.granted && permission.canAskAgain && ask) {
-        permission = await Location.requestForegroundPermissionsAsync();
-      }
-      if (!permission.granted) {
-        stopWatching();
-        setStatus(permission.canAskAgain ? "needs-permission" : "denied");
-        return;
-      }
-      if (!(await Location.hasServicesEnabledAsync())) {
-        stopWatching();
-        setStatus("services-off");
-        return;
-      }
-      setStatus("granted");
-      await startWatching();
+      const next = await checkLocation(ask);
+      setStatus(next);
+      if (next === "granted") await startWatching();
+      else stopWatching();
     },
     [startWatching, stopWatching],
   );

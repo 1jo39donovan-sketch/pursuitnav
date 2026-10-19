@@ -42,7 +42,7 @@ interface Destination {
 export default function SearchScreen() {
   const { fix } = useLocation();
   const { boroughs, policeRoutes, vehicle } = useSession();
-  const { data, search, places } = useSearch();
+  const { data, search, places, area: searchArea } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
   const [query, setQuery] = useState("");
@@ -65,8 +65,8 @@ export default function SearchScreen() {
   const area = useMemo(() => new Set(boroughs), [boroughs]);
   const results = useMemo(() => {
     const offline = search(deferredQuery);
-    return lookup.state.status === "ok" ? mergeAddresses(offline, lookup.state.addresses, area) : offline;
-  }, [search, deferredQuery, lookup, area]);
+    return lookup.state.status === "ok" ? mergeAddresses(offline, lookup.state.addresses, searchArea) : offline;
+  }, [search, deferredQuery, lookup, searchArea]);
   const lookupNote =
     !showResults || lookup.state.status === "idle"
       ? null
@@ -271,6 +271,7 @@ export default function SearchScreen() {
       <View style={styles.body}>
         <LiveMap
           routes={routes}
+          restrictions={plan?.police?.restrictions.map((r) => [r.location.lng, r.location.lat] as LngLat)}
           destination={destination?.point}
           onLongPress={(point) =>
             choose(

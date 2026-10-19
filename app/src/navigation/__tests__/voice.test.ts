@@ -50,6 +50,12 @@ describe("spoken directions", () => {
     expect(drive([100, 50])).toEqual(["Drive north on Holloway Road.", "Turn right onto Seven Sisters Road."]);
   });
 
+  it("says the destination is ahead, not that you've arrived, before you get there", () => {
+    const said = new Set(["start"]);
+    const p = { ...at(300), next: { ...m("You have arrived at your destination.", 9), type: 5 } } as unknown as Progress;
+    expect(nextCallout(p, said)?.text).toBe("In 350 yards, destination ahead on the right.");
+  });
+
   it("says arrival once", () => {
     const said = new Set(["start"]);
     const first = nextCallout(at(0, true), said)!;

@@ -1,14 +1,34 @@
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DEMO_MODE } from "../config";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 
+const WEB = Platform.OS === "web";
+// In a browser there's no Settings screen to open: say where to go instead.
+const WEB_DENIED =
+  "Location is blocked for this site. On iPhone: Settings → Privacy & Security → Location Services → " +
+  "Safari Websites → While Using the App (Precise Location on). Then reload.";
+const reload = () => window.location.reload();
+
 /** One line saying whether the GPS position can be trusted, with a fix when it can't. */
 export function GpsStatus() {
   const { status, fix, requestPermission, simulated } = useLocation();
   const { setDemoDrive } = useSession();
+
+  // After a while with no position, say what usually helps.
+  const waiting = !simulated && status === "granted" && !fix;
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setTimeout(() => setSlow(true), 15000);
+    return () => {
+      clearTimeout(t);
+      setSlow(false);
+    };
+  }, [waiting]);
 
   if (status === "needs-permission") {
     return (
@@ -18,11 +38,18 @@ export function GpsStatus() {
     );
   }
   if (status === "denied") {
-    return (
+    return WEB ? (
+      <Banner tone="warn" text={WEB_DENIED}>
+        <Action label="Reload" onPress={reload} />
+      </Banner>
+    ) : (
       <Banner tone="warn" text="Location permission was refused. Turn it on in Settings.">
         <Action label="Settings" onPress={() => Linking.openSettings()} />
       </Banner>
     );
+  }
+  if (status === "services-off" && WEB) {
+    return <Banner tone="warn" text="This browser can’t give a location. Try Safari or Chrome." />;
   }
   if (status === "services-off") {
     return (
@@ -42,7 +69,20 @@ export function GpsStatus() {
     );
   }
   if (status === "checking" || !fix) {
-    return <Banner tone="muted" text="Waiting for GPS…" />;
+    return slow ? (
+      <Banner
+        tone="warn"
+        text={
+          WEB
+            ? "Still no GPS. Check Location Services is on and Safari Websites is set to While Using the App, with Precise Location on."
+            : "Still no GPS. Check Location Services is on; a position comes quicker outdoors."
+        }
+      >
+        {WEB && <Action label="Reload" onPress={reload} />}
+      </Banner>
+    ) : (
+      <Banner tone="muted" text="Waiting for GPS…" />
+    );
   }
   const accuracy = fix.accuracy != null ? `±${Math.round(fix.accuracy)} m` : "accuracy unknown";
   return <Banner tone={fix.accuracy != null && fix.accuracy > 50 ? "warn" : "ok"} text={`GPS ${accuracy}`} />;

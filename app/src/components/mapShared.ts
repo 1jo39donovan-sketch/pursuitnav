@@ -5,6 +5,8 @@ import type {
   SymbolLayerSpecification,
 } from "@maplibre/maplibre-react-native";
 
+import type { MapView } from "../session/SessionProvider";
+
 export interface MapRoute {
   id: string;
   shape: LngLat[];
@@ -24,6 +26,12 @@ export interface MarkerProperties {
 export interface LiveMapProps {
   /** Rotate the map so the direction of travel points up (pursuit mini map). */
   headingUp?: boolean;
+  /** North up, direction of travel up, or tilted 3D; overrides headingUp. */
+  view?: MapView;
+  /** Show the button that cycles the view (navigation and pursuit maps). */
+  viewControl?: boolean;
+  /** Where a blue-light route relies on a restriction: shown as a red "R". */
+  restrictions?: LngLat[];
   /** Zoom used while following the officer's position. */
   followZoom?: number;
   /** Hide map controls for small embedded maps. */
@@ -104,3 +112,35 @@ export function boundsOf(points: LngLat[]): [number, number, number, number] {
 
 export const FIT_PADDING = { top: 60, right: 40, bottom: 60, left: 40 };
 export const FIT_DELAY_MS = 150;
+
+/** Camera tilt and rotation for each view. */
+export function cameraFor(view: MapView, course: number | null): { bearing: number; pitch: number } {
+  if (view === "north" || course == null) return { bearing: 0, pitch: view === "3d" ? 55 : 0 };
+  return { bearing: course, pitch: view === "3d" ? 55 : 0 };
+}
+
+export const RESTRICTION_RED = "#e5484d";
+
+export const RESTRICTION_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
+  "circle-radius": 11,
+  "circle-color": RESTRICTION_RED,
+  "circle-stroke-color": "#ffffff",
+  "circle-stroke-width": 2,
+};
+
+export const RESTRICTION_LABEL_LAYOUT: SymbolLayerSpecification["layout"] = {
+  "text-field": "R",
+  "text-font": ["Noto Sans Bold"],
+  "text-size": 13,
+  "text-allow-overlap": true,
+  "text-ignore-placement": true,
+};
+
+export const RESTRICTION_LABEL_PAINT: SymbolLayerSpecification["paint"] = { "text-color": "#ffffff" };
+
+export function pointsGeoJSON(points: LngLat[] | undefined): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: (points ?? []).map((p) => ({ type: "Feature", geometry: { type: "Point", coordinates: p }, properties: {} })),
+  };
+}

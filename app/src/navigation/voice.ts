@@ -1,7 +1,7 @@
 // What to say aloud during turn-by-turn, so the crew can keep their eyes on
 // the road. Each turn is called once on the approach and once just before
 // it; arrival once. Pure: the screen speaks what this returns.
-import type { Progress } from "./progress";
+import { upcomingInstruction, type Progress } from "./progress";
 
 /** Approach call between these distances, then the "now" call. */
 const EARLY_MAX_M = 450;
@@ -37,11 +37,12 @@ export function nextCallout(progress: Progress, said: ReadonlySet<string>): Call
   if (!next) return null;
   const id = `turn:${next.beginShapeIndex}`;
   const d = progress.distanceToNextM;
+  const text = upcomingInstruction(next);
   if (d <= NOW_M) {
-    return said.has(`${id}:now`) ? null : { key: `${id}:now`, text: next.instruction };
+    return said.has(`${id}:now`) ? null : { key: `${id}:now`, text: `${text}.`.replace(/\.\.$/, ".") };
   }
   if (d <= EARLY_MAX_M && d >= EARLY_MIN_M && !said.has(`${id}:early`)) {
-    return { key: `${id}:early`, text: `In ${spokenDistance(d)}, ${continuing(next.instruction)}` };
+    return { key: `${id}:early`, text: `In ${spokenDistance(d)}, ${continuing(text)}`.replace(/\.?$/, ".") };
   }
   return null;
 }

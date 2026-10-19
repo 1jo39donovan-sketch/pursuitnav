@@ -9,6 +9,8 @@ interface Session {
   boroughs: Borough[];
   setCallsign: (callsign: string) => void;
   toggleBorough: (borough: Borough) => void;
+  /** Replace the whole operating area (selecting or clearing a group at once). */
+  setBoroughs: (boroughs: Borough[]) => void;
   /** Simulated drive in London instead of GPS (store reviewers, trying it out). */
   demoDrive: boolean;
   setDemoDrive: (on: boolean) => void;
@@ -18,6 +20,35 @@ interface Session {
   /** What's being driven; routes avoid limits it can't take. */
   vehicle: VehicleType;
   setVehicle: (v: VehicleType) => void;
+  /** Night (dark) or day (light) map. */
+  mapTheme: MapTheme;
+  setMapTheme: (t: MapTheme) => void;
+  /** How the navigation and pursuit maps turn: north up, direction of travel up, or tilted 3D. */
+  mapView: MapView;
+  setMapView: (v: MapView) => void;
+  /** Spoken turn-by-turn directions. */
+  voice: boolean;
+  setVoice: (on: boolean) => void;
+}
+
+export type MapTheme = "night" | "day";
+export type MapView = "north" | "heading" | "3d";
+export const MAP_VIEWS: MapView[] = ["heading", "3d", "north"];
+
+/** A setting kept on the phone, read once at launch. */
+function useSetting<T extends string>(key: string, allowed: readonly T[], fallback: T): [T, (v: T) => void] {
+  const [value, setValue] = useState<T>(() => {
+    const saved = store.getSetting(key);
+    return (allowed as readonly string[]).includes(saved ?? "") ? (saved as T) : fallback;
+  });
+  const set = useCallback(
+    (v: T) => {
+      setValue(v);
+      store.setSetting(key, v);
+    },
+    [key],
+  );
+  return [value, set];
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -56,9 +87,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     store.setSetting("vehicle", v);
   }, []);
 
+  const [mapTheme, setMapTheme] = useSetting<MapTheme>("mapTheme", ["night", "day"], "night");
+  const [mapView, setMapView] = useSetting<MapView>("mapView", MAP_VIEWS, "heading");
+  // "voice" was first stored by the navigation screen as "1"/"0".
+  const [voiceSetting, setVoiceSetting] = useSetting<"1" | "0">("voice", ["1", "0"], "1");
+  const voice = voiceSetting === "1";
+  const setVoice = useCallback((on: boolean) => setVoiceSetting(on ? "1" : "0"), [setVoiceSetting]);
+
   const setCallsign = useCallback((value: string) => {
     setCallsignState(value);
     store.setSetting("callsign", value);
+  }, []);
+
+  const setBoroughList = useCallback((next: Borough[]) => {
+    setBoroughs(next);
+    store.setSetting("boroughs", JSON.stringify(next));
   }, []);
 
   const toggleBorough = useCallback((borough: Borough) => {
@@ -75,14 +118,39 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       boroughs,
       setCallsign,
       toggleBorough,
+      setBoroughs: setBoroughList,
       demoDrive,
       setDemoDrive,
       policeRoutes,
       setPoliceRoutes,
       vehicle,
       setVehicle,
+      mapTheme,
+      setMapTheme,
+      mapView,
+      setMapView,
+      voice,
+      setVoice,
     }),
-    [callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive, policeRoutes, setPoliceRoutes, vehicle, setVehicle],
+    [
+      callsign,
+      boroughs,
+      setCallsign,
+      toggleBorough,
+      setBoroughList,
+      demoDrive,
+      setDemoDrive,
+      policeRoutes,
+      setPoliceRoutes,
+      vehicle,
+      setVehicle,
+      mapTheme,
+      setMapTheme,
+      mapView,
+      setMapView,
+      voice,
+      setVoice,
+    ],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

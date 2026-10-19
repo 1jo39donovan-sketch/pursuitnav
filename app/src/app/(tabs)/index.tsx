@@ -4,7 +4,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, Vi
 
 import { API_URL, DEMO_MODE } from "../../config";
 
-import { CHIP_ORDER } from "../../search/boroughs";
+import { BoroughPicker } from "../../components/BoroughPicker";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
@@ -19,13 +19,16 @@ export default function SessionScreen() {
     callsign,
     setCallsign,
     boroughs,
-    toggleBorough,
     demoDrive,
     setDemoDrive,
     policeRoutes,
     setPoliceRoutes,
     vehicle,
     setVehicle,
+    voice,
+    setVoice,
+    mapTheme,
+    setMapTheme,
   } = useSession();
   useEffect(() => {
     if (openedThisLaunch) return;
@@ -63,25 +66,7 @@ export default function SessionScreen() {
         />
       </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Operating area · {boroughs.length} selected</Text>
-        <View style={styles.chips}>
-          {CHIP_ORDER.map((b) => {
-            const on = boroughs.includes(b);
-            return (
-              <Pressable
-                key={b}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: on }}
-                onPress={() => toggleBorough(b)}
-                style={[styles.chip, on && styles.chipOn]}
-              >
-                <Text style={[styles.chipText, on && styles.chipTextOn]}>{b}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+      <BoroughPicker />
 
       <View style={styles.field}>
         <Text style={styles.label}>Vehicle</Text>
@@ -99,6 +84,39 @@ export default function SessionScreen() {
                 style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
               >
                 <Text style={[styles.chipText, on && styles.chipTextOn]}>{v.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Map and voice</Text>
+        <View style={styles.toggleRow}>
+          <Text style={[styles.placeName, styles.placeText]} nativeID="voice-label">
+            Spoken directions
+          </Text>
+          <Switch
+            accessibilityLabelledBy="voice-label"
+            value={voice}
+            onValueChange={setVoice}
+            trackColor={{ false: colors.line, true: colors.amber }}
+          />
+        </View>
+        <View style={styles.chips}>
+          {(["night", "day"] as const).map((t) => {
+            const on = mapTheme === t;
+            return (
+              <Pressable
+                key={t}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                onPress={() => setMapTheme(t)}
+                style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                  {t === "night" ? "☾ Night map" : "☀ Day map"}
+                </Text>
               </Pressable>
             );
           })}

@@ -125,3 +125,53 @@ export function generallyTowards(
   }
   return best?.name ?? null;
 }
+
+const M_PER_DEG_LAT = 111320;
+
+/**
+ * A test for "in, or within `metres` of, one of these boroughs". Officers
+ * get told the wrong borough for roads near a boundary, so a road one over
+ * the line should still count as in their area.
+ */
+export function nearBoroughs(area: ReadonlySet<Borough>, metres: number): (lat: number, lng: number) => boolean {
+  const shapes = SHAPES.filter((b) => area.has(b.name));
+  if (!shapes.length) return () => false;
+  const cache = new Map<string, boolean>();
+  return (lat, lng) => {
+    const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    const hit = cache.get(key);
+    if (hit !== undefined) return hit;
+    const mPerDegLng = M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180);
+    const padLat = metres / M_PER_DEG_LAT;
+    const padLng = metres / mPerDegLng;
+    let near = false;
+    for (const b of shapes) {
+      const [w, s, e, n] = b.bbox;
+      if (lng < w - padLng || lng > e + padLng || lat < s - padLat || lat > n + padLat) continue;
+      for (const [outer, ...holes] of b.polygons) {
+        if (inRing(lng, lat, outer!) && !holes.some((h) => inRing(lng, lat, h))) near = true;
+        // Distance to the boundary, on a flat projection (fine at this scale).
+        for (const ring of [outer!, ...holes]) {
+          for (let i = 1; i < ring.length && !near; i++) {
+            const ax = (ring[i - 1]![0] - lng) * mPerDegLng;
+            const ay = (ring[i - 1]![1] - lat) * M_PER_DEG_LAT;
+            const bx = (ring[i]![0] - lng) * mPerDegLng;
+            const by = (ring[i]![1] - lat) * M_PER_DEG_LAT;
+            const dx = bx - ax;
+            const dy = by - ay;
+            const len2 = dx * dx + dy * dy;
+            const t = len2 > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+            const px = ax + t * dx;
+            const py = ay + t * dy;
+            if (px * px + py * py <= metres * metres) near = true;
+          }
+          if (near) break;
+        }
+        if (near) break;
+      }
+      if (near) break;
+    }
+    cache.set(key, near);
+    return near;
+  };
+}
