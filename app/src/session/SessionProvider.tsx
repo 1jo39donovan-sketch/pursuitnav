@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 
 import { BOROUGHS, type Borough } from "../search/boroughs";
 import { store } from "../storage/store";
+import { isVehicle, type VehicleType } from "../vehicles";
 
 interface Session {
   callsign: string;
@@ -14,6 +15,9 @@ interface Session {
   /** The user has confirmed they drive under the emergency-vehicle exemptions; until then, standard routes only. */
   policeRoutes: boolean;
   setPoliceRoutes: (on: boolean) => void;
+  /** What's being driven; routes avoid limits it can't take. */
+  vehicle: VehicleType;
+  setVehicle: (v: VehicleType) => void;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -43,6 +47,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     store.setSetting("policeRoutes", on ? "1" : "0");
   }, []);
 
+  const [vehicle, setVehicleState] = useState<VehicleType>(() => {
+    const saved = store.getSetting("vehicle");
+    return isVehicle(saved) ? saved : "car";
+  });
+  const setVehicle = useCallback((v: VehicleType) => {
+    setVehicleState(v);
+    store.setSetting("vehicle", v);
+  }, []);
+
   const setCallsign = useCallback((value: string) => {
     setCallsignState(value);
     store.setSetting("callsign", value);
@@ -57,8 +70,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive, policeRoutes, setPoliceRoutes }),
-    [callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive, policeRoutes, setPoliceRoutes],
+    () => ({
+      callsign,
+      boroughs,
+      setCallsign,
+      toggleBorough,
+      demoDrive,
+      setDemoDrive,
+      policeRoutes,
+      setPoliceRoutes,
+      vehicle,
+      setVehicle,
+    }),
+    [callsign, boroughs, setCallsign, toggleBorough, demoDrive, setDemoDrive, policeRoutes, setPoliceRoutes, vehicle, setVehicle],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

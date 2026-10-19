@@ -2,6 +2,7 @@
 import type { LngLat } from "@maplibre/maplibre-react-native";
 
 import { API_URL, DEMO_MODE } from "../config";
+import type { VehicleType } from "../vehicles";
 
 export interface Maneuver {
   type: number;
@@ -33,7 +34,12 @@ export interface PoliceRoute extends Route {
   restrictionsComplete: boolean;
 }
 
-export type NoPoliceReason = "not-faster" | "no-restrictions-found" | "wrong-way-unavoidable" | "not-declared";
+export type NoPoliceReason =
+  | "not-faster"
+  | "no-restrictions-found"
+  | "wrong-way-unavoidable"
+  | "vehicle-limit-unavoidable"
+  | "not-declared";
 
 /** The plan as shown to someone who hasn't confirmed they're a police driver: standard only. */
 export function withoutPolice(plan: RoutePlan): RoutePlan {
@@ -53,12 +59,15 @@ const MESSAGES: Record<string, string> = {
   "no-route": "No route found to there.",
   "no-road-near": "No road found near there.",
   "routing-unavailable": "The routing server is having problems. Try again.",
+  "no-safe-route": "No route found that avoids low bridges and weight limits for your vehicle.",
 };
 
 export async function fetchRoutes(
   /** heading: direction of travel when moving, so the route doesn't start with a U-turn. */
   from: { lat: number; lng: number; heading?: number },
   to: { lat: number; lng: number },
+  /** Routes avoid limits this vehicle can't take. */
+  vehicle: VehicleType,
   signal?: AbortSignal,
 ): Promise<RoutePlan> {
   if (!API_URL) {
@@ -73,7 +82,7 @@ export async function fetchRoutes(
     res = await fetch(`${API_URL}/v1/routes`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ from, to }),
+      body: JSON.stringify({ from, to, vehicle }),
       signal,
     });
   } catch (err) {
