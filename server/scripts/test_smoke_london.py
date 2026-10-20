@@ -72,3 +72,10 @@ def test_address_match_is_the_door_asked_for():
     assert not smoke_london.is_address(q, "154, CALEDONIAN ROAD, LONDON, N1 9RD")
     assert not smoke_london.is_address(q, "FLAT 54, 2, CALEDONIAN ROAD, LONDON, N1 9DT")
     assert not smoke_london.is_address(q, "54, CALEDONIAN WHARF, LONDON, E14 3EN")
+
+
+def test_a_gate_only_counts_when_driven_through():
+    ways = lambda *ids: {"ways": [{"wayId": i, "beginShapeIndex": 0, "endShapeIndex": 1} for i in ids]}
+    assert smoke_london.uses_way(ways(1, 7, 2), 7)
+    assert not smoke_london.uses_way(ways(7, 1, 2), 7)  # started on it
+    assert not smoke_london.uses_way(ways(1, 2, 7), 7)  # ended on it

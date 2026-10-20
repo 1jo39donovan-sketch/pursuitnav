@@ -294,23 +294,36 @@ def check_one_ways(api, oneways, street, near_m, count):
         print(f"      ({len(on_street)} one-way section(s) of {street} in the map)")
 
 
+def uses_way(route, way_id):
+    """Whether the route drives along the way part way through. Its first and last
+    ways don't count: Valhalla lets a route start or end on a road it couldn't use."""
+    return any(w["wayId"] == way_id for w in (route.get("ways") or [])[1:-1])
+
+
 def check_bus_gate(api, pbf, oneways, gates, offset_m, tries):
     ends = {refs[0] for _, _, _, refs, _ in gates} | {refs[-1] for _, _, _, refs, _ in gates}
     second = SecondPass(ends)
     second.apply_file(pbf, locations=True, idx="flex_mem")
 
-    def approach(node, gate_name):
-        """A point offset_m along a car road from the gate's end; the same street preferred."""
+    def approach(node, gate_name, gate_coords):
+        """A point offset_m along a car road from the gate's end (the same street preferred),
+        clear of the gate: a route may start or end on a restricted road, so it mustn't snap there."""
         options = sorted(second.at.get(node, []), key=lambda o: o[0] != gate_name)
-        return point_along(options[0][1], offset_m) if options else None
+        for _, part in options:
+            if length(part) < offset_m:
+                continue
+            p = point_along(part, offset_m)
+            if min(metres(p, c) for c in gate_coords) >= offset_m / 2:
+                return p
+        return None
 
     centre = (-0.1278, 51.5074)
     candidates = []
     for way_id, name, coords, refs, sign in gates:
         if not 15 <= length(coords) <= 600:
             continue
-        a = approach(refs[0], name)
-        b = approach(refs[-1], name)
+        a = approach(refs[0], name, coords)
+        b = approach(refs[-1], name, coords)
         if a and b:
             if sign < 0:
                 a, b = b, a
@@ -330,13 +343,13 @@ def check_bus_gate(api, pbf, oneways, gates, offset_m, tries):
         if not check_routes_one_way(body, oneways, f"bus gate {label}"):
             return
         standard, police = body.get("standard") or {}, body.get("police")
-        if any(w["wayId"] == way_id for w in standard.get("ways") or []):
+        if uses_way(standard, way_id):
             report(False, f"standard route stays out of the bus gate {label}")
             return
         if not police:
             reasons.append(f"{label}: no blue-light route ({body.get('noPoliceReason')})")
             continue
-        if not any(w["wayId"] == way_id for w in police.get("ways") or []):
+        if not uses_way(police, way_id):
             reasons.append(f"{label}: blue-light route went another way")
             continue
         listed = [r for r in police.get("restrictions") or []
