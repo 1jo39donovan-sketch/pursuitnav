@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { fetchRoutes } from "../api/routes";
+import { fetchRoutes, restrictionPoints } from "../api/routes";
 import { GpsStatus } from "../components/GpsStatus";
 import { LiveMap } from "../components/LiveMap";
 import type { MapRoute } from "../components/mapShared";
@@ -40,7 +40,7 @@ export default function NavigateScreen() {
   }, []);
   const { active, replan, stop } = useNavigation();
   const { fix } = useLocation();
-  const { vehicle, voice: voiceOn, setVoice, mapView } = useSession();
+  const { vehicle, voice: voiceOn, setVoice, mapView, roads } = useSession();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
@@ -78,7 +78,8 @@ export default function NavigateScreen() {
     lastAttempt.current = Date.now();
     const controller = new AbortController();
     inFlight.current = controller;
-    fetchRoutes(routeOrigin(fix), active.destination, vehicle, controller.signal)
+    // A standard route only needs the quick request; a blue-light one the full check.
+    fetchRoutes(routeOrigin(fix), active.destination, vehicle, controller.signal, active.kind === "standard", roads)
       .then((plan) => {
         setFailed(false);
         replan(plan);
@@ -89,7 +90,7 @@ export default function NavigateScreen() {
       .finally(() => {
         if (inFlight.current === controller) inFlight.current = null;
       });
-  }, [active, fix, offRoute, replan, vehicle]);
+  }, [active, fix, offRoute, replan, vehicle, roads]);
   useEffect(() => () => inFlight.current?.abort(), []);
 
   const end = () => {
@@ -141,8 +142,7 @@ export default function NavigateScreen() {
   const routeColor = isPolice ? colors.amber : colors.blue;
   const routes: MapRoute[] = [{ id: "nav", shape: active.route.shape, color: routeColor, dashed: isPolice }];
   const destination: [number, number] = [active.destination.lng, active.destination.lat];
-  const restrictionPoints: [number, number][] =
-    "restrictions" in active.route ? active.route.restrictions.map((r) => [r.location.lng, r.location.lat]) : [];
+  const restrictions = "restrictions" in active.route ? restrictionPoints(active.route) : [];
 
   const turnPanel = (
     <View style={[styles.turn, offRoute && styles.turnOff]}>
@@ -248,7 +248,7 @@ export default function NavigateScreen() {
               followZoom={17}
               routes={routes}
               destination={destination}
-              restrictions={restrictionPoints}
+              restrictions={restrictions}
               compact
             />
           </View>
@@ -263,7 +263,7 @@ export default function NavigateScreen() {
               followZoom={17}
               routes={routes}
               destination={destination}
-              restrictions={restrictionPoints}
+              restrictions={restrictions}
               compact
             />
           </View>

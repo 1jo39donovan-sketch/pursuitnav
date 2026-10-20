@@ -1,4 +1,12 @@
-import { POLICE as TRACE, policeFor, standardFor, VEHICLES, type Costing, type VehicleType } from "./costing.js";
+import {
+  POLICE as TRACE,
+  policeFor,
+  standardFor,
+  VEHICLES,
+  type Costing,
+  type RoadChoice,
+  type VehicleType,
+} from "./costing.js";
 import { cumulativeDistances, pointAlong, type LngLat } from "./geo.js";
 import { detectRestrictions, type Restriction } from "./restrictions.js";
 import { ValhallaError, type Route, type Router, type TraceEdge, type Waypoint } from "./valhalla.js";
@@ -7,6 +15,10 @@ export interface PlanOptions {
   minSavingSeconds: number;
   minSavingFraction: number;
   restrictionCheckBudget: number;
+  /** Just the standard route, so the app can show it while the blue-light one is worked out. */
+  standardOnly?: boolean;
+  /** Prefer main roads (default) or any roads. */
+  roads?: RoadChoice;
 }
 
 export interface PoliceRoute extends Route {
@@ -24,7 +36,9 @@ export type NoPoliceReason =
   /** Couldn't find a version that stays out of contraflow lanes. */
   | "wrong-way-unavoidable"
   /** Couldn't find a version that avoids limits the vehicle can't take. */
-  | "vehicle-limit-unavoidable";
+  | "vehicle-limit-unavoidable"
+  /** Not looked for: the standard route was asked for on its own. */
+  | "not-checked";
 
 export interface Plan {
   standard: Route;
@@ -102,17 +116,18 @@ export async function planRoutes(
   heading?: number,
   vehicle: VehicleType = "car",
 ): Promise<Plan> {
-  const STANDARD = standardFor(vehicle);
-  const POLICE = policeFor(vehicle);
+  const STANDARD = standardFor(vehicle, opts.roads);
+  const POLICE = policeFor(vehicle, opts.roads);
   const start = { point: from, heading };
   const end = { point: to };
   const [firstStandard, firstPolice] = await Promise.all([
     router.route({ costing: STANDARD, from: start, to: end }),
-    router.route({ costing: POLICE, from: start, to: end }),
+    opts.standardOnly ? null : router.route({ costing: POLICE, from: start, to: end }),
   ]);
   const safeStandard = await withinLimits(router, STANDARD, vehicle, start, end, [], firstStandard);
   if (!safeStandard) throw new NoSafeRouteError();
   const standard = safeStandard.route;
+  if (!firstPolice) return { standard, police: null, noPoliceReason: "not-checked" };
 
   const worthIt = (r: Route) => {
     const saving = standard.durationS - r.durationS;

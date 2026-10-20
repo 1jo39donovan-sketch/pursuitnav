@@ -1,5 +1,5 @@
 // The operating area on Session: a one-line summary once chosen, opening
-// to the boroughs grouped by Met command area. Tapping an area's name
+// to the boroughs grouped by Met BCU (Basic Command Unit). Tapping an area's name
 // selects (or clears) all of its boroughs; each borough can be set alone.
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -73,6 +73,7 @@ export function BoroughPicker() {
                   <View style={[styles.box, all && styles.boxOn, count > 0 && !all && styles.boxSome]}>
                     <Text style={styles.tick}>{all ? "✓" : count ? "–" : ""}</Text>
                   </View>
+                  {g.code !== "" && <Text style={styles.code}>{g.code}</Text>}
                   <Text style={styles.groupName}>{g.name}</Text>
                   {g.boroughs.length > 1 && (
                     <Text style={styles.count}>
@@ -141,6 +142,16 @@ const styles = StyleSheet.create({
   boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   boxSome: { borderColor: colors.blue },
   tick: { color: "#ffffff", fontFamily: fonts.bodySemiBold, fontSize: 15, lineHeight: 17 },
+  code: {
+    color: colors.amber,
+    fontFamily: fonts.mono,
+    fontSize: 13,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
   groupName: { flex: 1, color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 18 },
   count: { color: colors.muted, fontFamily: fonts.mono, fontSize: 12 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 34 },

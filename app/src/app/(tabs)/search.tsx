@@ -3,7 +3,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { fetchRoutes, RouteError, withoutPolice } from "../../api/routes";
+import { fetchRoutes, restrictionPoints, RouteError, withoutPolice } from "../../api/routes";
 import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
@@ -41,7 +41,7 @@ interface Destination {
 // where the phone is now. A long press on the map also sets a destination.
 export default function SearchScreen() {
   const { fix } = useLocation();
-  const { boroughs, policeRoutes, vehicle } = useSession();
+  const { boroughs, policeRoutes, vehicle, roads } = useSession();
   const { data, search, places, area: searchArea } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
@@ -96,17 +96,41 @@ export default function SearchScreen() {
       const controller = new AbortController();
       request.current = controller;
       setState({ status: "loading" });
+      const to = { lat: dest.point[1], lng: dest.point[0] };
+      const from = routeOrigin(fix);
+      // The standard route comes back in a second or so; the blue-light one
+      // takes longer to check, so show the standard route as soon as it's here.
+      const quick = fetchRoutes(from, to, vehicle, controller.signal, true, roads);
+      const full = policeRoutes ? fetchRoutes(from, to, vehicle, controller.signal, false, roads) : null;
+      let fullDone = false;
+      quick
+        .then((plan) => {
+          if (!controller.signal.aborted && !fullDone) setState({ status: "ready", plan, checking: !!full });
+        })
+        .catch(() => {});
       try {
-        const to = { lat: dest.point[1], lng: dest.point[0] };
-        const plan = await fetchRoutes(routeOrigin(fix), to, vehicle, controller.signal);
+        if (!full) {
+          const plan = await quick;
+          if (!controller.signal.aborted) setState({ status: "ready", plan });
+          return;
+        }
+        const plan = await full;
+        fullDone = true;
         if (!controller.signal.aborted) setState({ status: "ready", plan });
       } catch (err) {
+        fullDone = true;
         if (controller.signal.aborted) return;
+        // The blue-light check failed but the standard route may be fine.
+        const standard = await quick.catch(() => null);
+        if (standard) {
+          setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" } });
+          return;
+        }
         const message = err instanceof RouteError ? err.message : "Something went wrong working out routes.";
         setState({ status: "error", message });
       }
     },
-    [fix, vehicle],
+    [fix, vehicle, policeRoutes, roads],
   );
 
   useEffect(() => () => request.current?.abort(), []);
@@ -271,7 +295,7 @@ export default function SearchScreen() {
       <View style={styles.body}>
         <LiveMap
           routes={routes}
-          restrictions={plan?.police?.restrictions.map((r) => [r.location.lng, r.location.lat] as LngLat)}
+          restrictions={restrictionPoints(plan?.police)}
           destination={destination?.point}
           onLongPress={(point) =>
             choose(

@@ -7,7 +7,8 @@ import { colors, fonts } from "../theme";
 export type PlanState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; plan: RoutePlan };
+  /** checking: the standard route is here, the blue-light one is still being worked out. */
+  | { status: "ready"; plan: RoutePlan; checking?: boolean };
 
 interface Props {
   state: PlanState;
@@ -28,6 +29,8 @@ const NO_POLICE: Record<NoPoliceReason, string> = {
   "no-restrictions-found": "A faster route exists but its restrictions couldn't be identified, so it isn't offered.",
   "wrong-way-unavoidable": "The only faster route goes against a one-way street, so it isn't offered.",
   "vehicle-limit-unavoidable": "The only faster route has a bridge or limit your vehicle can't take, so it isn't offered.",
+  "not-checked": "Blue-light routes are off. Turn them on in Session.",
+  "check-failed": "Couldn’t check for a blue-light route (no signal?). The standard route is ready.",
   "not-declared":
     "A faster route using bus lanes or restricted turns exists. Blue-light routes are only shown to emergency-service drivers: turn them on in Session.",
 };
@@ -62,8 +65,13 @@ export function RoutePanel({ state, destination, title, note, onClose, onGo, onO
             </>
           ) : (
             <>
-              <StandardCard route={state.plan.standard} fastest onGo={() => onGo("standard")} />
-              <PoliceCard route={null} reason={state.plan.noPoliceReason} onGo={() => onGo("police")} />
+              <StandardCard route={state.plan.standard} fastest={!state.checking} onGo={() => onGo("standard")} />
+              <PoliceCard
+                route={null}
+                reason={state.plan.noPoliceReason}
+                checking={state.checking}
+                onGo={() => onGo("police")}
+              />
             </>
           )}
         </ScrollView>
@@ -116,17 +124,23 @@ function StandardCard({ route, fastest, onGo }: { route: Route; fastest?: boolea
 function PoliceCard({
   route,
   reason,
+  checking,
   onGo,
 }: {
   route: PoliceRoute | null;
   reason?: NoPoliceReason;
+  checking?: boolean;
   onGo: () => void;
 }) {
   if (!route) {
     return (
       <View style={[styles.card, styles.cardMuted]}>
         <Text style={styles.cardTitle}>Blue light</Text>
-        <Text style={styles.meta}>{NO_POLICE[reason ?? "not-faster"]}</Text>
+        <Text style={styles.meta}>
+          {checking
+            ? "Checking for a quicker route using bus lanes and restricted turns…"
+            : NO_POLICE[reason ?? "not-faster"]}
+        </Text>
       </View>
     );
   }

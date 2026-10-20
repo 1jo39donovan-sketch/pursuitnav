@@ -143,7 +143,11 @@ describe("matchScore", () => {
 
 describe("roads just over the borough line", () => {
   // Officers are often told the wrong borough for roads near a boundary.
-  const islingtonAndNear = { has: (b: Borough) => b === "Islington", near: nearBoroughs(ISLINGTON, 400) };
+  const islingtonAndNear = { has: (b: Borough) => b === "Islington", near: nearBoroughs(ISLINGTON, 500) };
+
+  it("finds York Way, on the Camden–Islington border, with Islington picked", () => {
+    expect(index.search("York Way", islingtonAndNear).inArea.map((r) => r.label)).toContain("York Way");
+  });
 
   it("shows a Camden road just over the Islington line with Islington's results", () => {
     expect(index.search("Agar Grove", ISLINGTON).inArea.map((r) => r.borough)).not.toContain("Camden");

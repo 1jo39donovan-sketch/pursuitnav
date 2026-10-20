@@ -38,6 +38,8 @@ export interface Restriction {
   /** Plain-English line for the operator, e.g. "No right turn: Upper Street into Islington Green". */
   description: string;
   location: { lat: number; lng: number };
+  /** Every place this applies, when it's the same restriction in several (location is the first). */
+  locations: { lat: number; lng: number }[];
   streets: string[];
 }
 
@@ -147,6 +149,7 @@ export async function detectRestrictions(
       kind,
       description: descriptions[kind]!,
       location: { lat: mid.point[1], lng: mid.point[0] },
+      locations: [],
       streets: [name],
       excludePoints: [mid.point],
     });
@@ -156,11 +159,26 @@ export async function detectRestrictions(
     const from = streetName(edges[i]!);
     const to = streetName(edges[j]!);
     const at = shape[edges[j]!.beginShapeIndex]!;
-    const phrase = turnPhrase(turnAngle(edges[i]!.endHeading, edges[j]!.beginHeading));
+    const angle = turnAngle(edges[i]!.endHeading, edges[j]!.beginHeading);
+    // Straight on along the same road isn't a banned turn: the road itself
+    // is restricted here (buses only, or at set times), and Valhalla only
+    // shows it at the join between two of its stretches.
+    if (from === to && Math.abs(angle) < 30) {
+      record(`section:${i}`, i, j, {
+        kind: "bus-only",
+        description: `Restricted section: ${from}`,
+        location: { lat: at[1], lng: at[0] },
+        locations: [],
+        streets: [from],
+        excludePoints: [],
+      });
+      return;
+    }
     record(`turn:${i}`, i, j, {
       kind: "turn",
-      description: `${phrase}: ${from} into ${to}`,
+      description: `${turnPhrase(angle)}: ${from} into ${to}`,
       location: { lat: at[1], lng: at[0] },
+      locations: [],
       streets: [from, to],
       excludePoints: [],
     });
@@ -173,6 +191,7 @@ export async function detectRestrictions(
       kind: "manoeuvre",
       description: `Restricted manoeuvre: ${names.join(" → ")}`,
       location: { lat: mid.point[1], lng: mid.point[0] },
+      locations: [],
       streets: names,
       excludePoints: [],
     });
@@ -181,20 +200,18 @@ export async function detectRestrictions(
   /** Narrow down what makes the (illegal) stretch i..j illegal. */
   async function locate(i: number, j: number): Promise<void> {
     if (i === j) return recordEdge(i);
+    // Checks that don't depend on each other run at the same time: on a long
+    // route this is most of the wait.
     if (j === i + 1) {
-      const firstOk = await stretchIsLegal(i, i);
-      const secondOk = await stretchIsLegal(j, j);
-      if (!firstOk) await recordEdge(i);
-      if (!secondOk) await recordEdge(j);
+      const [firstOk, secondOk] = await Promise.all([stretchIsLegal(i, i), stretchIsLegal(j, j)]);
+      await Promise.all([firstOk ? null : recordEdge(i), secondOk ? null : recordEdge(j)]);
       if (firstOk && secondOk) recordTurn(i, j);
       return;
     }
     // Halves share the middle edge, so a turn onto or off it is in one of them.
     const m = Math.floor((i + j) / 2);
-    const leftOk = await stretchIsLegal(i, m);
-    const rightOk = await stretchIsLegal(m, j);
-    if (!leftOk) await locate(i, m);
-    if (!rightOk) await locate(m, j);
+    const [leftOk, rightOk] = await Promise.all([stretchIsLegal(i, m), stretchIsLegal(m, j)]);
+    await Promise.all([leftOk ? null : locate(i, m), rightOk ? null : locate(m, j)]);
     // Each half is fine on its own but not together: a restriction that
     // spans the join, e.g. a banned turn via a short link road.
     if (leftOk && rightOk) recordManoeuvre(i, j);
@@ -207,8 +224,12 @@ export async function detectRestrictions(
   return { restrictions: mergeSections([...found.values()]), complete, checks };
 }
 
-/** Joins runs of adjacent bus-only (or wrong-way) edges into one section each. */
-function mergeSections(
+/**
+ * Joins runs of adjacent bus-only (or wrong-way) edges into one section each,
+ * then lists the same restriction once however many places it applies
+ * ("No right turn: … (2 places)"), keeping every place for the map.
+ */
+export function mergeSections(
   items: Array<DetectedRestriction & { order: number; first: number; last: number }>,
 ): DetectedRestriction[] {
   const sorted = items.sort((a, b) => a.order - b.order || a.first - b.first);
@@ -216,15 +237,35 @@ function mergeSections(
   for (const item of sorted) {
     const prev = out[out.length - 1];
     const joinable = item.kind === "bus-only" || item.kind === "wrong-way";
-    if (prev && joinable && prev.kind === item.kind && item.first === prev.last + 1) {
-      prev.last = item.last;
+    if (prev && joinable && prev.kind === item.kind && item.first <= prev.last + 1) {
+      prev.last = Math.max(prev.last, item.last);
       prev.excludePoints.push(...item.excludePoints);
+      prev.locations.push(item.location);
       for (const s of item.streets) if (!prev.streets.includes(s)) prev.streets.push(s);
-      const label = item.kind === "bus-only" ? "Bus-only section" : "Wrong way along one-way street";
+      const label = prev.description.slice(0, prev.description.indexOf(":"));
       prev.description = `${label}: ${prev.streets.join(", ")}`;
       continue;
     }
-    out.push({ ...item, excludePoints: [...item.excludePoints], streets: [...item.streets] });
+    out.push({
+      ...item,
+      excludePoints: [...item.excludePoints],
+      streets: [...item.streets],
+      locations: [item.location],
+    });
   }
-  return out.map(({ order: _o, first: _f, last: _l, ...r }) => r);
+
+  const byText = new Map<string, DetectedRestriction & { places: number }>();
+  for (const { order: _o, first: _f, last: _l, ...r } of out) {
+    const same = byText.get(r.description);
+    if (same) {
+      same.places++;
+      same.locations.push(...r.locations);
+      same.excludePoints.push(...r.excludePoints);
+    } else {
+      byText.set(r.description, { ...r, places: 1 });
+    }
+  }
+  return [...byText.values()].map(({ places, ...r }) =>
+    places > 1 ? { ...r, description: `${r.description} (${places} places)` } : r,
+  );
 }

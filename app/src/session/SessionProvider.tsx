@@ -29,7 +29,12 @@ interface Session {
   /** Spoken turn-by-turn directions. */
   voice: boolean;
   setVoice: (on: boolean) => void;
+  /** Prefer main roads (room to overtake, bus lanes) or any roads (shorter, side streets). */
+  roads: RoadChoice;
+  setRoads: (r: RoadChoice) => void;
 }
+
+export type RoadChoice = "main" | "any";
 
 export type MapTheme = "night" | "day";
 export type MapView = "north" | "heading" | "3d";
@@ -92,6 +97,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // "voice" was first stored by the navigation screen as "1"/"0".
   const [voiceSetting, setVoiceSetting] = useSetting<"1" | "0">("voice", ["1", "0"], "1");
   const voice = voiceSetting === "1";
+  const [roads, setRoads] = useSetting<RoadChoice>("roads", ["main", "any"], "main");
   const setVoice = useCallback((on: boolean) => setVoiceSetting(on ? "1" : "0"), [setVoiceSetting]);
 
   const setCallsign = useCallback((value: string) => {
@@ -131,6 +137,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapView,
       voice,
       setVoice,
+      roads,
+      setRoads,
     }),
     [
       callsign,
@@ -150,6 +158,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapView,
       voice,
       setVoice,
+      roads,
+      setRoads,
     ],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

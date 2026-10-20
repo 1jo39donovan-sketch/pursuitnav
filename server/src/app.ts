@@ -5,7 +5,7 @@ import cors from "@fastify/cors";
 import Fastify, { LogController, type FastifyInstance } from "fastify";
 
 import type { ServerConfig } from "./config.js";
-import { VEHICLE_TYPES, type VehicleType } from "./costing.js";
+import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
 import { privacyPage, supportPage } from "./pages.js";
 import { PlacesError, type PlacesClient } from "./places.js";
@@ -29,6 +29,10 @@ interface RoutesBody {
   to: { lat: number; lng: number };
   /** What's being driven; routes avoid limits it can't take. Defaults to a car. */
   vehicle?: VehicleType;
+  /** Only the standard route (quick), for showing while the full plan is worked out. */
+  standardOnly?: boolean;
+  /** Prefer main roads (default) or any roads. */
+  roads?: RoadChoice;
 }
 
 export function buildApp(
@@ -87,18 +91,20 @@ export function buildApp(
             },
             to: point,
             vehicle: { type: "string", enum: [...VEHICLE_TYPES] },
+            standardOnly: { type: "boolean" },
+            roads: { type: "string", enum: [...ROAD_CHOICES] },
           },
         },
       },
     },
     async (req, reply) => {
-      const { from, to, vehicle } = req.body;
+      const { from, to, vehicle, standardOnly, roads } = req.body;
       if (!inBounds(from) || !inBounds(to)) {
         return reply.code(422).send({ error: "outside-area", message: "Both points must be in the covered area." });
       }
       const toLngLat = (p: { lat: number; lng: number }): LngLat => [p.lng, p.lat];
       try {
-        return await planRoutes(router, toLngLat(from), toLngLat(to), config, from.heading, vehicle);
+        return await planRoutes(router, toLngLat(from), toLngLat(to), { ...config, standardOnly, roads }, from.heading, vehicle);
       } catch (err) {
         if (err instanceof NoSafeRouteError) {
           return reply.code(422).send({ error: "no-safe-route", message: err.message });

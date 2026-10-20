@@ -29,6 +29,8 @@ export default function SessionScreen() {
     setVoice,
     mapTheme,
     setMapTheme,
+    roads,
+    setRoads,
   } = useSession();
   useEffect(() => {
     if (openedThisLaunch) return;
@@ -88,6 +90,36 @@ export default function SessionScreen() {
             );
           })}
         </View>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Roads</Text>
+        <View style={styles.chips}>
+          {(
+            [
+              ["main", "Prefer main roads"],
+              ["any", "Any roads"],
+            ] as const
+          ).map(([value, label]) => {
+            const on = roads === value;
+            return (
+              <Pressable
+                key={value}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                onPress={() => setRoads(value)}
+                style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.placeMeta}>
+          {roads === "main"
+            ? "Main roads usually have room to overtake and bus lanes to use; side streets have humps and parked cars."
+            : "Takes the shortest sensible way, side streets included, unless a main road is much quicker."}
+        </Text>
       </View>
 
       <View style={styles.field}>

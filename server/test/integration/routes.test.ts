@@ -206,6 +206,30 @@ describe("main roads", () => {
     expect(streets).toContain("High Road");
     expect(streets).not.toContain("Back Street");
   });
+
+  it("takes the shorter back street when set to any roads", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: at("main_west"), to: at("main_east"), roads: "any" },
+    });
+    const streets = (res.json() as Plan).standard.maneuvers.flatMap((m) => m.streetNames);
+    expect(streets).toContain("Back Street");
+  });
+});
+
+describe("standard route on its own", () => {
+  it("comes back without the blue-light work, for showing straight away", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: at("gate_west_end"), to: at("gate_east_end"), standardOnly: true },
+    });
+    const result = res.json() as Plan;
+    expect(result.standard.distanceM).toBeGreaterThan(0);
+    expect(result.police).toBeNull();
+    expect(result.noPoliceReason).toBe("not-checked");
+  });
 });
 
 describe("no restrictions to gain from", () => {

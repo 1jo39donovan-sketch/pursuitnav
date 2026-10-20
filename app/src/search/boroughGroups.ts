@@ -1,25 +1,27 @@
-// London's boroughs grouped the way the Met organises them (its 12 Basic
-// Command Units, plus the City, which has its own force), so picking an
-// operating area is a short list rather than 33 names.
+// London's boroughs grouped by the Met's 12 Basic Command Units (BCUs), in
+// the Met's own order and codes, plus the City, which has its own force, so
+// picking an operating area is a short list rather than 33 names.
 import type { Borough } from "./boroughs";
 
 export interface BoroughGroup {
+  /** The Met's BCU code (AS, CN…), or "" for the City. */
+  code: string;
   name: string;
   boroughs: Borough[];
 }
 
 export const BOROUGH_GROUPS: BoroughGroup[] = [
-  { name: "Central North", boroughs: ["Camden", "Islington"] },
-  { name: "Central East", boroughs: ["Hackney", "Tower Hamlets"] },
-  { name: "Central South", boroughs: ["Lambeth", "Southwark"] },
-  { name: "Central West", boroughs: ["Westminster", "Kensington and Chelsea", "Hammersmith and Fulham"] },
-  { name: "City of London", boroughs: ["City of London"] },
-  { name: "North", boroughs: ["Enfield", "Haringey"] },
-  { name: "North East", boroughs: ["Newham", "Waltham Forest"] },
-  { name: "North West", boroughs: ["Barnet", "Brent", "Harrow"] },
-  { name: "East", boroughs: ["Barking and Dagenham", "Havering", "Redbridge"] },
-  { name: "South East", boroughs: ["Bexley", "Greenwich", "Lewisham"] },
-  { name: "South", boroughs: ["Bromley", "Croydon", "Sutton"] },
-  { name: "South West", boroughs: ["Kingston upon Thames", "Merton", "Richmond upon Thames", "Wandsworth"] },
-  { name: "West", boroughs: ["Ealing", "Hillingdon", "Hounslow"] },
+  { code: "AS", name: "Central South", boroughs: ["Lambeth", "Southwark"] },
+  { code: "AW", name: "Central West", boroughs: ["Westminster", "Kensington and Chelsea", "Hammersmith and Fulham"] },
+  { code: "CE", name: "Central East", boroughs: ["Hackney", "Tower Hamlets"] },
+  { code: "CN", name: "Central North", boroughs: ["Camden", "Islington"] },
+  { code: "EA", name: "East Area", boroughs: ["Barking and Dagenham", "Havering", "Redbridge"] },
+  { code: "NA", name: "North Area", boroughs: ["Enfield", "Haringey"] },
+  { code: "NE", name: "North East", boroughs: ["Newham", "Waltham Forest"] },
+  { code: "NW", name: "North West", boroughs: ["Barnet", "Brent", "Harrow"] },
+  { code: "SE", name: "South East", boroughs: ["Bexley", "Greenwich", "Lewisham"] },
+  { code: "SN", name: "South Area", boroughs: ["Bromley", "Croydon", "Sutton"] },
+  { code: "SW", name: "South West", boroughs: ["Kingston upon Thames", "Merton", "Richmond upon Thames", "Wandsworth"] },
+  { code: "WA", name: "West Area", boroughs: ["Ealing", "Hillingdon", "Hounslow"] },
+  { code: "", name: "City of London Police", boroughs: ["City of London"] },
 ];

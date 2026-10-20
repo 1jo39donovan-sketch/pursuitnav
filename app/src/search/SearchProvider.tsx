@@ -39,7 +39,7 @@ interface SearchContextValue {
 }
 
 /** How far over a boundary a road or place still counts as in the officer's area. */
-const NEAR_AREA_M = 400;
+const NEAR_AREA_M = 500;
 
 const EMPTY: SearchResults = { inArea: [], outside: [] };
 const SearchContext = createContext<SearchContextValue | null>(null);
