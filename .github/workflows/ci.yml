@@ -41,7 +41,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: python -m pytest places -q
+      - run: python -m pytest places scripts -q
 
   # The Docker images the server runs, built as the server builds them, so a
   # change upstream (a base image dropping a library) shows here, not mid-deploy.

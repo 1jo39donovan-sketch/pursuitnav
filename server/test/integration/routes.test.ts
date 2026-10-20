@@ -87,6 +87,21 @@ describe("contraflow bus lanes", () => {
     expect(result.police).toBeNull();
     expect(result.noPoliceReason).toBe("not-faster");
   });
+
+  it("still gives the standard route when blocking the lane leaves no blue-light way", async () => {
+    // Part way along the street, against the flow: once the contraflow lane
+    // is blocked the police costing has no way in, which used to fail the
+    // whole request ("no route") rather than just the blue-light route.
+    const along = (f: number) => ({
+      lat: at("contraflow_east_end").lat,
+      lng: at("contraflow_east_end").lng + (at("contraflow_west_end").lng - at("contraflow_east_end").lng) * f,
+    });
+    const res = await app.inject({ method: "POST", url: "/v1/routes", payload: { from: along(0.15), to: along(0.85) } });
+    expect(res.statusCode, res.body).toBe(200);
+    const result = res.json() as Plan;
+    expect(goesWestAlong(result.standard.shape, ...street())).toBe(false);
+    if (result.police) expect(goesWestAlong(result.police.shape, ...street())).toBe(false);
+  });
 });
 
 describe("bus gates", () => {

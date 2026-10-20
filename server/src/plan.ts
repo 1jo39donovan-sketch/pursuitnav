@@ -165,7 +165,16 @@ export async function planRoutes(
 
     // Never against the flow of a one-way street: block those sections and try again.
     for (const r of blocked) exclude.push(...r.excludePoints);
-    police = await router.route({ costing: POLICE, from: start, to: end, exclude });
+    try {
+      police = await router.route({ costing: POLICE, from: start, to: end, exclude });
+    } catch (err) {
+      // No way left once the wrong-way sections are blocked: no blue-light
+      // route, but the standard route still stands.
+      if (err instanceof ValhallaError && err.code === 442) {
+        return { standard, police: null, noPoliceReason: "wrong-way-unavoidable" };
+      }
+      throw err;
+    }
   }
   return { standard, police: null, noPoliceReason: "wrong-way-unavoidable" };
 }

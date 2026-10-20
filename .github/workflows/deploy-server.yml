@@ -31,6 +31,8 @@ jobs:
       NAME: blue-route
       BRANCH: ${{ github.ref_name }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Check settings
         run: |
           missing=0
@@ -196,6 +198,16 @@ jobs:
           log 80 || echo "(couldn't read it)"
           exit 1
 
+      # Real London cases against the live server: one-way streets (Stroud
+      # Green Road and its neighbours), a bus gate, and 54 Caledonian Road.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: London smoke test
+        timeout-minutes: 20
+        run: bash server/scripts/smoke-london.sh "https://${DOMAIN}"
+
       - name: Summary
         if: success()
         env:
@@ -206,5 +218,6 @@ jobs:
             echo ""
             echo "- Address: https://${DOMAIN}"
             echo "- Server IP: ${IP}"
+            echo "- London smoke test: passed"
             echo "- Next: run the **Android app** workflow to build the app pointed at it."
           } >> "$GITHUB_STEP_SUMMARY"
