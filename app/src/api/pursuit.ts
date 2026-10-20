@@ -1,6 +1,6 @@
 // Client for the server's POST /v1/pursuit.
 import { API_URL } from "../config";
-import { isNoSignal, serverJson } from "./http";
+import { isNoAnswer, isNoSignal, serverJson } from "./http";
 
 export interface PursuitInfo {
   road: string | null;
@@ -11,8 +11,10 @@ export interface PursuitInfo {
 
 export type PursuitLookup =
   | { status: "ok"; info: PursuitInfo }
-  /** No answer within the timeout: no signal, or the server is down. */
+  /** The network failed. */
   | { status: "no-signal" }
+  /** Sent, but no answer within the timeout: the server is slow or unreachable. */
+  | { status: "no-answer" }
   /** No server in this build, or it answered with an error. */
   | { status: "unavailable" };
 
@@ -31,6 +33,7 @@ export async function fetchPursuitInfo(
     });
     return res.ok && res.body ? { status: "ok", info: res.body } : { status: "unavailable" };
   } catch (err) {
-    return isNoSignal(err) ? { status: "no-signal" } : { status: "unavailable" };
+    if (isNoSignal(err)) return { status: "no-signal" };
+    return isNoAnswer(err) ? { status: "no-answer" } : { status: "unavailable" };
   }
 }

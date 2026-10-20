@@ -3,7 +3,9 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-na
 import type { NoPoliceReason, PoliceRoute, Route, RoutePlan } from "../api/routes";
 import type { PointOfInterest } from "../search/places";
 import { formatDistance, formatDuration } from "../format";
+import { planningText } from "../navigation/planning";
 import { colors, fonts } from "../theme";
+import { useElapsed } from "./useElapsed";
 
 export type PlanState =
   | { status: "loading" }
@@ -53,6 +55,9 @@ export function RoutePanel({
   onOpenExternal,
 }: Props) {
   const { lat, lng } = destination;
+  // A slow answer reads as "still planning", never as a fault.
+  const waiting = state.status === "loading" || (state.status === "ready" && !!state.checking);
+  const waited = useElapsed(waiting, `${lat},${lng}`);
   return (
     <View style={styles.panel}>
       <View style={styles.header}>
@@ -68,7 +73,7 @@ export function RoutePanel({
         </Text>
       )}
       {note && <Text style={styles.note}>{note}</Text>}
-      {state.status === "loading" && <Text style={styles.status}>Working out routes…</Text>}
+      {state.status === "loading" && <Text style={styles.status}>{planningText("routes", waited)}</Text>}
       {state.status === "error" && <Text style={[styles.status, styles.error]}>{state.message}</Text>}
       {state.status === "ready" && (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
@@ -86,6 +91,7 @@ export function RoutePanel({
                   route={null}
                   reason={state.plan.noPoliceReason}
                   checking={state.checking}
+                  checkingText={planningText("blue-light", waited)}
                   onGo={() => onGo("police")}
                 />
               </>
@@ -160,11 +166,13 @@ function PoliceCard({
   route,
   reason,
   checking,
+  checkingText,
   onGo,
 }: {
   route: PoliceRoute | null;
   reason?: NoPoliceReason;
   checking?: boolean;
+  checkingText?: string;
   onGo: () => void;
 }) {
   if (!route) {
@@ -172,9 +180,7 @@ function PoliceCard({
       <View style={[styles.card, styles.cardMuted]}>
         <Text style={styles.cardTitle}>Blue light</Text>
         <Text style={styles.meta}>
-          {checking
-            ? "Checking for a quicker route using bus lanes and restricted turns…"
-            : NO_POLICE[reason ?? "not-faster"]}
+          {checking ? checkingText : NO_POLICE[reason ?? "not-faster"]}
         </Text>
       </View>
     );

@@ -16,7 +16,7 @@ Blue Route counts how much it's used, with no third-party analytics and nothing 
   - Unique installs per day and per week, and per app version.
   - Routes planned. A search counts once; the quick standard-only request doesn't count again.
   - Navigation sessions and pursuit sessions.
-  - Timeouts, failed route plans and server errors.
+  - Timeouts, failed route plans and server errors. A "not set up here" answer (for example address search with no OS Places key) isn't counted as an error.
 - **How it keeps the IDs.** Unique installs are counted from salted hashes of the ID, never the ID itself.
   - Each UTC day has its own random salt, and each week (Monday to Sunday) has another.
   - The day hash records no week, and the week hash records no day, so nothing links one install from one day to the next.

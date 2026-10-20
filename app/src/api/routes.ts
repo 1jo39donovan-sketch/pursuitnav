@@ -4,7 +4,7 @@ import type { LngLat } from "@maplibre/maplibre-react-native";
 import { API_URL, DEMO_MODE } from "../config";
 import type { RoadChoice } from "../session/SessionProvider";
 import type { VehicleType } from "../vehicles";
-import { isNoSignal, serverJson } from "./http";
+import { isNoAnswer, isNoSignal, ROUTE_TIMEOUT_MS, serverJson } from "./http";
 
 export interface Maneuver {
   type: number;
@@ -66,11 +66,25 @@ export interface RoutePlan {
 
 export class RouteError extends Error {}
 
-/** No answer from the server within the timeout: no signal, or the server is down. */
+/** The network failed: the request couldn't be sent at all. */
 export class NoSignalRouteError extends RouteError {
   constructor() {
     super("No signal: can't reach the routing server. Check your signal and try again.");
   }
+}
+
+/** The request went but no route came back in time (30 s): the server is slow or unreachable. */
+export class NoAnswerRouteError extends RouteError {
+  constructor() {
+    super("The routing server didn't answer in time. Try again.");
+  }
+}
+
+/** A failed request to the server as the route error to show. */
+export function routeFailure(err: unknown): unknown {
+  if (isNoSignal(err)) return new NoSignalRouteError();
+  if (isNoAnswer(err)) return new NoAnswerRouteError();
+  return err;
 }
 
 const MESSAGES: Record<string, string> = {
@@ -101,15 +115,18 @@ export async function fetchRoutes(
   }
   let res: { ok: boolean; status: number; body: unknown };
   try {
-    res = await serverJson(`${API_URL}/v1/routes`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ from, to, vehicle, roads, ...(standardOnly ? { standardOnly } : {}) }),
-      signal,
-    });
+    res = await serverJson(
+      `${API_URL}/v1/routes`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ from, to, vehicle, roads, ...(standardOnly ? { standardOnly } : {}) }),
+        signal,
+      },
+      { timeoutMs: ROUTE_TIMEOUT_MS },
+    );
   } catch (err) {
-    if (isNoSignal(err)) throw new NoSignalRouteError();
-    throw err;
+    throw routeFailure(err);
   }
   if (!res.ok || !res.body) {
     const error = (res.body as { error?: string } | null)?.error ?? "";

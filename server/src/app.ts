@@ -104,7 +104,15 @@ export function buildApp(
 
   // The phone app doesn't need CORS; the browser preview of the app does.
   // There are no cookies or credentials to protect.
-  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"] });
+  // The browser asks before each cross-site request with custom headers (a
+  // CORS preflight); let it keep the answer, so a first search doesn't pay for
+  // an extra round trip every time. Browsers cap this (Safari at 10 minutes,
+  // Chrome at 2 hours).
+  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"], maxAge: 86_400 });
+
+  // Answers that mean "this feature isn't set up here" (no OS Places key, map
+  // data not built yet). Deliberate, so not counted as server errors.
+  const notSetUp = new WeakSet<FastifyRequest>();
 
   // Usage counts. Each request may carry the app's random install ID and its
   // version; they're counted (hashed, by day) and nothing else about the
@@ -117,7 +125,7 @@ export function buildApp(
     });
     app.addHook("onResponse", async (req, reply) => {
       const path = req.routeOptions.url;
-      if (reply.statusCode >= 500) usage.add("server_errors");
+      if (reply.statusCode >= 500 && !notSetUp.has(req)) usage.add("server_errors");
       if (path !== "/v1/routes" && path !== "/v1/follow") return;
       if (reply.statusCode === 422) usage.add("route_failures");
       // The app asks for the standard route alone first, then the full plan: count the plan once.
@@ -208,6 +216,7 @@ export function buildApp(
     },
     async (req, reply) => {
       if (!places) {
+        notSetUp.add(req);
         return reply
           .code(503)
           .send({ error: "addresses-not-configured", message: "Full address search isn't set up on this server." });
@@ -242,7 +251,10 @@ export function buildApp(
       },
     },
     async (req, reply) => {
-      if (!matcher) return reply.code(503).send({ error: "pursuit-unavailable" });
+      if (!matcher) {
+        notSetUp.add(req);
+        return reply.code(503).send({ error: "pursuit-unavailable" });
+      }
       const { points, heading } = req.body;
       if (!points.every(inBounds)) {
         return reply.code(422).send({ error: "outside-area", message: "Outside the area Blue Route covers." });
@@ -266,7 +278,10 @@ export function buildApp(
   const dataFile = (path: string | undefined, notReady: string, what: string) =>
     async (req: FastifyRequest, reply: FastifyReply) => {
       const info = path ? await stat(path).catch(() => null) : null;
-      if (!path || !info) return reply.code(503).send({ error: notReady, message: `${what} hasn't been built yet.` });
+      if (!path || !info) {
+        notSetUp.add(req);
+        return reply.code(503).send({ error: notReady, message: `${what} hasn't been built yet.` });
+      }
       const etag = `"${info.size.toString(36)}-${Math.floor(info.mtimeMs).toString(36)}"`;
       reply.header("etag", etag).header("last-modified", info.mtime.toUTCString()).header("cache-control", "no-cache");
       if (req.headers["if-none-match"] === etag) return reply.code(304).send();

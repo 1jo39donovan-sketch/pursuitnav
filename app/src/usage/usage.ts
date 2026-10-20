@@ -35,7 +35,7 @@ async function flush() {
 export function startUsage() {
   setClientHooks({
     headers: () => ({ "x-install-id": installId(store, randomHex), "x-app-version": APP_VERSION }),
-    onNoSignal: () => count(store, "timeout"),
+    onTimeout: () => count(store, "timeout"),
     onAnswer: () => void flush(),
   });
 }

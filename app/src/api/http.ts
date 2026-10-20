@@ -1,10 +1,17 @@
 // Every call to the Blue Route server goes through here, so none can hang:
-// a request with no answer within 8 seconds is given up as "no signal", and
-// the screen says so instead of waiting for ever.
+// a request with no answer in time is given up, and the screen says so
+// instead of waiting for ever. Two different failures, told apart:
+//   - no signal: the network itself failed (fetch couldn't send at all);
+//   - no answer: it was sent, but nothing came back in time. Usually a slow
+//     server (a first request after a restart, a long blue-light check),
+//     sometimes a connection that has quietly died. Not called "No signal".
 
+/** Most calls: 8 seconds. */
 export const SERVER_TIMEOUT_MS = 8000;
+/** Route plans do real work on the server (the blue-light check), so they get longer. */
+export const ROUTE_TIMEOUT_MS = 30_000;
 
-/** The server didn't answer in time, or couldn't be reached at all. */
+/** The network failed: the request couldn't be sent. */
 export class NoSignalError extends Error {
   constructor() {
     super("No signal: can't reach the Blue Route server.");
@@ -12,7 +19,16 @@ export class NoSignalError extends Error {
   }
 }
 
+/** The request went, but no answer came back within the timeout. */
+export class NoAnswerError extends Error {
+  constructor() {
+    super("The Blue Route server didn't answer in time.");
+    this.name = "NoAnswerError";
+  }
+}
+
 export const isNoSignal = (err: unknown): err is NoSignalError => err instanceof NoSignalError;
+export const isNoAnswer = (err: unknown): err is NoAnswerError => err instanceof NoAnswerError;
 
 function abortError(): Error {
   const err = new Error("Aborted");
@@ -32,8 +48,8 @@ export interface RequestOptions {
 export interface ClientHooks {
   /** Headers on every request: the install ID and app version. */
   headers?: () => Record<string, string>;
-  /** A request got no answer in time. */
-  onNoSignal?: () => void;
+  /** A request got no answer in time (counted as a timeout). */
+  onTimeout?: () => void;
   /** A request was answered (a moment to send anything waiting). */
   onAnswer?: () => void;
 }
@@ -45,8 +61,8 @@ export function setClientHooks(next: ClientHooks) {
 
 /**
  * fetch, then `read` the answer, all within the timeout. Throws NoSignalError
- * on a timeout or a network failure, and an AbortError if the caller's own
- * signal (init.signal) aborts first. Errors from `read` pass through.
+ * if the network fails, NoAnswerError on a timeout, and an AbortError if the
+ * caller's own signal (init.signal) aborts first. Errors from `read` pass through.
  *
  * The timer runs until `read` finishes, so pass a reader that consumes the
  * body (res.json(), res.text()) for the whole call to be covered. Large
@@ -81,8 +97,8 @@ export function serverRequest<T>(
     const timer = setTimeout(() => {
       controller.abort();
       finish(() => {
-        reject(new NoSignalError());
-        if (!uncounted) hooks.onNoSignal?.();
+        reject(new NoAnswerError());
+        if (!uncounted) hooks.onTimeout?.();
       });
     }, timeoutMs);
     outer?.addEventListener("abort", onAbort);
@@ -98,8 +114,9 @@ export function serverRequest<T>(
           }),
         (err: unknown) =>
           finish(() =>
-            // fetch rejects with a TypeError when there's no network at all.
-            reject(err instanceof TypeError || (err as Error)?.name === "AbortError" ? new NoSignalError() : err),
+            // fetch rejects with a TypeError when the network fails. (An abort
+            // here is ours, from the timer, which has already settled this.)
+            reject(err instanceof TypeError ? new NoSignalError() : (err as Error)?.name === "AbortError" ? new NoAnswerError() : err),
           ),
       );
   });
