@@ -17,11 +17,13 @@ npm start                 # then open the dev build on the phone
 
 ## Routing server
 
-Routes come from the Blue Route server (`../server`). Point the app at it when starting or building:
+Routes come from the Blue Route server (`../server`). The app reads its address from `EXPO_PUBLIC_API_URL` when it's bundled; nothing is checked in. Point it at your server when starting:
 
 ```bash
-EXPO_PUBLIC_API_URL=https://route.example.org npm start
+EXPO_PUBLIC_API_URL=https://your-server.example npm start
 ```
+
+GitHub builds set it from the repository's `SERVER_DOMAIN` variable (as `https://<SERVER_DOMAIN>`): `android.yml` exports it, `store.yml` writes it into the production profile just before the EAS build, and `web.yml` passes it to the web export. For an EAS build from your own machine, add `EXPO_PUBLIC_API_URL` as an EAS environment variable first (Expo dashboard → your project → Environment variables, or `npx eas-cli env:create`).
 
 Without it the app runs, but the Search tab says routing isn't set up. For now, press and hold on the map to set a destination; address search replaces that in build step 3.
 
