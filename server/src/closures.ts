@@ -76,19 +76,26 @@ function isLive(d: TflDisruption, now: Date): boolean {
   return true;
 }
 
-/** "[[lng,lat],[lng,lat]]" to points; [] if it isn't that. */
+/**
+ * A street segment's line to points. TfL documents it as a "geoJSON formatted
+ * LineString" of the segment's two ends: either the bare coordinates
+ * "[[lng,lat],[lng,lat]]" or a whole {"type":"LineString","coordinates":…}.
+ * [] if it's neither.
+ */
 function parseLine(raw: unknown): LngLat[] {
   if (typeof raw !== "string") return [];
+  let parsed: unknown;
   try {
-    const pts = JSON.parse(raw) as unknown;
-    if (!Array.isArray(pts)) return [];
-    return pts.filter(
-      (p): p is LngLat =>
-        Array.isArray(p) && p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]) && Math.abs(p[1]) <= 90,
-    );
+    parsed = JSON.parse(raw);
   } catch {
     return [];
   }
+  const coords = Array.isArray(parsed) ? parsed : (parsed as { coordinates?: unknown } | null)?.coordinates;
+  if (!Array.isArray(coords)) return [];
+  return coords.filter(
+    (p): p is LngLat =>
+      Array.isArray(p) && p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]) && Math.abs(p[1]) <= 90,
+  );
 }
 
 /** A thin box along each piece of the line, with the ends trimmed off. */

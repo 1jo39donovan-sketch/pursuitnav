@@ -52,6 +52,21 @@ describe("parseDisruptions", () => {
     expect(closures[0]!.rings).toHaveLength(1);
   });
 
+  it("reads a segment written as a whole GeoJSON LineString too", () => {
+    const geojson = JSON.stringify({ type: "LineString", coordinates: JSON.parse(LINE) });
+    const feed = [
+      { id: "G", streets: [{ name: "Holloway Road", closure: "Full Closure", segments: [{ lineString: geojson }] }] },
+    ];
+    expect(parseDisruptions(feed, NOW).map((c) => c.street)).toEqual(["Holloway Road"]);
+  });
+
+  it("works with the stripped-down feed, which has no status", () => {
+    const feed = [
+      { id: "S", streets: [{ name: "Upper Street", closure: "Full Closure", segments: [{ lineString: LINE }] }] },
+    ];
+    expect(parseDisruptions(feed, NOW)).toHaveLength(1);
+  });
+
   it("copes with something that isn't the feed", () => {
     expect(parseDisruptions({ message: "throttled" }, NOW)).toEqual([]);
   });
