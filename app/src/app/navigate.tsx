@@ -15,8 +15,16 @@ import { LiveMap } from "../components/LiveMap";
 import { namedPoints, type MapRoute } from "../components/mapShared";
 import { formatDistance, formatDuration } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
-import { useNavigation } from "../navigation/NavigationProvider";
-import { offRouteText, rerouteFailure, type RerouteFailure } from "../navigation/reroute";
+import { useNavigation, type RouteKind } from "../navigation/NavigationProvider";
+import {
+  offRouteText,
+  policeReroute,
+  RETRY_AFTER_FAILURE_MS,
+  rerouteAllowed,
+  rerouteFailure,
+  type LastReroute,
+  type RerouteFailure,
+} from "../navigation/reroute";
 import { nextCallout } from "../navigation/voice";
 import { recordEvent } from "../usage/usage";
 import { useSearch } from "../search/SearchProvider";
@@ -47,9 +55,6 @@ function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
   return { prepared: next, obs: [] };
 }
 
-// While re-routing fails (no signal), try again this often.
-const RETRY_MS = 10000;
-
 /** Turn-by-turn guidance, readable at a glance by the operator. */
 export default function NavigateScreen() {
   // Screen stays on while navigating. Ending quickly can release the lock
@@ -60,12 +65,12 @@ export default function NavigateScreen() {
       deactivateKeepAwake("navigate").catch(() => {});
     };
   }, []);
-  const { active, replan, stop } = useNavigation();
+  const { active, replan, rerouteNow, stop } = useNavigation();
   // Usage counts: one navigation session per time this screen opens.
   useEffect(() => recordEvent("navigation"), []);
   const { fix } = useLocation();
   const { data, places } = useSearch();
-  const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive } = useSession();
+  const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -94,41 +99,69 @@ export default function NavigateScreen() {
   const progress = track.prepared === prepared ? track.progress : null;
   const offRoute = track.prepared === prepared && track.offCount >= OFF_ROUTE_FIXES;
 
-  // Off route for a few seconds: get a new route from here, same kind.
+  // Off route for a few seconds, or asked for (an old plan, "Re-route now"):
+  // get a new route from here, same kind.
   const inFlight = useRef<AbortController | null>(null);
-  const lastAttempt = useRef(0);
+  const last = useRef<LastReroute | null>(null);
+  const handledAsk = useRef(0);
   // A re-route gives up after 30 s; "No signal" only when the network itself failed.
   const [failed, setFailed] = useState<RerouteFailure>(null);
+  // Waiting for the first new route (not for the blue-light check after it).
   const [rerouting, setRerouting] = useState(false);
   const reroutingFor = useElapsed(rerouting);
   useEffect(() => {
-    if (!active || !fix || !offRoute || inFlight.current) return;
-    if (Date.now() - lastAttempt.current < RETRY_MS) return;
-    lastAttempt.current = Date.now();
+    if (!active || !fix) return;
+    const forced = active.rerouteAsked !== handledAsk.current;
+    if (!forced && (!offRoute || inFlight.current)) return;
+    if (!rerouteAllowed(last.current, Date.now(), forced)) return;
+    handledAsk.current = active.rerouteAsked;
+    // Asked for now: what was in flight was for the old choice.
+    inFlight.current?.abort();
     const controller = new AbortController();
     inFlight.current = controller;
     setRerouting(true);
-    // A standard route only needs the quick request; a blue-light one the full check.
+    if (voiceOn) {
+      Speech.stop();
+      Speech.speak("Re-routing", { language: "en-GB" });
+    }
+    const current = () => inFlight.current === controller && !controller.signal.aborted;
+    const swapIn = (plan: RoutePlan, stage?: "checking" | "done") => {
+      if (!current()) return;
+      setRerouting(false);
+      replan(plan, stage);
+    };
+    const from = routeOrigin(fix);
     // Follow-in re-routes back onto the colleague's track, not to a fresh route.
-    const fresh: Promise<RoutePlan> = active.follow
-      ? fetchFollow(routeOrigin(fix), active.follow.track, vehicle, roads, controller.signal).then((f) => ({
-          standard: f.route,
-          police: f.route,
-        }))
-      : fetchRoutes(routeOrigin(fix), active.destination, vehicle, controller.signal, active.kind === "standard", roads);
-    fresh
-      .then((plan) => {
+    // A standard route only needs the quick request. A blue-light one swaps
+    // in the quick standard route at once, then the blue-light one if any.
+    const work: Promise<void> = active.follow
+      ? fetchFollow(from, active.follow.track, vehicle, roads, controller.signal).then((f) =>
+          swapIn({ standard: f.route, police: f.route }),
+        )
+      : active.kind === "standard"
+        ? fetchRoutes(from, active.destination, vehicle, controller.signal, true, roads).then((plan) => swapIn(plan))
+        : policeReroute(
+            (standardOnly) => fetchRoutes(from, active.destination, vehicle, controller.signal, standardOnly, roads),
+            swapIn,
+            () => !current(),
+          );
+    work
+      .then(() => {
+        if (!current()) return;
         setFailed(null);
-        replan(plan);
+        last.current = { at: Date.now(), ok: true };
       })
       .catch((err: unknown) => {
-        if (!controller.signal.aborted) setFailed(rerouteFailure(err));
+        if (!current()) return;
+        setFailed(rerouteFailure(err));
+        last.current = { at: Date.now(), ok: false };
       })
       .finally(() => {
-        if (inFlight.current === controller) inFlight.current = null;
+        if (inFlight.current !== controller) return;
+        inFlight.current = null;
         setRerouting(false);
       });
-  }, [active, fix, offRoute, replan, vehicle, roads]);
+  }, [active, fix, offRoute, replan, vehicle, roads, voiceOn]);
   useEffect(() => () => inFlight.current?.abort(), []);
 
   // Opt-in learning: time each road of this route while on it. Only way IDs
@@ -143,8 +176,18 @@ export default function NavigateScreen() {
   useEffect(() => () => void flushTiming(timing.current, null), []);
 
   const end = () => {
-    stop();
+    stop(progress?.arrived ? "arrived" : "end");
     router.back();
+  };
+
+  // Quick actions: one tap each, no second End tap needed.
+  const [sheet, setSheet] = useState(false);
+  const newDestination = () => {
+    setSheet(false);
+    stop("new-destination");
+    // Back to Search, wherever navigation was started from (follow-in starts on Session).
+    if (router.canGoBack()) router.back();
+    router.navigate("/search");
   };
 
   // Spoken directions, so the crew can keep their eyes on the road.
@@ -204,9 +247,11 @@ export default function NavigateScreen() {
   const destination: [number, number] = [active.destination.lng, active.destination.lat];
   const restrictions = "restrictions" in active.route ? restrictionPoints(active.route) : [];
 
-  const offRouteMsg = offRouteText(failed, RETRY_MS / 1000, reroutingFor);
+  const offRouteMsg = offRouteText(failed, RETRY_AFTER_FAILURE_MS / 1000, reroutingFor);
+  // The off-route panel also shows while a re-route asked for on the line is worked out.
+  const showOff = offRoute || rerouting;
   const turnPanel = (
-    <View style={[styles.turn, offRoute && styles.turnOff]}>
+    <View style={[styles.turn, showOff && styles.turnOff]}>
       {!progress ? (
         <Text style={styles.instruction}>Waiting for GPS…</Text>
       ) : progress.arrived ? (
@@ -214,9 +259,11 @@ export default function NavigateScreen() {
           <Text style={styles.distance}>⚑ Arrived</Text>
           <Text style={styles.instruction}>{active.destination.title}</Text>
         </>
-      ) : offRoute ? (
+      ) : showOff ? (
         <View accessibilityRole={failed ? "alert" : undefined}>
-          <Text style={[styles.distance, failed === "no-signal" && styles.noSignal]}>{offRouteMsg.title}</Text>
+          <Text style={[styles.distance, failed === "no-signal" && styles.noSignal]}>
+            {offRoute ? offRouteMsg.title : "Re-routing"}
+          </Text>
           <Text style={styles.instruction}>{offRouteMsg.detail}</Text>
         </View>
       ) : (
@@ -274,6 +321,14 @@ export default function NavigateScreen() {
             style={[styles.voiceButton, !voiceOn && styles.voiceOff]}
           >
             <Text style={styles.voiceText}>{voiceOn ? "🔊" : "🔇"}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Route options"
+            onPress={() => setSheet(true)}
+            style={styles.routeButton}
+          >
+            <Text style={styles.routeText}>Route</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -338,6 +393,66 @@ export default function NavigateScreen() {
           {etaPanel}
         </>
       )}
+      {sheet && (
+        <RouteSheet
+          kind={active.kind}
+          blueLightOn={policeRoutes}
+          onClose={() => setSheet(false)}
+          onNewDestination={newDestination}
+          onSwitch={(kind) => {
+            setSheet(false);
+            rerouteNow(kind);
+          }}
+          onRerouteNow={() => {
+            setSheet(false);
+            rerouteNow();
+          }}
+          bottomInset={insets.bottom}
+        />
+      )}
+    </View>
+  );
+}
+
+/** The quick actions behind the Route button, each one big and one tap. */
+function RouteSheet({
+  kind,
+  blueLightOn,
+  onClose,
+  onNewDestination,
+  onSwitch,
+  onRerouteNow,
+  bottomInset,
+}: {
+  kind: RouteKind;
+  blueLightOn: boolean;
+  onClose: () => void;
+  onNewDestination: () => void;
+  onSwitch: (kind: "standard" | "police") => void;
+  onRerouteNow: () => void;
+  bottomInset: number;
+}) {
+  const action = (label: string, onPress: () => void, style?: object) => (
+    <Pressable
+      key={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.sheetButton, style, pressed && { opacity: 0.8 }]}
+    >
+      <Text style={styles.sheetText}>{label}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={styles.sheetBackdrop}>
+      <Pressable style={{ flex: 1 }} accessibilityLabel="Close route options" onPress={onClose} />
+      <View style={[styles.sheet, { paddingBottom: bottomInset + 16 }]}>
+        {action("New destination", onNewDestination)}
+        {/* Follow-in keeps to the colleague's way in, so there's nothing to switch to. */}
+        {kind === "police" && action("Switch to standard", () => onSwitch("standard"))}
+        {kind === "standard" && blueLightOn && action("Switch to blue light", () => onSwitch("police"))}
+        {action("Re-route now", onRerouteNow)}
+        {action("Cancel", onClose, styles.sheetCancel)}
+      </View>
     </View>
   );
 }
@@ -360,7 +475,13 @@ const styles = StyleSheet.create({
   turnOff: { backgroundColor: "#2a1d0a" },
   turnRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   arrow: { color: colors.amber, fontSize: 56, lineHeight: 64, fontWeight: "700" },
-  distance: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 52, lineHeight: 58, fontVariant: ["tabular-nums"] },
+  distance: {
+    color: colors.fg,
+    fontFamily: fonts.displayBold,
+    fontSize: 52,
+    lineHeight: 58,
+    fontVariant: ["tabular-nums"],
+  },
   noSignal: { color: colors.amber },
   instruction: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26, lineHeight: 30 },
   then: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
@@ -376,11 +497,24 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   eta: { flex: 1, minWidth: 0 },
-  etaClock: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 36, lineHeight: 40, fontVariant: ["tabular-nums"] },
+  etaClock: {
+    color: colors.fg,
+    fontFamily: fonts.displayBold,
+    fontSize: 36,
+    lineHeight: 40,
+    fontVariant: ["tabular-nums"],
+  },
   etaMeta: { color: colors.muted, fontFamily: fonts.mono, fontSize: 13 },
   road: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, marginTop: 2 },
   side: { alignItems: "flex-end", gap: 8 },
-  badge: { fontFamily: fonts.mono, fontSize: 11, borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  badge: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   buttons: { flexDirection: "row", gap: 10, alignItems: "center" },
   voiceButton: {
     minWidth: 52,
@@ -400,6 +534,53 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 22,
   },
+  routeButton: {
+    minHeight: 56,
+    minWidth: 56,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.line,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  routeText: {
+    color: colors.fg,
+    fontFamily: fonts.displayBold,
+    fontSize: 18,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  sheetBackdrop: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.55)" },
+  sheet: {
+    backgroundColor: colors.panel,
+    borderTopColor: colors.line,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 10,
+  },
+  sheetButton: {
+    minHeight: 56,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.blue,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sheetCancel: { borderColor: colors.line },
+  sheetText: {
+    color: colors.fg,
+    fontFamily: fonts.displayBold,
+    fontSize: 22,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
   endConfirm: { backgroundColor: "#ff3b30" },
-  endText: { color: "#ffffff", fontFamily: fonts.displayBold, fontSize: 18, letterSpacing: 1, textTransform: "uppercase" },
+  endText: {
+    color: "#ffffff",
+    fontFamily: fonts.displayBold,
+    fontSize: 18,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
 });

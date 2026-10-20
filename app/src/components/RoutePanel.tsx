@@ -1,17 +1,30 @@
+import { useLayoutEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import type { NoPoliceReason, PoliceRoute, Route, RoutePlan } from "../api/routes";
+import type { NoPoliceReason, Route, RoutePlan } from "../api/routes";
 import type { PointOfInterest } from "../search/places";
 import { formatDistance, formatDuration } from "../format";
 import { planningText } from "../navigation/planning";
+import {
+  cardSlots,
+  createTapGuard,
+  planAgeText,
+  slotKey,
+  type PlanOrigin,
+  type PoliceSlot,
+} from "../navigation/routeChoice";
 import { colors, fonts } from "../theme";
 import { useElapsed } from "./useElapsed";
 
 export type PlanState =
   | { status: "loading" }
-  | { status: "error"; message: string }
-  /** checking: the standard route is here, the blue-light one is still being worked out. */
-  | { status: "ready"; plan: RoutePlan; checking?: boolean };
+  /** waitingForFix: refused for want of a GPS position; routes when the first fix arrives. */
+  | { status: "error"; message: string; waitingForFix?: boolean }
+  /**
+   * checking: the standard route is here, the blue-light one is still being worked out.
+   * origin: where and when the plan was made, to refresh an old one before it's followed.
+   */
+  | { status: "ready"; plan: RoutePlan; checking?: boolean; origin?: PlanOrigin };
 
 interface Props {
   state: PlanState;
@@ -21,6 +34,8 @@ interface Props {
   /** A caution about the destination, e.g. that it's the road, not the door. */
   note?: string;
   onClose: () => void;
+  /** Try again after an error, to the same destination. */
+  onRetry?: () => void;
   /** Start turn-by-turn on the chosen route. */
   onGo: (kind: "standard" | "police") => void;
   /** Named blocks and estates on the road, when the destination is a whole road. */
@@ -51,6 +66,7 @@ export function RoutePanel({
   blocks,
   onPickBlock,
   onClose,
+  onRetry,
   onGo,
   onOpenExternal,
 }: Props) {
@@ -58,10 +74,24 @@ export function RoutePanel({
   // A slow answer reads as "still planning", never as a fault.
   const waiting = state.status === "loading" || (state.status === "ready" && !!state.checking);
   const waited = useElapsed(waiting, `${lat},${lng}`);
+  // How old the plan is: said once it's old enough that Go will refresh it.
+  const madeAt = state.status === "ready" ? state.origin?.madeAt : undefined;
+  const age = useElapsed(madeAt !== undefined, madeAt);
+  const ageText = madeAt !== undefined ? planAgeText(0, age) : null;
+
+  // Blue light always left, standard always right, whatever has arrived.
+  const slots = state.status === "ready" ? cardSlots(state.plan, !!state.checking) : null;
+  // A Go tap just after a card changes is ignored: it was aimed at what was there before.
+  const [guard] = useState(() => createTapGuard());
+  const shownKey = slots ? slots.map(slotKey).join("|") : state.status;
+  useLayoutEffect(() => guard.see(shownKey, Date.now()), [guard, shownKey]);
+  const go = (kind: "standard" | "police") => {
+    if (guard.allows(Date.now())) onGo(kind);
+  };
   return (
     <View style={styles.panel}>
       <View style={styles.header}>
-        <Text style={styles.label}>Routes from your position</Text>
+        <Text style={[styles.label, ageText && styles.labelOld]}>{ageText ?? "Routes from your position"}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Clear destination" onPress={onClose} hitSlop={12}>
           <Text style={styles.close}>Clear</Text>
         </Pressable>
@@ -74,28 +104,26 @@ export function RoutePanel({
       )}
       {note && <Text style={styles.note}>{note}</Text>}
       {state.status === "loading" && <Text style={styles.status}>{planningText("routes", waited)}</Text>}
-      {state.status === "error" && <Text style={[styles.status, styles.error]}>{state.message}</Text>}
-      {state.status === "ready" && (
+      {state.status === "error" && (
+        <View style={styles.errorBox}>
+          <Text style={[styles.status, styles.error]}>{state.message}</Text>
+          {onRetry && !state.waitingForFix && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onRetry}
+              style={({ pressed }) => [styles.retry, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+      {slots && state.status === "ready" && (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-          {/* The quicker route first, with its Go in reach; blocks on the road below. */}
+          {/* Fixed places, so a card never moves under a finger; blocks on the road below. */}
           <View style={styles.cards}>
-            {state.plan.police ? (
-              <>
-                <PoliceCard route={state.plan.police} onGo={() => onGo("police")} />
-                <StandardCard route={state.plan.standard} onGo={() => onGo("standard")} />
-              </>
-            ) : (
-              <>
-                <StandardCard route={state.plan.standard} fastest={!state.checking} onGo={() => onGo("standard")} />
-                <PoliceCard
-                  route={null}
-                  reason={state.plan.noPoliceReason}
-                  checking={state.checking}
-                  checkingText={planningText("blue-light", waited)}
-                  onGo={() => onGo("police")}
-                />
-              </>
-            )}
+            <PoliceCard slot={slots[0]} checkingText={planningText("blue-light", waited)} onGo={() => go("police")} />
+            <StandardCard route={slots[1].route} fastest={slots[1].fastest} onGo={() => go("standard")} />
           </View>
           <ClosuresLine closures={state.plan.closures} />
           {blocks && blocks.length > 0 && (
@@ -146,10 +174,19 @@ function GoButton({ onPress, color }: { onPress: () => void; color: string }) {
   );
 }
 
-function StandardCard({ route, fastest, onGo }: { route: Route; fastest?: boolean; onGo: () => void }) {
+/** Always takes its space, shown or not, so the card's contents never shift. */
+function FastestBadge({ shown }: { shown: boolean }) {
+  return (
+    <Text style={[styles.fastest, !shown && styles.hidden]} importantForAccessibility={shown ? "auto" : "no"}>
+      Fastest
+    </Text>
+  );
+}
+
+function StandardCard({ route, fastest, onGo }: { route: Route; fastest: boolean; onGo: () => void }) {
   return (
     <View style={[styles.card, fastest && styles.cardFastest]}>
-      {fastest && <Text style={styles.fastest}>Fastest</Text>}
+      <FastestBadge shown={fastest} />
       <View style={styles.cardHead}>
         <Text style={styles.cardTitle}>Standard</Text>
         <Text style={[styles.tag, { color: colors.ok, borderColor: colors.ok }]}>LEGAL</Text>
@@ -162,34 +199,22 @@ function StandardCard({ route, fastest, onGo }: { route: Route; fastest?: boolea
   );
 }
 
-function PoliceCard({
-  route,
-  reason,
-  checking,
-  checkingText,
-  onGo,
-}: {
-  route: PoliceRoute | null;
-  reason?: NoPoliceReason;
-  checking?: boolean;
-  checkingText?: string;
-  onGo: () => void;
-}) {
-  if (!route) {
+function PoliceCard({ slot, checkingText, onGo }: { slot: PoliceSlot; checkingText: string; onGo: () => void }) {
+  if (slot.state !== "route") {
     return (
       <View style={[styles.card, styles.cardMuted]}>
+        <FastestBadge shown={false} />
         <Text style={styles.cardTitle}>Blue light</Text>
-        <Text style={styles.meta}>
-          {checking ? checkingText : NO_POLICE[reason ?? "not-faster"]}
-        </Text>
+        <Text style={styles.meta}>{slot.state === "checking" ? checkingText : NO_POLICE[slot.reason]}</Text>
       </View>
     );
   }
+  const route = slot.route;
   const count = route.restrictions.length;
   const countText = `${route.restrictionsComplete ? "" : "at least "}${count} restriction${count === 1 ? "" : "s"}`;
   return (
-    <View style={[styles.card, styles.cardPolice, styles.cardFastest]}>
-      <Text style={styles.fastest}>Fastest</Text>
+    <View style={[styles.card, styles.cardPolice]}>
+      <FastestBadge shown={slot.fastest} />
       <View style={styles.cardHead}>
         <Text style={styles.cardTitle}>Blue light</Text>
         <Text style={styles.tag}>{countText.toUpperCase()}</Text>
@@ -240,8 +265,8 @@ function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
   const at = new Date(closures.updatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   return (
     <Text style={styles.closures}>
-      Avoids {closures.active} full road {closures.active === 1 ? "closure" : "closures"} from TfL (checked {at}).
-      Lane closures and incidents TfL hasn’t listed yet aren’t included.
+      Avoids {closures.active} full road {closures.active === 1 ? "closure" : "closures"} from TfL (checked {at}). Lane
+      closures and incidents TfL hasn’t listed yet aren’t included.
     </Text>
   );
 }
@@ -269,6 +294,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: "uppercase",
   },
+  labelOld: { color: colors.amber },
   title: {
     color: colors.fg,
     fontFamily: fonts.displaySemiBold,
@@ -286,15 +312,32 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   error: { color: colors.amber },
+  errorBox: { gap: 4 },
+  retry: {
+    borderRadius: 10,
+    minHeight: 56,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.blue,
+  },
+  retryText: {
+    color: "#0c1220",
+    fontFamily: fonts.displayBold,
+    fontSize: 22,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+  },
   scroll: { flexGrow: 0 },
   scrollContent: { gap: 12 },
-  cards: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
+  // Stretch: the blue-light placeholder is the same size as the card beside it.
+  cards: { flexDirection: "row", gap: 10, alignItems: "stretch" },
   card: {
     flex: 1,
     minWidth: 0,
     backgroundColor: colors.panel,
     borderColor: colors.line,
-    borderWidth: 1,
+    // The same width whether fastest or not, so nothing inside shifts.
+    borderWidth: 2,
     borderRadius: 10,
     padding: 12,
     gap: 2,
@@ -367,7 +410,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: "uppercase",
   },
-  cardFastest: { borderWidth: 2 },
+  cardFastest: { borderColor: colors.blue },
   fastest: {
     color: colors.ok,
     fontFamily: fonts.displayBold,
@@ -375,6 +418,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: "uppercase",
   },
+  hidden: { opacity: 0 },
   reliesOn: { marginTop: 8 },
   blocks: { gap: 6 },
   blocksLabel: { color: colors.muted, fontFamily: fonts.body, fontSize: 12 },

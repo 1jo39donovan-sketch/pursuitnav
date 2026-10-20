@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import type { PoliceRoute, Route, RoutePlan } from "../api/routes";
+import type { ReplanStage } from "./reroute";
 
 /** follow: the way a colleague drove in (team sessions). */
 export type RouteKind = "standard" | "police" | "follow";
@@ -14,28 +15,51 @@ export interface ActiveNavigation {
   note?: string;
   /** For follow-in: whose way in, and their track, to re-route along it. */
   follow?: { callsign: string; track: { lat: number; lng: number }[] };
+  /** Goes up by one each time a re-route from here is asked for (stale plan, "Re-route now"). */
+  rerouteAsked: number;
 }
+
+/** Why navigation ended: Search clears or refreshes its plan to match. */
+export type EndReason = "end" | "arrived" | "new-destination";
 
 interface NavigationContextValue {
   active: ActiveNavigation | null;
+  /** The last time navigation ended, and why. */
+  ended: { at: number; reason: EndReason } | null;
   start: (
     kind: RouteKind,
     plan: RoutePlan,
     destination: ActiveNavigation["destination"],
     follow?: ActiveNavigation["follow"],
+    /** The plan is old or from somewhere else: re-route from here straight away. */
+    refresh?: boolean,
   ) => void;
-  /** Swap in a new plan after re-routing, keeping the operator's choice where possible. */
-  replan: (plan: RoutePlan) => void;
-  stop: () => void;
+  /**
+   * Swap in a new plan after re-routing, keeping the operator's choice where
+   * possible. stage "checking": only the standard route is in so far.
+   */
+  replan: (plan: RoutePlan, stage?: ReplanStage) => void;
+  /** Re-route from here now, switching to another kind of route if given. */
+  rerouteNow: (kind?: "standard" | "police") => void;
+  stop: (reason?: EndReason) => void;
 }
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
 
 /** Picks the route of the chosen kind from a plan, falling back to standard if needed. */
-export function chooseRoute(kind: RouteKind, plan: RoutePlan): { route: Route | PoliceRoute; note?: string } {
+export function chooseRoute(
+  kind: RouteKind,
+  plan: RoutePlan,
+  stage: ReplanStage = "done",
+): { route: Route | PoliceRoute; note?: string } {
   if (kind === "follow") return { route: plan.police ?? plan.standard };
   if (kind === "police") {
     if (plan.police) return { route: plan.police };
+    // Never "no faster route" before the full plan has answered.
+    if (stage === "checking") return { route: plan.standard, note: "Checking for a blue-light route…" };
+    if (plan.noPoliceReason === "check-failed") {
+      return { route: plan.standard, note: "Couldn’t check for a blue-light route. Following the standard route." };
+    }
     return {
       route: plan.standard,
       note: "No faster police route from here. Following the standard route.",
@@ -46,6 +70,7 @@ export function chooseRoute(kind: RouteKind, plan: RoutePlan): { route: Route | 
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveNavigation | null>(null);
+  const [ended, setEnded] = useState<{ at: number; reason: EndReason } | null>(null);
 
   const start = useCallback(
     (
@@ -53,6 +78,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       plan: RoutePlan,
       destination: ActiveNavigation["destination"],
       follow?: ActiveNavigation["follow"],
+      refresh = false,
     ) => {
       const chosen = chooseRoute(kind, plan);
       // Their way in may use restrictions: say how many up front, never silently.
@@ -60,15 +86,15 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       const note = follow
         ? `Following ${follow.callsign}’s way in. ${n ? `Uses ${n} restriction${n === 1 ? "" : "s"} (R on the map).` : "No restrictions found on it."}`
         : chosen.note;
-      setActive({ kind, destination, follow, ...chosen, note });
+      setActive({ kind, destination, follow, ...chosen, note, rerouteAsked: refresh ? 1 : 0 });
     },
     [],
   );
 
-  const replan = useCallback((plan: RoutePlan) => {
+  const replan = useCallback((plan: RoutePlan, stage: ReplanStage = "done") => {
     setActive((cur) => {
       if (!cur) return cur;
-      const chosen = chooseRoute(cur.kind, plan);
+      const chosen = chooseRoute(cur.kind, plan, stage);
       // A new police route may rely on different restrictions: say so, never silently.
       const police = "restrictions" in chosen.route ? chosen.route : null;
       const note =
@@ -80,9 +106,26 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const stop = useCallback(() => setActive(null), []);
+  const rerouteNow = useCallback((kind?: "standard" | "police") => {
+    setActive(
+      (cur) =>
+        cur && {
+          ...cur,
+          kind: cur.kind === "follow" ? cur.kind : (kind ?? cur.kind),
+          rerouteAsked: cur.rerouteAsked + 1,
+        },
+    );
+  }, []);
 
-  const value = useMemo(() => ({ active, start, replan, stop }), [active, start, replan, stop]);
+  const stop = useCallback((reason: EndReason = "end") => {
+    setActive(null);
+    setEnded({ at: Date.now(), reason });
+  }, []);
+
+  const value = useMemo(
+    () => ({ active, ended, start, replan, rerouteNow, stop }),
+    [active, ended, start, replan, rerouteNow, stop],
+  );
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
 }
 
