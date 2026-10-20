@@ -77,13 +77,20 @@ jobs:
               echo '#!/bin/bash'
               printf 'export DOMAIN=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q TFL_APP_KEY=%q BRANCH=%q\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$TFL_APP_KEY" "$BRANCH"
               echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/server/scripts/install.sh | bash > /var/log/blue-route-install.log 2>&1"
+              # Lets the wait step below stop early, and show why, if the install fails.
+              echo 'echo "== install finished with exit code $?" >> /var/log/blue-route-install.log'
             } > user-data.sh
 
-            ssh_args=()
+            # A one-off key, held only by this run, so it can show the install
+            # log if something goes wrong. Taken off the server once it's up.
+            ssh-keygen -q -t ed25519 -N "" -C blue-route-deploy -f deploy_key
+            KEY_NAME="blue-route-deploy-${GITHUB_RUN_ID}"
+            hcloud ssh-key create --name "$KEY_NAME" --public-key-from-file deploy_key.pub >/dev/null
+            ssh_args=(--ssh-key "$KEY_NAME")
             if [ -n "$SSH_PUBLIC_KEY" ]; then
               hcloud ssh-key describe blue-route-admin >/dev/null 2>&1 ||
                 hcloud ssh-key create --name blue-route-admin --public-key "$SSH_PUBLIC_KEY"
-              ssh_args=(--ssh-key blue-route-admin)
+              ssh_args+=(--ssh-key blue-route-admin)
             fi
 
             # Cheapest first; small plans sell out at times, so try a few.
@@ -112,6 +119,8 @@ jobs:
                 fi
               done
             done
+            # Only needed while creating the server; the key itself stays with this run.
+            hcloud ssh-key delete "$KEY_NAME" >/dev/null || true
             [ "$created" = 1 ] || { echo "::error::Hetzner had no suitable server available. Try again later."; exit 1; }
           fi
 
@@ -142,23 +151,49 @@ jobs:
           esac
 
       - name: Wait for the server to be ready
+        env:
+          IP: ${{ steps.server.outputs.ip }}
         run: |
           echo "Installing and building London's routing map and places: usually 20–40 minutes."
+          # The install log, through the one-off key (only for a server made by this run).
+          log() {
+            [ -f deploy_key ] || return 1
+            ssh -i deploy_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
+              -o LogLevel=ERROR "root@$IP" "tail -n $1 /var/log/blue-route-install.log" 2>/dev/null
+          }
+          tidy() {
+            [ -f deploy_key ] || return 0
+            ssh -i deploy_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
+              -o LogLevel=ERROR "root@$IP" "sed -i '/blue-route-deploy/d' /root/.ssh/authorized_keys" 2>/dev/null || true
+          }
           for i in $(seq 1 110); do
             health=$(curl -fsS "https://${DOMAIN}/health" 2>/dev/null || true)
             if grep -q '"routing":true' <<<"$health" && grep -q '"places":true' <<<"$health"; then
               echo "https://${DOMAIN} is up, with routing and places."
+              tidy
               exit 0
             fi
             # A server still on older code only reports ok; it updates itself overnight.
             if grep -q '"ok":true' <<<"$health" && ! grep -q '"routing"' <<<"$health"; then
               echo "https://${DOMAIN} is up (older version: it can't report whether the map is built yet)."
+              tidy
               exit 0
             fi
-            [ $((i % 5)) -eq 0 ] && echo "Still building ($i minutes): ${health:-not answering yet}"
+            # The install stopped with an error: no point waiting.
+            last=$(log 3 || true)
+            if grep -q "install finished with exit code [1-9]" <<<"$last"; then
+              echo "::error::The server's install failed. The end of its log:"
+              log 80 || true
+              exit 1
+            fi
+            if [ $((i % 5)) -eq 0 ]; then
+              echo "Still building ($i minutes): ${health:-not answering yet}"
+              [ -n "$last" ] && sed 's/^/    /' <<<"$last"
+            fi
             sleep 60
           done
-          echo "::error::Not fully ready after 110 minutes (last answer: ${health:-none}). Log into the server and check /var/log/blue-route-install.log"
+          echo "::error::Not fully ready after 110 minutes (last answer: ${health:-none}). The end of the server's install log:"
+          log 80 || echo "(couldn't read it)"
           exit 1
 
       - name: Summary

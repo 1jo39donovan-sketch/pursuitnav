@@ -44,7 +44,9 @@ if [ ! -s data/valhalla-next/valhalla_tiles.tar ]; then
   exit 1
 fi
 
-scripts/valhalla-limits.sh data/valhalla-next >/dev/null
+# Never fatal: without it, routes still work and just skip live closures.
+bash scripts/valhalla-limits.sh data/valhalla-next >/dev/null ||
+  echo "$(date -Is) couldn't raise Valhalla's avoid-area limits; live closures may be skipped" >&2
 
 echo "$(date -Is) swapping in new tiles"
 rm -rf data/valhalla-prev
@@ -58,4 +60,4 @@ fi
 echo "$(date -Is) tiles done (previous ones kept in data/valhalla-prev)"
 
 # Places come from the same extract, so they stay in step with the roads.
-"$(dirname "$0")/build-places.sh"
+bash "$(dirname "$0")/build-places.sh"

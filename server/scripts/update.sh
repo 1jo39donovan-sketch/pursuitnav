@@ -23,10 +23,10 @@ docker image prune -f >/dev/null
 # A new kind of search data (e.g. the named-roads list) is built now rather
 # than waiting for the weekly map refresh.
 if [ ! -s data/places/roads.txt.gz ]; then
-  scripts/build-places.sh || echo "$(date -Is) search data rebuild failed; the weekly refresh will retry" >&2
+  bash scripts/build-places.sh || echo "$(date -Is) search data rebuild failed; the weekly refresh will retry" >&2
 fi
 # Live closures need Valhalla's avoid-area limits raised (new map builds do it).
-if [ "$(scripts/valhalla-limits.sh data/valhalla)" = "changed" ]; then
+if [ "$(bash scripts/valhalla-limits.sh data/valhalla || true)" = "changed" ]; then
   docker compose restart valhalla
 fi
 echo "$(date -Is) done"

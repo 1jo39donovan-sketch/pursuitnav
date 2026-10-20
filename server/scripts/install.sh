@@ -107,7 +107,7 @@ say "Building the routing map and places list. This takes 20–40 minutes the fi
 if [ -s data/valhalla/valhalla_tiles.tar ]; then
   echo "Map already built; the weekly refresh keeps it current."
 else
-  scripts/build-map.sh
+  bash scripts/build-map.sh
 fi
 
 say "Starting Valhalla, the API and HTTPS"
@@ -125,8 +125,8 @@ done
 
 say "Weekly map and places refresh (Sundays 03:15); nightly code update from $BRANCH (04:30)"
 cat >/etc/cron.d/blue-route <<EOF
-15 3 * * 0 root $DIR/server/scripts/rebuild-tiles.sh >> /var/log/blue-route-tiles.log 2>&1
-30 4 * * * root BRANCH=$BRANCH $DIR/server/scripts/update.sh >> /var/log/blue-route-update.log 2>&1
+15 3 * * 0 root bash $DIR/server/scripts/rebuild-tiles.sh >> /var/log/blue-route-tiles.log 2>&1
+30 4 * * * root BRANCH=$BRANCH bash $DIR/server/scripts/update.sh >> /var/log/blue-route-update.log 2>&1
 EOF
 chmod 644 /etc/cron.d/blue-route
 
