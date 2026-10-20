@@ -1,0 +1,243 @@
+[
+  {
+    "$type": "Tfl.Api.Presentation.Entities.RoadDisruption, Tfl.Api.Presentation.Entities",
+    "id": "TIMS-235412",
+    "url": "/Road/All/Disruption/TIMS-235412",
+    "point": "[-0.117126,51.371285]",
+    "severity": "Serious",
+    "ordinal": 3,
+    "category": "Works",
+    "subCategory": "Utility works",
+    "comments": "[A23] Purley Way (All approaches) at the junction of Waddon Road - Three-way temporary traffic signals in place to facilitate SGN works. Waddon Road is also closed. ",
+    "currentUpdate": "Use an alternative route. Southbound traffic is slow moving on Purley Way with queues from Trafalgar Way. Expect delays on diversion.",
+    "currentUpdateDateTime": "2026-10-20T17:40:08Z",
+    "corridorIds": [
+      "a23"
+    ],
+    "startDateTime": "2026-10-05T07:00:00Z",
+    "endDateTime": "2026-11-07T18:00:00Z",
+    "lastModifiedTime": "2026-10-20T17:40:08Z",
+    "levelOfInterest": "High",
+    "location": "[A23] PURLEY WAY (CR0 ) (Croydon)",
+    "geography": {
+      "type": "Point",
+      "coordinates": [
+        -0.117126,
+        51.371285
+      ],
+      "crs": {
+        "type": "name",
+        "properties": {
+          "name": "EPSG:4326"
+        }
+      }
+    },
+    "streets": [
+      {
+        "$type": "Tfl.Api.Presentation.Entities.Street, Tfl.Api.Presentation.Entities",
+        "name": "WADDON ROAD (CR0)",
+        "closure": "Closed",
+        "directions": "Both directions",
+        "segments": [
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "5000005216568743",
+            "lineString": "[[-0.117234,51.371279],[-0.116735,51.371333]]",
+            "sourceSystemId": 235412,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "4000000030229210",
+            "lineString": "[[-0.116735,51.371333],[-0.115979,51.371412]]",
+            "sourceSystemId": 235412,
+            "sourceSystemKey": "TIMS"
+          }
+        ]
+      }
+    ],
+    "isProvisional": false,
+    "hasClosures": false,
+    "roadDisruptionLines": [],
+    "roadDisruptionImpactAreas": [],
+    "recurringSchedules": []
+  },
+  {
+    "$type": "Tfl.Api.Presentation.Entities.RoadDisruption, Tfl.Api.Presentation.Entities",
+    "id": "TIMS-236249",
+    "url": "/Road/All/Disruption/TIMS-236249",
+    "point": "[-0.081155,51.462251]",
+    "severity": "Moderate",
+    "ordinal": 10,
+    "category": "Works",
+    "subCategory": "Utility works",
+    "comments": "[A2216] Dog Kennel Hill (Northbound) at the junction of St Francis Road - The road is closed due to a burst water main",
+    "currentUpdate": "Use an alternative route. There are no reported delays on diversion.",
+    "currentUpdateDateTime": "2026-10-20T02:53:12Z",
+    "corridorIds": [],
+    "startDateTime": "2026-10-14T09:00:00Z",
+    "endDateTime": "2026-10-23T18:00:00Z",
+    "lastModifiedTime": "2026-10-20T02:53:12Z",
+    "levelOfInterest": "High",
+    "location": "[A2216] DOG KENNEL HILL (SE22 ,SE5 ) (Southwark)",
+    "geography": {
+      "type": "Point",
+      "coordinates": [
+        -0.081155,
+        51.462251
+      ],
+      "crs": {
+        "type": "name",
+        "properties": {
+          "name": "EPSG:4326"
+        }
+      }
+    },
+    "streets": [
+      {
+        "$type": "Tfl.Api.Presentation.Entities.Street, Tfl.Api.Presentation.Entities",
+        "name": "[A2216] DOG KENNEL HILL (SE22 ,SE5)",
+        "closure": "Closed",
+        "directions": "Northbound",
+        "segments": [
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "5000005309356013",
+            "lineString": "[[-0.08218,51.462967],[-0.082418,51.463188]]",
+            "sourceSystemId": 236249,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "4000000030146512",
+            "lineString": "[[-0.081244,51.462297],[-0.082002,51.462838]]",
+            "sourceSystemId": 236249,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "5000005309347644",
+            "lineString": "[[-0.080978,51.462188],[-0.081244,51.462297]]",
+            "sourceSystemId": 236249,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "4000000030458590",
+            "lineString": "[[-0.080978,51.462188],[-0.080818,51.462088]]",
+            "sourceSystemId": 236249,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "5000005309365147",
+            "lineString": "[[-0.082597,51.463353],[-0.083011,51.463736]]",
+            "sourceSystemId": 236249,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "5000005309369186",
+            "lineString": "[[-0.082002,51.462838],[-0.08218,51.462967]]",
+            "sourceSystemId": 236249,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "5000005309365145",
+            "lineString": "[[-0.082418,51.463188],[-0.082597,51.463353]]",
+            "sourceSystemId": 236249,
+            "sourceSystemKey": "TIMS"
+          }
+        ]
+      }
+    ],
+    "isProvisional": false,
+    "hasClosures": false,
+    "roadDisruptionLines": [],
+    "roadDisruptionImpactAreas": [],
+    "recurringSchedules": []
+  },
+  {
+    "$type": "Tfl.Api.Presentation.Entities.RoadDisruption, Tfl.Api.Presentation.Entities",
+    "id": "TIMS-236643",
+    "url": "/Road/All/Disruption/TIMS-236643",
+    "point": "[-0.040347,51.671366]",
+    "severity": "Moderate",
+    "ordinal": 11,
+    "category": "Emergency service incidents",
+    "subCategory": "Police activity",
+    "comments": "[A1010] Hertford Road (Both directions) at the junction of Ordnance Road - Road is closed in both directions following an emergency services incident. ",
+    "currentUpdate": "Use an alternative route. there are no reported delays on diversion route. ",
+    "currentUpdateDateTime": "2026-10-20T15:39:47Z",
+    "corridorIds": [],
+    "startDateTime": "2026-10-20T05:52:22Z",
+    "endDateTime": "2026-10-20T23:59:59Z",
+    "lastModifiedTime": "2026-10-20T15:40:09Z",
+    "levelOfInterest": "High",
+    "location": "[A1010] HERTFORD ROAD (EN3 ) (Enfield)",
+    "geography": {
+      "type": "Point",
+      "coordinates": [
+        -0.040347,
+        51.671366
+      ],
+      "crs": {
+        "type": "name",
+        "properties": {
+          "name": "EPSG:4326"
+        }
+      }
+    },
+    "streets": [
+      {
+        "$type": "Tfl.Api.Presentation.Entities.Street, Tfl.Api.Presentation.Entities",
+        "name": "[A1010] HERTFORD ROAD (EN3)",
+        "closure": "Closed",
+        "directions": "Both directions",
+        "segments": [
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "4000000030364547",
+            "lineString": "[[-0.040793,51.670667],[-0.040634,51.670988]]",
+            "sourceSystemId": 236643,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "4000000030364546",
+            "lineString": "[[-0.040501,51.671187],[-0.040331,51.671441]]",
+            "sourceSystemId": 236643,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "5000005302520613",
+            "lineString": "[[-0.040331,51.671441],[-0.040189,51.671654]]",
+            "sourceSystemId": 236643,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "5000005184402836",
+            "lineString": "[[-0.040634,51.670988],[-0.040501,51.671187]]",
+            "sourceSystemId": 236643,
+            "sourceSystemKey": "TIMS"
+          },
+          {
+            "$type": "Tfl.Api.Presentation.Entities.StreetSegment, Tfl.Api.Presentation.Entities",
+            "toid": "4000000030465047",
+            "lineString": "[[-0.040047,51.67186],[-0.040189,51.671654]]",
+            "sourceSystemId": 236643,
+            "sourceSystemKey": "TIMS"
+          }
+        ]
+      }
+    ],
+    "isProvisional": false,
+    "hasClosures": false,
+    "roadDisruptionLines": [],
+    "roadDisruptionImpactAreas": [],
+    "recurringSchedules": []
+  }
+]
