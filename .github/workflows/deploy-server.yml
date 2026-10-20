@@ -78,10 +78,29 @@ jobs:
             {
               echo '#!/bin/bash'
               printf 'export DOMAIN=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q TFL_APP_KEY=%q BRANCH=%q\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$TFL_APP_KEY" "$BRANCH"
-              echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/server/scripts/install.sh | bash > /var/log/blue-route-install.log 2>&1"
-              # Lets the wait step below stop early, and show why, if the install fails.
-              echo 'echo "== install finished with exit code $?" >> /var/log/blue-route-install.log'
+              printf 'URL=%q\n' "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/server/scripts/install.sh"
+              # Download first, then run: piping curl into bash ran an empty
+              # script, and reported success, whenever the download failed
+              # (as it can at first boot, before the network is fully up).
+              cat <<'BOOT'
+          LOG=/var/log/blue-route-install.log
+          for attempt in $(seq 1 30); do
+            curl -fsSL -o /root/blue-route-install.sh "$URL" >>"$LOG" 2>&1 && break
+            echo "== couldn't download the installer (attempt $attempt); retrying in 10 s" >>"$LOG"
+            sleep 10
+          done
+          if [ -s /root/blue-route-install.sh ]; then
+            bash /root/blue-route-install.sh >>"$LOG" 2>&1
+            code=$?
+          else
+            echo "== gave up downloading the installer from $URL" >>"$LOG"
+            code=1
+          fi
+          # Lets the wait step stop early, and show why, if the install fails.
+          echo "== install finished with exit code $code" >>"$LOG"
+          BOOT
             } > user-data.sh
+            sed -i 's/^          //' user-data.sh
 
             # A one-off key, held only by this run, so it can show the install
             # log if something goes wrong. Taken off the server once it's up.
@@ -157,19 +176,17 @@ jobs:
           IP: ${{ steps.server.outputs.ip }}
         run: |
           echo "Installing and building London's routing map and places: usually 20–40 minutes."
-          # The install log, through the one-off key (only for a server made by this run).
-          log() {
+          # On the server, through the one-off key (only for a server made by this run).
+          remote() {
             [ -f deploy_key ] || return 1
             ssh -i deploy_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
-              -o LogLevel=ERROR "root@$IP" "tail -n $1 /var/log/blue-route-install.log" 2>/dev/null
+              -o LogLevel=ERROR "root@$IP" "$@" 2>/dev/null
           }
-          tidy() {
-            [ -f deploy_key ] || return 0
-            ssh -i deploy_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
-              -o LogLevel=ERROR "root@$IP" "sed -i '/blue-route-deploy/d' /root/.ssh/authorized_keys" 2>/dev/null || true
-          }
+          status() { remote "bash -s $1" < server/scripts/deploy-status.sh; }
+          tidy() { remote "sed -i '/blue-route-deploy/d' /root/.ssh/authorized_keys" || true; }
+          down=0
           for i in $(seq 1 110); do
-            health=$(curl -fsS "https://${DOMAIN}/health" 2>/dev/null || true)
+            health=$(curl -fsS -m 10 "https://${DOMAIN}/health" 2>/dev/null || true)
             if grep -q '"routing":true' <<<"$health" && grep -q '"places":true' <<<"$health"; then
               echo "https://${DOMAIN} is up, with routing and places."
               tidy
@@ -181,21 +198,32 @@ jobs:
               tidy
               exit 0
             fi
-            # The install stopped with an error: no point waiting.
-            last=$(log 3 || true)
-            if grep -q "install finished with exit code [1-9]" <<<"$last"; then
-              echo "::error::The server's install failed. The end of its log:"
-              log 80 || true
-              exit 1
-            fi
-            if [ $((i % 5)) -eq 0 ]; then
-              echo "Still building ($i minutes): ${health:-not answering yet}"
-              [ -n "$last" ] && sed 's/^/    /' <<<"$last"
-            fi
+            echo "::group::$i min: https://${DOMAIN}/health ${health:-not answering}"
+            report=$(status 10 || echo "(can't reach the server over SSH)")
+            echo "$report"
+            echo "::endgroup::"
+            state=$(grep -o '^STATUS=.*' <<<"$report" | tail -n 1 | cut -d= -f2)
+            case "$state" in
+              install-failed | install-empty)
+                echo "::error::The server's install ${state#install-}. Details:"
+                status 100 || true
+                exit 1
+                ;;
+              container-down)
+                # Twice in a row: a container restarting once (as the map build does) isn't a failure.
+                down=$((down + 1))
+                if [ "$down" -ge 2 ]; then
+                  echo "::error::A container on the server has stopped or keeps restarting. Its logs:"
+                  status 100 || true
+                  exit 1
+                fi
+                ;;
+              *) down=0 ;;
+            esac
             sleep 60
           done
-          echo "::error::Not fully ready after 110 minutes (last answer: ${health:-none}). The end of the server's install log:"
-          log 80 || echo "(couldn't read it)"
+          echo "::error::Not fully ready after 110 minutes (last answer: ${health:-none}). The server's state:"
+          status 100 || echo "(couldn't reach it over SSH)"
           exit 1
 
       # Real London cases against the live server: one-way streets (Stroud
