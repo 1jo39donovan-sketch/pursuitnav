@@ -45,7 +45,8 @@ export function privacyPage(email?: string): string {
     `<p class="muted">Blue Route · last updated ${UPDATED}</p>
 
 <p>Blue Route is a navigation app for police, fire and ambulance crews. It’s an independent app, not a police force or emergency service
-system. It has no accounts, no adverts, no analytics and no tracking.</p>
+system. It has no accounts, no adverts, no third-party analytics and no tracking. It counts how much it's used, in
+the way described under “Usage counts” below.</p>
 
 <h2>Kept on your phone only</h2>
 <ul>
@@ -84,6 +85,20 @@ daytime. The first and last 500 m of every drive are left out. These wait on you
 then sent mixed with your other drives, with no position, route, time, callsign or device ID. The server adds them to
 totals per road and discards them; a road’s learned speed is used only once at least 5 drives have been timed on it.
 Turning it off deletes anything not yet sent.</p>
+
+<h2>Usage counts</h2>
+<p>So we know how many crews use Blue Route, every request to the server carries a random install ID, made on your
+phone the first time the app runs, and the app's version number. You can reset the ID in the Session tab, after which
+the app counts as a new install. The app also reports how many navigation and pursuit sessions were started and how
+many requests got no answer in time, as plain numbers.</p>
+<p>The server keeps, for each day: how many different installs it heard from (and on which app versions), how many
+routes were planned, how many navigation and pursuit sessions were started, and how many requests timed out or
+failed. To count each install once a day, it keeps a scrambled form of the ID (a hash with a random “salt” made for
+that day only), and to count it once a week, another (with a salt made for that week only). Neither can be turned back
+into the ID, and with a new salt each day and each week, one install can't be linked from one day, or week, to the
+next. Within an hour of a day ending, its totals are saved and its scrambled IDs and salt are deleted; the same when a
+week ends. Nothing more than a week's worth is ever held. No positions, addresses,
+searches, callsigns or IP addresses are kept with these counts, and no third-party analytics service is used.</p>
 
 <h2>Other services</h2>
 <ul>

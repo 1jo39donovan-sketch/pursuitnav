@@ -17,6 +17,7 @@ import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation } from "../navigation/NavigationProvider";
 import { offRouteText, rerouteFailure, type RerouteFailure } from "../navigation/reroute";
 import { nextCallout } from "../navigation/voice";
+import { recordEvent } from "../usage/usage";
 import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
 import { useTeam } from "../team/TeamProvider";
@@ -59,6 +60,8 @@ export default function NavigateScreen() {
     };
   }, []);
   const { active, replan, stop } = useNavigation();
+  // Usage counts: one navigation session per time this screen opens.
+  useEffect(() => recordEvent("navigation"), []);
   const { fix } = useLocation();
   const { data, places } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive } = useSession();

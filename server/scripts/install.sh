@@ -62,6 +62,11 @@ if [ -z "${TFL_APP_KEY:-}" ] && [ -f "$DIR/server/.env" ]; then
   TFL_APP_KEY=$(grep -E '^TFL_APP_KEY=' "$DIR/server/.env" | cut -d= -f2- || true)
 fi
 TFL_APP_KEY=${TFL_APP_KEY:-}
+# Token for GET /stats (usage counts); /stats is off without one.
+if [ -z "${STATS_TOKEN:-}" ] && [ -f "$DIR/server/.env" ]; then
+  STATS_TOKEN=$(grep -E '^STATS_TOKEN=' "$DIR/server/.env" | cut -d= -f2- || true)
+fi
+STATS_TOKEN=${STATS_TOKEN:-}
 
 say "Installing Docker and basics"
 apt-get update -qq
@@ -115,7 +120,7 @@ cd "$DIR/server"
 [ -f docker-compose.yml ] || fail "No server code on branch $BRANCH. Merge the pull request into main first, or run with BRANCH=<branch>."
 
 umask 077
-printf 'DOMAIN=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" >.env
+printf 'DOMAIN=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" >.env
 umask 022
 
 say "Building the routing map and places list. This takes 20–40 minutes the first time."

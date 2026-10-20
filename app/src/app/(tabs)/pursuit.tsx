@@ -14,6 +14,7 @@ import { EMPTY_FEED, feedNote, nextFeed, shownInfo } from "../../navigation/serv
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { useTeam } from "../../team/TeamProvider";
+import { recordEvent } from "../../usage/usage";
 import { colors, fonts } from "../../theme";
 
 const POLL_MS = 1000;
@@ -34,6 +35,8 @@ export default function PursuitScreen() {
   const focused = useIsFocused();
   useEffect(() => {
     if (!focused) return;
+    // Usage counts: a pursuit session each time this screen is opened.
+    recordEvent("pursuit");
     activateKeepAwakeAsync("pursuit").catch(() => {});
     return () => {
       deactivateKeepAwake("pursuit").catch(() => {});
