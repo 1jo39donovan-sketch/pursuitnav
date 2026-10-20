@@ -16,6 +16,13 @@ import { colors, fonts } from "../theme";
 import {
   boundsOf,
   cameraFor,
+  LABEL_LAYOUT,
+  labelPaint,
+  ROAD_NAME_SOURCE,
+  ROAD_NAME_SOURCE_LAYER,
+  roadNameLayout,
+  roadNamePaint,
+  speedZoom,
   EMPTY_COLLECTION,
   FIT_DELAY_MS,
   FIT_PADDING,
@@ -42,6 +49,10 @@ export function LiveMap({
   view: viewProp,
   viewControl = false,
   restrictions,
+  autoZoom = false,
+  zoomControl = false,
+  roadNames = false,
+  labels,
   followZoom = 15,
   compact = false,
   routes = [],
@@ -54,6 +65,10 @@ export function LiveMap({
   const { fix } = useLocation();
   const { mapTheme } = useSession();
   const view = viewProp ?? (headingUp ? "heading" : "north");
+  // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
+  const [zoomOffset, setZoomOffset] = useState(0);
+  const followAt =
+    followZoom + zoomOffset + (autoZoom ? speedZoom(fix?.speed ?? null) : 0);
   const [following, setFollowing] = useState(true);
   const camera = useRef<CameraRef>(null);
 
@@ -90,7 +105,7 @@ export function LiveMap({
     following && position
       ? {
           center: position,
-          zoom: followZoom,
+          zoom: followAt,
           ...cameraFor(view, fix?.course ?? null),
           duration: 800,
           easing: "ease" as const,
@@ -156,6 +171,20 @@ export function LiveMap({
             paint={{ "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] }}
           />
         </GeoJSONSource>
+        {roadNames && (
+          <Layer
+            type="symbol"
+            id="road-names-bright"
+            source={ROAD_NAME_SOURCE}
+            source-layer={ROAD_NAME_SOURCE_LAYER}
+            minzoom={14}
+            layout={roadNameLayout}
+            paint={roadNamePaint(mapTheme)}
+          />
+        )}
+        <GeoJSONSource id="labels" data={labels ?? EMPTY_COLLECTION}>
+          <Layer type="symbol" id="block-labels" minzoom={15} layout={LABEL_LAYOUT} paint={labelPaint(mapTheme)} />
+        </GeoJSONSource>
         <GeoJSONSource id="restrictions" data={pointsGeoJSON(restrictions)}>
           <Layer type="circle" id="restriction-dot" paint={RESTRICTION_CIRCLE_PAINT} />
           <Layer
@@ -204,7 +233,11 @@ export function LiveMap({
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>
       )}
-      <MapButtons showView={viewControl} top={compact ? 12 : 56} />
+      <MapButtons
+        showView={viewControl}
+        top={compact ? 12 : 56}
+        onZoom={zoomControl ? (step) => setZoomOffset((z) => Math.max(-3, Math.min(3, z + step))) : undefined}
+      />
       {!following && position && (
         <Pressable
           accessibilityRole="button"

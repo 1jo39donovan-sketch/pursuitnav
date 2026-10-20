@@ -39,3 +39,24 @@ describe("GET /v1/places-data", () => {
     expect(res.json().error).toBe("places-not-ready");
   });
 });
+
+describe("GET /v1/roads-data", () => {
+  it("serves the gzipped road list", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "roads-"));
+    const file = join(dir, "roads.txt.gz");
+    const text = "#blueroute-roads v1 2026-10-20 1\nMutton Place|5|5154460|-14740\n";
+    writeFileSync(file, gzipSync(text));
+    const app = buildApp({ bounds: [-0.8, 51.2, 0.6, 51.8], placesFile: "/nope", roadsFile: file } as ServerConfig, {} as Router);
+    const res = await app.inject({ method: "GET", url: "/v1/roads-data" });
+    expect(res.statusCode).toBe(200);
+    expect(gunzipSync(res.rawPayload).toString()).toBe(text);
+  });
+
+  it("says when the road list hasn't been built", async () => {
+    const res = await buildApp({ bounds: [-0.8, 51.2, 0.6, 51.8], placesFile: "/nope" } as ServerConfig, {} as Router).inject({
+      method: "GET",
+      url: "/v1/roads-data",
+    });
+    expect(res.statusCode).toBe(503);
+  });
+});

@@ -8,11 +8,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchRoutes, restrictionPoints } from "../api/routes";
 import { GpsStatus } from "../components/GpsStatus";
 import { LiveMap } from "../components/LiveMap";
-import type { MapRoute } from "../components/mapShared";
+import { namedPoints, type MapRoute } from "../components/mapShared";
 import { formatDistance, formatDuration } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation } from "../navigation/NavigationProvider";
 import { nextCallout } from "../navigation/voice";
+import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
 import {
   maneuverArrow,
@@ -40,6 +41,7 @@ export default function NavigateScreen() {
   }, []);
   const { active, replan, stop } = useNavigation();
   const { fix } = useLocation();
+  const { data, places } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads } = useSession();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -126,6 +128,17 @@ export default function NavigateScreen() {
     const t = setTimeout(() => setConfirmEnd(false), 3000);
     return () => clearTimeout(t);
   }, [confirmEnd]);
+
+  // Named blocks and estates round the destination, so the crew can find the right one.
+  const destLat = active?.destination.lat;
+  const destLng = active?.destination.lng;
+  const blockLabels = useMemo(
+    () =>
+      data.status === "ready" && places.status === "ready" && destLat != null && destLng != null
+        ? namedPoints(data.index.housingNear(destLat, destLng, 600))
+        : null,
+    [data, places, destLat, destLng],
+  );
 
   if (!active || !prepared) {
     return (
@@ -245,10 +258,14 @@ export default function NavigateScreen() {
             <LiveMap
               view={mapView}
               viewControl
-              followZoom={17}
+              zoomControl
+              autoZoom
+              roadNames
+              followZoom={16.5}
               routes={routes}
               destination={destination}
               restrictions={restrictions}
+              labels={blockLabels}
               compact
             />
           </View>
@@ -260,10 +277,14 @@ export default function NavigateScreen() {
             <LiveMap
               view={mapView}
               viewControl
-              followZoom={17}
+              zoomControl
+              autoZoom
+              roadNames
+              followZoom={16.5}
               routes={routes}
               destination={destination}
               restrictions={restrictions}
+              labels={blockLabels}
               compact
             />
           </View>

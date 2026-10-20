@@ -112,3 +112,32 @@ describe("listing a kind of place", () => {
     expect(typesForQuery("hospitals", types)).toEqual(["Hospital"]);
   });
 });
+
+describe("blocks and estates", () => {
+  const HOUSING = `#blueroute-places v1 2026-10-20 4
+Smith House||Block of flats|housing|18|5155200|-11300|90 Holloway Road
+Jones Court||Block of flats|housing|18|5155300|-11350|Holloway Road, N7
+Bemerton Estate||Housing estate|housing|18|5154200|-11600|
+Lower Holloway Road House||Block of flats|housing|11|5154600|-7500|1 Lower Holloway Roadside
+`;
+  let homes: SearchIndex;
+  beforeAll(async () => {
+    homes = new SearchIndex(
+      parseRoads(readFileSync(join(dataDir, "roads.dat"), "utf8")),
+      parsePostcodes(readFileSync(join(dataDir, "postcodes.dat"), "utf8")),
+    );
+    await homes.setPointsOfInterest(parsePlacesFile(HOUSING).places);
+  });
+
+  it("lists the named blocks on a road, by their address", () => {
+    const names = homes.housingOnRoad("Holloway Road", { lat: 51.552, lng: -0.113 }).map((p) => p.name);
+    expect(names).toEqual(["Jones Court", "Smith House"]);
+  });
+
+  it("finds blocks and estates near a point for the map, nearest first", () => {
+    const names = homes.housingNear(51.5521, -0.1131, 300).map((p) => p.name);
+    expect(names[0]).toBe("Smith House");
+    expect(names).toContain("Jones Court");
+    expect(names).not.toContain("Lower Holloway Road House");
+  });
+});

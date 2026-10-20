@@ -32,6 +32,14 @@ export interface LiveMapProps {
   viewControl?: boolean;
   /** Where a blue-light route relies on a restriction: shown as a red "R". */
   restrictions?: LngLat[];
+  /** Zoom in when slow (junctions, dense streets) and out when fast. */
+  autoZoom?: boolean;
+  /** + and − buttons. */
+  zoomControl?: boolean;
+  /** Bigger, brighter road names than the map style's own. */
+  roadNames?: boolean;
+  /** Named blocks and estates to label (points with a "name"), when zoomed in. */
+  labels?: GeoJSON.FeatureCollection | null;
   /** Zoom used while following the officer's position. */
   followZoom?: number;
   /** Hide map controls for small embedded maps. */
@@ -142,5 +150,65 @@ export function pointsGeoJSON(points: LngLat[] | undefined): GeoJSON.FeatureColl
   return {
     type: "FeatureCollection",
     features: (points ?? []).map((p) => ({ type: "Feature", geometry: { type: "Point", coordinates: p }, properties: {} })),
+  };
+}
+
+/**
+ * Extra zoom for the speed: closer in when crawling through junctions and
+ * dense streets, further out at speed to see what's coming.
+ */
+export function speedZoom(speedMs: number | null): number {
+  if (speedMs == null) return 0;
+  const mph = speedMs * 2.23694;
+  if (mph < 10) return 1;
+  if (mph < 25) return 0.5;
+  if (mph < 45) return 0;
+  return -1;
+}
+
+/**
+ * Road names drawn on top of the map style's own, bigger and brighter, so
+ * the crew can always read the roads around them. Uses the street names in
+ * OpenFreeMap's tiles ("openmaptiles" source).
+ */
+export const ROAD_NAME_SOURCE = "openmaptiles";
+export const ROAD_NAME_SOURCE_LAYER = "transportation_name";
+export const roadNameLayout: SymbolLayerSpecification["layout"] = {
+  "symbol-placement": "line",
+  "text-field": ["coalesce", ["get", "name:en"], ["get", "name"]],
+  "text-font": ["Noto Sans Bold"],
+  "text-size": ["interpolate", ["linear"], ["zoom"], 14, 12, 17, 16, 19, 19],
+  "text-max-angle": 30,
+  "symbol-spacing": 250,
+};
+export function roadNamePaint(theme: "night" | "day"): SymbolLayerSpecification["paint"] {
+  return theme === "night"
+    ? { "text-color": "#ffffff", "text-halo-color": "#0c1220", "text-halo-width": 2 }
+    : { "text-color": "#111111", "text-halo-color": "#ffffff", "text-halo-width": 2 };
+}
+
+/** Block and estate names: blue, like their place colour, readable on either map. */
+export const LABEL_LAYOUT: SymbolLayerSpecification["layout"] = {
+  "text-field": ["get", "name"],
+  "text-font": ["Noto Sans Bold"],
+  "text-size": 13,
+  "text-max-width": 8,
+  "text-allow-overlap": false,
+};
+export function labelPaint(theme: "night" | "day"): SymbolLayerSpecification["paint"] {
+  return theme === "night"
+    ? { "text-color": "#93c5fd", "text-halo-color": "#0c1220", "text-halo-width": 2 }
+    : { "text-color": "#1d4ed8", "text-halo-color": "#ffffff", "text-halo-width": 2 };
+}
+
+/** Points with a name, for the labels prop. */
+export function namedPoints(items: { name: string; lat: number; lng: number }[]): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: items.map((p) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+      properties: { name: p.name },
+    })),
   };
 }

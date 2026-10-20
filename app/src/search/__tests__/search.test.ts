@@ -7,7 +7,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { nearBoroughs } from "../../area/area";
 import type { Borough } from "../boroughs";
-import { parsePostcodes, parseRoads } from "../data";
+import { parsePostcodes, parseRoads, parseServerRoads } from "../data";
 import { SearchIndex } from "../engine";
 import { starterEstatePlaces } from "../estates";
 import { parseQuery } from "../parse";
@@ -157,5 +157,34 @@ describe("roads just over the borough line", () => {
 
   it("still keeps roads well into the next borough outside", () => {
     expect(index.search("Kentish Town Road", islingtonAndNear).inArea).toEqual([]);
+  });
+});
+
+describe("roads missing from the bundled list", () => {
+  // Small Camden roads the OS-based bundled list doesn't have; the server's
+  // OpenStreetMap list does (server/places/extract_roads.py).
+  const SERVER_ROADS = `#blueroute-roads v1 2026-10-20 3
+Mutton Place|5|5154460|-14740
+Castle Mews|5|5154530|-14600
+Harmood Street|5|5154438|-14725
+`;
+  const CAMDEN = new Set<Borough>(["Camden"]);
+
+  it("finds Mutton Place and Camden's Castle Mews once the server's road list is added", () => {
+    const fresh = new SearchIndex(
+      parseRoads(readFileSync(join(dataDir, "roads.dat"), "utf8")),
+      parsePostcodes(readFileSync(join(dataDir, "postcodes.dat"), "utf8")),
+    );
+    expect(fresh.search("Mutton Place", CAMDEN).inArea).toEqual([]);
+    expect(fresh.search("Castle Mews", CAMDEN).inArea).toEqual([]);
+
+    // Harmood Street is already listed, so only the two new ones are added.
+    expect(fresh.addRoads(parseServerRoads(SERVER_ROADS))).toBe(2);
+    expect(fresh.search("Mutton Place", CAMDEN).inArea[0]).toMatchObject({ label: "Mutton Place", borough: "Camden" });
+    expect(fresh.search("Castle Mews", CAMDEN).inArea[0]).toMatchObject({ label: "Castle Mews", borough: "Camden" });
+    // It's listed under its postcode district too.
+    expect(fresh.search("NW1", CAMDEN).inArea.map((r) => r.label)).toContain("Mutton Place");
+    // Adding the same list again adds nothing.
+    expect(fresh.addRoads(parseServerRoads(SERVER_ROADS))).toBe(0);
   });
 });

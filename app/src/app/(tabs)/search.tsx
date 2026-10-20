@@ -7,7 +7,7 @@ import { fetchRoutes, restrictionPoints, RouteError, withoutPolice } from "../..
 import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
-import type { MapRoute, MarkerProperties } from "../../components/mapShared";
+import { namedPoints, type MapRoute, type MarkerProperties } from "../../components/mapShared";
 import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
@@ -32,6 +32,8 @@ import { colors, fonts } from "../../theme";
 interface Destination {
   point: LngLat;
   title?: string;
+  /** Set when it's a whole road (no door): its name, to list the blocks on it. */
+  road?: string;
   note?: string;
   /** The log entry for this pick, to add the route chosen. */
   logId?: number;
@@ -171,7 +173,7 @@ export default function SearchScreen() {
         : r.precision === "postcode" && r.kind !== "postcode"
           ? "Routes to the postcode, which may cover several doors."
           : undefined;
-    choose({ point: [r.lng, r.lat], title: r.label, note }, query, r.borough);
+    choose({ point: [r.lng, r.lat], title: r.label, note, road: r.precision === "road" ? r.road : undefined }, query, r.borough);
   };
 
   const clear = () => {
@@ -224,6 +226,26 @@ export default function SearchScreen() {
     // Only reframe when the destination or routes change, not on every GPS fix.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routes, destination, hasHere]);
+
+  // Named blocks and estates: labelled on the map round the destination, and
+  // listed for a whole road, so the crew know which block to head for.
+  const destLng = destination?.point[0];
+  const destLat = destination?.point[1];
+  const destRoad = destination?.road;
+  const blockLabels = useMemo(
+    () =>
+      data.status === "ready" && places.status === "ready" && destLat != null && destLng != null
+        ? namedPoints(data.index.housingNear(destLat, destLng, 600))
+        : null,
+    [data, places, destLat, destLng],
+  );
+  const blocks = useMemo(
+    () =>
+      data.status === "ready" && places.status === "ready" && destRoad && destLat != null && destLng != null
+        ? data.index.housingOnRoad(destRoad, { lat: destLat, lng: destLng })
+        : [],
+    [data, places, destRoad, destLat, destLng],
+  );
 
   const dataNote =
     data.status === "loading"
@@ -296,6 +318,7 @@ export default function SearchScreen() {
         <LiveMap
           routes={routes}
           restrictions={restrictionPoints(plan?.police)}
+          labels={blockLabels}
           destination={destination?.point}
           onLongPress={(point) =>
             choose(
@@ -384,6 +407,11 @@ export default function SearchScreen() {
           destination={{ lat: destination.point[1], lng: destination.point[0] }}
           title={destination.title}
           note={destination.note}
+          blocks={blocks}
+          onPickBlock={(b) => {
+            setQuery(b.name);
+            choose({ point: [b.lng, b.lat], title: `${b.name}, ${destination.road}` }, query, b.borough);
+          }}
           onClose={clear}
           onOpenExternal={(app) => destination.logId && log.setRoute(destination.logId, app)}
           onGo={(kind) => {

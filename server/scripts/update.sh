@@ -17,4 +17,10 @@ git reset -q --hard "origin/$BRANCH"
 cd server
 docker compose up -d --build
 docker image prune -f >/dev/null
+
+# A new kind of search data (e.g. the named-roads list) is built now rather
+# than waiting for the weekly map refresh.
+if [ ! -s data/places/roads.txt.gz ]; then
+  scripts/build-places.sh || echo "$(date -Is) search data rebuild failed; the weekly refresh will retry" >&2
+fi
 echo "$(date -Is) done"

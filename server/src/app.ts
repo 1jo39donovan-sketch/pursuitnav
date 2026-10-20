@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 
 import cors from "@fastify/cors";
-import Fastify, { LogController, type FastifyInstance } from "fastify";
+import Fastify, { LogController, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 
 import type { ServerConfig } from "./config.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
@@ -191,20 +191,23 @@ export function buildApp(
 
   // Every named place in London for the app's offline place search. Public
   // OpenStreetMap data: the request carries nothing about the officer.
-  app.get("/v1/places-data", async (req, reply) => {
-    const info = await stat(config.placesFile).catch(() => null);
-    if (!info) {
-      return reply.code(503).send({ error: "places-not-ready", message: "Place data hasn't been built yet." });
-    }
-    const etag = `"${info.size.toString(36)}-${Math.floor(info.mtimeMs).toString(36)}"`;
-    reply.header("etag", etag).header("last-modified", info.mtime.toUTCString()).header("cache-control", "no-cache");
-    if (req.headers["if-none-match"] === etag) return reply.code(304).send();
-    return reply
-      .header("content-type", "text/plain; charset=utf-8")
-      .header("content-encoding", "gzip")
-      .header("content-length", info.size)
-      .send(createReadStream(config.placesFile));
-  });
+  // Data files the app keeps a copy of for searching with no signal. Sent
+  // gzipped as built, with an ETag so an unchanged file isn't sent again.
+  const dataFile = (path: string | undefined, notReady: string, what: string) =>
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      const info = path ? await stat(path).catch(() => null) : null;
+      if (!path || !info) return reply.code(503).send({ error: notReady, message: `${what} hasn't been built yet.` });
+      const etag = `"${info.size.toString(36)}-${Math.floor(info.mtimeMs).toString(36)}"`;
+      reply.header("etag", etag).header("last-modified", info.mtime.toUTCString()).header("cache-control", "no-cache");
+      if (req.headers["if-none-match"] === etag) return reply.code(304).send();
+      return reply
+        .header("content-type", "text/plain; charset=utf-8")
+        .header("content-encoding", "gzip")
+        .header("content-length", info.size)
+        .send(createReadStream(path));
+    };
+  app.get("/v1/places-data", dataFile(config.placesFile, "places-not-ready", "Place data"));
+  app.get("/v1/roads-data", dataFile(config.roadsFile, "roads-not-ready", "The road list"));
 
   return app;
 }
