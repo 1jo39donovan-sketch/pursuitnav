@@ -60,4 +60,4 @@ fi
 echo "$(date -Is) tiles done (previous ones kept in data/valhalla-prev)"
 
 # Places come from the same extract, so they stay in step with the roads.
-"$(dirname "$0")/build-places.sh"
+bash "$(dirname "$0")/build-places.sh"
