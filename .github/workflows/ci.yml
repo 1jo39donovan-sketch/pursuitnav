@@ -42,3 +42,36 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: python -m pytest places -q
+
+  # The Docker images the server runs, built as the server builds them, so a
+  # change upstream (a base image dropping a library) shows here, not mid-deploy.
+  server-images:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - name: Map tools image (osmium must load)
+        run: docker build -t blueroute-places places
+      - name: Map tools run on a tiny map
+        run: |
+          python3 - <<'EOF'
+          # One named road in Camden, written as plain OSM XML.
+          open("/tmp/tiny.osm", "w").write("""<?xml version='1.0' encoding='UTF-8'?>
+          <osm version="0.6">
+            <node id="1" version="1" lat="51.5444" lon="-0.1473"/>
+            <node id="2" version="1" lat="51.5448" lon="-0.1469"/>
+            <way id="1" version="1"><nd ref="1"/><nd ref="2"/>
+              <tag k="highway" v="residential"/><tag k="name" v="Mutton Place"/></way>
+          </osm>""")
+          EOF
+          docker run --rm -v /tmp:/data --entrypoint python blueroute-places extract_roads.py /data/tiny.osm /data/roads.txt.gz
+          docker run --rm -v /tmp:/data --entrypoint python blueroute-places practical_speeds.py /data/tiny.osm /data/out.osm.pbf
+      - name: API image starts and answers
+        run: |
+          docker build -t blueroute-api .
+          docker run -d --name api -p 3000:3000 -e TFL_CLOSURES=0 blueroute-api
+          for _ in $(seq 1 20); do curl -fsS localhost:3000/health && exit 0; sleep 1; done
+          docker logs api
+          exit 1
