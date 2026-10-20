@@ -44,16 +44,7 @@ if [ ! -s data/valhalla-next/valhalla_tiles.tar ]; then
   exit 1
 fi
 
-# Live TfL closures are sent to Valhalla as avoid areas; its default limits
-# on those (10 km of outline, 100 corners) are far too small for London.
-docker compose run --rm --entrypoint python places -c '
-import json
-p = "/data/valhalla-next/valhalla.json"
-c = json.load(open(p))
-c["service_limits"]["max_exclude_polygons_length"] = 500000
-c["service_limits"]["max_exclude_polygons_vertices"] = 5000
-json.dump(c, open(p, "w"), indent=2)
-'
+scripts/valhalla-limits.sh data/valhalla-next >/dev/null
 
 echo "$(date -Is) swapping in new tiles"
 rm -rf data/valhalla-prev

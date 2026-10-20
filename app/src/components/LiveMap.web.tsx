@@ -19,6 +19,9 @@ import {
   cameraFor,
   LABEL_LAYOUT,
   labelPaint,
+  TEAM_CIRCLE_PAINT,
+  TEAM_LABEL_LAYOUT,
+  teamLabelPaint,
   ROAD_NAME_SOURCE,
   ROAD_NAME_SOURCE_LAYER,
   roadNameLayout,
@@ -54,6 +57,7 @@ export function LiveMap({
   zoomControl = false,
   roadNames = false,
   labels,
+  team,
   vehicleArrow = false,
   followZoom = 15,
   compact = false,
@@ -168,6 +172,17 @@ export function LiveMap({
           paint: labelPaint(mapTheme),
         });
       }
+      m.addSource("team", { type: "geojson", data: EMPTY });
+      m.addLayer({ id: "team-dot", type: "circle", source: "team", paint: TEAM_CIRCLE_PAINT });
+      if (!DEMO_MODE) {
+        m.addLayer({
+          id: "team-label",
+          type: "symbol",
+          source: "team",
+          layout: TEAM_LABEL_LAYOUT,
+          paint: teamLabelPaint(mapTheme),
+        });
+      }
       m.addSource("restrictions", { type: "geojson", data: EMPTY });
       m.addLayer({ id: "restriction-dot", type: "circle", source: "restrictions", paint: RESTRICTION_CIRCLE_PAINT });
       if (!DEMO_MODE) {
@@ -276,7 +291,8 @@ export function LiveMap({
     set("places", markers ?? EMPTY_COLLECTION);
     set("restrictions", pointsGeoJSON(restrictions));
     set("labels", labels ?? EMPTY_COLLECTION);
-  }, [routes, destination, markers, restrictions, labels, loaded]);
+    set("team", team ?? EMPTY_COLLECTION);
+  }, [routes, destination, markers, restrictions, labels, team, loaded]);
 
   useEffect(() => {
     const m = map.current;

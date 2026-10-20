@@ -71,6 +71,8 @@ export interface Router {
    * given names (any road if no names). Optional: test doubles leave it out.
    */
   sizeLimitsAt?(points: Array<{ point: LngLat; names: string[] }>): Promise<SizeLimits[]>;
+  /** The route along a driven track, matched to the roads. Optional: test doubles leave it out. */
+  traceRoute?(points: LngLat[], costing: Costing): Promise<Route>;
 }
 
 /** The road a GPS trace was on at its last point. */
@@ -160,6 +162,35 @@ interface ValhallaLocateResponse {
 /** Valhalla reports 0 for "not tagged" and 255 for "no limit"; neither is a number to show. */
 const signedLimit = (kph?: number) => (kph && kph > 0 && kph < 255 ? kph : undefined);
 
+function tripRoute(data: ValhallaRouteResponse): Route {
+  // A trace can come back in several legs where it lost the road; join them.
+  const shape: LngLat[] = [];
+  const maneuvers: Maneuver[] = [];
+  for (const [k, leg] of data.trip.legs.entries()) {
+    const offset = Math.max(0, shape.length - 1);
+    const legShape = decodePolyline6(leg.shape);
+    shape.push(...(shape.length ? legShape.slice(1) : legShape));
+    const last = k === data.trip.legs.length - 1;
+    for (const m of leg.maneuvers ?? []) {
+      // Arrival at the end of a leg that isn't the last isn't an arrival.
+      if (!last && ARRIVE_TYPES.has(m.type)) continue;
+      maneuvers.push({
+        type: m.type,
+        instruction: m.instruction,
+        streetNames: m.street_names ?? [],
+        lengthM: m.length * 1000,
+        timeS: m.time,
+        beginShapeIndex: m.begin_shape_index + offset,
+        endShapeIndex: m.end_shape_index + offset,
+      });
+    }
+  }
+  return { durationS: data.trip.summary.time, distanceM: data.trip.summary.length * 1000, shape, maneuvers };
+}
+
+/** Valhalla's "you have arrived" maneuver types. */
+export const ARRIVE_TYPES = new Set([4, 5, 6]);
+
 /** Talks to a Valhalla server over HTTP. */
 export class ValhallaClient implements Router, Matcher {
   constructor(
@@ -199,22 +230,20 @@ export class ValhallaClient implements Router, Matcher {
       ...(req.exclude?.length ? { exclude_locations: req.exclude.map((p) => location({ point: p })) } : {}),
       ...(req.avoidAreas?.length ? { exclude_polygons: req.avoidAreas } : {}),
     };
-    const data = await this.post<ValhallaRouteResponse>("/route", body);
-    const leg = data.trip.legs[0]!;
-    return {
-      durationS: data.trip.summary.time,
-      distanceM: data.trip.summary.length * 1000,
-      shape: decodePolyline6(leg.shape),
-      maneuvers: (leg.maneuvers ?? []).map((m) => ({
-        type: m.type,
-        instruction: m.instruction,
-        streetNames: m.street_names ?? [],
-        lengthM: m.length * 1000,
-        timeS: m.time,
-        beginShapeIndex: m.begin_shape_index,
-        endShapeIndex: m.end_shape_index,
-      })),
-    };
+    return tripRoute(await this.post<ValhallaRouteResponse>("/route", body));
+  }
+
+  /** The route along a driven GPS track, matched to the roads, with turn-by-turn. */
+  async traceRoute(points: LngLat[], costing: Costing): Promise<Route> {
+    const data = await this.post<ValhallaRouteResponse>("/trace_route", {
+      shape: points.map(([lon, lat]) => ({ lat, lon })),
+      costing: costing.costing,
+      costing_options: { [costing.costing]: costing.options },
+      shape_match: "map_snap",
+      trace_options: { search_radius: 40, gps_accuracy: 15 },
+      directions_options: { units: "kilometers", language: "en-GB" },
+    });
+    return tripRoute(data);
   }
 
   /** Map-matches a short GPS trace; the road at its last point. Null if it can't be matched. */

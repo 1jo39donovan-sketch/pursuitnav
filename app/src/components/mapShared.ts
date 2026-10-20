@@ -42,6 +42,8 @@ export interface LiveMapProps {
   vehicleArrow?: boolean;
   /** Named blocks and estates to label (points with a "name"), when zoomed in. */
   labels?: GeoJSON.FeatureCollection | null;
+  /** Colleagues in a team session (points with a "name": their callsign), at every zoom. */
+  team?: GeoJSON.FeatureCollection | null;
   /** Zoom used while following the officer's position. */
   followZoom?: number;
   /** Hide map controls for small embedded maps. */
@@ -201,6 +203,28 @@ export function labelPaint(theme: "night" | "day"): SymbolLayerSpecification["pa
   return theme === "night"
     ? { "text-color": "#93c5fd", "text-halo-color": "#0c1220", "text-halo-width": 2 }
     : { "text-color": "#1d4ed8", "text-halo-color": "#ffffff", "text-halo-width": 2 };
+}
+
+// Colleagues: a green dot with their callsign beside it, never hidden by other labels.
+export const TEAM_COLOR = "#22c55e";
+export const TEAM_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
+  "circle-color": TEAM_COLOR,
+  "circle-radius": 7,
+  "circle-stroke-color": "#ffffff",
+  "circle-stroke-width": 2,
+};
+export const TEAM_LABEL_LAYOUT: SymbolLayerSpecification["layout"] = {
+  "text-field": ["get", "name"],
+  "text-font": ["Noto Sans Bold"],
+  "text-size": 14,
+  "text-offset": [0, -1.4],
+  "text-allow-overlap": true,
+  "text-ignore-placement": true,
+};
+export function teamLabelPaint(theme: "night" | "day"): SymbolLayerSpecification["paint"] {
+  return theme === "night"
+    ? { "text-color": "#86efac", "text-halo-color": "#0c1220", "text-halo-width": 2 }
+    : { "text-color": "#15803d", "text-halo-color": "#ffffff", "text-halo-width": 2 };
 }
 
 /** Points with a name, for the labels prop. */

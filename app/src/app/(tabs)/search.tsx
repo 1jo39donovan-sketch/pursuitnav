@@ -26,6 +26,7 @@ import type { PlaceGroup } from "../../search/places";
 import { useSearch } from "../../search/SearchProvider";
 import { useAddressLookup } from "../../search/useAddressLookup";
 import { useSession } from "../../session/SessionProvider";
+import { useTeam } from "../../team/TeamProvider";
 import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
 
@@ -44,6 +45,7 @@ interface Destination {
 export default function SearchScreen() {
   const { fix } = useLocation();
   const { boroughs, policeRoutes, vehicle, roads } = useSession();
+  const { mapPoints: teamMap } = useTeam();
   const { data, search, places, area: searchArea } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
@@ -316,6 +318,7 @@ export default function SearchScreen() {
 
       <View style={styles.body}>
         <LiveMap
+          team={teamMap}
           routes={routes}
           restrictions={restrictionPoints(plan?.police)}
           labels={blockLabels}

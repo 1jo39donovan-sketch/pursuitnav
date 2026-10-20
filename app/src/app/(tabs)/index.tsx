@@ -6,6 +6,7 @@ import { API_URL, DEMO_MODE } from "../../config";
 
 import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
+import { TeamSection } from "../../components/TeamSection";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
@@ -173,6 +174,8 @@ export default function SessionScreen() {
             : "Off: standard, fully legal routes only."}
         </Text>
       </View>
+
+      <TeamSection />
 
       <Pressable
         accessibilityRole="button"

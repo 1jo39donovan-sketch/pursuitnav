@@ -31,6 +31,8 @@ services:
       OS_PLACES_KEY: ${OS_PLACES_KEY:-}
       # Contact address on the /privacy and /support pages.
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+      # Free key from https://api-portal.tfl.gov.uk; live closures work without one but may be throttled.
+      TFL_APP_KEY: ${TFL_APP_KEY:-}
 
   # Map tools (places list, travel speeds), run by scripts/build-map.sh and
   # scripts/build-places.sh, not by `docker compose up`.

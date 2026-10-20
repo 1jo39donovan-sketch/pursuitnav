@@ -216,11 +216,15 @@ export function avoidingClosures(router: Router, feed: Pick<ClosureFeed, "curren
       try {
         return await router.route({ ...req, avoidAreas: [...(req.avoidAreas ?? []), ...rings] });
       } catch (err) {
-        if (!(err instanceof ValhallaError && err.code === 442)) throw err;
+        // No way round them (442), or Valhalla refused the areas (its limits not
+        // yet raised on this server): route without them rather than fail.
+        if (!(err instanceof ValhallaError && err.httpStatus >= 400 && err.httpStatus < 500)) throw err;
         return { ...(await router.route(req)), closuresIgnored: true };
       }
     },
     traceEdges: (shape, costing) => router.traceEdges(shape, costing),
     ...(router.sizeLimitsAt ? { sizeLimitsAt: (points) => router.sizeLimitsAt!(points) } : {}),
+    // A colleague's track is followed as they drove it.
+    ...(router.traceRoute ? { traceRoute: (points, costing) => router.traceRoute!(points, costing) } : {}),
   };
 }

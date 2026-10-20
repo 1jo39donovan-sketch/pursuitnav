@@ -54,7 +54,7 @@ export interface Plan {
  * because Valhalla lets a route start or end on a road the vehicle may not
  * use, and the police costing ignores these limits altogether.
  */
-async function overLimits(router: Router, shape: LngLat[], edges: TraceEdge[], vehicle: VehicleType) {
+export async function overLimits(router: Router, shape: LngLat[], edges: TraceEdge[], vehicle: VehicleType) {
   if (!router.sizeLimitsAt || edges.length === 0) return [];
   const size = VEHICLES[vehicle];
   const cumulative = cumulativeDistances(shape);
@@ -171,7 +171,7 @@ export async function planRoutes(
 
 /** No route avoids the limits the vehicle can't take. */
 export class NoSafeRouteError extends Error {
-  constructor() {
-    super("No route found that avoids low bridges and weight limits for this vehicle.");
+  constructor(message = "No route found that avoids low bridges and weight limits for this vehicle.") {
+    super(message);
   }
 }

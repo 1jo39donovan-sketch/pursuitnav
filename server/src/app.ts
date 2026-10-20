@@ -10,8 +10,10 @@ import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "
 import type { LngLat } from "./geo.js";
 import { privacyPage, supportPage } from "./pages.js";
 import { PlacesError, type PlacesClient } from "./places.js";
+import { FollowWrongWayError, planFollow } from "./follow.js";
 import { NoSafeRouteError, planRoutes } from "./plan.js";
 import { pursuitInfo } from "./pursuit.js";
+import { MAX_BLOB_CHARS, NoSuchTeamError, TeamFullError, TeamStore, TeamTokenError } from "./teams.js";
 import { ValhallaError, type Matcher, type Router } from "./valhalla.js";
 
 const point = {
@@ -23,6 +25,14 @@ const point = {
     lng: { type: "number", minimum: -180, maximum: 180 },
   },
 } as const;
+
+interface FollowBody {
+  from: { lat: number; lng: number; heading?: number };
+  /** Their track as [lng, lat], oldest first, ending where they are. */
+  track: number[][];
+  vehicle?: VehicleType;
+  roads?: RoadChoice;
+}
 
 interface RoutesBody {
   /** heading: direction of travel in degrees, when moving, so the route starts that way. */
@@ -36,6 +46,31 @@ interface RoutesBody {
   roads?: RoadChoice;
 }
 
+function routeError(err: unknown, req: FastifyRequest, reply: FastifyReply) {
+  if (err instanceof NoSafeRouteError) {
+    return reply.code(422).send({ error: "no-safe-route", message: err.message });
+  }
+  if (err instanceof ValhallaError) {
+    if (err.code === 442) {
+      return reply.code(422).send({ error: "no-route", message: "No route between these points." });
+    }
+    if (err.code === 171) {
+      return reply.code(422).send({ error: "no-road-near", message: "No road found near one of the points." });
+    }
+    req.log.error({ status: err.httpStatus, code: err.code }, "routing engine error");
+    return reply.code(503).send({ error: "routing-unavailable", message: "Routing is unavailable. Try again." });
+  }
+  throw err;
+}
+
+const teamId = { type: "string", pattern: "^[0-9a-f]{32}$" } as const;
+const teamParams = {
+  type: "object",
+  required: ["teamId", "memberId"],
+  properties: { teamId, memberId: teamId },
+} as const;
+const token = { type: "string", minLength: 32, maxLength: 64 } as const;
+
 export function buildApp(
   config: ServerConfig,
   router: Router,
@@ -43,6 +78,7 @@ export function buildApp(
   matcher?: Matcher,
   /** Live road closures; the router passed in already avoids them. */
   closures?: Pick<ClosureFeed, "summary">,
+  teams: TeamStore = new TeamStore(),
 ): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
@@ -53,7 +89,7 @@ export function buildApp(
 
   // The phone app doesn't need CORS; the browser preview of the app does.
   // There are no cookies or credentials to protect.
-  app.register(cors, { origin: true, methods: ["GET", "POST"] });
+  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"] });
 
   const inBounds = ({ lat, lng }: { lat: number; lng: number }) => {
     const [west, south, east, north] = config.bounds;
@@ -112,20 +148,7 @@ export function buildApp(
         const ignored = [plan.standard, plan.police].some((r) => (r as ClosureAwareRoute | null)?.closuresIgnored);
         return { ...plan, closures: { ...closures.summary(), ignored } };
       } catch (err) {
-        if (err instanceof NoSafeRouteError) {
-          return reply.code(422).send({ error: "no-safe-route", message: err.message });
-        }
-        if (err instanceof ValhallaError) {
-          if (err.code === 442) {
-            return reply.code(422).send({ error: "no-route", message: "No route between these points." });
-          }
-          if (err.code === 171) {
-            return reply.code(422).send({ error: "no-road-near", message: "No road found near one of the points." });
-          }
-          req.log.error({ status: err.httpStatus, code: err.code }, "routing engine error");
-          return reply.code(503).send({ error: "routing-unavailable", message: "Routing is unavailable. Try again." });
-        }
-        throw err;
+        return routeError(err, req, reply);
       }
     },
   );
@@ -214,6 +237,113 @@ export function buildApp(
     };
   app.get("/v1/places-data", dataFile(config.placesFile, "places-not-ready", "Place data"));
   app.get("/v1/roads-data", dataFile(config.roadsFile, "roads-not-ready", "The road list"));
+
+  // Follow-in: the way a colleague drove, from here. Their track comes from the
+  // phone (decrypted there) and, like every request, isn't logged or kept.
+  app.post<{ Body: FollowBody }>(
+    "/v1/follow",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["from", "track"],
+          additionalProperties: false,
+          properties: {
+            from: {
+              ...point,
+              properties: { ...point.properties, heading: { type: "number", minimum: 0, maximum: 360 } },
+            },
+            track: {
+              type: "array",
+              minItems: 2,
+              maxItems: 600,
+              items: { type: "array", minItems: 2, maxItems: 2, items: { type: "number" } },
+            },
+            vehicle: { type: "string", enum: [...VEHICLE_TYPES] },
+            roads: { type: "string", enum: [...ROAD_CHOICES] },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { from, track, vehicle, roads } = req.body;
+      const points = track as LngLat[];
+      if (!inBounds(from) || points.some(([lng, lat]) => !inBounds({ lat, lng }))) {
+        return reply.code(422).send({ error: "outside-area", message: "Their track must be in the covered area." });
+      }
+      try {
+        return await planFollow(router, [from.lng, from.lat], points, { ...config, roads }, from.heading, vehicle);
+      } catch (err) {
+        if (err instanceof FollowWrongWayError) {
+          return reply.code(422).send({ error: "follow-refused", message: err.message });
+        }
+        // 443–445: the track couldn't be matched to the roads.
+        if (err instanceof ValhallaError && err.code !== undefined && err.code >= 443 && err.code <= 445) {
+          return reply.code(422).send({ error: "follow-refused", message: "Couldn't match their track to the roads." });
+        }
+        return routeError(err, req, reply);
+      }
+    },
+  );
+
+  // Team sessions. Blobs are sealed on the phones with a key the server never
+  // sees; the server keeps them in memory only, for at most a week.
+  app.get<{ Params: { teamId: string } }>(
+    "/v1/teams/:teamId",
+    { schema: { params: { type: "object", required: ["teamId"], properties: { teamId } } } },
+    async (req, reply) => {
+      try {
+        return teams.get(req.params.teamId);
+      } catch (err) {
+        if (err instanceof NoSuchTeamError) return reply.code(404).send({ error: "no-team", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  app.put<{ Params: { teamId: string; memberId: string }; Body: { token: string; blob: string } }>(
+    "/v1/teams/:teamId/members/:memberId",
+    {
+      bodyLimit: MAX_BLOB_CHARS + 1000,
+      schema: {
+        params: teamParams,
+        body: {
+          type: "object",
+          required: ["token", "blob"],
+          additionalProperties: false,
+          properties: { token, blob: { type: "string", minLength: 1, maxLength: MAX_BLOB_CHARS } },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        return teams.put(req.params.teamId, req.params.memberId, req.body.token, req.body.blob);
+      } catch (err) {
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
+        if (err instanceof TeamFullError) return reply.code(429).send({ error: "team-full", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  app.delete<{ Params: { teamId: string; memberId: string }; Body: { token: string } }>(
+    "/v1/teams/:teamId/members/:memberId",
+    {
+      schema: {
+        params: teamParams,
+        body: { type: "object", required: ["token"], additionalProperties: false, properties: { token } },
+      },
+    },
+    async (req, reply) => {
+      try {
+        teams.remove(req.params.teamId, req.params.memberId, req.body.token);
+        return { ok: true };
+      } catch (err) {
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
+        throw err;
+      }
+    },
+  );
 
   return app;
 }

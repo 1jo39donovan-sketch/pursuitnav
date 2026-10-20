@@ -24,6 +24,7 @@ jobs:
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
       DUCKDNS_TOKEN: ${{ secrets.DUCKDNS_TOKEN }}
       OS_PLACES_KEY: ${{ secrets.OS_PLACES_KEY }}
+      TFL_APP_KEY: ${{ secrets.TFL_APP_KEY }}
       SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
       DOMAIN: ${{ vars.SERVER_DOMAIN }}
       CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
@@ -74,7 +75,7 @@ jobs:
             # OS key (and contact email) go to the server; the DuckDNS token stays here.
             {
               echo '#!/bin/bash'
-              printf 'export DOMAIN=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q BRANCH=%q\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$BRANCH"
+              printf 'export DOMAIN=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q TFL_APP_KEY=%q BRANCH=%q\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$TFL_APP_KEY" "$BRANCH"
               echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/server/scripts/install.sh | bash > /var/log/blue-route-install.log 2>&1"
             } > user-data.sh
 

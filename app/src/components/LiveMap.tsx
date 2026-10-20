@@ -20,6 +20,9 @@ import {
   cameraFor,
   LABEL_LAYOUT,
   labelPaint,
+  TEAM_CIRCLE_PAINT,
+  TEAM_LABEL_LAYOUT,
+  teamLabelPaint,
   ROAD_NAME_SOURCE,
   ROAD_NAME_SOURCE_LAYER,
   roadNameLayout,
@@ -57,6 +60,7 @@ export function LiveMap({
   zoomControl = false,
   roadNames = false,
   labels,
+  team,
   vehicleArrow = false,
   followZoom = 15,
   compact = false,
@@ -187,6 +191,10 @@ export function LiveMap({
         )}
         <GeoJSONSource id="labels" data={labels ?? EMPTY_COLLECTION}>
           <Layer type="symbol" id="block-labels" minzoom={15} layout={LABEL_LAYOUT} paint={labelPaint(mapTheme)} />
+        </GeoJSONSource>
+        <GeoJSONSource id="team" data={team ?? EMPTY_COLLECTION}>
+          <Layer type="circle" id="team-dot" paint={TEAM_CIRCLE_PAINT} />
+          <Layer type="symbol" id="team-label" layout={TEAM_LABEL_LAYOUT} paint={teamLabelPaint(mapTheme)} />
         </GeoJSONSource>
         <GeoJSONSource id="restrictions" data={pointsGeoJSON(restrictions)}>
           <Layer type="circle" id="restriction-dot" paint={RESTRICTION_CIRCLE_PAINT} />

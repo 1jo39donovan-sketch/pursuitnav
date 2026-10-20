@@ -251,6 +251,45 @@ describe("live road closures", () => {
   });
 });
 
+describe("follow-in", () => {
+  /** Points every ~30 m from a to b, as a phone would record a drive. */
+  const drive = (a: LngLat, b: LngLat): LngLat[] =>
+    Array.from({ length: 8 }, (_, i) => [a[0] + ((b[0] - a[0]) * i) / 7, a[1] + ((b[1] - a[1]) * i) / 7] as LngLat);
+  const backStreet = (from: number, to: number): LngLat[] => {
+    const col = (c: number): LngLat => [lngLat("main_west")[0] + c * 0.003, lngLat("main_west")[1]];
+    const out: LngLat[] = [];
+    for (let c = from; c < to; c++) out.push(...drive(col(c), col(c + 1)).slice(c === from ? 0 : 1));
+    return out;
+  };
+  const follow = (from: string, track: LngLat[]) =>
+    app.inject({ method: "POST", url: "/v1/follow", payload: { from: at(from), track } });
+
+  it("goes the way they drove, not the way the router would choose", async () => {
+    // Left to itself the route takes High Road; they went along Back Street.
+    const res = await follow("main_west", backStreet(0, 3));
+    expect(res.statusCode, res.body).toBe(200);
+    const streets = res.json().route.maneuvers.flatMap((m: { streetNames: string[] }) => m.streetNames);
+    expect(streets).toContain("Back Street");
+    expect(streets).not.toContain("High Road");
+  });
+
+  it("drives you to their track first, as one route with one arrival", async () => {
+    const res = await follow("main_west", backStreet(1, 3));
+    expect(res.statusCode, res.body).toBe(200);
+    const { route } = res.json() as { route: Plan["standard"] };
+    expect(route.distanceM).toBeGreaterThan(550);
+    expect(route.maneuvers.filter((m) => [4, 5, 6].includes(m.type))).toHaveLength(1);
+    expect(route.maneuvers.at(-1)!.endShapeIndex).toBe(route.shape.length - 1);
+  });
+
+  it("won't follow them the wrong way down a one-way street", async () => {
+    // Buses may go west along Contraflow Street; the police route may not.
+    const res = await follow("contraflow_east_end", drive(lngLat("contraflow_east_end"), lngLat("contraflow_west_end")));
+    expect(res.statusCode, res.body).toBe(422);
+    expect(res.json().error).toBe("follow-refused");
+  });
+});
+
 describe("standard route on its own", () => {
   it("comes back without the blue-light work, for showing straight away", async () => {
     const res = await app.inject({

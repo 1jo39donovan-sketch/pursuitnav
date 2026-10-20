@@ -11,6 +11,12 @@ A small TypeScript API (Fastify) in front of a [Valhalla](https://github.com/val
 
 Each route has `durationS`, `distanceM`, `shape` (`[lng, lat]` points) and turn-by-turn `maneuvers`. The police route also has `savingS` and `restrictions`, one entry per restricted manoeuvre or bus-only section it relies on, e.g. `{"kind": "turn", "description": "No right turn: Upper Street into Islington Green", "location": {...}}`. If `restrictionsComplete` is false, the list is a lower bound.
 
+`POST /v1/follow` with `{"from": {...}, "track": [[lng, lat], ...]}` returns `{"route", "joinedAtM"}`: a colleague's way in, from here (team sessions). The route lists restrictions like a blue-light route; a track that goes the wrong way down a one-way street is refused (422 `follow-refused`).
+
+`PUT /v1/teams/:teamId/members/:memberId` `{token, blob}`, `GET /v1/teams/:teamId`, `DELETE …/members/:memberId` `{token}`: team sessions. Blobs are sealed on the phones; the server keeps them in memory only, for at most a week.
+
+Both route responses avoid roads TfL lists as fully closed (`src/closures.ts`) and say so in `closures: {active, updatedAt, ignored}`.
+
 `POST /v1/addresses` with `{"query": "Flat 3, 54 Caledonian Road"}` returns `{"addresses": [...]}`: door-level addresses from the OS Places API, each with `uprn`, `label`, `postcode`, `borough` and `lat`/`lng`. Only London addresses are returned; the app sorts them into the officer's boroughs and the rest. Without `OS_PLACES_KEY` this returns 503 `addresses-not-configured` and the app uses its offline road search alone.
 
 `GET /v1/places-data` returns every named place in London (shops, cafés, schools, parks, blocks, estates…) as a gzipped text file for the app to keep offline. It has an ETag, so the app only downloads it when it changes. It's public OpenStreetMap data and the request carries nothing about the officer.
@@ -88,6 +94,6 @@ crontab -e
 15 3 * * 0  /opt/blue-route/server/scripts/rebuild-tiles.sh >> /var/log/blue-route-tiles.log 2>&1
 ```
 
-Settings (environment variables on the `api` service): `VALHALLA_URL`, `OS_PLACES_KEY`, `PORT`, `REGION_BOUNDS` (`west,south,east,north`, London by default), `MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`, `RESTRICTION_CHECK_BUDGET`.
+Settings (environment variables on the `api` service): `VALHALLA_URL`, `OS_PLACES_KEY`, `PORT`, `REGION_BOUNDS` (`west,south,east,north`, London by default), `MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`, `RESTRICTION_CHECK_BUDGET`, `TFL_APP_KEY` (optional key for the TfL closures feed), `TFL_CLOSURES` (`0` turns live closures off).
 
 Map data © OpenStreetMap contributors, under the Open Database License.

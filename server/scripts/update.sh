@@ -23,4 +23,8 @@ docker image prune -f >/dev/null
 if [ ! -s data/places/roads.txt.gz ]; then
   scripts/build-places.sh || echo "$(date -Is) search data rebuild failed; the weekly refresh will retry" >&2
 fi
+# Live closures need Valhalla's avoid-area limits raised (new map builds do it).
+if [ "$(scripts/valhalla-limits.sh data/valhalla)" = "changed" ]; then
+  docker compose restart valhalla
+fi
 echo "$(date -Is) done"

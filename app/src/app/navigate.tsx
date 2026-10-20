@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { fetchRoutes, restrictionPoints } from "../api/routes";
+import { fetchRoutes, restrictionPoints, type RoutePlan } from "../api/routes";
+import { fetchFollow } from "../api/teams";
 import { GpsStatus } from "../components/GpsStatus";
 import { LiveMap } from "../components/LiveMap";
 import { namedPoints, type MapRoute } from "../components/mapShared";
@@ -15,6 +16,7 @@ import { useNavigation } from "../navigation/NavigationProvider";
 import { nextCallout } from "../navigation/voice";
 import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
+import { useTeam } from "../team/TeamProvider";
 import {
   maneuverArrow,
   upcomingInstruction,
@@ -43,6 +45,7 @@ export default function NavigateScreen() {
   const { fix } = useLocation();
   const { data, places } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads } = useSession();
+  const { mapPoints: teamMap } = useTeam();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
@@ -81,7 +84,14 @@ export default function NavigateScreen() {
     const controller = new AbortController();
     inFlight.current = controller;
     // A standard route only needs the quick request; a blue-light one the full check.
-    fetchRoutes(routeOrigin(fix), active.destination, vehicle, controller.signal, active.kind === "standard", roads)
+    // Follow-in re-routes back onto the colleague's track, not to a fresh route.
+    const fresh: Promise<RoutePlan> = active.follow
+      ? fetchFollow(routeOrigin(fix), active.follow.track, vehicle, roads, controller.signal).then((f) => ({
+          standard: f.route,
+          police: f.route,
+        }))
+      : fetchRoutes(routeOrigin(fix), active.destination, vehicle, controller.signal, active.kind === "standard", roads);
+    fresh
       .then((plan) => {
         setFailed(false);
         replan(plan);
@@ -256,6 +266,7 @@ export default function NavigateScreen() {
           </View>
           <View style={styles.map}>
             <LiveMap
+              team={teamMap}
               view={mapView}
               viewControl
               zoomControl
@@ -276,6 +287,7 @@ export default function NavigateScreen() {
           {turnPanel}
           <View style={styles.map}>
             <LiveMap
+              team={teamMap}
               view={mapView}
               viewControl
               zoomControl

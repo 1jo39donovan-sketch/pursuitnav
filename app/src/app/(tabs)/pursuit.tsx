@@ -12,6 +12,7 @@ import { formatDistance } from "../../format";
 import { useLocation, type Fix } from "../../location/LocationProvider";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
+import { useTeam } from "../../team/TeamProvider";
 import { colors, fonts } from "../../theme";
 
 const POLL_MS = 1000;
@@ -41,6 +42,7 @@ export default function PursuitScreen() {
   }, [focused]);
   const { fix } = useLocation();
   const { mapView } = useSession();
+  const { mapPoints: teamMap } = useTeam();
   const { data, places } = useSearch();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
@@ -208,6 +210,7 @@ export default function PursuitScreen() {
   const map = (
     <View style={styles.map}>
       <LiveMap
+        team={teamMap}
         view={mapView}
         viewControl
         zoomControl

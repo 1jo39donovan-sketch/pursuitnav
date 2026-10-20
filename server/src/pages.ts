@@ -2,7 +2,7 @@
 // served by the API so they live at the same address as the server.
 
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
-const UPDATED = "10 October 2026";
+const UPDATED = "20 October 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -64,14 +64,25 @@ system. It has no accounts, no adverts, no analytics and no tracking.</p>
     to look it up.</li>
   <li><strong>Pursuit mode:</strong> your last few positions and direction of travel, to find the road and its speed
     limit.</li>
+  <li><strong>Follow in</strong> (team sessions): your position and the colleague’s recent track, to work out the way
+    they drove.</li>
 </ul>
 <p>The server works out the answer in memory and keeps nothing: it doesn’t log requests, positions or addresses, and
 has no database of users. Connections use HTTPS.</p>
+
+<h2>Team sessions (only if you start or join one)</h2>
+<p>In a team, while Blue Route is open, your phone shares your callsign, position and the way you’ve driven in the last
+two hours with the others in the team, every 15 seconds. It’s encrypted on your phone with a key that’s part of the team
+code and is never sent to the server, so the server holds only data it can’t read. It keeps that in memory only (a
+restart forgets it), drops your entry when you leave or a day after you stop sharing, and ends the team after a week.
+Anyone you give the team code to can see your position, so share it only with colleagues on the job.</p>
 
 <h2>Other services</h2>
 <ul>
   <li><strong>Map tiles</strong> come from OpenFreeMap. Like any website, it sees your phone’s IP address and which part
     of the map is being shown.</li>
+  <li><strong>TfL</strong>: the server reads TfL’s public road closures feed to route around closed roads. Nothing
+    about you or your journeys is sent to TfL.</li>
   <li><strong>Ordnance Survey</strong> receives address searches from the server (not your position or anything about
     you).</li>
   <li><strong>Open in Google Maps / Waze</strong> hands the destination to that app when you tap it; their own privacy
@@ -108,6 +119,11 @@ and what happened, but please don’t send real addresses from jobs.</p>
   <li><strong>Not in London?</strong> Turn on <em>Demo drive</em> in the Session tab to try the app with a simulated
     drive through London.</li>
   <li><strong>Search can’t find a block or estate?</strong> Save it in the Search tab with the road it’s on.</li>
+  <li><strong>Team sessions?</strong> Start a team in the Session tab and share the code. You see each other only while
+    Blue Route is open on both phones, and it needs signal. It doesn’t replace your radio or any force system, and it’s
+    for you to check it fits your force’s policy.</li>
+  <li><strong>Road closures?</strong> Routes avoid roads TfL lists as fully closed, updated every 5 minutes. Lane
+    closures, and incidents TfL hasn’t listed yet, aren’t included.</li>
   <li><strong>Where is my log?</strong> On your phone only, in the Log tab. It’s never cleared unless you clear it.</li>
 </ul>
 
