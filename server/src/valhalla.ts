@@ -51,6 +51,8 @@ export interface RouteRequest {
   exclude?: LngLat[];
   /** Skip turn-by-turn text; cheaper when only the distance matters. */
   distanceOnly?: boolean;
+  /** Closed rings of [lng, lat]; roads crossing them aren't used (live closures). */
+  avoidAreas?: LngLat[][];
 }
 
 /** Signed size and weight limits on the road at a point (metres, tonnes). */
@@ -195,6 +197,7 @@ export class ValhallaClient implements Router, Matcher {
         ? { directions_type: "none" }
         : { units: "kilometers", language: "en-GB" },
       ...(req.exclude?.length ? { exclude_locations: req.exclude.map((p) => location({ point: p })) } : {}),
+      ...(req.avoidAreas?.length ? { exclude_polygons: req.avoidAreas } : {}),
     };
     const data = await this.post<ValhallaRouteResponse>("/route", body);
     const leg = data.trip.legs[0]!;

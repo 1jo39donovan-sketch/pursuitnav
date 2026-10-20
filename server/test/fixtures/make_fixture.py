@@ -142,6 +142,8 @@ way(7, [(0.8, 0), (0.8, 1), (0.8, 2), (0.8, 3)], "High Road", highway="primary",
 way(7, [(0.8, 3), (1, 3)], "Link East")
 point("main_west", 7, 1, 0)
 point("main_east", 7, 1, 3)
+point("high_road_1", 7, 0.8, 1)  # a block of High Road, closed in the live-closure test
+point("high_road_2", 7, 0.8, 2)
 
 def main(pbf_path, points_path):
     writer = osmium.SimpleWriter(pbf_path, overwrite=True)

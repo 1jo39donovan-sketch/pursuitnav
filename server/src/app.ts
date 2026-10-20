@@ -4,6 +4,7 @@ import { stat } from "node:fs/promises";
 import cors from "@fastify/cors";
 import Fastify, { LogController, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 
+import type { ClosureAwareRoute, ClosureFeed } from "./closures.js";
 import type { ServerConfig } from "./config.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
@@ -40,6 +41,8 @@ export function buildApp(
   router: Router,
   places?: PlacesClient,
   matcher?: Matcher,
+  /** Live road closures; the router passed in already avoids them. */
+  closures?: Pick<ClosureFeed, "summary">,
 ): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
@@ -66,7 +69,7 @@ export function buildApp(
     const places = await stat(config.placesFile)
       .then(() => true)
       .catch(() => false);
-    return { ok: true, routing, places };
+    return { ok: true, routing, places, ...(closures ? { closures: closures.summary().active } : {}) };
   });
 
   // Linked from the app and the store listings.
@@ -104,7 +107,10 @@ export function buildApp(
       }
       const toLngLat = (p: { lat: number; lng: number }): LngLat => [p.lng, p.lat];
       try {
-        return await planRoutes(router, toLngLat(from), toLngLat(to), { ...config, standardOnly, roads }, from.heading, vehicle);
+        const plan = await planRoutes(router, toLngLat(from), toLngLat(to), { ...config, standardOnly, roads }, from.heading, vehicle);
+        if (!closures) return plan;
+        const ignored = [plan.standard, plan.police].some((r) => (r as ClosureAwareRoute | null)?.closuresIgnored);
+        return { ...plan, closures: { ...closures.summary(), ignored } };
       } catch (err) {
         if (err instanceof NoSafeRouteError) {
           return reply.code(422).send({ error: "no-safe-route", message: err.message });

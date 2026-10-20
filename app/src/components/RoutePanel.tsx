@@ -91,6 +91,7 @@ export function RoutePanel({
               </>
             )}
           </View>
+          <ClosuresLine closures={state.plan.closures} />
           {blocks && blocks.length > 0 && (
             <View style={styles.blocks}>
               <Text style={styles.blocksLabel}>Blocks and estates on this road · tap to go there</Text>
@@ -219,6 +220,26 @@ function LinkButton({ label, url, onPress }: { label: string; url: string; onPre
   );
 }
 
+/** One honest line on live closures: what was checked, and how fresh it is. */
+function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
+  if (!closures) return null;
+  if (closures.ignored) {
+    return (
+      <Text style={[styles.closures, styles.closuresWarn]}>
+        ⚠ No way round a TfL road closure: this route may go through one.
+      </Text>
+    );
+  }
+  if (!closures.updatedAt) return <Text style={styles.closures}>Live TfL closures unavailable right now.</Text>;
+  const at = new Date(closures.updatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return (
+    <Text style={styles.closures}>
+      Avoids {closures.active} full road {closures.active === 1 ? "closure" : "closures"} from TfL (checked {at}).
+      Lane closures and incidents TfL hasn’t listed yet aren’t included.
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
   panel: {
     backgroundColor: colors.bg,
@@ -249,6 +270,8 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 13 },
+  closures: { color: colors.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 17 },
+  closuresWarn: { color: colors.amber, fontFamily: fonts.bodySemiBold },
   close: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 15 },
   status: {
     color: colors.muted,

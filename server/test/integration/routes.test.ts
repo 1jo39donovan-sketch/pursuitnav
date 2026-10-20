@@ -3,6 +3,7 @@
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 
 import { buildApp } from "../../src/app.js";
+import { avoidingClosures, boxesAlong, ClosureFeed } from "../../src/closures.js";
 import type { ServerConfig } from "../../src/config.js";
 import { POLICE, policeFor, STANDARD } from "../../src/costing.js";
 import type { LngLat } from "../../src/geo.js";
@@ -215,6 +216,38 @@ describe("main roads", () => {
     });
     const streets = (res.json() as Plan).standard.maneuvers.flatMap((m) => m.streetNames);
     expect(streets).toContain("Back Street");
+  });
+});
+
+describe("live road closures", () => {
+  // A block of High Road is fully closed: both routes go by Back Street instead.
+  const feed = new ClosureFeed();
+  feed.set([{ id: "t1", street: "High Road", rings: boxesAlong([lngLat("high_road_1"), lngLat("high_road_2")]) }]);
+  const closedApp = buildApp(config, avoidingClosures(client, feed, 50), undefined, undefined, feed);
+  beforeAll(() => closedApp.ready());
+  afterAll(() => closedApp.close());
+
+  it("routes round a closed road and says closures were avoided", async () => {
+    const res = await closedApp.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: at("main_west"), to: at("main_east") },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const result = res.json() as Plan & { closures: { active: number; ignored: boolean } };
+    const streets = result.standard.maneuvers.flatMap((m) => m.streetNames);
+    expect(streets).toContain("Back Street");
+    expect(streets).not.toContain("High Road");
+    expect(result.closures).toMatchObject({ active: 1, ignored: false });
+  });
+
+  it("leaves a closure at the destination to the officer", async () => {
+    const res = await closedApp.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: at("main_west"), to: at("high_road_2") },
+    });
+    expect(res.statusCode, res.body).toBe(200);
   });
 });
 

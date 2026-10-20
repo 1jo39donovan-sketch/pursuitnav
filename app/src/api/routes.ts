@@ -57,6 +57,8 @@ export interface RoutePlan {
   standard: Route;
   police: PoliceRoute | null;
   noPoliceReason?: NoPoliceReason;
+  /** Live TfL full closures the routes keep clear of (absent if the server doesn't check). */
+  closures?: { active: number; updatedAt?: string; ignored: boolean };
 }
 
 export class RouteError extends Error {}
