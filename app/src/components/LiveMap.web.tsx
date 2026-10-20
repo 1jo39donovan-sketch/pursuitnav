@@ -3,6 +3,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./mapControls.web.css";
 
+import { Asset } from "expo-asset";
 import maplibregl from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -13,8 +14,19 @@ import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 import {
+  ARROW_LAYOUT,
   boundsOf,
   cameraFor,
+  LABEL_LAYOUT,
+  labelPaint,
+  TEAM_CIRCLE_PAINT,
+  TEAM_LABEL_LAYOUT,
+  teamLabelPaint,
+  ROAD_NAME_SOURCE,
+  ROAD_NAME_SOURCE_LAYER,
+  roadNameLayout,
+  roadNamePaint,
+  speedZoom,
   EMPTY_COLLECTION,
   FIT_DELAY_MS,
   FIT_PADDING,
@@ -29,6 +41,8 @@ import {
   routesGeoJSON,
   type LiveMapProps,
   type MarkerProperties,
+  VEHICLE_IMAGE,
+  vehicleFeature,
 } from "./mapShared";
 import { MapButtons } from "./MapButtons";
 
@@ -39,6 +53,12 @@ export function LiveMap({
   view: viewProp,
   viewControl = false,
   restrictions,
+  autoZoom = false,
+  zoomControl = false,
+  roadNames = false,
+  labels,
+  team,
+  vehicleArrow = false,
   followZoom = 15,
   compact = false,
   routes = [],
@@ -51,6 +71,10 @@ export function LiveMap({
   const { fix } = useLocation();
   const { mapTheme } = useSession();
   const view = viewProp ?? (headingUp ? "heading" : "north");
+  // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
+  const [zoomOffset, setZoomOffset] = useState(0);
+  const followAt =
+    followZoom + zoomOffset + (autoZoom ? speedZoom(fix?.speed ?? null) : 0);
   const rotates = view !== "north";
   const [following, setFollowing] = useState(true);
   const longPress = useRef(onLongPress);
@@ -71,7 +95,7 @@ export function LiveMap({
   const [loaded, setLoaded] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
   // The demo map only has borough outlines, which say nothing at street zoom.
-  const zoom = DEMO_MODE ? 12 : followZoom;
+  const zoom = DEMO_MODE ? 12 : followAt;
 
   useEffect(() => {
     const m = new maplibregl.Map({
@@ -126,6 +150,39 @@ export function LiveMap({
         layout: { "line-join": "round" },
         paint: { "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] },
       });
+      if (roadNames && m.getSource(ROAD_NAME_SOURCE)) {
+        m.addLayer({
+          id: "road-names-bright",
+          type: "symbol",
+          source: ROAD_NAME_SOURCE,
+          "source-layer": ROAD_NAME_SOURCE_LAYER,
+          minzoom: 14,
+          layout: roadNameLayout,
+          paint: roadNamePaint(mapTheme),
+        });
+      }
+      m.addSource("labels", { type: "geojson", data: EMPTY });
+      if (!DEMO_MODE) {
+        m.addLayer({
+          id: "block-labels",
+          type: "symbol",
+          source: "labels",
+          minzoom: 15,
+          layout: LABEL_LAYOUT,
+          paint: labelPaint(mapTheme),
+        });
+      }
+      m.addSource("team", { type: "geojson", data: EMPTY });
+      m.addLayer({ id: "team-dot", type: "circle", source: "team", paint: TEAM_CIRCLE_PAINT });
+      if (!DEMO_MODE) {
+        m.addLayer({
+          id: "team-label",
+          type: "symbol",
+          source: "team",
+          layout: TEAM_LABEL_LAYOUT,
+          paint: teamLabelPaint(mapTheme),
+        });
+      }
       m.addSource("restrictions", { type: "geojson", data: EMPTY });
       m.addLayer({ id: "restriction-dot", type: "circle", source: "restrictions", paint: RESTRICTION_CIRCLE_PAINT });
       if (!DEMO_MODE) {
@@ -160,6 +217,8 @@ export function LiveMap({
         id: "me-dot",
         type: "circle",
         source: "me",
+        // With a direction of travel and an arrow to show it, the arrow replaces the dot.
+        ...(vehicleArrow ? { filter: ["!", ["has", "course"]] } : {}),
         paint: {
           "circle-radius": 7,
           "circle-color": colors.blue,
@@ -167,6 +226,16 @@ export function LiveMap({
           "circle-stroke-width": 2,
         },
       });
+      if (vehicleArrow) {
+        const arrow = new Image();
+        arrow.onload = () => {
+          if (!m.hasImage(VEHICLE_IMAGE)) m.addImage(VEHICLE_IMAGE, arrow);
+          if (!m.getLayer("me-arrow")) {
+            m.addLayer({ id: "me-arrow", type: "symbol", source: "me", filter: ["has", "course"], layout: ARROW_LAYOUT });
+          }
+        };
+        arrow.src = Asset.fromModule(require("../../assets/images/vehicle-arrow.png")).uri;
+      }
       if (DEMO_MODE) {
         // The offline demo style has no font glyphs, so names are HTML markers.
         for (const { name, lngLat } of demoBoroughLabels) {
@@ -211,7 +280,7 @@ export function LiveMap({
       // A new map (different style or view) has to load before it's drawn on.
       setLoaded(false);
     };
-  }, [rotates, compact, mapTheme]);
+  }, [rotates, compact, mapTheme, roadNames, vehicleArrow]);
 
   useEffect(() => {
     const m = map.current;
@@ -221,7 +290,9 @@ export function LiveMap({
     set("destination", pointGeoJSON(destination));
     set("places", markers ?? EMPTY_COLLECTION);
     set("restrictions", pointsGeoJSON(restrictions));
-  }, [routes, destination, markers, restrictions, loaded]);
+    set("labels", labels ?? EMPTY_COLLECTION);
+    set("team", team ?? EMPTY_COLLECTION);
+  }, [routes, destination, markers, restrictions, labels, team, loaded]);
 
   useEffect(() => {
     const m = map.current;
@@ -238,11 +309,7 @@ export function LiveMap({
   useEffect(() => {
     const m = map.current;
     if (!m || !loaded || !fix) return;
-    (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [fix.lng, fix.lat] },
-      properties: {},
-    });
+    (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(fix.lng, fix.lat, fix.course));
     if (following) {
       m.easeTo({ center: [fix.lng, fix.lat], zoom, ...cameraFor(view, fix.course), duration: 800 });
     }
@@ -258,7 +325,13 @@ export function LiveMap({
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>
       )}
-      {!DEMO_MODE && <MapButtons showView={viewControl} top={compact ? 12 : 56} />}
+      {!DEMO_MODE && (
+        <MapButtons
+          showView={viewControl}
+          top={compact ? 12 : 56}
+          onZoom={zoomControl ? (step) => setZoomOffset((z) => Math.max(-3, Math.min(3, z + step))) : undefined}
+        />
+      )}
       {!following && fix && (
         <Pressable
           accessibilityRole="button"

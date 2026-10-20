@@ -34,6 +34,9 @@ config_json = subprocess.run(
 ).stdout
 config = json.loads(config_json)
 config["httpd"]["service"]["listen"] = "tcp://127.0.0.1:0"  # replaced by the test harness
+# As scripts/build-map.sh sets them, for live closures.
+config["service_limits"]["max_exclude_polygons_length"] = 500000
+config["service_limits"]["max_exclude_polygons_vertices"] = 5000
 (work / "valhalla.json").write_text(json.dumps(config, indent=2))
 
 bin_dir = Path(valhalla.PYVALHALLA_DIR) / "bin"

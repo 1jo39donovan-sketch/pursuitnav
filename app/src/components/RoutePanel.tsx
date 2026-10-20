@@ -1,13 +1,15 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { NoPoliceReason, PoliceRoute, Route, RoutePlan } from "../api/routes";
+import type { PointOfInterest } from "../search/places";
 import { formatDistance, formatDuration } from "../format";
 import { colors, fonts } from "../theme";
 
 export type PlanState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; plan: RoutePlan };
+  /** checking: the standard route is here, the blue-light one is still being worked out. */
+  | { status: "ready"; plan: RoutePlan; checking?: boolean };
 
 interface Props {
   state: PlanState;
@@ -19,6 +21,9 @@ interface Props {
   onClose: () => void;
   /** Start turn-by-turn on the chosen route. */
   onGo: (kind: "standard" | "police") => void;
+  /** Named blocks and estates on the road, when the destination is a whole road. */
+  blocks?: PointOfInterest[];
+  onPickBlock?: (block: PointOfInterest) => void;
   /** Handing over to another app (logged as the route picked). */
   onOpenExternal?: (app: "google-maps" | "waze") => void;
 }
@@ -27,13 +32,26 @@ const NO_POLICE: Record<NoPoliceReason, string> = {
   "not-faster": "No meaningfully faster route using bus lanes or restricted turns.",
   "no-restrictions-found": "A faster route exists but its restrictions couldn't be identified, so it isn't offered.",
   "wrong-way-unavoidable": "The only faster route goes against a one-way street, so it isn't offered.",
-  "vehicle-limit-unavoidable": "The only faster route has a bridge or limit your vehicle can't take, so it isn't offered.",
+  "vehicle-limit-unavoidable":
+    "The only faster route has a bridge or limit your vehicle can't take, so it isn't offered.",
+  "not-checked": "Blue-light routes are off. Turn them on in Session.",
+  "check-failed": "Couldn’t check for a blue-light route (no signal?). The standard route is ready.",
   "not-declared":
     "A faster route using bus lanes or restricted turns exists. Blue-light routes are only shown to emergency-service drivers: turn them on in Session.",
 };
 
 /** The two routes side by side, for the operator to choose between. */
-export function RoutePanel({ state, destination, title, note, onClose, onGo, onOpenExternal }: Props) {
+export function RoutePanel({
+  state,
+  destination,
+  title,
+  note,
+  blocks,
+  onPickBlock,
+  onClose,
+  onGo,
+  onOpenExternal,
+}: Props) {
   const { lat, lng } = destination;
   return (
     <View style={styles.panel}>
@@ -53,18 +71,43 @@ export function RoutePanel({ state, destination, title, note, onClose, onGo, onO
       {state.status === "loading" && <Text style={styles.status}>Working out routes…</Text>}
       {state.status === "error" && <Text style={[styles.status, styles.error]}>{state.message}</Text>}
       {state.status === "ready" && (
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.cards}>
-          {/* The quicker route first: a blue-light route is only offered when it's quicker. */}
-          {state.plan.police ? (
-            <>
-              <PoliceCard route={state.plan.police} onGo={() => onGo("police")} />
-              <StandardCard route={state.plan.standard} onGo={() => onGo("standard")} />
-            </>
-          ) : (
-            <>
-              <StandardCard route={state.plan.standard} fastest onGo={() => onGo("standard")} />
-              <PoliceCard route={null} reason={state.plan.noPoliceReason} onGo={() => onGo("police")} />
-            </>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+          {/* The quicker route first, with its Go in reach; blocks on the road below. */}
+          <View style={styles.cards}>
+            {state.plan.police ? (
+              <>
+                <PoliceCard route={state.plan.police} onGo={() => onGo("police")} />
+                <StandardCard route={state.plan.standard} onGo={() => onGo("standard")} />
+              </>
+            ) : (
+              <>
+                <StandardCard route={state.plan.standard} fastest={!state.checking} onGo={() => onGo("standard")} />
+                <PoliceCard
+                  route={null}
+                  reason={state.plan.noPoliceReason}
+                  checking={state.checking}
+                  onGo={() => onGo("police")}
+                />
+              </>
+            )}
+          </View>
+          <ClosuresLine closures={state.plan.closures} />
+          {blocks && blocks.length > 0 && (
+            <View style={styles.blocks}>
+              <Text style={styles.blocksLabel}>Blocks and estates on this road · tap to go there</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.blockRow}>
+                {blocks.map((b) => (
+                  <Pressable
+                    key={`${b.name}|${b.lat}|${b.lng}`}
+                    accessibilityRole="button"
+                    onPress={() => onPickBlock?.(b)}
+                    style={({ pressed }) => [styles.block, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.blockText}>{b.name}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
           )}
         </ScrollView>
       )}
@@ -116,17 +159,23 @@ function StandardCard({ route, fastest, onGo }: { route: Route; fastest?: boolea
 function PoliceCard({
   route,
   reason,
+  checking,
   onGo,
 }: {
   route: PoliceRoute | null;
   reason?: NoPoliceReason;
+  checking?: boolean;
   onGo: () => void;
 }) {
   if (!route) {
     return (
       <View style={[styles.card, styles.cardMuted]}>
         <Text style={styles.cardTitle}>Blue light</Text>
-        <Text style={styles.meta}>{NO_POLICE[reason ?? "not-faster"]}</Text>
+        <Text style={styles.meta}>
+          {checking
+            ? "Checking for a quicker route using bus lanes and restricted turns…"
+            : NO_POLICE[reason ?? "not-faster"]}
+        </Text>
       </View>
     );
   }
@@ -171,6 +220,26 @@ function LinkButton({ label, url, onPress }: { label: string; url: string; onPre
   );
 }
 
+/** One honest line on live closures: what was checked, and how fresh it is. */
+function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
+  if (!closures) return null;
+  if (closures.ignored) {
+    return (
+      <Text style={[styles.closures, styles.closuresWarn]}>
+        ⚠ No way round a TfL road closure: this route may go through one.
+      </Text>
+    );
+  }
+  if (!closures.updatedAt) return <Text style={styles.closures}>Live TfL closures unavailable right now.</Text>;
+  const at = new Date(closures.updatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return (
+    <Text style={styles.closures}>
+      Avoids {closures.active} full road {closures.active === 1 ? "closure" : "closures"} from TfL (checked {at}).
+      Lane closures and incidents TfL hasn’t listed yet aren’t included.
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
   panel: {
     backgroundColor: colors.bg,
@@ -180,9 +249,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 12,
     gap: 10,
-    maxHeight: "55%",
+    maxHeight: "60%",
   },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   label: {
     color: colors.muted,
     fontFamily: fonts.displaySemiBold,
@@ -190,12 +263,25 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: "uppercase",
   },
-  title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 24, lineHeight: 26 },
+  title: {
+    color: colors.fg,
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 24,
+    lineHeight: 26,
+  },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 13 },
+  closures: { color: colors.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 17 },
+  closuresWarn: { color: colors.amber, fontFamily: fonts.bodySemiBold },
   close: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 15 },
-  status: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, paddingVertical: 12 },
+  status: {
+    color: colors.muted,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    paddingVertical: 12,
+  },
   error: { color: colors.amber },
   scroll: { flexGrow: 0 },
+  scrollContent: { gap: 12 },
   cards: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
   card: {
     flex: 1,
@@ -209,7 +295,12 @@ const styles = StyleSheet.create({
   },
   cardPolice: { borderColor: colors.amber },
   cardMuted: { gap: 6 },
-  cardHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 6 },
+  cardHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 6,
+  },
   cardTitle: {
     color: colors.fg,
     fontFamily: fonts.displayBold,
@@ -235,13 +326,41 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
     marginTop: 2,
   },
-  meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
+  meta: {
+    color: colors.muted,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   saving: { color: colors.amber, fontFamily: fonts.bodySemiBold },
-  restriction: { color: colors.fg, fontFamily: fonts.body, fontSize: 13, lineHeight: 18, marginTop: 4 },
+  restriction: {
+    color: colors.fg,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
   swatch: { height: 4, borderRadius: 2, marginTop: 10 },
-  swatchDashed: { borderTopWidth: 4, borderStyle: "dashed", borderColor: colors.amber, height: 0 },
-  go: { borderRadius: 10, minHeight: 56, justifyContent: "center", alignItems: "center", marginTop: 10 },
-  goText: { color: "#0c1220", fontFamily: fonts.displayBold, fontSize: 24, letterSpacing: 2, textTransform: "uppercase" },
+  swatchDashed: {
+    borderTopWidth: 4,
+    borderStyle: "dashed",
+    borderColor: colors.amber,
+    height: 0,
+  },
+  go: {
+    borderRadius: 10,
+    minHeight: 56,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  goText: {
+    color: "#0c1220",
+    fontFamily: fonts.displayBold,
+    fontSize: 24,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+  },
   cardFastest: { borderWidth: 2 },
   fastest: {
     color: colors.ok,
@@ -251,6 +370,17 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   reliesOn: { marginTop: 8 },
+  blocks: { gap: 6 },
+  blocksLabel: { color: colors.muted, fontFamily: fonts.body, fontSize: 12 },
+  blockRow: { gap: 8 },
+  block: {
+    borderColor: "#60a5fa",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  blockText: { color: "#93c5fd", fontFamily: fonts.bodySemiBold, fontSize: 15 },
   links: { flexDirection: "row", gap: 10 },
   link: {
     flex: 1,

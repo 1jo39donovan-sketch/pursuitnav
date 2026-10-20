@@ -36,12 +36,16 @@ Each week the server turns its per-road totals into `data/learned/practical_spee
 - **Ideally, agreement from the forces and services whose crews use it.**
 - **About £0 extra running cost:** the totals are small and fit on the current server.
 
-### Build steps
+### Built (October 2026)
 
-1. Phone: record matched road segments during navigation and pursuit, apply the rules above, and queue them.
-2. Phone: an opt-in switch with its explanation, plus delayed, batched upload.
-3. Server: an endpoint that adds a batch to the per-road totals, then discards it. No request logging, as now.
-4. Server: a weekly job that writes the learned speeds file before the map build.
+1. **Phone:** during navigation it times each road of the route while on it. The server sends each route's OpenStreetMap way IDs with it, so the phone never has to send GPS to match the drive (`app/src/learning/timing.ts`). Demo drives are never timed.
+2. **Phone:** the opt-in switch on Session with its explanation. Times wait on the phone at least 6 hours, until 30 or more can go together, shuffled (`app/src/learning/queue.ts`). Turning it off deletes the queue.
+3. **Server:** `POST /v1/learn` adds each batch to per-road histograms (by time band) and discards it; no request logging (`server/src/learning.ts`). Uploads carry no identity, so "5 separate drives" is counted as 5 timings of the road.
+4. **Server:** every 10 minutes the API writes `data/learned/practical_speeds.csv` (median per road, roads with 5+ timings), which the weekly map build reads.
+
+### Switching it on
+
+It stays off on the server, and the app hides the switch, until `LEARNING=1` is in `/opt/blue-route/server/.env` (then run `docker compose up -d` in `/opt/blue-route/server`). Do the steps under "Before switching it on" first, and update the App Store and Play privacy answers to say the app collects anonymised "product interaction" data (not linked to the user) only when the user opts in.
 
 ## 2. Beyond London: UK-wide, then Ireland
 

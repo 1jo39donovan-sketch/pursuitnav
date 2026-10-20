@@ -42,6 +42,11 @@ if [ -z "${PBF_URL:-}" ] && [ -f "$DIR/server/.env" ]; then
   PBF_URL=$(grep -E '^PBF_URL=' "$DIR/server/.env" | cut -d= -f2- || true)
 fi
 PBF_URL=${PBF_URL:-}
+# Optional TfL API key for live road closures (they work without one, but may be throttled).
+if [ -z "${TFL_APP_KEY:-}" ] && [ -f "$DIR/server/.env" ]; then
+  TFL_APP_KEY=$(grep -E '^TFL_APP_KEY=' "$DIR/server/.env" | cut -d= -f2- || true)
+fi
+TFL_APP_KEY=${TFL_APP_KEY:-}
 
 say "Installing Docker and basics"
 apt-get update -qq
@@ -95,7 +100,7 @@ cd "$DIR/server"
 [ -f docker-compose.yml ] || fail "No server code on branch $BRANCH. Merge the pull request into main first, or run with BRANCH=<branch>."
 
 umask 077
-printf 'DOMAIN=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" >.env
+printf 'DOMAIN=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" >.env
 umask 022
 
 say "Building the routing map and places list. This takes 20–40 minutes the first time."
@@ -106,6 +111,8 @@ else
 fi
 
 say "Starting Valhalla, the API and HTTPS"
+# The API runs as the node user (uid 1000) and writes learning totals here.
+mkdir -p data/learned && chown 1000:1000 data/learned
 docker compose up -d --build
 for i in $(seq 1 60); do
   if docker compose exec -T api wget -qO- http://valhalla:8002/status >/dev/null 2>&1; then

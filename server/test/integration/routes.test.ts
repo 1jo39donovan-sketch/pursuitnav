@@ -3,6 +3,7 @@
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 
 import { buildApp } from "../../src/app.js";
+import { avoidingClosures, boxesAlong, ClosureFeed } from "../../src/closures.js";
 import type { ServerConfig } from "../../src/config.js";
 import { POLICE, policeFor, STANDARD } from "../../src/costing.js";
 import type { LngLat } from "../../src/geo.js";
@@ -205,6 +206,109 @@ describe("main roads", () => {
     const streets = result.standard.maneuvers.flatMap((m) => m.streetNames);
     expect(streets).toContain("High Road");
     expect(streets).not.toContain("Back Street");
+  });
+
+  it("lists the OpenStreetMap ways along it, for opt-in learning", async () => {
+    const { ways } = (await plan("main_west", "main_east")).standard as Plan["standard"] & {
+      ways: { wayId: number; beginShapeIndex: number; endShapeIndex: number }[];
+    };
+    expect(ways.length).toBeGreaterThanOrEqual(3);
+    expect(ways.every((w) => Number.isInteger(w.wayId) && w.endShapeIndex > w.beginShapeIndex)).toBe(true);
+  });
+
+  it("takes the shorter back street when set to any roads", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: at("main_west"), to: at("main_east"), roads: "any" },
+    });
+    const streets = (res.json() as Plan).standard.maneuvers.flatMap((m) => m.streetNames);
+    expect(streets).toContain("Back Street");
+  });
+});
+
+describe("live road closures", () => {
+  // A block of High Road is fully closed: both routes go by Back Street instead.
+  const feed = new ClosureFeed();
+  feed.set([{ id: "t1", street: "High Road", rings: boxesAlong([lngLat("high_road_1"), lngLat("high_road_2")]) }]);
+  const closedApp = buildApp(config, avoidingClosures(client, feed, 50), undefined, undefined, feed);
+  beforeAll(() => closedApp.ready());
+  afterAll(() => closedApp.close());
+
+  it("routes round a closed road and says closures were avoided", async () => {
+    const res = await closedApp.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: at("main_west"), to: at("main_east") },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const result = res.json() as Plan & { closures: { active: number; ignored: boolean } };
+    const streets = result.standard.maneuvers.flatMap((m) => m.streetNames);
+    expect(streets).toContain("Back Street");
+    expect(streets).not.toContain("High Road");
+    expect(result.closures).toMatchObject({ active: 1, ignored: false });
+  });
+
+  it("leaves a closure at the destination to the officer", async () => {
+    const res = await closedApp.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: at("main_west"), to: at("high_road_2") },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+  });
+});
+
+describe("follow-in", () => {
+  /** Points every ~30 m from a to b, as a phone would record a drive. */
+  const drive = (a: LngLat, b: LngLat): LngLat[] =>
+    Array.from({ length: 8 }, (_, i) => [a[0] + ((b[0] - a[0]) * i) / 7, a[1] + ((b[1] - a[1]) * i) / 7] as LngLat);
+  const backStreet = (from: number, to: number): LngLat[] => {
+    const col = (c: number): LngLat => [lngLat("main_west")[0] + c * 0.003, lngLat("main_west")[1]];
+    const out: LngLat[] = [];
+    for (let c = from; c < to; c++) out.push(...drive(col(c), col(c + 1)).slice(c === from ? 0 : 1));
+    return out;
+  };
+  const follow = (from: string, track: LngLat[]) =>
+    app.inject({ method: "POST", url: "/v1/follow", payload: { from: at(from), track } });
+
+  it("goes the way they drove, not the way the router would choose", async () => {
+    // Left to itself the route takes High Road; they went along Back Street.
+    const res = await follow("main_west", backStreet(0, 3));
+    expect(res.statusCode, res.body).toBe(200);
+    const streets = res.json().route.maneuvers.flatMap((m: { streetNames: string[] }) => m.streetNames);
+    expect(streets).toContain("Back Street");
+    expect(streets).not.toContain("High Road");
+  });
+
+  it("drives you to their track first, as one route with one arrival", async () => {
+    const res = await follow("main_west", backStreet(1, 3));
+    expect(res.statusCode, res.body).toBe(200);
+    const { route } = res.json() as { route: Plan["standard"] };
+    expect(route.distanceM).toBeGreaterThan(550);
+    expect(route.maneuvers.filter((m) => [4, 5, 6].includes(m.type))).toHaveLength(1);
+    expect(route.maneuvers.at(-1)!.endShapeIndex).toBe(route.shape.length - 1);
+  });
+
+  it("won't follow them the wrong way down a one-way street", async () => {
+    // Buses may go west along Contraflow Street; the police route may not.
+    const res = await follow("contraflow_east_end", drive(lngLat("contraflow_east_end"), lngLat("contraflow_west_end")));
+    expect(res.statusCode, res.body).toBe(422);
+    expect(res.json().error).toBe("follow-refused");
+  });
+});
+
+describe("standard route on its own", () => {
+  it("comes back without the blue-light work, for showing straight away", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/routes",
+      payload: { from: at("gate_west_end"), to: at("gate_east_end"), standardOnly: true },
+    });
+    const result = res.json() as Plan;
+    expect(result.standard.distanceM).toBeGreaterThan(0);
+    expect(result.police).toBeNull();
+    expect(result.noPoliceReason).toBe("not-checked");
   });
 });
 

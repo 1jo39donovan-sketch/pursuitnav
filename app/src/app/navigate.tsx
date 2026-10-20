@@ -5,15 +5,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { fetchRoutes } from "../api/routes";
+import { fetchRoutes, restrictionPoints, type RoutePlan } from "../api/routes";
+import { fetchFollow } from "../api/teams";
+import { queueSamples } from "../learning/queue";
+import { wayTimes, type Observation } from "../learning/timing";
 import { GpsStatus } from "../components/GpsStatus";
 import { LiveMap } from "../components/LiveMap";
-import type { MapRoute } from "../components/mapShared";
+import { namedPoints, type MapRoute } from "../components/mapShared";
 import { formatDistance, formatDuration } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation } from "../navigation/NavigationProvider";
 import { nextCallout } from "../navigation/voice";
+import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
+import { useTeam } from "../team/TeamProvider";
 import {
   maneuverArrow,
   upcomingInstruction,
@@ -21,9 +26,23 @@ import {
   offRouteCount,
   prepare,
   progressAt,
+  type PreparedRoute,
   type Progress,
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
+
+interface Timing {
+  prepared: PreparedRoute | null;
+  obs: Observation[];
+}
+
+/** Queues the road times measured on a route, and starts afresh on the next. */
+function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
+  if (t.prepared?.route.ways && t.obs.length > 1) {
+    queueSamples(wayTimes(t.prepared.route.ways, t.prepared.cumulative, t.obs));
+  }
+  return { prepared: next, obs: [] };
+}
 
 // While re-routing fails (no signal), try again this often.
 const RETRY_MS = 10000;
@@ -40,7 +59,9 @@ export default function NavigateScreen() {
   }, []);
   const { active, replan, stop } = useNavigation();
   const { fix } = useLocation();
-  const { vehicle, voice: voiceOn, setVoice, mapView } = useSession();
+  const { data, places } = useSearch();
+  const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive } = useSession();
+  const { mapPoints: teamMap } = useTeam();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
@@ -78,7 +99,15 @@ export default function NavigateScreen() {
     lastAttempt.current = Date.now();
     const controller = new AbortController();
     inFlight.current = controller;
-    fetchRoutes(routeOrigin(fix), active.destination, vehicle, controller.signal)
+    // A standard route only needs the quick request; a blue-light one the full check.
+    // Follow-in re-routes back onto the colleague's track, not to a fresh route.
+    const fresh: Promise<RoutePlan> = active.follow
+      ? fetchFollow(routeOrigin(fix), active.follow.track, vehicle, roads, controller.signal).then((f) => ({
+          standard: f.route,
+          police: f.route,
+        }))
+      : fetchRoutes(routeOrigin(fix), active.destination, vehicle, controller.signal, active.kind === "standard", roads);
+    fresh
       .then((plan) => {
         setFailed(false);
         replan(plan);
@@ -89,8 +118,19 @@ export default function NavigateScreen() {
       .finally(() => {
         if (inFlight.current === controller) inFlight.current = null;
       });
-  }, [active, fix, offRoute, replan, vehicle]);
+  }, [active, fix, offRoute, replan, vehicle, roads]);
   useEffect(() => () => inFlight.current?.abort(), []);
+
+  // Opt-in learning: time each road of this route while on it. Only way IDs
+  // and seconds are kept, on the phone, and sent hours later (learning/queue.ts).
+  const timing = useRef<Timing>({ prepared: null, obs: [] });
+  useEffect(() => {
+    if (!learning || demoDrive || !prepared) return;
+    if (timing.current.prepared !== prepared) timing.current = flushTiming(timing.current, prepared);
+    if (offRoute) timing.current = flushTiming(timing.current, null);
+    else if (progress && fix) timing.current.obs.push({ along: progress.along, at: fix.timestamp });
+  }, [learning, demoDrive, prepared, progress, offRoute, fix]);
+  useEffect(() => () => void flushTiming(timing.current, null), []);
 
   const end = () => {
     stop();
@@ -126,6 +166,17 @@ export default function NavigateScreen() {
     return () => clearTimeout(t);
   }, [confirmEnd]);
 
+  // Named blocks and estates round the destination, so the crew can find the right one.
+  const destLat = active?.destination.lat;
+  const destLng = active?.destination.lng;
+  const blockLabels = useMemo(
+    () =>
+      data.status === "ready" && places.status === "ready" && destLat != null && destLng != null
+        ? namedPoints(data.index.housingNear(destLat, destLng, 600))
+        : null,
+    [data, places, destLat, destLng],
+  );
+
   if (!active || !prepared) {
     return (
       <View style={[styles.screen, styles.empty]}>
@@ -141,8 +192,7 @@ export default function NavigateScreen() {
   const routeColor = isPolice ? colors.amber : colors.blue;
   const routes: MapRoute[] = [{ id: "nav", shape: active.route.shape, color: routeColor, dashed: isPolice }];
   const destination: [number, number] = [active.destination.lng, active.destination.lat];
-  const restrictionPoints: [number, number][] =
-    "restrictions" in active.route ? active.route.restrictions.map((r) => [r.location.lng, r.location.lat]) : [];
+  const restrictions = "restrictions" in active.route ? restrictionPoints(active.route) : [];
 
   const turnPanel = (
     <View style={[styles.turn, offRoute && styles.turnOff]}>
@@ -243,12 +293,18 @@ export default function NavigateScreen() {
           </View>
           <View style={styles.map}>
             <LiveMap
+              team={teamMap}
               view={mapView}
               viewControl
-              followZoom={17}
+              zoomControl
+              autoZoom
+              roadNames
+              vehicleArrow
+              followZoom={16.5}
               routes={routes}
               destination={destination}
-              restrictions={restrictionPoints}
+              restrictions={restrictions}
+              labels={blockLabels}
               compact
             />
           </View>
@@ -258,12 +314,17 @@ export default function NavigateScreen() {
           {turnPanel}
           <View style={styles.map}>
             <LiveMap
+              team={teamMap}
               view={mapView}
               viewControl
-              followZoom={17}
+              zoomControl
+              autoZoom
+              roadNames
+              followZoom={16.5}
               routes={routes}
               destination={destination}
-              restrictions={restrictionPoints}
+              restrictions={restrictions}
+              labels={blockLabels}
               compact
             />
           </View>

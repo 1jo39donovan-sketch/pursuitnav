@@ -5,6 +5,9 @@ import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, Vi
 import { API_URL, DEMO_MODE } from "../../config";
 
 import { BoroughPicker } from "../../components/BoroughPicker";
+import { Button } from "../../components/Button";
+import { TeamSection } from "../../components/TeamSection";
+import { serverLearns } from "../../learning/queue";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
@@ -29,7 +32,16 @@ export default function SessionScreen() {
     setVoice,
     mapTheme,
     setMapTheme,
+    roads,
+    setRoads,
+    learning,
+    setLearning,
   } = useSession();
+  // Offered only once the server takes it (switched on after the privacy steps).
+  const [canLearn, setCanLearn] = useState(false);
+  useEffect(() => {
+    void serverLearns().then(setCanLearn);
+  }, []);
   useEffect(() => {
     if (openedThisLaunch) return;
     openedThisLaunch = true;
@@ -37,7 +49,6 @@ export default function SessionScreen() {
     // Only on launch: later edits to the session shouldn't jump screens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [confirmingPolice, setConfirmingPolice] = useState(false);
   const { savedPlaces, deletePlace, places } = useSearch();
 
   return (
@@ -91,6 +102,36 @@ export default function SessionScreen() {
       </View>
 
       <View style={styles.field}>
+        <Text style={styles.label}>Roads</Text>
+        <View style={styles.chips}>
+          {(
+            [
+              ["main", "Prefer main roads"],
+              ["any", "Any roads"],
+            ] as const
+          ).map(([value, label]) => {
+            const on = roads === value;
+            return (
+              <Pressable
+                key={value}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                onPress={() => setRoads(value)}
+                style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.placeMeta}>
+          {roads === "main"
+            ? "Main roads usually have room to overtake and bus lanes to use; side streets have humps and parked cars."
+            : "Takes the shortest sensible way, side streets included, unless a main road is much quicker."}
+        </Text>
+      </View>
+
+      <View style={styles.field}>
         <Text style={styles.label}>Map and voice</Text>
         <View style={styles.toggleRow}>
           <Text style={[styles.placeName, styles.placeText]} nativeID="voice-label">
@@ -124,59 +165,25 @@ export default function SessionScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Blue-light routes · {policeRoutes ? "on" : "off"}</Text>
-        {policeRoutes ? (
-          <View style={styles.toggleRow}>
-            <Text style={[styles.placeMeta, styles.placeText]}>
-              Shown beside the standard route when meaningfully faster, with every bus lane, bus gate and turn
-              restriction it uses listed.
-            </Text>
-            <Pressable accessibilityRole="button" onPress={() => setPoliceRoutes(false)} hitSlop={8}>
-              <Text style={styles.remove}>Turn off</Text>
-            </Pressable>
-          </View>
-        ) : confirmingPolice ? (
-          <View style={styles.confirm}>
-            <Text style={styles.confirmText}>
-              Blue-light routes use bus lanes, bus gates and bus-only roads, and ignore turn restrictions such as no
-              right turn. They never go the wrong way down a one-way street. Only a police, fire or ambulance driver
-              using the emergency exemptions may follow them; anyone else would be breaking the law.
-            </Text>
-            <Text style={styles.confirmText}>
-              I drive for the police, fire or ambulance service, and I’ll only follow a blue-light route when the
-              exemptions apply and it’s safe to.
-            </Text>
-            <View style={styles.confirmButtons}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  setPoliceRoutes(true);
-                  setConfirmingPolice(false);
-                }}
-                style={[styles.smallButton, { backgroundColor: colors.amber }]}
-              >
-                <Text style={styles.smallButtonText}>I confirm</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setConfirmingPolice(false)}
-                style={[styles.smallButton, styles.smallButtonOutline]}
-              >
-                <Text style={[styles.smallButtonText, { color: colors.fg }]}>Cancel</Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.toggleRow}>
-            <Text style={[styles.placeMeta, styles.placeText]}>
-              Off: you’ll get standard, fully legal routes only.
-            </Text>
-            <Pressable accessibilityRole="button" onPress={() => setConfirmingPolice(true)} hitSlop={8}>
-              <Text style={[styles.remove, { color: colors.amber }]}>Turn on</Text>
-            </Pressable>
-          </View>
-        )}
+        <View style={styles.toggleRow}>
+          <Text style={[styles.label, styles.placeText]} nativeID="bluelight-label">
+            Blue-light routes
+          </Text>
+          <Switch
+            accessibilityLabelledBy="bluelight-label"
+            value={policeRoutes}
+            onValueChange={setPoliceRoutes}
+            trackColor={{ false: colors.line, true: colors.amber }}
+          />
+        </View>
+        <Text style={styles.placeMeta}>
+          {policeRoutes
+            ? "Shown beside the standard route when meaningfully faster. They use bus lanes, bus gates and bus-only roads and ignore turn restrictions (never the wrong way down a one-way street), and list every restriction used. Only for police, fire and ambulance drivers using the emergency exemptions: you choose each time."
+            : "Off: standard, fully legal routes only."}
+        </Text>
       </View>
+
+      <TeamSection />
 
       <Pressable
         accessibilityRole="button"
@@ -197,11 +204,31 @@ export default function SessionScreen() {
                   {p.borough} · off {p.road}
                 </Text>
               </View>
-              <Pressable accessibilityRole="button" onPress={() => deletePlace(p.id)} hitSlop={8}>
-                <Text style={styles.remove}>Remove</Text>
-              </Pressable>
+              <Button label="Remove" variant="danger" onPress={() => deletePlace(p.id)} />
             </View>
           ))}
+        </View>
+      )}
+
+      {(canLearn || learning) && (
+        <View style={styles.field}>
+          <View style={styles.toggleRow}>
+            <Text style={[styles.label, styles.placeText]} nativeID="learning-label">
+              Help improve journey times
+            </Text>
+            <Switch
+              accessibilityLabelledBy="learning-label"
+              value={learning}
+              onValueChange={setLearning}
+              trackColor={{ false: colors.line, true: colors.amber }}
+            />
+          </View>
+          <Text style={styles.placeMeta}>
+            Off unless you turn it on. While you navigate, your phone times each road it drives along and later sends
+            only “this road took this long”: never your position, your route, where you started or stopped (the first
+            and last 500 m are left out), your callsign or anything about you. Times wait on your phone for at least 6
+            hours and go mixed with other drives. Turning this off deletes anything not yet sent.
+          </Text>
         </View>
       )}
 
@@ -226,13 +253,9 @@ export default function SessionScreen() {
       )}
 
       {API_URL !== "" && (
-        <View style={styles.confirmButtons}>
-          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${API_URL}/privacy`)} hitSlop={8}>
-            <Text style={styles.link}>Privacy</Text>
-          </Pressable>
-          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${API_URL}/support`)} hitSlop={8}>
-            <Text style={styles.link}>Help and support</Text>
-          </Pressable>
+        <View style={styles.linkRow}>
+          <Button label="Privacy" onPress={() => Linking.openURL(`${API_URL}/privacy`)} />
+          <Button label="Help and support" onPress={() => Linking.openURL(`${API_URL}/support`)} />
         </View>
       )}
 
@@ -298,16 +321,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   placeText: { flex: 1, minWidth: 0 },
-  confirm: { gap: 10, borderColor: colors.amber, borderWidth: 1, borderRadius: 10, padding: 12 },
-  confirmText: { color: colors.fg, fontFamily: fonts.body, fontSize: 15, lineHeight: 21 },
-  confirmButtons: { flexDirection: "row", gap: 10 },
-  smallButton: { borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16 },
-  smallButtonOutline: { borderColor: colors.line, borderWidth: 1 },
-  smallButtonText: { color: "#1a1200", fontFamily: fonts.displayBold, fontSize: 16, letterSpacing: 0.5 },
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   placeName: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   placeMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
-  remove: { color: colors.warn, fontFamily: fonts.bodyMedium, fontSize: 14 },
-  link: { color: colors.amber, fontFamily: fonts.bodyMedium, fontSize: 14, textDecorationLine: "underline" },
+  linkRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   attribution: { color: colors.muted, fontFamily: fonts.body, fontSize: 11, lineHeight: 16, opacity: 0.8 },
 });

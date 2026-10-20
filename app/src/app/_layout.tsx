@@ -20,6 +20,7 @@ import { LogProvider } from "../log/LogProvider";
 import { NavigationProvider } from "../navigation/NavigationProvider";
 import { SearchProvider } from "../search/SearchProvider";
 import { SessionProvider } from "../session/SessionProvider";
+import { TeamProvider } from "../team/TeamProvider";
 import { colors } from "../theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -49,13 +50,26 @@ export default function RootLayout() {
         <LogProvider>
           <SearchProvider>
             <LocationProvider>
-              <NavigationProvider>
-                <StatusBar style="light" />
-                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="navigate" options={{ gestureEnabled: false, animation: "slide_from_bottom" }} />
-                </Stack>
-              </NavigationProvider>
+              <TeamProvider>
+                <NavigationProvider>
+                  <StatusBar style="light" />
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: colors.bg },
+                    }}
+                  >
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen
+                      name="navigate"
+                      options={{
+                        gestureEnabled: false,
+                        animation: "slide_from_bottom",
+                      }}
+                    />
+                  </Stack>
+                </NavigationProvider>
+              </TeamProvider>
             </LocationProvider>
           </SearchProvider>
         </LogProvider>

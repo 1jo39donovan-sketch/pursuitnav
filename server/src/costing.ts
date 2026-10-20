@@ -25,6 +25,16 @@ export const VEHICLES: Record<VehicleType, Dimensions> = {
   fire: { height: 3.4, width: 2.55, length: 9.0, weight: 16.0 },
 };
 
+/**
+ * Main roads (the default) or any roads. Main roads are quicker on blue
+ * lights (room to overtake, bus lanes) and the map's travel speeds already
+ * favour them. "Any" weighs distance heavily too, so a shorter way through
+ * side streets wins unless a main road is much quicker.
+ */
+export const ROAD_CHOICES = ["main", "any"] as const;
+export type RoadChoice = (typeof ROAD_CHOICES)[number];
+const ANY_ROADS = { use_distance: 0.8 };
+
 export interface Costing {
   costing: "auto" | "bus";
   options: Readonly<Record<string, number | boolean>>;
@@ -34,8 +44,11 @@ const cache = new Map<string, Costing>();
 const once = (key: string, make: () => Costing) => cache.get(key) ?? cache.set(key, make()).get(key)!;
 
 /** Fully legal routing, avoiding height, width, length and weight limits the vehicle can't take. */
-export const standardFor = (vehicle: VehicleType): Costing =>
-  once(`standard:${vehicle}`, () => ({ costing: "auto", options: { ...VEHICLES[vehicle] } }));
+export const standardFor = (vehicle: VehicleType, roads: RoadChoice = "main"): Costing =>
+  once(`standard:${vehicle}:${roads}`, () => ({
+    costing: "auto",
+    options: { ...VEHICLES[vehicle], ...(roads === "any" ? ANY_ROADS : {}) },
+  }));
 
 /**
  * Bus costing so bus lanes, bus-only roads and bus gates are usable.
@@ -49,10 +62,15 @@ export const standardFor = (vehicle: VehicleType): Costing =>
  * - ignore_oneways: false keeps one-way streets one-way. Bus contraflow lanes
  *   are still open to bus costing; planRoutes() finds and removes those.
  */
-export const policeFor = (vehicle: VehicleType): Costing =>
-  once(`police:${vehicle}`, () => ({
+export const policeFor = (vehicle: VehicleType, roads: RoadChoice = "main"): Costing =>
+  once(`police:${vehicle}:${roads}`, () => ({
     costing: "bus",
-    options: { ignore_restrictions: true, ignore_oneways: false, ...VEHICLES[vehicle] },
+    options: {
+      ignore_restrictions: true,
+      ignore_oneways: false,
+      ...VEHICLES[vehicle],
+      ...(roads === "any" ? ANY_ROADS : {}),
+    },
   }));
 
 /**

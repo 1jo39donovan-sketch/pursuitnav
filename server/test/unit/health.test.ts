@@ -13,7 +13,7 @@ const config = (valhallaUrl: string) =>
 describe("GET /health", () => {
   it("is ok while the map data is still building", async () => {
     const res = await buildApp(config("http://127.0.0.1:1"), {} as Router).inject({ method: "GET", url: "/health" });
-    expect(res.json()).toEqual({ ok: true, routing: false, places: false });
+    expect(res.json()).toEqual({ ok: true, routing: false, places: false, learning: false });
   });
 
   it("says when routing is ready", async () => {

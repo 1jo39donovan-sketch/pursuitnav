@@ -15,7 +15,8 @@ import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import type { SavedPlace } from "../storage/types";
 import type { Borough } from "./boroughs";
-import { parsePostcodes, parseRoads } from "./data";
+import { fetchNewer, loadCached } from "./dataFiles";
+import { parsePostcodes, parseRoads, parseServerRoads } from "./data";
 import { SearchIndex, type AreaFilter, type Place, type SearchResults } from "./engine";
 import { starterEstatePlaces } from "./estates";
 import { loadText } from "./loadText";
@@ -39,7 +40,7 @@ interface SearchContextValue {
 }
 
 /** How far over a boundary a road or place still counts as in the officer's area. */
-const NEAR_AREA_M = 400;
+const NEAR_AREA_M = 500;
 
 const EMPTY: SearchResults = { inArea: [], outside: [] };
 const SearchContext = createContext<SearchContextValue | null>(null);
@@ -74,6 +75,30 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  // Roads the bundled list misses (mews, estate roads), from the server's
+  // weekly OpenStreetMap list: the copy kept on the phone, then any newer one.
+  const [extraRoads, setExtraRoads] = useState(0);
+  useEffect(() => {
+    if (data.status !== "ready") return;
+    let cancelled = false;
+    const use = (text: string | null) => {
+      if (!text || cancelled) return;
+      try {
+        const added = data.index.addRoads(parseServerRoads(text));
+        if (added) setExtraRoads((n) => n + added);
+      } catch {
+        // A bad file is ignored; the bundled roads still work.
+      }
+    };
+    (async () => {
+      use(await loadCached("roads"));
+      use(await fetchNewer("roads"));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
 
   // Named places: the copy kept on the phone first, then any newer one.
   useEffect(() => {
@@ -113,9 +138,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   }, [boroughs]);
   const search = useCallback(
     (query: string) => (data.status === "ready" ? data.index.search(query, area) : EMPTY),
-    // savedPlaces, places: results change when places are added or arrive, though the index object doesn't.
+    // savedPlaces, places, extraRoads: results change when they arrive, though the index object doesn't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, area, savedPlaces, places],
+    [data, area, savedPlaces, places, extraRoads],
   );
 
   const addPlace = useCallback((place: Omit<SavedPlace, "id">) => {

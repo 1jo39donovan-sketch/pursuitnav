@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { BOROUGHS, type Borough } from "../search/boroughs";
+import { clearQueue, uploadDue } from "../learning/queue";
 import { store } from "../storage/store";
 import { isVehicle, type VehicleType } from "../vehicles";
 
@@ -14,7 +15,7 @@ interface Session {
   /** Simulated drive in London instead of GPS (store reviewers, trying it out). */
   demoDrive: boolean;
   setDemoDrive: (on: boolean) => void;
-  /** The user has confirmed they drive under the emergency-vehicle exemptions; until then, standard routes only. */
+  /** Offer blue-light routes beside standard ones (on unless switched off). */
   policeRoutes: boolean;
   setPoliceRoutes: (on: boolean) => void;
   /** What's being driven; routes avoid limits it can't take. */
@@ -29,7 +30,15 @@ interface Session {
   /** Spoken turn-by-turn directions. */
   voice: boolean;
   setVoice: (on: boolean) => void;
+  /** Prefer main roads (room to overtake, bus lanes) or any roads (shorter, side streets). */
+  roads: RoadChoice;
+  setRoads: (r: RoadChoice) => void;
+  /** Opt-in: time roads on drives to improve journey times (off unless turned on). */
+  learning: boolean;
+  setLearning: (on: boolean) => void;
 }
+
+export type RoadChoice = "main" | "any";
 
 export type MapTheme = "night" | "day";
 export type MapView = "north" | "heading" | "3d";
@@ -72,7 +81,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     store.setSetting("demoDrive", on ? "1" : "0");
   }, []);
 
-  const [policeRoutes, setPoliceRoutesState] = useState(() => store.getSetting("policeRoutes") === "1");
+  // On unless turned off: the operator chooses standard or blue light each time anyway.
+  const [policeRoutes, setPoliceRoutesState] = useState(() => store.getSetting("policeRoutes") !== "0");
   const setPoliceRoutes = useCallback((on: boolean) => {
     setPoliceRoutesState(on);
     store.setSetting("policeRoutes", on ? "1" : "0");
@@ -92,7 +102,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // "voice" was first stored by the navigation screen as "1"/"0".
   const [voiceSetting, setVoiceSetting] = useSetting<"1" | "0">("voice", ["1", "0"], "1");
   const voice = voiceSetting === "1";
+  const [roads, setRoads] = useSetting<RoadChoice>("roads", ["main", "any"], "main");
   const setVoice = useCallback((on: boolean) => setVoiceSetting(on ? "1" : "0"), [setVoiceSetting]);
+  const [learningSetting, setLearningSetting] = useSetting<"1" | "0">("learning", ["1", "0"], "0");
+  const learning = learningSetting === "1";
+  // Sends road times that have waited long enough: at launch, then every half hour.
+  useEffect(() => {
+    if (!learning) return;
+    void uploadDue();
+    const t = setInterval(() => void uploadDue(), 30 * 60_000);
+    return () => clearInterval(t);
+  }, [learning]);
+  const setLearning = useCallback(
+    (on: boolean) => {
+      setLearningSetting(on ? "1" : "0");
+      // Turning it off also deletes anything not yet sent.
+      if (!on) clearQueue();
+    },
+    [setLearningSetting],
+  );
 
   const setCallsign = useCallback((value: string) => {
     setCallsignState(value);
@@ -131,8 +159,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapView,
       voice,
       setVoice,
+      roads,
+      setRoads,
+      learning,
+      setLearning,
     }),
     [
+      learning,
+      setLearning,
       callsign,
       boroughs,
       setCallsign,
@@ -150,6 +184,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapView,
       voice,
       setVoice,
+      roads,
+      setRoads,
     ],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

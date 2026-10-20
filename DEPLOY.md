@@ -62,6 +62,7 @@ Add secret `ANDROID_KEYSTORE_PASSWORD`: a long random password (a password manag
 
 - Secret `OS_PLACES_KEY`: door-level addresses (needed for "54 Caledonian Road" to route to the door). From [osdatahub.os.uk](https://osdatahub.os.uk): create a project with the OS Places API. Check the free allowance and licence terms there.
 - Variable `CONTACT_EMAIL`: shown on the privacy and support pages the app stores link to (STORE.md).
+- Secret `TFL_APP_KEY` (optional): live road closures work without it, but TfL may throttle the server. Free from [api-portal.tfl.gov.uk](https://api-portal.tfl.gov.uk): sign up, then Products → subscribe to the free one, and copy the primary key. On a server that already exists, add `TFL_APP_KEY=...` to `/opt/blue-route/server/.env` instead and run `docker compose up -d` in that folder.
 - Secret `SSH_PUBLIC_KEY`: your SSH public key, to log into the server yourself. Without it Hetzner emails you a root password.
 
 ## 6. Run it

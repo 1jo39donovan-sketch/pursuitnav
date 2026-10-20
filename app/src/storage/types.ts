@@ -9,8 +9,8 @@ export interface SavedPlace {
   lng: number;
 }
 
-/** How the officer went: in-app route, or handed to another app. */
-export type LoggedRoute = "standard" | "police" | "google-maps" | "waze";
+/** How the officer went: in-app route (follow: a colleague's way in), or handed to another app. */
+export type LoggedRoute = "standard" | "police" | "follow" | "google-maps" | "waze";
 
 /** One search and what came of it. Kept until the officer clears the log. */
 export interface LogEntry {

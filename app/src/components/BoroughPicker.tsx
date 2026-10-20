@@ -1,15 +1,25 @@
 // The operating area on Session: a one-line summary once chosen, opening
-// to the boroughs grouped by Met command area. Tapping an area's name
+// to the boroughs grouped by Met BCU (Basic Command Unit). Tapping an area's name
 // selects (or clears) all of its boroughs; each borough can be set alone.
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { boroughAt } from "../area/area";
 import { useLocation } from "../location/LocationProvider";
-import { BOROUGH_GROUPS } from "../search/boroughGroups";
+import { BOROUGH_GROUPS, LONDON_AREAS } from "../search/boroughGroups";
 import { BOROUGHS, type Borough } from "../search/boroughs";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { Button } from "./Button";
+
+/** "All London", "North London", or the boroughs by name. */
+function summary(chosen: readonly Borough[]): string {
+  if (!chosen.length) return "None chosen: every search result shows as outside your area.";
+  if (chosen.length === BOROUGHS.length) return "All London";
+  const same = (list: Borough[]) => list.length === chosen.length && list.every((b) => chosen.includes(b));
+  const area = LONDON_AREAS.find((a) => same(a.boroughs));
+  return area ? `${area.name} London (${chosen.length} boroughs)` : chosen.join(" · ");
+}
 
 export function BoroughPicker() {
   const { boroughs, toggleBorough, setBoroughs } = useSession();
@@ -27,35 +37,25 @@ export function BoroughPicker() {
     <View style={styles.field}>
       <View style={styles.headRow}>
         <Text style={styles.label}>Operating area</Text>
-        <Pressable accessibilityRole="button" onPress={() => setOpen(!open)} hitSlop={10} style={styles.toggle}>
-          <Text style={styles.toggleText}>{open ? "Done" : "Change"}</Text>
-        </Pressable>
+        <Button label={open ? "Done" : "Change"} variant={open ? "primary" : "secondary"} onPress={() => setOpen(!open)} />
       </View>
       <Text style={[styles.summary, !inOrder.length && styles.summaryEmpty]}>
-        {inOrder.length ? inOrder.join(" · ") : "None chosen: every search result shows as outside your area."}
+        {summary(inOrder)}
       </Text>
 
       {open && (
         <View style={styles.list}>
+          <Text style={styles.subLabel}>Big areas (replace what’s picked)</Text>
           <View style={styles.quickRow}>
-            {here && !chosen.has(here) && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => toggleBorough(here)}
-                style={({ pressed }) => [styles.quick, pressed && styles.pressed]}
-              >
-                <Text style={styles.quickText}>+ Where I am ({here})</Text>
-              </Pressable>
-            )}
-            {inOrder.length > 0 && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setBoroughs([])}
-                style={({ pressed }) => [styles.quick, pressed && styles.pressed]}
-              >
-                <Text style={[styles.quickText, { color: colors.warn }]}>Clear all</Text>
-              </Pressable>
-            )}
+            <Button label="All London" variant="primary" onPress={() => setBoroughs([...BOROUGHS])} />
+            {LONDON_AREAS.map((a) => (
+              <Button key={a.name} label={a.name} onPress={() => setBoroughs(a.boroughs)} />
+            ))}
+          </View>
+          <Text style={styles.subLabel}>Or by BCU and borough</Text>
+          <View style={styles.quickRow}>
+            {here && !chosen.has(here) && <Button label={`+ Where I am (${here})`} onPress={() => toggleBorough(here)} />}
+            {inOrder.length > 0 && <Button label="Clear all" variant="danger" onPress={() => setBoroughs([])} />}
           </View>
 
           {BOROUGH_GROUPS.map((g) => {
@@ -73,6 +73,7 @@ export function BoroughPicker() {
                   <View style={[styles.box, all && styles.boxOn, count > 0 && !all && styles.boxSome]}>
                     <Text style={styles.tick}>{all ? "✓" : count ? "–" : ""}</Text>
                   </View>
+                  {g.code !== "" && <Text style={styles.code}>{g.code}</Text>}
                   <Text style={styles.groupName}>{g.name}</Text>
                   {g.boroughs.length > 1 && (
                     <Text style={styles.count}>
@@ -117,15 +118,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: "uppercase",
   },
-  toggle: { paddingVertical: 4, paddingHorizontal: 8 },
-  toggleText: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 15 },
   summary: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 17, lineHeight: 23 },
   summaryEmpty: { color: colors.amber, fontFamily: fonts.body, fontSize: 15 },
   list: { gap: 8, marginTop: 4 },
+  subLabel: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, marginTop: 4 },
   quickRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  quick: { borderColor: colors.line, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },
-  quickText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 14 },
-  pressed: { opacity: 0.7 },
   group: { borderColor: colors.line, borderWidth: 1, borderRadius: 10, padding: 10, gap: 8 },
   groupOn: { borderColor: colors.blue },
   groupHead: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 32 },
@@ -141,6 +138,16 @@ const styles = StyleSheet.create({
   boxOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   boxSome: { borderColor: colors.blue },
   tick: { color: "#ffffff", fontFamily: fonts.bodySemiBold, fontSize: 15, lineHeight: 17 },
+  code: {
+    color: colors.amber,
+    fontFamily: fonts.mono,
+    fontSize: 13,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
   groupName: { flex: 1, color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 18 },
   count: { color: colors.muted, fontFamily: fonts.mono, fontSize: 12 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 34 },

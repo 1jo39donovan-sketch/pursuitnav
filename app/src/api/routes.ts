@@ -2,6 +2,7 @@
 import type { LngLat } from "@maplibre/maplibre-react-native";
 
 import { API_URL, DEMO_MODE } from "../config";
+import type { RoadChoice } from "../session/SessionProvider";
 import type { VehicleType } from "../vehicles";
 
 export interface Maneuver {
@@ -19,12 +20,16 @@ export interface Route {
   distanceM: number;
   shape: LngLat[];
   maneuvers: Maneuver[];
+  /** OpenStreetMap ways along the route by shape index, for timing roads (opt-in learning). */
+  ways?: { wayId: number; beginShapeIndex: number; endShapeIndex: number }[];
 }
 
 export interface Restriction {
   kind: "turn" | "bus-only" | "manoeuvre" | "wrong-way";
   description: string;
   location: { lat: number; lng: number };
+  /** Every place it applies (older servers don't send this: use location). */
+  locations?: { lat: number; lng: number }[];
   streets: string[];
 }
 
@@ -39,7 +44,11 @@ export type NoPoliceReason =
   | "no-restrictions-found"
   | "wrong-way-unavoidable"
   | "vehicle-limit-unavoidable"
-  | "not-declared";
+  | "not-declared"
+  /** Only the standard route was asked for (blue-light routes off, or still being worked out). */
+  | "not-checked"
+  /** The blue-light check failed (no signal, server busy); the standard route stands. */
+  | "check-failed";
 
 /** The plan as shown to someone who hasn't confirmed they drive for an emergency service: standard only. */
 export function withoutPolice(plan: RoutePlan): RoutePlan {
@@ -50,6 +59,8 @@ export interface RoutePlan {
   standard: Route;
   police: PoliceRoute | null;
   noPoliceReason?: NoPoliceReason;
+  /** Live TfL full closures the routes keep clear of (absent if the server doesn't check). */
+  closures?: { active: number; updatedAt?: string; ignored: boolean };
 }
 
 export class RouteError extends Error {}
@@ -69,6 +80,9 @@ export async function fetchRoutes(
   /** Routes avoid limits this vehicle can't take. */
   vehicle: VehicleType,
   signal?: AbortSignal,
+  /** Just the standard route: quick, for showing while the blue-light one is worked out. */
+  standardOnly = false,
+  roads: RoadChoice = "main",
 ): Promise<RoutePlan> {
   if (!API_URL) {
     throw new RouteError(
@@ -82,7 +96,7 @@ export async function fetchRoutes(
     res = await fetch(`${API_URL}/v1/routes`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ from, to, vehicle }),
+      body: JSON.stringify({ from, to, vehicle, roads, ...(standardOnly ? { standardOnly } : {}) }),
       signal,
     });
   } catch (err) {
@@ -94,4 +108,11 @@ export async function fetchRoutes(
     throw new RouteError(MESSAGES[body.error ?? ""] ?? `Routing failed (${res.status}).`);
   }
   return (await res.json()) as RoutePlan;
+}
+
+/** Map points for a route's restrictions: one "R" per place. */
+export function restrictionPoints(route: { restrictions: Restriction[] } | null | undefined): [number, number][] {
+  return (route?.restrictions ?? []).flatMap((r) =>
+    (r.locations?.length ? r.locations : [r.location]).map((p) => [p.lng, p.lat] as [number, number]),
+  );
 }

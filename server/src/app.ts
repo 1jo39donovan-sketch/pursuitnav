@@ -2,15 +2,19 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 
 import cors from "@fastify/cors";
-import Fastify, { LogController, type FastifyInstance } from "fastify";
+import Fastify, { LogController, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 
+import type { ClosureAwareRoute, ClosureFeed } from "./closures.js";
 import type { ServerConfig } from "./config.js";
-import { VEHICLE_TYPES, type VehicleType } from "./costing.js";
+import { BANDS, type LearningStore, type Sample } from "./learning.js";
+import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
 import { privacyPage, supportPage } from "./pages.js";
 import { PlacesError, type PlacesClient } from "./places.js";
+import { FollowWrongWayError, planFollow } from "./follow.js";
 import { NoSafeRouteError, planRoutes } from "./plan.js";
 import { pursuitInfo } from "./pursuit.js";
+import { MAX_BLOB_CHARS, NoSuchTeamError, TeamFullError, TeamStore, TeamTokenError } from "./teams.js";
 import { ValhallaError, type Matcher, type Router } from "./valhalla.js";
 
 const point = {
@@ -23,19 +27,61 @@ const point = {
   },
 } as const;
 
+interface FollowBody {
+  from: { lat: number; lng: number; heading?: number };
+  /** Their track as [lng, lat], oldest first, ending where they are. */
+  track: number[][];
+  vehicle?: VehicleType;
+  roads?: RoadChoice;
+}
+
 interface RoutesBody {
   /** heading: direction of travel in degrees, when moving, so the route starts that way. */
   from: { lat: number; lng: number; heading?: number };
   to: { lat: number; lng: number };
   /** What's being driven; routes avoid limits it can't take. Defaults to a car. */
   vehicle?: VehicleType;
+  /** Only the standard route (quick), for showing while the full plan is worked out. */
+  standardOnly?: boolean;
+  /** Prefer main roads (default) or any roads. */
+  roads?: RoadChoice;
 }
+
+function routeError(err: unknown, req: FastifyRequest, reply: FastifyReply) {
+  if (err instanceof NoSafeRouteError) {
+    return reply.code(422).send({ error: "no-safe-route", message: err.message });
+  }
+  if (err instanceof ValhallaError) {
+    if (err.code === 442) {
+      return reply.code(422).send({ error: "no-route", message: "No route between these points." });
+    }
+    if (err.code === 171) {
+      return reply.code(422).send({ error: "no-road-near", message: "No road found near one of the points." });
+    }
+    req.log.error({ status: err.httpStatus, code: err.code }, "routing engine error");
+    return reply.code(503).send({ error: "routing-unavailable", message: "Routing is unavailable. Try again." });
+  }
+  throw err;
+}
+
+const teamId = { type: "string", pattern: "^[0-9a-f]{32}$" } as const;
+const teamParams = {
+  type: "object",
+  required: ["teamId", "memberId"],
+  properties: { teamId, memberId: teamId },
+} as const;
+const token = { type: "string", minLength: 32, maxLength: 64 } as const;
 
 export function buildApp(
   config: ServerConfig,
   router: Router,
   places?: PlacesClient,
   matcher?: Matcher,
+  /** Live road closures; the router passed in already avoids them. */
+  closures?: Pick<ClosureFeed, "summary">,
+  teams: TeamStore = new TeamStore(),
+  /** Opt-in learning totals; uploads are refused without it. */
+  learning?: LearningStore,
 ): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
@@ -46,7 +92,7 @@ export function buildApp(
 
   // The phone app doesn't need CORS; the browser preview of the app does.
   // There are no cookies or credentials to protect.
-  app.register(cors, { origin: true, methods: ["GET", "POST"] });
+  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"] });
 
   const inBounds = ({ lat, lng }: { lat: number; lng: number }) => {
     const [west, south, east, north] = config.bounds;
@@ -62,7 +108,13 @@ export function buildApp(
     const places = await stat(config.placesFile)
       .then(() => true)
       .catch(() => false);
-    return { ok: true, routing, places };
+    return {
+      ok: true,
+      routing,
+      places,
+      learning: Boolean(learning),
+      ...(closures ? { closures: closures.summary().active } : {}),
+    };
   });
 
   // Linked from the app and the store listings.
@@ -87,33 +139,25 @@ export function buildApp(
             },
             to: point,
             vehicle: { type: "string", enum: [...VEHICLE_TYPES] },
+            standardOnly: { type: "boolean" },
+            roads: { type: "string", enum: [...ROAD_CHOICES] },
           },
         },
       },
     },
     async (req, reply) => {
-      const { from, to, vehicle } = req.body;
+      const { from, to, vehicle, standardOnly, roads } = req.body;
       if (!inBounds(from) || !inBounds(to)) {
         return reply.code(422).send({ error: "outside-area", message: "Both points must be in the covered area." });
       }
       const toLngLat = (p: { lat: number; lng: number }): LngLat => [p.lng, p.lat];
       try {
-        return await planRoutes(router, toLngLat(from), toLngLat(to), config, from.heading, vehicle);
+        const plan = await planRoutes(router, toLngLat(from), toLngLat(to), { ...config, standardOnly, roads }, from.heading, vehicle);
+        if (!closures) return plan;
+        const ignored = [plan.standard, plan.police].some((r) => (r as ClosureAwareRoute | null)?.closuresIgnored);
+        return { ...plan, closures: { ...closures.summary(), ignored } };
       } catch (err) {
-        if (err instanceof NoSafeRouteError) {
-          return reply.code(422).send({ error: "no-safe-route", message: err.message });
-        }
-        if (err instanceof ValhallaError) {
-          if (err.code === 442) {
-            return reply.code(422).send({ error: "no-route", message: "No route between these points." });
-          }
-          if (err.code === 171) {
-            return reply.code(422).send({ error: "no-road-near", message: "No road found near one of the points." });
-          }
-          req.log.error({ status: err.httpStatus, code: err.code }, "routing engine error");
-          return reply.code(503).send({ error: "routing-unavailable", message: "Routing is unavailable. Try again." });
-        }
-        throw err;
+        return routeError(err, req, reply);
       }
     },
   );
@@ -185,20 +229,166 @@ export function buildApp(
 
   // Every named place in London for the app's offline place search. Public
   // OpenStreetMap data: the request carries nothing about the officer.
-  app.get("/v1/places-data", async (req, reply) => {
-    const info = await stat(config.placesFile).catch(() => null);
-    if (!info) {
-      return reply.code(503).send({ error: "places-not-ready", message: "Place data hasn't been built yet." });
-    }
-    const etag = `"${info.size.toString(36)}-${Math.floor(info.mtimeMs).toString(36)}"`;
-    reply.header("etag", etag).header("last-modified", info.mtime.toUTCString()).header("cache-control", "no-cache");
-    if (req.headers["if-none-match"] === etag) return reply.code(304).send();
-    return reply
-      .header("content-type", "text/plain; charset=utf-8")
-      .header("content-encoding", "gzip")
-      .header("content-length", info.size)
-      .send(createReadStream(config.placesFile));
-  });
+  // Data files the app keeps a copy of for searching with no signal. Sent
+  // gzipped as built, with an ETag so an unchanged file isn't sent again.
+  const dataFile = (path: string | undefined, notReady: string, what: string) =>
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      const info = path ? await stat(path).catch(() => null) : null;
+      if (!path || !info) return reply.code(503).send({ error: notReady, message: `${what} hasn't been built yet.` });
+      const etag = `"${info.size.toString(36)}-${Math.floor(info.mtimeMs).toString(36)}"`;
+      reply.header("etag", etag).header("last-modified", info.mtime.toUTCString()).header("cache-control", "no-cache");
+      if (req.headers["if-none-match"] === etag) return reply.code(304).send();
+      return reply
+        .header("content-type", "text/plain; charset=utf-8")
+        .header("content-encoding", "gzip")
+        .header("content-length", info.size)
+        .send(createReadStream(path));
+    };
+  app.get("/v1/places-data", dataFile(config.placesFile, "places-not-ready", "Place data"));
+  app.get("/v1/roads-data", dataFile(config.roadsFile, "roads-not-ready", "The road list"));
+
+  // Follow-in: the way a colleague drove, from here. Their track comes from the
+  // phone (decrypted there) and, like every request, isn't logged or kept.
+  app.post<{ Body: FollowBody }>(
+    "/v1/follow",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["from", "track"],
+          additionalProperties: false,
+          properties: {
+            from: {
+              ...point,
+              properties: { ...point.properties, heading: { type: "number", minimum: 0, maximum: 360 } },
+            },
+            track: {
+              type: "array",
+              minItems: 2,
+              maxItems: 600,
+              items: { type: "array", minItems: 2, maxItems: 2, items: { type: "number" } },
+            },
+            vehicle: { type: "string", enum: [...VEHICLE_TYPES] },
+            roads: { type: "string", enum: [...ROAD_CHOICES] },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { from, track, vehicle, roads } = req.body;
+      const points = track as LngLat[];
+      if (!inBounds(from) || points.some(([lng, lat]) => !inBounds({ lat, lng }))) {
+        return reply.code(422).send({ error: "outside-area", message: "Their track must be in the covered area." });
+      }
+      try {
+        return await planFollow(router, [from.lng, from.lat], points, { ...config, roads }, from.heading, vehicle);
+      } catch (err) {
+        if (err instanceof FollowWrongWayError) {
+          return reply.code(422).send({ error: "follow-refused", message: err.message });
+        }
+        // 443–445: the track couldn't be matched to the roads.
+        if (err instanceof ValhallaError && err.code !== undefined && err.code >= 443 && err.code <= 445) {
+          return reply.code(422).send({ error: "follow-refused", message: "Couldn't match their track to the roads." });
+        }
+        return routeError(err, req, reply);
+      }
+    },
+  );
+
+  // Opt-in learning: per-road times, never positions. Added to the totals and discarded.
+  app.post<{ Body: { segments: Sample[] } }>(
+    "/v1/learn",
+    {
+      bodyLimit: 400_000,
+      schema: {
+        body: {
+          type: "object",
+          required: ["segments"],
+          additionalProperties: false,
+          properties: {
+            segments: {
+              type: "array",
+              maxItems: 3000,
+              items: {
+                type: "object",
+                required: ["w", "s", "m", "b"],
+                additionalProperties: false,
+                properties: {
+                  w: { type: "integer", minimum: 1 },
+                  s: { type: "number", minimum: 2, maximum: 3600 },
+                  m: { type: "number", minimum: 30, maximum: 20000 },
+                  b: { type: "string", enum: [...BANDS] },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (!learning) return reply.code(404).send({ error: "learning-off", message: "Learning isn't switched on." });
+      return { added: learning.add(req.body.segments) };
+    },
+  );
+
+  // Team sessions. Blobs are sealed on the phones with a key the server never
+  // sees; the server keeps them in memory only, for at most a week.
+  app.get<{ Params: { teamId: string } }>(
+    "/v1/teams/:teamId",
+    { schema: { params: { type: "object", required: ["teamId"], properties: { teamId } } } },
+    async (req, reply) => {
+      try {
+        return teams.get(req.params.teamId);
+      } catch (err) {
+        if (err instanceof NoSuchTeamError) return reply.code(404).send({ error: "no-team", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  app.put<{ Params: { teamId: string; memberId: string }; Body: { token: string; blob: string } }>(
+    "/v1/teams/:teamId/members/:memberId",
+    {
+      bodyLimit: MAX_BLOB_CHARS + 1000,
+      schema: {
+        params: teamParams,
+        body: {
+          type: "object",
+          required: ["token", "blob"],
+          additionalProperties: false,
+          properties: { token, blob: { type: "string", minLength: 1, maxLength: MAX_BLOB_CHARS } },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        return teams.put(req.params.teamId, req.params.memberId, req.body.token, req.body.blob);
+      } catch (err) {
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
+        if (err instanceof TeamFullError) return reply.code(429).send({ error: "team-full", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  app.delete<{ Params: { teamId: string; memberId: string }; Body: { token: string } }>(
+    "/v1/teams/:teamId/members/:memberId",
+    {
+      schema: {
+        params: teamParams,
+        body: { type: "object", required: ["token"], additionalProperties: false, properties: { token } },
+      },
+    },
+    async (req, reply) => {
+      try {
+        teams.remove(req.params.teamId, req.params.memberId, req.body.token);
+        return { ok: true };
+      } catch (err) {
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
+        throw err;
+      }
+    },
+  );
 
   return app;
 }

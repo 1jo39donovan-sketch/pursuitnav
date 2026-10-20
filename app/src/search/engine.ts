@@ -55,6 +55,8 @@ export interface SearchResult {
   /** For named places: their type, e.g. "Coffee shop", shown as the tag. */
   placeType?: string;
   placeGroup?: PlaceGroup;
+  /** For road results: the road's name, for listing the blocks on it. */
+  road?: string;
 }
 
 /**
@@ -164,6 +166,93 @@ export class SearchIndex {
   pointsOfInterestIn(boroughs: ReadonlySet<Borough>, groups: ReadonlySet<PlaceGroup>): PointOfInterest[] {
     if (!boroughs.size || !groups.size) return [];
     return this.pois.filter((p) => boroughs.has(p.item.borough) && groups.has(p.item.group)).map((p) => p.item);
+  }
+
+  /**
+   * Adds roads the bundled list doesn't have (from the server's OpenStreetMap
+   * list: mews, estate roads, walkways). A road already listed in the same
+   * borough within a kilometre is skipped. Each new road gets the postcode
+   * district of its nearest postcode, so "NW1" lists it. Returns how many
+   * were added; calling again with a newer list only adds what's new.
+   */
+  addRoads(extra: Road[]): number {
+    const have = new Map<string, Road[]>();
+    for (const { item, norm } of this.roads) {
+      const key = `${norm}|${item.borough}`;
+      const list = have.get(key);
+      if (list) list.push(item);
+      else have.set(key, [item]);
+    }
+    let added = 0;
+    for (const road of extra) {
+      const norm = normalise(road.name);
+      const key = `${norm}|${road.borough}`;
+      const same = have.get(key);
+      if (same?.some((r) => distanceKm(r, road) < 1)) continue;
+      const nearest = this.nearestPostcode(road);
+      const item = { ...road, outcodes: nearest ? [nearest.postcode.split(" ")[0]!] : [] };
+      this.roads.push({ item, norm });
+      if (same) same.push(item);
+      else have.set(key, [item]);
+      added++;
+    }
+    return added;
+  }
+
+  private postcodeGrid: Map<string, PostcodePoint[]> | null = null;
+
+  private nearestPostcode(p: { lat: number; lng: number }): PostcodePoint | null {
+    const cell = (lat: number, lng: number) => `${Math.floor(lat * 100)}|${Math.floor(lng * 100)}`;
+    if (!this.postcodeGrid) {
+      this.postcodeGrid = new Map();
+      for (const pc of this.postcodes.values()) {
+        const k = cell(pc.lat, pc.lng);
+        const list = this.postcodeGrid.get(k);
+        if (list) list.push(pc);
+        else this.postcodeGrid.set(k, [pc]);
+      }
+    }
+    let best: PostcodePoint | null = null;
+    let bestKm = Infinity;
+    const [la, ln] = [Math.floor(p.lat * 100), Math.floor(p.lng * 100)];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        for (const pc of this.postcodeGrid.get(`${la + dy}|${ln + dx}`) ?? []) {
+          const d = distanceKm(p, pc);
+          if (d < bestKm) {
+            bestKm = d;
+            best = pc;
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  /** Named blocks and estates within `metres` of a point, nearest first (for map labels). */
+  housingNear(lat: number, lng: number, metres: number, limit = 150): PointOfInterest[] {
+    const km = metres / 1000;
+    return this.pois
+      .filter((p) => p.item.group === "housing" && Math.abs(p.item.lat - lat) < km / 111 && distanceKm(p.item, { lat, lng }) <= km)
+      .map((p) => p.item)
+      .sort((a, b) => distanceKm(a, { lat, lng }) - distanceKm(b, { lat, lng }))
+      .slice(0, limit);
+  }
+
+  /**
+   * Named blocks and estates on a road, by their address ("Smith House,
+   * 12 Holloway Road"), near the given point so a same-named road elsewhere
+   * doesn't count. For "which block?" when control gives only the road.
+   */
+  housingOnRoad(road: string, near: { lat: number; lng: number }, limit = 12): PointOfInterest[] {
+    const name = normalise(road);
+    if (name.length < 3) return [];
+    const words = new RegExp(`(^|\\s)${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`);
+    return this.pois
+      .filter((p) => p.item.group === "housing" && words.test(p.address) && distanceKm(p.item, near) < 2)
+      .map((p) => p.item)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, limit);
   }
 
   /** Named neighbourhoods and areas (Brixton, Angel…), for "generally towards". */
@@ -375,6 +464,7 @@ export class SearchIndex {
       kind: "road",
       precision: "road",
       score,
+      road: r.name,
     };
   }
 

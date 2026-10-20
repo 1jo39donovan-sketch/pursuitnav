@@ -1,12 +1,24 @@
-import { POLICE as TRACE, policeFor, standardFor, VEHICLES, type Costing, type VehicleType } from "./costing.js";
+import {
+  POLICE as TRACE,
+  policeFor,
+  standardFor,
+  VEHICLES,
+  type Costing,
+  type RoadChoice,
+  type VehicleType,
+} from "./costing.js";
 import { cumulativeDistances, pointAlong, type LngLat } from "./geo.js";
 import { detectRestrictions, type Restriction } from "./restrictions.js";
-import { ValhallaError, type Route, type Router, type TraceEdge, type Waypoint } from "./valhalla.js";
+import { ValhallaError, waysOf, type Route, type Router, type TraceEdge, type Waypoint } from "./valhalla.js";
 
 export interface PlanOptions {
   minSavingSeconds: number;
   minSavingFraction: number;
   restrictionCheckBudget: number;
+  /** Just the standard route, so the app can show it while the blue-light one is worked out. */
+  standardOnly?: boolean;
+  /** Prefer main roads (default) or any roads. */
+  roads?: RoadChoice;
 }
 
 export interface PoliceRoute extends Route {
@@ -24,7 +36,9 @@ export type NoPoliceReason =
   /** Couldn't find a version that stays out of contraflow lanes. */
   | "wrong-way-unavoidable"
   /** Couldn't find a version that avoids limits the vehicle can't take. */
-  | "vehicle-limit-unavoidable";
+  | "vehicle-limit-unavoidable"
+  /** Not looked for: the standard route was asked for on its own. */
+  | "not-checked";
 
 export interface Plan {
   standard: Route;
@@ -40,7 +54,7 @@ export interface Plan {
  * because Valhalla lets a route start or end on a road the vehicle may not
  * use, and the police costing ignores these limits altogether.
  */
-async function overLimits(router: Router, shape: LngLat[], edges: TraceEdge[], vehicle: VehicleType) {
+export async function overLimits(router: Router, shape: LngLat[], edges: TraceEdge[], vehicle: VehicleType) {
   if (!router.sizeLimitsAt || edges.length === 0) return [];
   const size = VEHICLES[vehicle];
   const cumulative = cumulativeDistances(shape);
@@ -102,17 +116,18 @@ export async function planRoutes(
   heading?: number,
   vehicle: VehicleType = "car",
 ): Promise<Plan> {
-  const STANDARD = standardFor(vehicle);
-  const POLICE = policeFor(vehicle);
+  const STANDARD = standardFor(vehicle, opts.roads);
+  const POLICE = policeFor(vehicle, opts.roads);
   const start = { point: from, heading };
   const end = { point: to };
   const [firstStandard, firstPolice] = await Promise.all([
     router.route({ costing: STANDARD, from: start, to: end }),
-    router.route({ costing: POLICE, from: start, to: end }),
+    opts.standardOnly ? null : router.route({ costing: POLICE, from: start, to: end }),
   ]);
   const safeStandard = await withinLimits(router, STANDARD, vehicle, start, end, [], firstStandard);
   if (!safeStandard) throw new NoSafeRouteError();
-  const standard = safeStandard.route;
+  const standard = { ...safeStandard.route, ways: waysOf(safeStandard.edges) };
+  if (!firstPolice) return { standard, police: null, noPoliceReason: "not-checked" };
 
   const worthIt = (r: Route) => {
     const saving = standard.durationS - r.durationS;
@@ -140,6 +155,7 @@ export async function planRoutes(
         standard,
         police: {
           ...police,
+          ways: waysOf(edges),
           savingS: standard.durationS - police.durationS,
           restrictions: detection.restrictions.map(({ excludePoints: _e, ...r }) => r),
           restrictionsComplete: detection.complete,
@@ -156,7 +172,7 @@ export async function planRoutes(
 
 /** No route avoids the limits the vehicle can't take. */
 export class NoSafeRouteError extends Error {
-  constructor() {
-    super("No route found that avoids low bridges and weight limits for this vehicle.");
+  constructor(message = "No route found that avoids low bridges and weight limits for this vehicle.") {
+    super(message);
   }
 }

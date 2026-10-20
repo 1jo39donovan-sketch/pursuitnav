@@ -16,8 +16,21 @@ export interface ServerConfig {
   osPlacesKey: string | undefined;
   /** Gzipped places file written by places/extract_places.py. */
   placesFile: string;
+  /** Gzipped named-roads file written by places/extract_roads.py. */
+  roadsFile?: string;
   /** Shown on the privacy and support pages; without it they point at GitHub issues. */
   contactEmail?: string;
+  /** Avoid TfL's live full road closures (default on; TFL_CLOSURES=0 turns it off). */
+  tflClosures?: boolean;
+  /** TfL API key: without one the feed still works but may be throttled. */
+  tflAppKey?: string;
+  /**
+   * Accept opt-in learning uploads (LEARNING=1). Off until the privacy steps in
+   * docs/ROADMAP.md are done; the app only offers the switch when it's on.
+   */
+  learning?: boolean;
+  /** Where learned totals and learned speeds are kept. */
+  learnedDir?: string;
 }
 
 // Greater London with a margin, matching the app's region config.
@@ -48,6 +61,11 @@ export function loadConfig(): ServerConfig {
     restrictionCheckBudget: num("RESTRICTION_CHECK_BUDGET", 150),
     osPlacesKey: process.env.OS_PLACES_KEY || undefined,
     placesFile: process.env.PLACES_FILE ?? "/data/places/places.txt.gz",
+    roadsFile: process.env.ROADS_FILE ?? "/data/places/roads.txt.gz",
     contactEmail: process.env.CONTACT_EMAIL || undefined,
+    tflClosures: process.env.TFL_CLOSURES !== "0",
+    tflAppKey: process.env.TFL_APP_KEY || undefined,
+    learning: process.env.LEARNING === "1",
+    learnedDir: process.env.LEARNED_DIR ?? "/data/learned",
   };
 }

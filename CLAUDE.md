@@ -96,9 +96,17 @@ Works in portrait and landscape, keeps the screen awake.
 
 Every search and the route picked is saved on the phone (SQLite): time, what was typed, the address chosen, standard or police route. **Never auto-clear.** Officers refer back to it later. Manual "Clear log" with an in-app confirmation.
 
+## Live road closures
+
+The server polls TfL's road disruption feed every 5 minutes and both routes avoid roads TfL lists as fully closed (Valhalla `exclude_polygons`). Closures by the start or destination are left to the officer; if no route avoids them all, the route is found without them and the app says so. Nothing about officers is sent to TfL.
+
+## Team sessions
+
+Opt-in. An officer starts a team and shares its code; members see each other on the maps while the app is open, and can **follow in**: be routed to the nearest point of a colleague's recent track, then along it (map-matched with Valhalla `trace_route`). Follow-in lists restrictions like a blue-light route and refuses a track that goes the wrong way down a one-way street or under a limit the vehicle can't take. Shares are end-to-end encrypted with a key derived from the code; the server keeps only sealed blobs, in memory, for at most a week. Following force policy is the officer's responsibility; the app is upfront about what it does and doesn't do.
+
 ## Data handling
 
-Addresses from the control room stay on the phone. The server must not store request logs containing addresses or locations. Use HTTPS throughout.
+Addresses from the control room stay on the phone. The server must not store request logs containing addresses or locations. Use HTTPS throughout. Team-session data is the one thing the server holds, and only end-to-end encrypted, in memory.
 
 ## Learning (planned)
 
@@ -106,7 +114,7 @@ Blue Route should learn from real drives: opt-in, anonymised, totals per road on
 
 ## Out of scope for v1
 
-UK-wide coverage, CAD integration, sharing between officers, accounts or logins.
+UK-wide coverage, CAD integration, accounts or logins.
 
 ## Build order
 

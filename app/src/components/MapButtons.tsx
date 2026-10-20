@@ -8,7 +8,16 @@ import { colors, fonts } from "../theme";
 const VIEW_LABEL = { heading: "▲", "3d": "3D", north: "N" } as const;
 const VIEW_NAME = { heading: "Direction of travel up", "3d": "Tilted 3D view", north: "North up" } as const;
 
-export function MapButtons({ showView, top = 12 }: { showView: boolean; top?: number }) {
+export function MapButtons({
+  showView,
+  top = 12,
+  onZoom,
+}: {
+  showView: boolean;
+  top?: number;
+  /** With this, + and − buttons: +1 zooms in, −1 out. */
+  onZoom?: (step: 1 | -1) => void;
+}) {
   const { mapTheme, setMapTheme, mapView, setMapView } = useSession();
   const next = MAP_VIEWS[(MAP_VIEWS.indexOf(mapView) + 1) % MAP_VIEWS.length]!;
   return (
@@ -33,6 +42,18 @@ export function MapButtons({ showView, top = 12 }: { showView: boolean; top?: nu
         <Text style={styles.label}>{mapTheme === "night" ? "☀" : "☾"}</Text>
         <Text style={styles.caption}>{mapTheme === "night" ? "Day" : "Night"}</Text>
       </Pressable>
+      {onZoom &&
+        ([1, -1] as const).map((step) => (
+          <Pressable
+            key={step}
+            accessibilityRole="button"
+            accessibilityLabel={step === 1 ? "Zoom in" : "Zoom out"}
+            onPress={() => onZoom(step)}
+            style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+          >
+            <Text style={[styles.label, styles.zoom]}>{step === 1 ? "+" : "−"}</Text>
+          </Pressable>
+        ))}
     </View>
   );
 }
@@ -52,5 +73,6 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.7 },
   label: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 18, lineHeight: 20 },
+  zoom: { fontSize: 28, lineHeight: 30 },
   caption: { color: colors.muted, fontFamily: fonts.body, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5 },
 });

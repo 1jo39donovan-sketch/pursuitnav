@@ -44,6 +44,8 @@ if [ ! -s data/valhalla-next/valhalla_tiles.tar ]; then
   exit 1
 fi
 
+scripts/valhalla-limits.sh data/valhalla-next >/dev/null
+
 echo "$(date -Is) swapping in new tiles"
 rm -rf data/valhalla-prev
 [ -d data/valhalla ] && mv data/valhalla data/valhalla-prev

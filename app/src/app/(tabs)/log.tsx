@@ -9,6 +9,7 @@ import { colors, fonts } from "../../theme";
 const ROUTE_LABEL: Record<LoggedRoute, { text: string; color: string }> = {
   standard: { text: "STANDARD ROUTE", color: colors.blue },
   police: { text: "POLICE ROUTE", color: colors.amber },
+  follow: { text: "FOLLOWED IN", color: colors.amber },
   "google-maps": { text: "GOOGLE MAPS", color: colors.muted },
   waze: { text: "WAZE", color: colors.muted },
 };
