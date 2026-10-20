@@ -3,21 +3,20 @@ import { Tabs, useIsFocused } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
-import { fetchPursuitInfo, type PursuitInfo } from "../../api/pursuit";
+import { fetchPursuitInfo } from "../../api/pursuit";
 import { boroughAt, cardinal, generallyTowards } from "../../area/area";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import { namedPoints } from "../../components/mapShared";
 import { formatDistance } from "../../format";
 import { useLocation, type Fix } from "../../location/LocationProvider";
+import { EMPTY_FEED, feedNote, nextFeed, shownInfo } from "../../navigation/serverFeed";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { useTeam } from "../../team/TeamProvider";
 import { colors, fonts } from "../../theme";
 
 const POLL_MS = 1000;
-// Road and limit older than this are shown as unknown, not as last known.
-const STALE_MS = 10000;
 const TRACE_POINTS = 8;
 const TRACE_MAX_AGE_MS = 30000;
 // Below walking pace GPS course is noise.
@@ -56,34 +55,32 @@ export default function PursuitScreen() {
     setTrace({ fixes, course: moving ? fix.course : trace.course });
   }
 
-  // Road, limit and next junction from the server, every couple of seconds.
-  const [info, setInfo] = useState<{ value: PursuitInfo | null; stale: boolean }>({ value: null, stale: true });
+  // Road, limit and next junction from the server, about once a second. Each
+  // request gives up after 8 s (no signal) rather than hanging; answers older
+  // than 10 s are shown as "—", never as last known.
+  const [feed, setFeed] = useState(EMPTY_FEED);
+  const [now, setNow] = useState(() => Date.now());
   const traceRef = useRef(trace);
   useEffect(() => {
     traceRef.current = trace;
   }, [trace]);
   useEffect(() => {
     if (!focused) return;
-    let lastOk = 0;
     let busy = false;
     const controller = new AbortController();
     const tick = async () => {
+      setNow(Date.now());
       const { fixes, course } = traceRef.current;
-      if (!busy && fixes.length) {
-        busy = true;
-        const result = await fetchPursuitInfo(
-          fixes.map((f) => ({ lat: f.lat, lng: f.lng })),
-          course ?? undefined,
-          controller.signal,
-        );
-        busy = false;
-        if (result) {
-          lastOk = Date.now();
-          setInfo({ value: result, stale: false });
-          return;
-        }
-      }
-      if (Date.now() - lastOk > STALE_MS) setInfo((cur) => (cur.stale ? cur : { value: null, stale: true }));
+      if (busy || !fixes.length) return;
+      busy = true;
+      const lookup = await fetchPursuitInfo(
+        fixes.map((f) => ({ lat: f.lat, lng: f.lng })),
+        course ?? undefined,
+        controller.signal,
+      );
+      busy = false;
+      if (controller.signal.aborted) return;
+      setFeed((cur) => nextFeed(cur, lookup, Date.now()));
     };
     const timer = setInterval(tick, POLL_MS);
     return () => {
@@ -109,7 +106,7 @@ export default function PursuitScreen() {
   );
 
   const speed = fix?.speed != null ? Math.round(mph(fix.speed)) : null;
-  const pursuit = info.stale ? null : info.value;
+  const pursuit = shownInfo(feed, now);
   const limit = pursuit?.speedLimitMph ?? null;
   const over = speed != null && limit != null && speed > limit;
   const borough = fix ? boroughAt(fix.lat, fix.lng) : null;
@@ -183,9 +180,17 @@ export default function PursuitScreen() {
       </Text>
     </View>
   );
-  const serverNote = info.stale && fix && (
-    <Text style={styles.note}>Road, limit and junction need the Blue Route server. Showing “—” until it answers.</Text>
-  );
+  const note = fix ? feedNote(feed, now) : null;
+  const serverNote =
+    note &&
+    (note.noSignal ? (
+      <View style={styles.noSignal} accessibilityRole="alert">
+        <Text style={styles.noSignalTitle}>NO SIGNAL</Text>
+        <Text style={styles.noSignalText}>{note.text.replace(/^No signal: /, "")}</Text>
+      </View>
+    ) : (
+      <Text style={styles.note}>{note.text}</Text>
+    ));
 
   // Compact readouts in pairs, so the map gets most of the screen: the crew
   // read roads off it. Landscape puts them beside the map.
@@ -299,5 +304,17 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.amber,
   },
   note: { color: colors.muted, fontFamily: fonts.mono, fontSize: 11 },
+  noSignal: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  noSignalTitle: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 16, letterSpacing: 1 },
+  noSignalText: { flex: 1, color: colors.fg, fontFamily: fonts.body, fontSize: 13 },
   map: { flex: 1, minHeight: 140, borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth },
 });

@@ -4,6 +4,7 @@ import type { LngLat } from "@maplibre/maplibre-react-native";
 import { API_URL, DEMO_MODE } from "../config";
 import type { RoadChoice } from "../session/SessionProvider";
 import type { VehicleType } from "../vehicles";
+import { isNoSignal, serverJson } from "./http";
 
 export interface Maneuver {
   type: number;
@@ -65,6 +66,13 @@ export interface RoutePlan {
 
 export class RouteError extends Error {}
 
+/** No answer from the server within the timeout: no signal, or the server is down. */
+export class NoSignalRouteError extends RouteError {
+  constructor() {
+    super("No signal: can't reach the routing server. Check your signal and try again.");
+  }
+}
+
 const MESSAGES: Record<string, string> = {
   "outside-area": "That's outside the area Blue Route covers.",
   "no-route": "No route found to there.",
@@ -91,23 +99,23 @@ export async function fetchRoutes(
         : "Routing server not set up in this build.",
     );
   }
-  let res: Response;
+  let res: { ok: boolean; status: number; body: unknown };
   try {
-    res = await fetch(`${API_URL}/v1/routes`, {
+    res = await serverJson(`${API_URL}/v1/routes`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ from, to, vehicle, roads, ...(standardOnly ? { standardOnly } : {}) }),
       signal,
     });
   } catch (err) {
-    if ((err as Error).name === "AbortError") throw err;
-    throw new RouteError("Can't reach the routing server. Check your signal.");
+    if (isNoSignal(err)) throw new NoSignalRouteError();
+    throw err;
   }
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new RouteError(MESSAGES[body.error ?? ""] ?? `Routing failed (${res.status}).`);
+  if (!res.ok || !res.body) {
+    const error = (res.body as { error?: string } | null)?.error ?? "";
+    throw new RouteError(MESSAGES[error] ?? `Routing failed (${res.status}).`);
   }
-  return (await res.json()) as RoutePlan;
+  return res.body as RoutePlan;
 }
 
 /** Map points for a route's restrictions: one "R" per place. */
