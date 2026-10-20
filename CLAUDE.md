@@ -6,7 +6,7 @@
 
 A phone app for Met Police officers on patrol and in pursuits, widening to fire and ambulance crews. Officers currently use Google Maps, which doesn't understand borough boundaries, police routing or pursuit needs. Blue Route fixes that.
 
-Officers install it on their own phones and use it off their own back. It is not a force system. In a pursuit the **operator** (passenger) uses it and relays directions to the driver, so screens can be information-dense.
+Officers install it on their own phones and use it off their own back. It is not a force system. The passenger, the **operator**, normally runs the app and gives the driver directions, on the way to calls as well as in pursuits, so screens can be information-dense.
 
 Scope for v1 is **London only**. The whole UK comes next, then Ireland and beyond, so don't hard-code London where a config value would do. The plan is in `docs/ROADMAP.md`.
 
@@ -69,7 +69,7 @@ Origin is always the phone's **current GPS position**. Every search returns two 
 
 This allows bus lanes, bus-only roads and bus gates. **The police route must never travel the wrong way down a one-way street.** Check the Valhalla docs for the current option names and behaviour, and write tests that prove one-ways are respected.
 
-The police route (shown as "Blue light") is only shown when it is meaningfully faster, and only after the user declares on Session that they drive for the police, fire or ambulance service. It shows the time saved and lists each restricted manoeuvre or bus-only section it uses, with location (e.g. "No right turn: Upper Street into Islington Green"). Work out the best way to detect these, for example by matching the police route against `auto` costing. At minimum it must say how many restrictions it relies on. The operator chooses; the app never silently routes through a restriction.
+Blue-light routes are **on by default, by design** (a switch on Session turns them off). The police route (shown as "Blue light") is offered beside the standard route only when it is meaningfully faster, never instead of it: the standard route can still be picked for every journey. It shows the time saved and lists each restricted manoeuvre or bus-only section it uses, with location (e.g. "No right turn: Upper Street into Islington Green"). Work out the best way to detect these, for example by matching the police route against `auto` costing. At minimum it must say how many restrictions it relies on. The operator chooses; the app never silently routes through a restriction.
 
 Both routes also offer "Open in Google Maps" and "Open in Waze".
 
