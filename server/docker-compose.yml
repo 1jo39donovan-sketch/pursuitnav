@@ -27,6 +27,8 @@ services:
       - ./data/places:/data/places:ro
       # Opt-in learning totals and the learned speeds the weekly map build reads.
       - ./data/learned:/data/learned
+      # Usage counts (daily totals; hashed install IDs, deleted after 30 days).
+      - usage:/data/usage
     environment:
       VALHALLA_URL: http://valhalla:8002
       # Door-level address search; leave empty to run with road-level search only.
@@ -37,6 +39,8 @@ services:
       TFL_APP_KEY: ${TFL_APP_KEY:-}
       # 1 accepts opt-in learning uploads. Do the privacy steps in docs/ROADMAP.md first.
       LEARNING: ${LEARNING:-0}
+      # Bearer token for GET /stats (usage counts); /stats is off without it.
+      STATS_TOKEN: ${STATS_TOKEN:-}
 
   # Map tools (places list, travel speeds), run by scripts/build-map.sh and
   # scripts/build-places.sh, not by `docker compose up`.
@@ -62,5 +66,6 @@ services:
       - caddy_config:/config
 
 volumes:
+  usage:
   caddy_data:
   caddy_config:

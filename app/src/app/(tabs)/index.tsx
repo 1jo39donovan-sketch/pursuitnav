@@ -10,6 +10,7 @@ import { TeamSection } from "../../components/TeamSection";
 import { serverLearns } from "../../learning/queue";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
+import { currentInstallId, newInstallId } from "../../usage/usage";
 import { colors, fonts } from "../../theme";
 import { VEHICLES } from "../../vehicles";
 
@@ -252,6 +253,8 @@ export default function SessionScreen() {
         </View>
       )}
 
+      <UsageNote />
+
       {API_URL !== "" && (
         <View style={styles.linkRow}>
           <Button label="Privacy" onPress={() => Linking.openURL(`${API_URL}/privacy`)} />
@@ -270,6 +273,28 @@ export default function SessionScreen() {
         contributors (places and map).
       </Text>
     </ScrollView>
+  );
+}
+
+/** Exactly what usage counting sends, and a way to start again as a new install. */
+function UsageNote() {
+  const [id, setId] = useState(() => currentInstallId());
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>Usage data</Text>
+      <Text style={styles.placeMeta}>
+        To see how many crews use Blue Route, each request to the server carries a random install ID made on this phone
+        and the app version. The server counts, per day: installs, routes planned, navigation and pursuit sessions, and
+        requests that timed out or failed. Nothing else: no positions, addresses, searches or callsign. It keeps a
+        scrambled form of the ID for 30 days, then only the day&apos;s totals.
+      </Text>
+      <View style={styles.toggleRow}>
+        <Text style={[styles.placeMeta, styles.placeText]} selectable>
+          Install ID: {id.slice(0, 8)}…
+        </Text>
+        <Button label="Reset ID" onPress={() => setId(newInstallId())} />
+      </View>
+    </View>
   );
 }
 

@@ -106,7 +106,7 @@ Opt-in. An officer starts a team and shares its code; members see each other on 
 
 ## Data handling
 
-Addresses from the control room stay on the phone. The server must not store request logs containing addresses or locations. Use HTTPS throughout. Team-session data is the one thing the server holds, and only end-to-end encrypted, in memory.
+Addresses from the control room stay on the phone. The server must not store request logs containing addresses or locations. Use HTTPS throughout. Team-session data is the one thing the server holds, and only end-to-end encrypted, in memory. Usage counts (README, "Usage data") are daily totals only: a random install ID per phone (resettable) and the app version ride on each request, and are kept as salted hashes for 30 days to count unique installs. Never positions, addresses or searches, and no third-party analytics SDK.
 
 ## Learning (planned)
 

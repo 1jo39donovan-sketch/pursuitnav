@@ -167,7 +167,23 @@ On iPhone, use a 6.7" or 6.9" model if you can (otherwise Apple asks for that si
 
 ### Apple: App Privacy
 
-Answer **"Data Not Collected"**. The app sends positions and searched addresses to the Blue Route server only to answer each request in real time, and nothing is kept. Apple doesn't count real-time processing that isn't retained as collection. There's no tracking.
+Positions and searched addresses don't count as collected: the app sends them to the Blue Route server only to answer each request in real time, and nothing is kept. Apple doesn't count real-time processing that isn't retained as collection.
+
+Usage counts (README, "Usage data") do count. Answer:
+- **Identifiers → Device ID:** collected (the app's own random install ID, kept by the server as a salted hash for 30 days).
+  - Linked to the user: **No**.
+  - Used for tracking: **No**.
+  - Purpose: **Analytics**.
+- **Usage Data → Product Interaction:** collected (counts of routes planned, navigation and pursuit sessions).
+  - Linked to the user: **No**.
+  - Used for tracking: **No**.
+  - Purpose: **Analytics**.
+- **Diagnostics → Other Diagnostic Data:** collected (counts of timeouts and failed requests).
+  - Linked to the user: **No**.
+  - Used for tracking: **No**.
+  - Purpose: **Analytics**.
+
+There's no tracking.
 
 ### Google: Data safety
 
@@ -176,9 +192,12 @@ Answer **"Data Not Collected"**. The app sends positions and searched addresses 
   - Processed ephemerally: **Yes**.
   - Required: **Yes**.
   - Purpose: **App functionality**.
+- **Device or other IDs:** Collected, not shared. Purpose: **Analytics**. (The app's own random install ID, resettable in the app, kept as a salted hash for 30 days.)
+- **App activity → Other actions:** Collected, not shared. Purpose: **Analytics**. (Counts of routes planned, navigation and pursuit sessions.)
+- **App info and performance → Diagnostics:** Collected, not shared. Purpose: **Analytics**. (Counts of timeouts and failed requests.)
 - No other data types.
 - **Is all of the user data encrypted in transit?** Yes.
-- **Do you provide a way for users to request that their data is deleted?** Nothing is kept on the server. Data on the phone is deleted by clearing the log or uninstalling.
+- **Do you provide a way for users to request that their data is deleted?** The server keeps only daily usage totals, plus hashed install IDs for 30 days, after which they're deleted. Resetting the install ID in the app stops it being linked to the old one. Data on the phone is deleted by clearing the log or uninstalling.
 
 Other Play questions: **Ads:** No. **Government app:** No. **News app:** No. **Financial features:** None. **Health:** No.
 

@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 
@@ -15,6 +16,7 @@ import { FollowWrongWayError, planFollow } from "./follow.js";
 import { NoSafeRouteError, planRoutes } from "./plan.js";
 import { pursuitInfo } from "./pursuit.js";
 import { MAX_BLOB_CHARS, NoSuchTeamError, TeamFullError, TeamStore, TeamTokenError } from "./teams.js";
+import { APP_EVENTS, type UsageStore } from "./usage.js";
 import { ValhallaError, type Matcher, type Router } from "./valhalla.js";
 
 const point = {
@@ -45,6 +47,14 @@ interface RoutesBody {
   standardOnly?: boolean;
   /** Prefer main roads (default) or any roads. */
   roads?: RoadChoice;
+}
+
+/** Constant-time check of an "Authorization: Bearer <token>" header. */
+export function bearerMatches(header: string | undefined, token: string): boolean {
+  const given = /^Bearer (.+)$/i.exec(header ?? "")?.[1] ?? "";
+  // Compared as hashes, so the lengths match and nothing leaks through timing.
+  const digest = (v: string) => createHash("sha256").update(v).digest();
+  return given.length > 0 && timingSafeEqual(digest(given), digest(token));
 }
 
 function routeError(err: unknown, req: FastifyRequest, reply: FastifyReply) {
@@ -82,6 +92,8 @@ export function buildApp(
   teams: TeamStore = new TeamStore(),
   /** Opt-in learning totals; uploads are refused without it. */
   learning?: LearningStore,
+  /** Usage counts (no positions, no addresses); not counted without it. */
+  usage?: UsageStore,
 ): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
@@ -93,6 +105,26 @@ export function buildApp(
   // The phone app doesn't need CORS; the browser preview of the app does.
   // There are no cookies or credentials to protect.
   app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"] });
+
+  // Usage counts. Each request may carry the app's random install ID and its
+  // version; they're counted (hashed, by day) and nothing else about the
+  // request is kept. Plans and failures are counted by kind, never by content.
+  if (usage) {
+    app.addHook("onRequest", async (req) => {
+      const id = req.headers["x-install-id"];
+      const version = req.headers["x-app-version"];
+      usage.seen(typeof id === "string" ? id : undefined, typeof version === "string" ? version : undefined);
+    });
+    app.addHook("onResponse", async (req, reply) => {
+      const path = req.routeOptions.url;
+      if (reply.statusCode >= 500) usage.add("server_errors");
+      if (path !== "/v1/routes" && path !== "/v1/follow") return;
+      if (reply.statusCode === 422) usage.add("route_failures");
+      // The app asks for the standard route alone first, then the full plan: count the plan once.
+      const quick = (req.body as { standardOnly?: boolean } | undefined)?.standardOnly === true;
+      if (reply.statusCode === 200 && !quick) usage.add("routes_planned");
+    });
+  }
 
   const inBounds = ({ lat, lng }: { lat: number; lng: number }) => {
     const [west, south, east, north] = config.bounds;
@@ -330,6 +362,45 @@ export function buildApp(
       return { added: learning.add(req.body.segments) };
     },
   );
+
+  // Events only the app sees (a navigation or pursuit session starting, a
+  // request that timed out). Counts only.
+  app.post<{ Body: { events: Record<string, number> } }>(
+    "/v1/usage",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["events"],
+          additionalProperties: false,
+          properties: {
+            events: {
+              type: "object",
+              additionalProperties: false,
+              properties: Object.fromEntries(
+                Object.keys(APP_EVENTS).map((e) => [e, { type: "integer", minimum: 0, maximum: 1000 }]),
+              ),
+            },
+          },
+        },
+      },
+    },
+    async (req) => {
+      for (const [event, n] of Object.entries(req.body.events)) usage?.add(APP_EVENTS[event]!, n);
+      return { ok: true };
+    },
+  );
+
+  // The counts, for whoever runs the server: Authorization: Bearer <STATS_TOKEN>.
+  // Off (404) unless STATS_TOKEN is set.
+  const statsToken = config.statsToken;
+  app.get("/stats", async (req, reply) => {
+    if (!statsToken || !usage) return reply.code(404).send({ error: "not-found" });
+    if (!bearerMatches(req.headers.authorization, statsToken)) {
+      return reply.code(401).header("www-authenticate", "Bearer").send({ error: "unauthorized" });
+    }
+    return usage.stats();
+  });
 
   // Team sessions. Blobs are sealed on the phones with a key the server never
   // sees; the server keeps them in memory only, for at most a week.

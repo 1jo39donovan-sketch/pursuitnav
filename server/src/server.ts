@@ -2,6 +2,7 @@ import { buildApp } from "./app.js";
 import { avoidingClosures, ClosureFeed } from "./closures.js";
 import { loadConfig } from "./config.js";
 import { LearningStore } from "./learning.js";
+import { UsageStore } from "./usage.js";
 import { OsPlacesClient } from "./places.js";
 import { ValhallaClient } from "./valhalla.js";
 
@@ -15,7 +16,26 @@ const learning = config.learning ? new LearningStore(`${config.learnedDir}/total
 await learning?.load();
 const learnedCsv = `${config.learnedDir}/practical_speeds.csv`;
 setInterval(() => void learning?.save(learnedCsv).catch((err) => app.log.error(err)), 10 * 60_000).unref();
-const app = buildApp(config, router, places, valhalla, closures, undefined, learning);
+const usage = openUsage(config.usageDb);
+setInterval(() => {
+  try {
+    usage?.rollup();
+  } catch (err) {
+    app.log.error(err);
+  }
+}, 60 * 60_000).unref();
+const app = buildApp(config, router, places, valhalla, closures, undefined, learning, usage);
+
+/** The usage database; routing carries on without counts if it can't be opened. */
+function openUsage(file: string | undefined): UsageStore | undefined {
+  if (!file) return undefined;
+  try {
+    return new UsageStore(file);
+  } catch (err) {
+    console.error(`Usage counts are off: can't open ${file}: ${(err as Error).message}`);
+    return undefined;
+  }
+}
 
 app.listen({ port: config.port, host: config.host }).catch((err) => {
   app.log.error(err);

@@ -22,8 +22,11 @@ import { SearchProvider } from "../search/SearchProvider";
 import { SessionProvider } from "../session/SessionProvider";
 import { TeamProvider } from "../team/TeamProvider";
 import { colors } from "../theme";
+import { startUsage } from "../usage/usage";
 
 SplashScreen.preventAutoHideAsync();
+// Every request to the server carries the install ID and app version (usage counts).
+startUsage();
 
 export default function RootLayout() {
   // Fonts are bundled with the app, so this works with no signal.

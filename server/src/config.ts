@@ -31,6 +31,10 @@ export interface ServerConfig {
   learning?: boolean;
   /** Where learned totals and learned speeds are kept. */
   learnedDir?: string;
+  /** SQLite file for usage counts (daily totals, hashed install IDs for 30 days). */
+  usageDb?: string;
+  /** Bearer token for GET /stats; the endpoint is off without one. */
+  statsToken?: string;
 }
 
 // Greater London with a margin, matching the app's region config.
@@ -67,5 +71,7 @@ export function loadConfig(): ServerConfig {
     tflAppKey: process.env.TFL_APP_KEY || undefined,
     learning: process.env.LEARNING === "1",
     learnedDir: process.env.LEARNED_DIR ?? "/data/learned",
+    usageDb: process.env.USAGE_DB ?? "/data/usage/usage.sqlite",
+    statsToken: process.env.STATS_TOKEN || undefined,
   };
 }

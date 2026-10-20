@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NoSignalError, SERVER_TIMEOUT_MS, serverJson, serverRequest } from "../http";
+import { NoSignalError, SERVER_TIMEOUT_MS, serverJson, serverRequest, setClientHooks } from "../http";
 
 /** A fetch that never answers, like a phone in a dead spot. */
 const hangs = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
@@ -71,5 +71,34 @@ describe("serverRequest", () => {
     const res = await serverRequest("https://x", {}, async (r) => r, { fetchFn: answers("big file") });
     await vi.advanceTimersByTimeAsync(SERVER_TIMEOUT_MS * 2);
     expect(await res.text()).toBe('"big file"');
+  });
+});
+
+describe("usage hooks", () => {
+  afterEach(() => {
+    setClientHooks({});
+    vi.useRealTimers();
+  });
+
+  it("puts the install ID and app version on every request", async () => {
+    let sent: Record<string, string> = {};
+    const capture = (async (_url: string, init: RequestInit) => {
+      sent = init.headers as Record<string, string>;
+      return new Response("{}");
+    }) as unknown as typeof fetch;
+    setClientHooks({ headers: () => ({ "x-install-id": "a".repeat(32), "x-app-version": "1.0.0" }) });
+    await serverJson("https://x", { headers: { "content-type": "application/json" } }, { fetchFn: capture });
+    expect(sent).toEqual({ "x-install-id": "a".repeat(32), "x-app-version": "1.0.0", "content-type": "application/json" });
+  });
+
+  it("reports a timeout, but not for the usage report itself", async () => {
+    vi.useFakeTimers();
+    let timeouts = 0;
+    setClientHooks({ onNoSignal: () => timeouts++ });
+    const a = serverJson("https://x", {}, { fetchFn: hangs }).catch(() => {});
+    const b = serverJson("https://x", {}, { fetchFn: hangs, uncounted: true }).catch(() => {});
+    await vi.advanceTimersByTimeAsync(SERVER_TIMEOUT_MS);
+    await Promise.all([a, b]);
+    expect(timeouts).toBe(1);
   });
 });
