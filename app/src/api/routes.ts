@@ -20,6 +20,8 @@ export interface Route {
   distanceM: number;
   shape: LngLat[];
   maneuvers: Maneuver[];
+  /** OpenStreetMap ways along the route by shape index, for timing roads (opt-in learning). */
+  ways?: { wayId: number; beginShapeIndex: number; endShapeIndex: number }[];
 }
 
 export interface Restriction {

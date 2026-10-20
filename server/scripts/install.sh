@@ -111,6 +111,8 @@ else
 fi
 
 say "Starting Valhalla, the API and HTTPS"
+# The API runs as the node user (uid 1000) and writes learning totals here.
+mkdir -p data/learned && chown 1000:1000 data/learned
 docker compose up -d --build
 for i in $(seq 1 60); do
   if docker compose exec -T api wget -qO- http://valhalla:8002/status >/dev/null 2>&1; then

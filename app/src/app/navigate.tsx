@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchRoutes, restrictionPoints, type RoutePlan } from "../api/routes";
 import { fetchFollow } from "../api/teams";
+import { queueSamples } from "../learning/queue";
+import { wayTimes, type Observation } from "../learning/timing";
 import { GpsStatus } from "../components/GpsStatus";
 import { LiveMap } from "../components/LiveMap";
 import { namedPoints, type MapRoute } from "../components/mapShared";
@@ -24,9 +26,23 @@ import {
   offRouteCount,
   prepare,
   progressAt,
+  type PreparedRoute,
   type Progress,
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
+
+interface Timing {
+  prepared: PreparedRoute | null;
+  obs: Observation[];
+}
+
+/** Queues the road times measured on a route, and starts afresh on the next. */
+function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
+  if (t.prepared?.route.ways && t.obs.length > 1) {
+    queueSamples(wayTimes(t.prepared.route.ways, t.prepared.cumulative, t.obs));
+  }
+  return { prepared: next, obs: [] };
+}
 
 // While re-routing fails (no signal), try again this often.
 const RETRY_MS = 10000;
@@ -44,7 +60,7 @@ export default function NavigateScreen() {
   const { active, replan, stop } = useNavigation();
   const { fix } = useLocation();
   const { data, places } = useSearch();
-  const { vehicle, voice: voiceOn, setVoice, mapView, roads } = useSession();
+  const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -104,6 +120,17 @@ export default function NavigateScreen() {
       });
   }, [active, fix, offRoute, replan, vehicle, roads]);
   useEffect(() => () => inFlight.current?.abort(), []);
+
+  // Opt-in learning: time each road of this route while on it. Only way IDs
+  // and seconds are kept, on the phone, and sent hours later (learning/queue.ts).
+  const timing = useRef<Timing>({ prepared: null, obs: [] });
+  useEffect(() => {
+    if (!learning || demoDrive || !prepared) return;
+    if (timing.current.prepared !== prepared) timing.current = flushTiming(timing.current, prepared);
+    if (offRoute) timing.current = flushTiming(timing.current, null);
+    else if (progress && fix) timing.current.obs.push({ along: progress.along, at: fix.timestamp });
+  }, [learning, demoDrive, prepared, progress, offRoute, fix]);
+  useEffect(() => () => void flushTiming(timing.current, null), []);
 
   const end = () => {
     stop();

@@ -11,7 +11,7 @@ import { POLICE as TRACE, policeFor, standardFor, type RoadChoice, type VehicleT
 import { distanceM, type LngLat } from "./geo.js";
 import { NoSafeRouteError, overLimits, type PoliceRoute } from "./plan.js";
 import { detectRestrictions } from "./restrictions.js";
-import { ARRIVE_TYPES, type Route, type Router } from "./valhalla.js";
+import { ARRIVE_TYPES, waysOf, type Route, type Router } from "./valhalla.js";
 
 export interface FollowPlan {
   route: PoliceRoute;
@@ -72,6 +72,7 @@ export async function planFollow(
   return {
     route: {
       ...route,
+      ways: waysOf(edges),
       savingS: 0,
       restrictions: detection.restrictions.map(({ excludePoints: _e, ...r }) => r),
       restrictionsComplete: detection.complete,

@@ -9,7 +9,7 @@ import {
 } from "./costing.js";
 import { cumulativeDistances, pointAlong, type LngLat } from "./geo.js";
 import { detectRestrictions, type Restriction } from "./restrictions.js";
-import { ValhallaError, type Route, type Router, type TraceEdge, type Waypoint } from "./valhalla.js";
+import { ValhallaError, waysOf, type Route, type Router, type TraceEdge, type Waypoint } from "./valhalla.js";
 
 export interface PlanOptions {
   minSavingSeconds: number;
@@ -126,7 +126,7 @@ export async function planRoutes(
   ]);
   const safeStandard = await withinLimits(router, STANDARD, vehicle, start, end, [], firstStandard);
   if (!safeStandard) throw new NoSafeRouteError();
-  const standard = safeStandard.route;
+  const standard = { ...safeStandard.route, ways: waysOf(safeStandard.edges) };
   if (!firstPolice) return { standard, police: null, noPoliceReason: "not-checked" };
 
   const worthIt = (r: Route) => {
@@ -155,6 +155,7 @@ export async function planRoutes(
         standard,
         police: {
           ...police,
+          ways: waysOf(edges),
           savingS: standard.durationS - police.durationS,
           restrictions: detection.restrictions.map(({ excludePoints: _e, ...r }) => r),
           restrictionsComplete: detection.complete,

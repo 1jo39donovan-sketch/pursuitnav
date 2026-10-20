@@ -77,6 +77,14 @@ code and is never sent to the server, so the server holds only data it can’t r
 restart forgets it), drops your entry when you leave or a day after you stop sharing, and ends the team after a week.
 Anyone you give the team code to can see your position, so share it only with colleagues on the job.</p>
 
+<h2>Helping improve journey times (only if you turn it on)</h2>
+<p>Off unless you turn it on in the Session tab. While you navigate, the phone times each road it drives along and
+keeps only the road’s OpenStreetMap ID, the seconds it took, its length, and whether it was night, rush hour or
+daytime. The first and last 500 m of every drive are left out. These wait on your phone for at least 6 hours and are
+then sent mixed with your other drives, with no position, route, time, callsign or device ID. The server adds them to
+totals per road and discards them; a road’s learned speed is used only once at least 5 drives have been timed on it.
+Turning it off deletes anything not yet sent.</p>
+
 <h2>Other services</h2>
 <ul>
   <li><strong>Map tiles</strong> come from OpenFreeMap. Like any website, it sees your phone’s IP address and which part

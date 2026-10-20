@@ -22,10 +22,35 @@ export interface Route {
   distanceM: number;
   shape: LngLat[];
   maneuvers: Maneuver[];
+  /**
+   * The OpenStreetMap ways along the route, by shape index. The phone times
+   * itself along them for opt-in learning, so no GPS has to leave it.
+   */
+  ways?: RouteWay[];
+}
+
+export interface RouteWay {
+  wayId: number;
+  beginShapeIndex: number;
+  endShapeIndex: number;
+}
+
+/** Runs of edges on the same way, as one entry each. */
+export function waysOf(edges: TraceEdge[]): RouteWay[] {
+  const out: RouteWay[] = [];
+  for (const e of edges) {
+    if (e.wayId === undefined) continue;
+    const last = out[out.length - 1];
+    if (last && last.wayId === e.wayId && last.endShapeIndex === e.beginShapeIndex) last.endShapeIndex = e.endShapeIndex;
+    else out.push({ wayId: e.wayId, beginShapeIndex: e.beginShapeIndex, endShapeIndex: e.endShapeIndex });
+  }
+  return out;
 }
 
 export interface TraceEdge {
   names: string[];
+  /** OpenStreetMap way the edge is part of (for learned speeds); absent from test doubles. */
+  wayId?: number;
   beginShapeIndex: number;
   endShapeIndex: number;
   beginHeading: number;
@@ -130,6 +155,7 @@ interface ValhallaRouteResponse {
 interface ValhallaTraceResponse {
   edges?: Array<{
     names?: string[];
+    way_id?: number;
     begin_shape_index: number;
     end_shape_index: number;
     begin_heading: number;
@@ -333,6 +359,7 @@ export class ValhallaClient implements Router, Matcher {
       filters: {
         attributes: [
           "edge.names",
+          "edge.way_id",
           "edge.begin_shape_index",
           "edge.end_shape_index",
           "edge.begin_heading",
@@ -346,6 +373,7 @@ export class ValhallaClient implements Router, Matcher {
     const last = shape.length - 1;
     return (data.edges ?? []).map((e) => ({
       names: e.names ?? [],
+      wayId: e.way_id,
       beginShapeIndex: Math.min(e.begin_shape_index, last),
       endShapeIndex: Math.min(e.end_shape_index, last),
       beginHeading: e.begin_heading,

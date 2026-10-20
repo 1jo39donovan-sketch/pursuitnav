@@ -25,6 +25,8 @@ services:
       - valhalla
     volumes:
       - ./data/places:/data/places:ro
+      # Opt-in learning totals and the learned speeds the weekly map build reads.
+      - ./data/learned:/data/learned
     environment:
       VALHALLA_URL: http://valhalla:8002
       # Door-level address search; leave empty to run with road-level search only.
@@ -33,6 +35,8 @@ services:
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       # Free key from https://api-portal.tfl.gov.uk; live closures work without one but may be throttled.
       TFL_APP_KEY: ${TFL_APP_KEY:-}
+      # 1 accepts opt-in learning uploads. Do the privacy steps in docs/ROADMAP.md first.
+      LEARNING: ${LEARNING:-0}
 
   # Map tools (places list, travel speeds), run by scripts/build-map.sh and
   # scripts/build-places.sh, not by `docker compose up`.

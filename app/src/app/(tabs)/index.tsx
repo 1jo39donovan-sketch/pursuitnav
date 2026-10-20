@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { API_URL, DEMO_MODE } from "../../config";
@@ -7,6 +7,7 @@ import { API_URL, DEMO_MODE } from "../../config";
 import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
 import { TeamSection } from "../../components/TeamSection";
+import { serverLearns } from "../../learning/queue";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { colors, fonts } from "../../theme";
@@ -33,7 +34,14 @@ export default function SessionScreen() {
     setMapTheme,
     roads,
     setRoads,
+    learning,
+    setLearning,
   } = useSession();
+  // Offered only once the server takes it (switched on after the privacy steps).
+  const [canLearn, setCanLearn] = useState(false);
+  useEffect(() => {
+    void serverLearns().then(setCanLearn);
+  }, []);
   useEffect(() => {
     if (openedThisLaunch) return;
     openedThisLaunch = true;
@@ -199,6 +207,28 @@ export default function SessionScreen() {
               <Button label="Remove" variant="danger" onPress={() => deletePlace(p.id)} />
             </View>
           ))}
+        </View>
+      )}
+
+      {(canLearn || learning) && (
+        <View style={styles.field}>
+          <View style={styles.toggleRow}>
+            <Text style={[styles.label, styles.placeText]} nativeID="learning-label">
+              Help improve journey times
+            </Text>
+            <Switch
+              accessibilityLabelledBy="learning-label"
+              value={learning}
+              onValueChange={setLearning}
+              trackColor={{ false: colors.line, true: colors.amber }}
+            />
+          </View>
+          <Text style={styles.placeMeta}>
+            Off unless you turn it on. While you navigate, your phone times each road it drives along and later sends
+            only “this road took this long”: never your position, your route, where you started or stopped (the first
+            and last 500 m are left out), your callsign or anything about you. Times wait on your phone for at least 6
+            hours and go mixed with other drives. Turning this off deletes anything not yet sent.
+          </Text>
         </View>
       )}
 

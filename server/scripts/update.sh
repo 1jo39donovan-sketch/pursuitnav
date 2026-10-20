@@ -15,6 +15,8 @@ fi
 echo "$(date -Is) updating to $(git rev-parse --short "origin/$BRANCH")"
 git reset -q --hard "origin/$BRANCH"
 cd server
+# The API runs as the node user (uid 1000) and writes learning totals here.
+mkdir -p data/learned && chown 1000:1000 data/learned
 docker compose up -d --build
 docker image prune -f >/dev/null
 

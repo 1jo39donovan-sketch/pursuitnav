@@ -6,6 +6,7 @@ import Fastify, { LogController, type FastifyInstance, type FastifyReply, type F
 
 import type { ClosureAwareRoute, ClosureFeed } from "./closures.js";
 import type { ServerConfig } from "./config.js";
+import { BANDS, type LearningStore, type Sample } from "./learning.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
 import { privacyPage, supportPage } from "./pages.js";
@@ -79,6 +80,8 @@ export function buildApp(
   /** Live road closures; the router passed in already avoids them. */
   closures?: Pick<ClosureFeed, "summary">,
   teams: TeamStore = new TeamStore(),
+  /** Opt-in learning totals; uploads are refused without it. */
+  learning?: LearningStore,
 ): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
@@ -105,7 +108,13 @@ export function buildApp(
     const places = await stat(config.placesFile)
       .then(() => true)
       .catch(() => false);
-    return { ok: true, routing, places, ...(closures ? { closures: closures.summary().active } : {}) };
+    return {
+      ok: true,
+      routing,
+      places,
+      learning: Boolean(learning),
+      ...(closures ? { closures: closures.summary().active } : {}),
+    };
   });
 
   // Linked from the app and the store listings.
@@ -283,6 +292,42 @@ export function buildApp(
         }
         return routeError(err, req, reply);
       }
+    },
+  );
+
+  // Opt-in learning: per-road times, never positions. Added to the totals and discarded.
+  app.post<{ Body: { segments: Sample[] } }>(
+    "/v1/learn",
+    {
+      bodyLimit: 400_000,
+      schema: {
+        body: {
+          type: "object",
+          required: ["segments"],
+          additionalProperties: false,
+          properties: {
+            segments: {
+              type: "array",
+              maxItems: 3000,
+              items: {
+                type: "object",
+                required: ["w", "s", "m", "b"],
+                additionalProperties: false,
+                properties: {
+                  w: { type: "integer", minimum: 1 },
+                  s: { type: "number", minimum: 2, maximum: 3600 },
+                  m: { type: "number", minimum: 30, maximum: 20000 },
+                  b: { type: "string", enum: [...BANDS] },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (!learning) return reply.code(404).send({ error: "learning-off", message: "Learning isn't switched on." });
+      return { added: learning.add(req.body.segments) };
     },
   );
 

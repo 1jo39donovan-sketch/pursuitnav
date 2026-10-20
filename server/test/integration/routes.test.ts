@@ -208,6 +208,14 @@ describe("main roads", () => {
     expect(streets).not.toContain("Back Street");
   });
 
+  it("lists the OpenStreetMap ways along it, for opt-in learning", async () => {
+    const { ways } = (await plan("main_west", "main_east")).standard as Plan["standard"] & {
+      ways: { wayId: number; beginShapeIndex: number; endShapeIndex: number }[];
+    };
+    expect(ways.length).toBeGreaterThanOrEqual(3);
+    expect(ways.every((w) => Number.isInteger(w.wayId) && w.endShapeIndex > w.beginShapeIndex)).toBe(true);
+  });
+
   it("takes the shorter back street when set to any roads", async () => {
     const res = await app.inject({
       method: "POST",
