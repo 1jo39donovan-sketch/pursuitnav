@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BOROUGHS } from "../search/boroughs";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 
@@ -8,7 +9,11 @@ export function Header() {
   const insets = useSafeAreaInsets();
   const { callsign, boroughs } = useSession();
   const area =
-    boroughs.length === 0 ? "No boroughs" : boroughs.length <= 2 ? boroughs.join(" · ") : `${boroughs[0]} +${boroughs.length - 1}`;
+    boroughs.length === 0
+      ? "No boroughs"
+      : boroughs.length === BOROUGHS.length
+        ? "All London"
+        : boroughs.length <= 2 ? boroughs.join(" · ") : `${boroughs[0]} +${boroughs.length - 1}`;
   return (
     <View
       style={[

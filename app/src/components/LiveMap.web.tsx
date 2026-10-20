@@ -3,6 +3,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./mapControls.web.css";
 
+import { Asset } from "expo-asset";
 import maplibregl from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -13,6 +14,7 @@ import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 import {
+  ARROW_LAYOUT,
   boundsOf,
   cameraFor,
   LABEL_LAYOUT,
@@ -36,6 +38,8 @@ import {
   routesGeoJSON,
   type LiveMapProps,
   type MarkerProperties,
+  VEHICLE_IMAGE,
+  vehicleFeature,
 } from "./mapShared";
 import { MapButtons } from "./MapButtons";
 
@@ -50,6 +54,7 @@ export function LiveMap({
   zoomControl = false,
   roadNames = false,
   labels,
+  vehicleArrow = false,
   followZoom = 15,
   compact = false,
   routes = [],
@@ -197,6 +202,8 @@ export function LiveMap({
         id: "me-dot",
         type: "circle",
         source: "me",
+        // With a direction of travel and an arrow to show it, the arrow replaces the dot.
+        ...(vehicleArrow ? { filter: ["!", ["has", "course"]] } : {}),
         paint: {
           "circle-radius": 7,
           "circle-color": colors.blue,
@@ -204,6 +211,16 @@ export function LiveMap({
           "circle-stroke-width": 2,
         },
       });
+      if (vehicleArrow) {
+        const arrow = new Image();
+        arrow.onload = () => {
+          if (!m.hasImage(VEHICLE_IMAGE)) m.addImage(VEHICLE_IMAGE, arrow);
+          if (!m.getLayer("me-arrow")) {
+            m.addLayer({ id: "me-arrow", type: "symbol", source: "me", filter: ["has", "course"], layout: ARROW_LAYOUT });
+          }
+        };
+        arrow.src = Asset.fromModule(require("../../assets/images/vehicle-arrow.png")).uri;
+      }
       if (DEMO_MODE) {
         // The offline demo style has no font glyphs, so names are HTML markers.
         for (const { name, lngLat } of demoBoroughLabels) {
@@ -248,7 +265,7 @@ export function LiveMap({
       // A new map (different style or view) has to load before it's drawn on.
       setLoaded(false);
     };
-  }, [rotates, compact, mapTheme, roadNames]);
+  }, [rotates, compact, mapTheme, roadNames, vehicleArrow]);
 
   useEffect(() => {
     const m = map.current;
@@ -276,11 +293,7 @@ export function LiveMap({
   useEffect(() => {
     const m = map.current;
     if (!m || !loaded || !fix) return;
-    (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [fix.lng, fix.lat] },
-      properties: {},
-    });
+    (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(fix.lng, fix.lat, fix.course));
     if (following) {
       m.easeTo({ center: [fix.lng, fix.lat], zoom, ...cameraFor(view, fix.course), duration: 800 });
     }

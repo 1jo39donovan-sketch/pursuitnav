@@ -25,3 +25,30 @@ export const BOROUGH_GROUPS: BoroughGroup[] = [
   { code: "WA", name: "West Area", boroughs: ["Ealing", "Hillingdon", "Hounslow"] },
   { code: "", name: "City of London Police", boroughs: ["City of London"] },
 ];
+
+/**
+ * Big areas for units that work across London (TSG, firearms, traffic…):
+ * one tap picks every borough in them. Neighbouring areas overlap.
+ */
+export const LONDON_AREAS: { name: string; boroughs: Borough[] }[] = [
+  {
+    name: "Central",
+    boroughs: ["City of London", "Westminster", "Camden", "Islington", "Hackney", "Tower Hamlets", "Southwark", "Lambeth", "Kensington and Chelsea"],
+  },
+  {
+    name: "North",
+    boroughs: ["Barnet", "Enfield", "Haringey", "Camden", "Islington", "Hackney", "Waltham Forest", "Brent", "Harrow"],
+  },
+  {
+    name: "East",
+    boroughs: ["Tower Hamlets", "Newham", "Barking and Dagenham", "Havering", "Redbridge", "Waltham Forest", "Hackney", "Greenwich", "Bexley"],
+  },
+  {
+    name: "South",
+    boroughs: ["Lambeth", "Southwark", "Lewisham", "Greenwich", "Bexley", "Bromley", "Croydon", "Sutton", "Merton", "Wandsworth", "Kingston upon Thames"],
+  },
+  {
+    name: "West",
+    boroughs: ["Hillingdon", "Ealing", "Hounslow", "Hammersmith and Fulham", "Kensington and Chelsea", "Richmond upon Thames", "Brent", "Harrow", "Westminster"],
+  },
+];

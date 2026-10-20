@@ -1,6 +1,7 @@
 import {
   Camera,
   GeoJSONSource,
+  Images,
   Layer,
   Map,
   type CameraRef,
@@ -14,6 +15,7 @@ import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 import {
+  ARROW_LAYOUT,
   boundsOf,
   cameraFor,
   LABEL_LAYOUT,
@@ -37,6 +39,8 @@ import {
   routesGeoJSON,
   type LiveMapProps,
   type MarkerProperties,
+  VEHICLE_IMAGE,
+  vehicleFeature,
 } from "./mapShared";
 import { MapButtons } from "./MapButtons";
 
@@ -53,6 +57,7 @@ export function LiveMap({
   zoomControl = false,
   roadNames = false,
   labels,
+  vehicleArrow = false,
   followZoom = 15,
   compact = false,
   routes = [],
@@ -93,12 +98,10 @@ export function LiveMap({
 
   const lng = fix?.lng;
   const lat = fix?.lat;
+  const course = fix?.course ?? null;
   const puck = useMemo<GeoJSON.Feature | null>(
-    () =>
-      lng != null && lat != null
-        ? { type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: {} }
-        : null,
-    [lng, lat],
+    () => (lng != null && lat != null ? vehicleFeature(lng, lat, course) : null),
+    [lng, lat, course],
   );
 
   const followCamera =
@@ -216,6 +219,8 @@ export function LiveMap({
             <Layer
               type="circle"
               id="me-dot"
+              // With a direction of travel and an arrow to show it, the arrow replaces the dot.
+              {...(vehicleArrow ? { filter: ["!", ["has", "course"]] as const } : {})}
               paint={{
                 "circle-radius": 7,
                 "circle-color": colors.blue,
@@ -223,8 +228,10 @@ export function LiveMap({
                 "circle-stroke-width": 2,
               }}
             />
+            {vehicleArrow && <Layer type="symbol" id="me-arrow" filter={["has", "course"]} layout={ARROW_LAYOUT} />}
           </GeoJSONSource>
         )}
+        {vehicleArrow && <Images images={{ [VEHICLE_IMAGE]: require("../../assets/images/vehicle-arrow.png") }} />}
       </Map>
 
       {mapFailed && (

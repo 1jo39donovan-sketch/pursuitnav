@@ -261,6 +261,7 @@ export default function NavigateScreen() {
               zoomControl
               autoZoom
               roadNames
+              vehicleArrow
               followZoom={16.5}
               routes={routes}
               destination={destination}

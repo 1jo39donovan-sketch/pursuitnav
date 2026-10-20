@@ -213,6 +213,7 @@ export default function PursuitScreen() {
         zoomControl
         autoZoom
         roadNames
+        vehicleArrow
         labels={blockLabels}
         followZoom={16}
         compact

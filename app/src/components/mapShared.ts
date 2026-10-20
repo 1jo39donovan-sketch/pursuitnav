@@ -38,6 +38,8 @@ export interface LiveMapProps {
   zoomControl?: boolean;
   /** Bigger, brighter road names than the map style's own. */
   roadNames?: boolean;
+  /** Show the vehicle as an arrow pointing the way it's going (navigation, pursuit). */
+  vehicleArrow?: boolean;
   /** Named blocks and estates to label (points with a "name"), when zoomed in. */
   labels?: GeoJSON.FeatureCollection | null;
   /** Zoom used while following the officer's position. */
@@ -212,3 +214,24 @@ export function namedPoints(items: { name: string; lat: number; lng: number }[])
     })),
   };
 }
+
+export const VEHICLE_IMAGE = "vehicle-arrow";
+
+/** The vehicle's position; with a course, drawn as an arrow turned that way. */
+export function vehicleFeature(lng: number, lat: number, course: number | null): GeoJSON.Feature {
+  return {
+    type: "Feature",
+    geometry: { type: "Point", coordinates: [lng, lat] },
+    properties: course != null ? { course } : {},
+  };
+}
+
+export const ARROW_LAYOUT: SymbolLayerSpecification["layout"] = {
+  "icon-image": VEHICLE_IMAGE,
+  "icon-size": 0.45,
+  "icon-rotate": ["get", "course"],
+  "icon-rotation-alignment": "map",
+  "icon-pitch-alignment": "map",
+  "icon-allow-overlap": true,
+  "icon-ignore-placement": true,
+};

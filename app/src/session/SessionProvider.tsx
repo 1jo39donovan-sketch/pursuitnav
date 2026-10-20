@@ -14,7 +14,7 @@ interface Session {
   /** Simulated drive in London instead of GPS (store reviewers, trying it out). */
   demoDrive: boolean;
   setDemoDrive: (on: boolean) => void;
-  /** The user has confirmed they drive under the emergency-vehicle exemptions; until then, standard routes only. */
+  /** Offer blue-light routes beside standard ones (on unless switched off). */
   policeRoutes: boolean;
   setPoliceRoutes: (on: boolean) => void;
   /** What's being driven; routes avoid limits it can't take. */
@@ -77,7 +77,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     store.setSetting("demoDrive", on ? "1" : "0");
   }, []);
 
-  const [policeRoutes, setPoliceRoutesState] = useState(() => store.getSetting("policeRoutes") === "1");
+  // On unless turned off: the operator chooses standard or blue light each time anyway.
+  const [policeRoutes, setPoliceRoutesState] = useState(() => store.getSetting("policeRoutes") !== "0");
   const setPoliceRoutes = useCallback((on: boolean) => {
     setPoliceRoutesState(on);
     store.setSetting("policeRoutes", on ? "1" : "0");
