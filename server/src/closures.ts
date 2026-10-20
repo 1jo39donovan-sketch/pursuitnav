@@ -6,8 +6,10 @@
 // then asks Valhalla to avoid those boxes. Nothing about officers or their
 // routes is sent to TfL: the feed is fetched the same way whoever is driving.
 //
-// Only full closures count. Lane closures and partial closures are passable,
-// and an emergency vehicle can often get past them anyway.
+// Only streets closed to traffic count ("Closed" in the live feed). Lane
+// closures and partial closures are passable, and an emergency vehicle can
+// often get past them anyway. A street closed in one direction is avoided in
+// both: the feed's segments don't say which carriageway.
 import { distanceM, type LngLat } from "./geo.js";
 import { ValhallaError, type Route, type RouteRequest, type Router } from "./valhalla.js";
 
@@ -45,8 +47,12 @@ export function parseDisruptions(json: unknown, now = new Date()): Closure[] {
     if (!d || typeof d !== "object") continue;
     if (!isLive(d, now)) continue;
     for (const [k, s] of (d.streets ?? []).entries()) {
-      if (!/full/i.test(s?.closure ?? "")) continue;
-      const rings = (s.segments ?? []).flatMap((seg) => boxesAlong(parseLine(seg?.lineString)));
+      if (!isClosed(s?.closure)) continue;
+      // A closed street comes as many short pieces (one per road link, often
+      // 20–100 m): join them up first, so only the ends of each closed
+      // stretch are trimmed back from the junctions, not every piece.
+      const lines = (s.segments ?? []).map((seg) => parseLine(seg?.lineString)).filter((l) => l.length >= 2);
+      const rings = joinLines(lines).flatMap(boxesAlong);
       if (rings.length) closures.push({ id: `${d.id ?? "?"}:${k}`, street: s.name ?? "", rings });
     }
   }
@@ -63,6 +69,43 @@ interface TflDisruption {
     closure?: string;
     segments?: Array<{ lineString?: string }>;
   }>;
+}
+
+/**
+ * A street closed to traffic. The live feed says "Closed" (its documentation
+ * says "Full Closure"); "Partial Closure" and "Open" are passable.
+ */
+export const isClosed = (closure: string | undefined) => /^\s*(closed|full)/i.test(closure ?? "");
+
+// Pieces whose ends are this close are one line.
+const JOIN_M = 2;
+
+/** Joins lines that meet end to end into longer lines (reversing pieces as needed). */
+export function joinLines(lines: LngLat[][]): LngLat[][] {
+  const left = lines.map((l) => [...l]);
+  const out: LngLat[][] = [];
+  const near = (a: LngLat, b: LngLat) => distanceM(a, b) <= JOIN_M;
+  while (left.length) {
+    let line = left.shift()!;
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (let i = 0; i < left.length; i++) {
+        const piece = left[i]!;
+        const [first, last] = [line[0]!, line[line.length - 1]!];
+        const [pFirst, pLast] = [piece[0]!, piece[piece.length - 1]!];
+        if (near(last, pFirst)) line = [...line, ...piece.slice(1)];
+        else if (near(last, pLast)) line = [...line, ...piece.slice(0, -1).reverse()];
+        else if (near(first, pLast)) line = [...piece.slice(0, -1), ...line];
+        else if (near(first, pFirst)) line = [...piece.slice(1).reverse(), ...line];
+        else continue;
+        left.splice(i, 1);
+        grew = true;
+        break;
+      }
+    }
+    out.push(line);
+  }
+  return out;
 }
 
 function isLive(d: TflDisruption, now: Date): boolean {

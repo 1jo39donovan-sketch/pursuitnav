@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { avoidingClosures, boxesAlong, ClosureFeed, parseDisruptions } from "../../src/closures.js";
+import {
+  avoidingClosures,
+  boxesAlong,
+  ClosureFeed,
+  isClosed,
+  joinLines,
+  parseDisruptions,
+} from "../../src/closures.js";
 import type { LngLat } from "../../src/geo.js";
+// Three records from the live feed (GET /Road/all/Disruption?stripContent=true,
+// 20 October 2026), unchanged. Powered by TfL Open Data.
+import tflLive from "../fixtures/tfl-disruptions.json" with { type: "json" };
 import { ValhallaError, type Route, type RouteRequest, type Router } from "../../src/valhalla.js";
 
 // Shaped like TfL's /Road/all/Disruption (fields cut down; TfL sends many more).
@@ -163,5 +173,68 @@ describe("avoidingClosures", () => {
       to: { point: [-0.25, 51.5] },
     });
     expect(r).toMatchObject({ closuresIgnored: true });
+  });
+});
+
+describe("the live TfL feed", () => {
+  const AT = new Date("2026-10-20T18:00:00Z");
+
+  it("treats 'Closed' streets as closures (the feed never says 'Full Closure')", () => {
+    const closures = parseDisruptions(tflLive, AT);
+    expect(closures.map((c) => c.street)).toEqual([
+      "WADDON ROAD (CR0)",
+      "[A2216] DOG KENNEL HILL (SE22 ,SE5)",
+      "[A1010] HERTFORD ROAD (EN3)",
+    ]);
+  });
+
+  it("joins a street's short pieces into one stretch before trimming the ends", () => {
+    const dogKennelHill = parseDisruptions(tflLive, AT)[1]!;
+    // 7 pieces, most 20–100 m: trimmed one by one, most would vanish.
+    expect(dogKennelHill.rings.length).toBeGreaterThanOrEqual(6);
+    const lngs = dogKennelHill.rings.flat().map((p) => p[0]);
+    // Covers the hill from near its south end to near its north end.
+    expect(Math.min(...lngs)).toBeLessThan(-0.0805);
+    expect(Math.max(...lngs)).toBeGreaterThan(-0.0832);
+  });
+
+  it("drops a closure once its end time has passed", () => {
+    const later = new Date("2026-10-21T01:00:00Z"); // Hertford Road reopened at midnight
+    expect(parseDisruptions(tflLive, later).map((c) => c.street)).not.toContain("[A1010] HERTFORD ROAD (EN3)");
+  });
+});
+
+describe("isClosed", () => {
+  it("knows which closure values block the road", () => {
+    expect(isClosed("Closed")).toBe(true);
+    expect(isClosed("Full Closure")).toBe(true);
+    expect(isClosed("Partial Closure")).toBe(false);
+    expect(isClosed("Open")).toBe(false);
+    expect(isClosed(undefined)).toBe(false);
+  });
+});
+
+describe("joinLines", () => {
+  it("joins pieces given in any order and either way round", () => {
+    const joined = joinLines([
+      [
+        [0, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.002, 0],
+        [0.001, 0],
+      ],
+      [
+        [0.003, 0],
+        [0.004, 0],
+      ],
+    ]);
+    expect(joined).toHaveLength(2);
+    expect(joined[0]).toEqual([
+      [0, 0],
+      [0.001, 0],
+      [0.002, 0],
+    ]);
   });
 });
