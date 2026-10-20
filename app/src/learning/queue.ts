@@ -1,6 +1,7 @@
 // Learned road times wait on the phone and go to the server in batches, hours
 // after the drive and shuffled together, so a batch can't be tied to a person
 // or an incident. Nothing here is sent unless the officer turned learning on.
+import { serverJson } from "../api/http";
 import { API_URL } from "../config";
 import { store } from "../storage/store";
 import type { Sample } from "./timing";
@@ -59,7 +60,7 @@ export async function uploadDue(now = Date.now()) {
   const { send, keep } = due(read(), now);
   if (!send.length) return;
   try {
-    const res = await fetch(`${API_URL}/v1/learn`, {
+    const res = await serverJson(`${API_URL}/v1/learn`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ segments: send }),
@@ -75,8 +76,8 @@ export async function uploadDue(now = Date.now()) {
 export async function serverLearns(): Promise<boolean> {
   if (!API_URL) return false;
   try {
-    const res = await fetch(`${API_URL}/health`);
-    return res.ok && ((await res.json()) as { learning?: boolean }).learning === true;
+    const res = await serverJson<{ learning?: boolean }>(`${API_URL}/health`);
+    return res.ok && res.body?.learning === true;
   } catch {
     return false;
   }

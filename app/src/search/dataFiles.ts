@@ -2,6 +2,7 @@
 // roads), so search works with no signal, and checks for weekly updates.
 import { File, Paths } from "expo-file-system";
 
+import { serverRequest } from "../api/http";
 import { API_URL } from "../config";
 import { store } from "../storage/store";
 
@@ -27,7 +28,12 @@ export async function fetchNewer(kind: DataKind, force = false): Promise<string 
   if (!force && haveCopy && Date.now() - lastCheck < CHECK_EVERY_MS) return null;
   try {
     const etag = haveCopy ? store.getSetting(`${kind}Etag`) : null;
-    const res = await fetch(`${API_URL}/v1/${kind}-data`, { headers: etag ? { "if-none-match": etag } : {} });
+    // 8 s for the server to start answering; the file itself may take longer on a slow link.
+    const res = await serverRequest(
+      `${API_URL}/v1/${kind}-data`,
+      { headers: etag ? { "if-none-match": etag } : {} },
+      async (r) => r,
+    );
     store.setSetting(`${kind}CheckedAt`, String(Date.now()));
     if (res.status !== 200) return null;
     const text = await res.text();

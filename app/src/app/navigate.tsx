@@ -15,6 +15,7 @@ import { namedPoints, type MapRoute } from "../components/mapShared";
 import { formatDistance, formatDuration } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation } from "../navigation/NavigationProvider";
+import { offRouteText, rerouteFailure, type RerouteFailure } from "../navigation/reroute";
 import { nextCallout } from "../navigation/voice";
 import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
@@ -92,7 +93,8 @@ export default function NavigateScreen() {
   // Off route for a few seconds: get a new route from here, same kind.
   const inFlight = useRef<AbortController | null>(null);
   const lastAttempt = useRef(0);
-  const [failed, setFailed] = useState(false);
+  // Each request gives up after 8 s, so a dead connection shows as no signal rather than hanging.
+  const [failed, setFailed] = useState<RerouteFailure>(null);
   useEffect(() => {
     if (!active || !fix || !offRoute || inFlight.current) return;
     if (Date.now() - lastAttempt.current < RETRY_MS) return;
@@ -109,11 +111,11 @@ export default function NavigateScreen() {
       : fetchRoutes(routeOrigin(fix), active.destination, vehicle, controller.signal, active.kind === "standard", roads);
     fresh
       .then((plan) => {
-        setFailed(false);
+        setFailed(null);
         replan(plan);
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setFailed(true);
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) setFailed(rerouteFailure(err));
       })
       .finally(() => {
         if (inFlight.current === controller) inFlight.current = null;
@@ -194,6 +196,7 @@ export default function NavigateScreen() {
   const destination: [number, number] = [active.destination.lng, active.destination.lat];
   const restrictions = "restrictions" in active.route ? restrictionPoints(active.route) : [];
 
+  const offRouteMsg = offRouteText(failed, RETRY_MS / 1000);
   const turnPanel = (
     <View style={[styles.turn, offRoute && styles.turnOff]}>
       {!progress ? (
@@ -204,14 +207,10 @@ export default function NavigateScreen() {
           <Text style={styles.instruction}>{active.destination.title}</Text>
         </>
       ) : offRoute ? (
-        <>
-          <Text style={styles.distance}>Off route</Text>
-          <Text style={styles.instruction}>
-            {failed
-              ? "Can't reach the routing server. Head back to the line; trying again."
-              : "Finding a new route from here…"}
-          </Text>
-        </>
+        <View accessibilityRole={failed ? "alert" : undefined}>
+          <Text style={[styles.distance, failed === "no-signal" && styles.noSignal]}>{offRouteMsg.title}</Text>
+          <Text style={styles.instruction}>{offRouteMsg.detail}</Text>
+        </View>
       ) : (
         <>
           <View style={styles.turnRow}>
@@ -354,6 +353,7 @@ const styles = StyleSheet.create({
   turnRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   arrow: { color: colors.amber, fontSize: 56, lineHeight: 64, fontWeight: "700" },
   distance: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 52, lineHeight: 58, fontVariant: ["tabular-nums"] },
+  noSignal: { color: colors.amber },
   instruction: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26, lineHeight: 30 },
   then: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
