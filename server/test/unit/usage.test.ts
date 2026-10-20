@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { bearerMatches, buildApp } from "../../src/app.js";
 import type { ServerConfig } from "../../src/config.js";
 import type { Route, Router } from "../../src/valhalla.js";
-import { KEEP_IDS_DAYS, UsageStore } from "../../src/usage.js";
+import { UsageStore } from "../../src/usage.js";
 
 const A = "a".repeat(32);
 const B = "b".repeat(32);
@@ -61,20 +61,45 @@ describe("UsageStore", () => {
     expect(usage.stats(1).days[0]!.counts).toMatchObject({ routes_planned: 2, timeouts: 3, pursuit_sessions: 0 });
   });
 
-  it("drops install IDs after 30 days but keeps the day and week totals", () => {
+  it("deletes a day's hashes and salt once the day is over, keeping its totals", () => {
     const c = clock(MON);
     const usage = new UsageStore(":memory:", c.now);
     usage.seen(A, "1.0.0");
-    usage.seen(B, "1.0.0");
+    usage.seen(B, "1.1.0");
+    expect(usage.held()).toEqual({ dayHashes: 2, weekHashes: 2, salts: 2 }); // today's and this week's
     c.set(MON + DAY);
     usage.rollup();
-    expect(usage.heldIds()).toBe(2);
-    c.set(MON + (KEEP_IDS_DAYS + 1) * DAY);
+    // Monday's day hashes and salt are gone; the week is still being counted.
+    expect(usage.held()).toEqual({ dayHashes: 0, weekHashes: 2, salts: 1 });
+    expect(usage.stats(2).days[1]).toMatchObject({ day: "2026-10-19", installs: 2, versions: { "1.0.0": 1, "1.1.0": 1 } });
+  });
+
+  it("deletes a week's hashes and salt once the week is over, keeping its total", () => {
+    const c = clock(MON);
+    const usage = new UsageStore(":memory:", c.now);
+    usage.seen(A, "1.0.0");
+    c.set(MON + 3 * DAY);
+    usage.seen(A, "1.0.0");
+    usage.seen(B, "1.0.0");
+    c.set(MON + 7 * DAY); // the next Monday
     usage.rollup();
-    expect(usage.heldIds()).toBe(0);
-    const s = usage.stats(KEEP_IDS_DAYS + 2);
-    expect(s.days.find((d) => d.day === "2026-10-19")?.installs).toBe(2);
+    expect(usage.held()).toEqual({ dayHashes: 0, weekHashes: 0, salts: 0 });
+    const s = usage.stats(8);
     expect(s.weeks.find((w) => w.week === "2026-10-19")?.installs).toBe(2);
+    expect(s.days.find((d) => d.day === "2026-10-22")?.installs).toBe(2);
+  });
+
+  it("can't link one install from one day to the next: a new salt each day", () => {
+    const c = clock(MON);
+    const usage = new UsageStore(":memory:", c.now);
+    usage.seen(A, "1.0.0");
+    const monday = usage.dayHashes();
+    c.set(MON + DAY);
+    usage.seen(A, "1.0.0");
+    const tuesday = usage.dayHashes().filter((h) => !monday.includes(h));
+    expect(tuesday).toHaveLength(1); // Tuesday's hash of the same install is a different value
+    // Weekly uniques still count the install once.
+    expect(usage.stats(2).weeks).toEqual([{ week: "2026-10-19", installs: 1 }]);
   });
 
   it("never stores the install ID itself", () => {

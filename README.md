@@ -17,7 +17,11 @@ Blue Route counts how much it's used, with no third-party analytics and nothing 
   - Routes planned. A search counts once; the quick standard-only request doesn't count again.
   - Navigation sessions and pursuit sessions.
   - Timeouts, failed route plans and server errors.
-- **How long it keeps the IDs.** Unique installs are counted from a salted hash of the ID, never the ID itself. The hashes are deleted after 30 days, leaving only the totals.
+- **How it keeps the IDs.** Unique installs are counted from salted hashes of the ID, never the ID itself.
+  - Each UTC day has its own random salt, and each week (Monday to Sunday) has another.
+  - The day hash records no week, and the week hash records no day, so nothing links one install from one day to the next.
+  - Within an hour of a day ending, that day's unique total and per-version counts are saved, and its hashes and salt are deleted. The same happens for a week when it ends.
+  - At most a week's hashes are ever held. After that, only totals remain.
 - **What's never kept.** No positions, addresses, searches, callsigns or IP addresses.
 
 The counts are at `GET /stats` on the server, with the header `Authorization: Bearer <STATS_TOKEN>`. `/stats` is off unless the `STATS_TOKEN` secret is set. Code: `server/src/usage.ts` and `app/src/usage/`.

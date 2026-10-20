@@ -93,8 +93,11 @@ the app counts as a new install. The app also reports how many navigation and pu
 many requests got no answer in time, as plain numbers.</p>
 <p>The server keeps, for each day: how many different installs it heard from (and on which app versions), how many
 routes were planned, how many navigation and pursuit sessions were started, and how many requests timed out or
-failed. To count each install once a day and once a week it keeps a scrambled (salted hash) form of the ID, which
-can't be turned back into the ID; these are deleted after 30 days, leaving only the totals. No positions, addresses,
+failed. To count each install once a day, it keeps a scrambled form of the ID (a hash with a random “salt” made for
+that day only), and to count it once a week, another (with a salt made for that week only). Neither can be turned back
+into the ID, and with a new salt each day and each week, one install can't be linked from one day, or week, to the
+next. Within an hour of a day ending, its totals are saved and its scrambled IDs and salt are deleted; the same when a
+week ends. Nothing more than a week's worth is ever held. No positions, addresses,
 searches, callsigns or IP addresses are kept with these counts, and no third-party analytics service is used.</p>
 
 <h2>Other services</h2>

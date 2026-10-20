@@ -285,8 +285,9 @@ function UsageNote() {
       <Text style={styles.placeMeta}>
         To see how many crews use Blue Route, each request to the server carries a random install ID made on this phone
         and the app version. The server counts, per day: installs, routes planned, navigation and pursuit sessions, and
-        requests that timed out or failed. Nothing else: no positions, addresses, searches or callsign. It keeps a
-        scrambled form of the ID for 30 days, then only the day&apos;s totals.
+        requests that timed out or failed. Nothing else: no positions, addresses, searches or callsign. It keeps only
+        a scrambled form of the ID, scrambled differently each day and each week so days can&apos;t be linked, and
+        deletes it once the day (or week) is over, keeping just the totals.
       </Text>
       <View style={styles.toggleRow}>
         <Text style={[styles.placeMeta, styles.placeText]} selectable>
