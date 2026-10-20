@@ -42,6 +42,12 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: python -m pytest places scripts -q
+      # Run as "curl | bash", the installer must be read in full before it
+      # starts (see the note at the top of install.sh).
+      - name: Installer is safe to pipe into bash
+        run: |
+          bash -n scripts/install.sh
+          [ "$(grep -v '^$' scripts/install.sh | tail -n 1)" = 'main "$@"' ]
 
   # The Docker images the server runs, built as the server builds them, so a
   # change upstream (a base image dropping a library) shows here, not mid-deploy.

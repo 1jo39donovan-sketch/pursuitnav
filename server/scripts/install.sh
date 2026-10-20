@@ -10,6 +10,12 @@
 #
 # Unattended (the GitHub "Deploy server" workflow does this): set DOMAIN, and
 # optionally OS_PLACES_KEY and CONTACT_EMAIL, in the environment and nothing is asked.
+# Everything is in main(), run on the last line: bash then reads the whole
+# script before running any of it. Run as "curl … | bash", bash reads the
+# script from the pipe as it goes, and a command that reads its input (docker
+# compose run/exec do) swallowed the rest: the install stopped after the map
+# build, with only Valhalla running, and still reported success.
+main() {
 set -euo pipefail
 
 REPO=https://github.com/1jo39donovan-sketch/pursuitnav.git
@@ -18,6 +24,15 @@ DIR=/opt/blue-route
 
 say() { printf '\n\033[1;33m== %s\033[0m\n' "$*"; }
 fail() { printf '\n\033[1;31m%s\033[0m\n' "$*" >&2; exit 1; }
+
+# However the install ends, leave the containers' state and the front end's
+# logs in the install log, for the deploy workflow to print.
+show_state() {
+  [ -f "$DIR/server/docker-compose.yml" ] && command -v docker >/dev/null || return 0
+  printf '\n== Containers at the end of the install\n'
+  (cd "$DIR/server" && docker compose ps -a && docker compose logs --no-color --tail 50 caddy api) 2>&1 || true
+}
+trap show_state EXIT
 
 [ "$(id -u)" -eq 0 ] || fail "Run this as root (or with sudo)."
 
@@ -107,15 +122,15 @@ say "Building the routing map and places list. This takes 20–40 minutes the fi
 if [ -s data/valhalla/valhalla_tiles.tar ]; then
   echo "Map already built; the weekly refresh keeps it current."
 else
-  bash scripts/build-map.sh
+  bash scripts/build-map.sh </dev/null
 fi
 
 say "Starting Valhalla, the API and HTTPS"
 # The API runs as the node user (uid 1000) and writes learning totals here.
 mkdir -p data/learned && chown 1000:1000 data/learned
-docker compose up -d --build
+docker compose up -d --build </dev/null
 for i in $(seq 1 60); do
-  if docker compose exec -T api wget -qO- http://valhalla:8002/status >/dev/null 2>&1; then
+  if docker compose exec -T api wget -qO- http://valhalla:8002/status </dev/null >/dev/null 2>&1; then
     echo "Routing ready."
     break
   fi
@@ -141,3 +156,6 @@ for i in $(seq 1 20); do
   sleep 6
 done
 fail "HTTPS isn't answering yet. The certificate can take a minute; check with: docker compose logs caddy"
+}
+
+main "$@"

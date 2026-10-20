@@ -146,19 +146,22 @@ jobs:
           fi
 
           IP=$(hcloud server ip "$NAME")
-          echo "ip=$IP" >> "$GITHUB_OUTPUT"
-          echo "Server IP: $IP"
+          IP6=$(hcloud server ip --ipv6 "$NAME" 2>/dev/null || true)
+          { echo "ip=$IP"; echo "ip6=$IP6"; } >> "$GITHUB_OUTPUT"
+          echo "Server IP: $IP${IP6:+ and $IP6}"
 
       - name: Point the domain at the server
         env:
           IP: ${{ steps.server.outputs.ip }}
+          IP6: ${{ steps.server.outputs.ip6 }}
         run: |
           case "$DOMAIN" in
             *.duckdns.org)
               SUB=${DOMAIN%.duckdns.org}
-              result=$(curl -fsS "https://www.duckdns.org/update?domains=${SUB}&token=${DUCKDNS_TOKEN}&ip=${IP}")
+              # IPv6 too: a stale AAAA record sends phones on IPv6 mobile networks to the wrong place.
+              result=$(curl -fsS "https://www.duckdns.org/update?domains=${SUB}&token=${DUCKDNS_TOKEN}&ip=${IP}&ipv6=${IP6}")
               [ "$result" = "OK" ] || { echo "::error::DuckDNS refused the update. Check DUCKDNS_TOKEN and that ${SUB} is one of your DuckDNS domains."; exit 1; }
-              echo "$DOMAIN now points at $IP"
+              echo "$DOMAIN now points at $IP${IP6:+ and $IP6}"
               ;;
             *)
               echo "Make sure $DOMAIN has an A record pointing at $IP. Waiting for it…"
@@ -174,6 +177,7 @@ jobs:
       - name: Wait for the server to be ready
         env:
           IP: ${{ steps.server.outputs.ip }}
+          IP6: ${{ steps.server.outputs.ip6 }}
         run: |
           echo "Installing and building London's routing map and places: usually 20–40 minutes."
           # On the server, through the one-off key (only for a server made by this run).
@@ -184,7 +188,11 @@ jobs:
           }
           status() { remote "bash -s $1" < server/scripts/deploy-status.sh; }
           tidy() { remote "sed -i '/blue-route-deploy/d' /root/.ssh/authorized_keys" || true; }
+          # Hetzner firewalls, if any, filter traffic before the server's own (ufw).
+          echo "Hetzner firewalls in this project:"
+          hcloud firewall list 2>&1 | sed 's/^/    /'
           down=0
+          moved=0
           for i in $(seq 1 110); do
             health=$(curl -fsS -m 10 "https://${DOMAIN}/health" 2>/dev/null || true)
             if grep -q '"routing":true' <<<"$health" && grep -q '"places":true' <<<"$health"; then
@@ -198,10 +206,31 @@ jobs:
               tidy
               exit 0
             fi
-            echo "::group::$i min: https://${DOMAIN}/health ${health:-not answering}"
+            # From outside: where the name points, and whether HTTPS answers
+            # straight from the server's IP (so DNS and the server can be told apart).
+            dns=$(dig +short A "$DOMAIN" @1.1.1.1 | tail -n 1)
+            dns6=$(dig +short AAAA "$DOMAIN" @1.1.1.1 | tail -n 1)
+            byip=$(curl -sS -m 10 -o /dev/null -w '%{http_code}' --resolve "${DOMAIN}:443:${IP}" "https://${DOMAIN}/health" 2>&1 || true)
+            echo "::group::$i min: https://${DOMAIN}/health ${health:-not answering} | DNS ${dns:-none}${dns6:+ / $dns6} (server $IP) | HTTPS to $IP: $byip"
             report=$(status 10 || echo "(can't reach the server over SSH)")
             echo "$report"
             echo "::endgroup::"
+            if [ -n "$dns6" ] && [ -n "$IP6" ] && [ "$dns6" != "$IP6" ]; then
+              echo "::warning::$DOMAIN's IPv6 record is $dns6, not this server ($IP6): phones on IPv6 networks would miss it."
+            fi
+            if [ -n "$dns" ] && [ "$dns" != "$IP" ]; then
+              moved=$((moved + 1))
+              echo "::warning::$DOMAIN points at $dns, not this server ($IP)."
+              if [ "$moved" -ge 3 ]; then
+                echo "::error::Something keeps changing $DOMAIN to $dns. It's usually a DuckDNS updater (an app on a computer, a router setting or a script) set up for this domain: turn it off, or give it another domain. The server itself is $IP."
+                status 100 || true
+                exit 1
+              fi
+              case "$DOMAIN" in
+                *.duckdns.org) curl -fsS "https://www.duckdns.org/update?domains=${DOMAIN%.duckdns.org}&token=${DUCKDNS_TOKEN}&ip=${IP}&ipv6=${IP6}" >/dev/null &&
+                  echo "Pointed $DOMAIN back at $IP." ;;
+              esac
+            fi
             state=$(grep -o '^STATUS=.*' <<<"$report" | tail -n 1 | cut -d= -f2)
             case "$state" in
               install-failed | install-empty)
