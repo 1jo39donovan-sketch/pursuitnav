@@ -205,6 +205,7 @@ jobs:
             if grep -q '"routing":true' <<<"$health" && grep -q '"places":true' <<<"$health" &&
                { grep -q '"nominatim":true' <<<"$health" || ! grep -q '"addresses"' <<<"$health"; }; then
               echo "https://${DOMAIN} is up, with routing, places and house-number search: $health"
+              echo "Server type: $(hcloud server describe "$NAME" -o format='{{.ServerType.Name}}' 2>/dev/null || echo unknown)"
               # The import's measurements (time, memory, database size), for README.md.
               echo "::group::Server state and geocoder measurements"
               status 20 || echo "(can't reach the server over SSH)"

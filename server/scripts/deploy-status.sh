@@ -5,6 +5,11 @@
 # the server itself, then one last line the workflow acts on:
 #   STATUS=installing | running | container-down | install-failed | install-empty
 # The argument is how many log lines to show per container (default 20).
+# All in main(), run on the last line with no input: the workflow pipes this
+# script in over SSH ("bash -s"), and a command that reads its input (docker
+# compose exec does) would otherwise swallow the rest of the script, as it
+# did: nothing after the Valhalla check was ever shown.
+main() {
 set -uo pipefail
 
 LINES=${1:-20}
@@ -50,7 +55,7 @@ done
 
 # The house-number search: its build's progress and measurements (no queries are logged).
 echo "--- geocoder (house-number search)"
-tail -n 12 /var/log/blue-route-geocoder.log 2>/dev/null || echo "(no build yet)"
+tail -n 20 /var/log/blue-route-geocoder.log 2>/dev/null || echo "(no build yet)"
 if docker ps --format '{{.Names}}' | grep -q '^blue-route-geocoder-build$'; then
   echo "importing: $(docker stats --no-stream --format '{{.MemUsage}}' blue-route-geocoder-build 2>/dev/null)," \
     "server $(free -m | awk '/^Mem:/ {print $3}') MiB used + $(free -m | awk '/^Swap:/ {print $3}') MiB swap"
@@ -76,3 +81,6 @@ elif [ -n "$states" ]; then
 else
   echo "STATUS=installing"
 fi
+}
+
+main "$@" </dev/null
