@@ -55,7 +55,8 @@ Both route responses avoid roads TfL lists as fully closed (`src/closures.ts`) a
 **Nominatim on the server** (measured on a Hetzner CX23, 2 vCPU, 4 GB RAM + 4 GB swap, during the deploy of this change):
 
 - First deploy (21 Oct 2026, from an empty server): the routing map, places and the Nominatim import were all done 128 minutes after the server was created; the London smoke test then passed with no OS Places key.
-- Import time, peak memory, database size and memory while serving: being measured on a second deploy (the first one's status script didn't print them). Filled in here before merge.
+- Import (London, `IMPORT_STYLE=address`, 21 Oct 2026, on GitHub's 4-core build machine): 33 minutes; the import peaked at 1,336 MiB and the whole machine at 2,375 MiB with no swap, so it fits a 4 GB CX23. The database is 3.6 GB on disk (853 MB compressed). On the CX23 itself, early in an import: 528 MiB for the import, 1,012 MiB used on the whole server, no swap.
+- Memory while serving, with Valhalla and the API: reported by `GET /stats` (`server`) once servers run the code that adds it; the serving container is capped at 1 GB (`mem_limit`), and served in 171 MiB on an Islington-sized test.
 
 ### How the police route works
 
