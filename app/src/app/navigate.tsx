@@ -10,6 +10,7 @@ import { fetchFollow } from "../api/teams";
 import { queueSamples } from "../learning/queue";
 import { wayTimes, type Observation } from "../learning/timing";
 import { GpsStatus } from "../components/GpsStatus";
+import { useElapsed } from "../components/useElapsed";
 import { LiveMap } from "../components/LiveMap";
 import { namedPoints, type MapRoute } from "../components/mapShared";
 import { formatDistance, formatDuration } from "../format";
@@ -96,14 +97,17 @@ export default function NavigateScreen() {
   // Off route for a few seconds: get a new route from here, same kind.
   const inFlight = useRef<AbortController | null>(null);
   const lastAttempt = useRef(0);
-  // Each request gives up after 8 s, so a dead connection shows as no signal rather than hanging.
+  // A re-route gives up after 30 s; "No signal" only when the network itself failed.
   const [failed, setFailed] = useState<RerouteFailure>(null);
+  const [rerouting, setRerouting] = useState(false);
+  const reroutingFor = useElapsed(rerouting);
   useEffect(() => {
     if (!active || !fix || !offRoute || inFlight.current) return;
     if (Date.now() - lastAttempt.current < RETRY_MS) return;
     lastAttempt.current = Date.now();
     const controller = new AbortController();
     inFlight.current = controller;
+    setRerouting(true);
     // A standard route only needs the quick request; a blue-light one the full check.
     // Follow-in re-routes back onto the colleague's track, not to a fresh route.
     const fresh: Promise<RoutePlan> = active.follow
@@ -122,6 +126,7 @@ export default function NavigateScreen() {
       })
       .finally(() => {
         if (inFlight.current === controller) inFlight.current = null;
+        setRerouting(false);
       });
   }, [active, fix, offRoute, replan, vehicle, roads]);
   useEffect(() => () => inFlight.current?.abort(), []);
@@ -199,7 +204,7 @@ export default function NavigateScreen() {
   const destination: [number, number] = [active.destination.lng, active.destination.lat];
   const restrictions = "restrictions" in active.route ? restrictionPoints(active.route) : [];
 
-  const offRouteMsg = offRouteText(failed, RETRY_MS / 1000);
+  const offRouteMsg = offRouteText(failed, RETRY_MS / 1000, reroutingFor);
   const turnPanel = (
     <View style={[styles.turn, offRoute && styles.turnOff]}>
       {!progress ? (

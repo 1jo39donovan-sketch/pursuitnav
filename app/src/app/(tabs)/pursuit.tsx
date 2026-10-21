@@ -59,7 +59,7 @@ export default function PursuitScreen() {
   }
 
   // Road, limit and next junction from the server, about once a second. Each
-  // request gives up after 8 s (no signal) rather than hanging; answers older
+  // request gives up after 8 s rather than hanging; answers older
   // than 10 s are shown as "—", never as last known.
   const [feed, setFeed] = useState(EMPTY_FEED);
   const [now, setNow] = useState(() => Date.now());
@@ -186,10 +186,10 @@ export default function PursuitScreen() {
   const note = fix ? feedNote(feed, now) : null;
   const serverNote =
     note &&
-    (note.noSignal ? (
+    (note.title ? (
       <View style={styles.noSignal} accessibilityRole="alert">
-        <Text style={styles.noSignalTitle}>NO SIGNAL</Text>
-        <Text style={styles.noSignalText}>{note.text.replace(/^No signal: /, "")}</Text>
+        <Text style={styles.noSignalTitle}>{note.title}</Text>
+        <Text style={styles.noSignalText}>{note.text}</Text>
       </View>
     ) : (
       <Text style={styles.note}>{note.text}</Text>

@@ -3,8 +3,8 @@
 import { API_URL } from "../config";
 import type { RoadChoice } from "../session/SessionProvider";
 import type { VehicleType } from "../vehicles";
-import { isNoSignal, serverJson } from "./http";
-import { NoSignalRouteError, RouteError, type PoliceRoute } from "./routes";
+import { ROUTE_TIMEOUT_MS, serverJson } from "./http";
+import { RouteError, routeFailure, type PoliceRoute } from "./routes";
 
 export interface SealedMember {
   memberId: string;
@@ -16,16 +16,16 @@ export class NoTeamError extends Error {}
 
 type Answer = { ok: boolean; status: number; body: unknown };
 
-async function call(path: string, init?: RequestInit): Promise<Answer> {
+async function call(path: string, init?: RequestInit, timeoutMs?: number): Promise<Answer> {
   if (!API_URL) throw new RouteError("Team sessions need the Blue Route server, which isn't set up in this build.");
   try {
-    return await serverJson(`${API_URL}${path}`, {
-      ...init,
-      headers: init?.body ? { "content-type": "application/json" } : undefined,
-    });
+    return await serverJson(
+      `${API_URL}${path}`,
+      { ...init, headers: init?.body ? { "content-type": "application/json" } : undefined },
+      { timeoutMs },
+    );
   } catch (err) {
-    if (isNoSignal(err)) throw new NoSignalRouteError();
-    throw err;
+    throw routeFailure(err);
   }
 }
 
@@ -67,7 +67,7 @@ export async function fetchFollow(
     method: "POST",
     body: JSON.stringify({ from, track: track.map((p) => [p.lng, p.lat]), vehicle, roads }),
     signal,
-  });
+  }, ROUTE_TIMEOUT_MS);
   if (!res.ok || !res.body) {
     const message = (res.body as { message?: string } | null)?.message;
     throw new RouteError(message ?? `Couldn't work out their way in (${res.status}).`);

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { bearerMatches, buildApp } from "../../src/app.js";
 import type { ServerConfig } from "../../src/config.js";
-import type { Route, Router } from "../../src/valhalla.js";
+import { ValhallaError, type Route, type Router } from "../../src/valhalla.js";
 import { UsageStore } from "../../src/usage.js";
 
 const A = "a".repeat(32);
@@ -187,6 +187,26 @@ describe("usage API", () => {
     expect(tooMany.statusCode).toBe(400);
   });
 
+  it("doesn't count a feature that isn't set up as a server error, but does count a real failure", async () => {
+    const { usage, app } = setup();
+    // No OS Places key on this server: a deliberate 503.
+    const off = await app.inject({ method: "POST", url: "/v1/addresses", headers, payload: { query: "54 Caledonian Road" } });
+    expect(off.statusCode).toBe(503);
+    expect(usage.stats(1).days[0]!.counts.server_errors).toBe(0);
+    // The routing engine failing is a real server error.
+    const failing: Router = {
+      route: async () => {
+        throw new ValhallaError("engine down", 503, undefined);
+      },
+      traceEdges: async () => [],
+    };
+    const usage2 = new UsageStore(":memory:");
+    const app2 = buildApp(config, failing, undefined, undefined, undefined, undefined, undefined, usage2);
+    const down = await app2.inject({ method: "POST", url: "/v1/routes", headers, payload: trip });
+    expect(down.statusCode).toBe(503);
+    expect(usage2.stats(1).days[0]!.counts.server_errors).toBe(1);
+  });
+
   it("guards /stats with the bearer token", async () => {
     const { app } = setup();
     expect((await app.inject({ method: "GET", url: "/stats" })).statusCode).toBe(401);
@@ -201,5 +221,26 @@ describe("usage API", () => {
     const { app } = setup({ ...config, statsToken: undefined });
     const res = await app.inject({ method: "GET", url: "/stats", headers: { authorization: "Bearer anything" } });
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe("CORS preflight", () => {
+  it("lets the browser keep the answer, so a first request doesn't pay an extra round trip each time", async () => {
+    const app = buildApp({ bounds: [-1, 51, 1, 52], placesFile: "/nonexistent" } as unknown as ServerConfig, {
+      route: async () => ({}) as never,
+      traceEdges: async () => [],
+    });
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/v1/routes",
+      headers: {
+        origin: "https://example.github.io",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,x-install-id,x-app-version",
+      },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(Number(res.headers["access-control-max-age"])).toBeGreaterThanOrEqual(600);
+    expect(String(res.headers["access-control-allow-headers"])).toContain("x-install-id");
   });
 });

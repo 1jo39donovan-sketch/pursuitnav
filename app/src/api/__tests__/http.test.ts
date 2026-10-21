@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NoSignalError, SERVER_TIMEOUT_MS, serverJson, serverRequest, setClientHooks } from "../http";
+import { NoAnswerError, NoSignalError, SERVER_TIMEOUT_MS, serverJson, serverRequest, setClientHooks } from "../http";
 
 /** A fetch that never answers, like a phone in a dead spot. */
 const hangs = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
@@ -11,7 +11,7 @@ describe("serverRequest", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("times out at 8 seconds as no signal instead of hanging", async () => {
+  it("times out at 8 seconds as no answer (not no signal) instead of hanging", async () => {
     expect(SERVER_TIMEOUT_MS).toBe(8000);
     const result = serverJson("https://x/v1/routes", {}, { fetchFn: hangs });
     const caught = result.catch((e: unknown) => e);
@@ -24,7 +24,7 @@ describe("serverRequest", () => {
     await Promise.resolve();
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
-    expect(await caught).toBeInstanceOf(NoSignalError);
+    expect(await caught).toBeInstanceOf(NoAnswerError);
   });
 
   it("times out even when the answer starts but the body never finishes", async () => {
@@ -35,10 +35,20 @@ describe("serverRequest", () => {
     })) as unknown as typeof fetch;
     const caught = serverJson("https://x", {}, { fetchFn: stalls }).catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(SERVER_TIMEOUT_MS);
-    expect(await caught).toBeInstanceOf(NoSignalError);
+    expect(await caught).toBeInstanceOf(NoAnswerError);
   });
 
-  it("treats no network at all as no signal", async () => {
+  it("can give a slow call longer", async () => {
+    const caught = serverJson("https://x", {}, { fetchFn: hangs, timeoutMs: 30_000 }).catch((e: unknown) => e);
+    let settled = false;
+    void caught.then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(SERVER_TIMEOUT_MS);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(30_000 - SERVER_TIMEOUT_MS);
+    expect(await caught).toBeInstanceOf(NoAnswerError);
+  });
+
+  it("calls it no signal only when the network fails", async () => {
     const offline = (async () => {
       throw new TypeError("Network request failed");
     }) as unknown as typeof fetch;
@@ -52,6 +62,7 @@ describe("serverRequest", () => {
     const err = (await caught) as Error;
     expect(err.name).toBe("AbortError");
     expect(err).not.toBeInstanceOf(NoSignalError);
+    expect(err).not.toBeInstanceOf(NoAnswerError);
   });
 
   it("returns the answer, with errors from the server as a status", async () => {
@@ -94,7 +105,7 @@ describe("usage hooks", () => {
   it("reports a timeout, but not for the usage report itself", async () => {
     vi.useFakeTimers();
     let timeouts = 0;
-    setClientHooks({ onNoSignal: () => timeouts++ });
+    setClientHooks({ onTimeout: () => timeouts++ });
     const a = serverJson("https://x", {}, { fetchFn: hangs }).catch(() => {});
     const b = serverJson("https://x", {}, { fetchFn: hangs, uncounted: true }).catch(() => {});
     await vi.advanceTimersByTimeAsync(SERVER_TIMEOUT_MS);
