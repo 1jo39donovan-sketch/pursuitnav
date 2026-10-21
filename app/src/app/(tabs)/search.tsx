@@ -19,6 +19,7 @@ import { formatDistance } from "../../format";
 import { distanceM } from "../../geo";
 import { routeOrigin, useLocation } from "../../location/LocationProvider";
 import { useNavigation } from "../../navigation/NavigationProvider";
+import { planIsStale } from "../../navigation/routeChoice";
 import type { SearchResult } from "../../search/engine";
 import { mergeAddresses } from "../../search/merge";
 import { DEFAULT_MARKER_GROUPS, GROUP_COLOR, MARKER_GROUPS } from "../../search/placeGroups";
@@ -94,7 +95,8 @@ export default function SearchScreen() {
       request.current?.abort();
       setDestination(dest);
       if (!fix) {
-        setState({ status: "error", message: "Waiting for a GPS position to route from." });
+        // Routed automatically when the first fix arrives (below).
+        setState({ status: "error", message: "Waiting for a GPS position to route from.", waitingForFix: true });
         return;
       }
       const controller = new AbortController();
@@ -102,6 +104,7 @@ export default function SearchScreen() {
       setState({ status: "loading" });
       const to = { lat: dest.point[1], lng: dest.point[0] };
       const from = routeOrigin(fix);
+      const origin = { madeAt: Date.now(), from };
       // The standard route comes back in a second or so; the blue-light one
       // takes longer to check, so show the standard route as soon as it's here.
       const quick = fetchRoutes(from, to, vehicle, controller.signal, true, roads);
@@ -109,25 +112,25 @@ export default function SearchScreen() {
       let fullDone = false;
       quick
         .then((plan) => {
-          if (!controller.signal.aborted && !fullDone) setState({ status: "ready", plan, checking: !!full });
+          if (!controller.signal.aborted && !fullDone) setState({ status: "ready", plan, checking: !!full, origin });
         })
         .catch(() => {});
       try {
         if (!full) {
           const plan = await quick;
-          if (!controller.signal.aborted) setState({ status: "ready", plan });
+          if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
           return;
         }
         const plan = await full;
         fullDone = true;
-        if (!controller.signal.aborted) setState({ status: "ready", plan });
+        if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
       } catch (err) {
         fullDone = true;
         if (controller.signal.aborted) return;
         // The blue-light check failed but the standard route may be fine.
         const standard = await quick.catch(() => null);
         if (standard) {
-          setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" } });
+          setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" }, origin });
           return;
         }
         const message = err instanceof RouteError ? err.message : "Something went wrong working out routes.";
@@ -159,11 +162,14 @@ export default function SearchScreen() {
     handledParams.current = params.from;
     const title = params.title ?? "Destination";
     setQuery(title);
-    choose({ point: [Number(params.lng), Number(params.lat)], title }, "", boroughAt(Number(params.lat), Number(params.lng)));
+    choose(
+      { point: [Number(params.lng), Number(params.lat)], title },
+      "",
+      boroughAt(Number(params.lat), Number(params.lng)),
+    );
     // choose() is recreated each render; only new params should trigger this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.from, params.lat, params.lng, params.title]);
-
 
   const pick = (r: SearchResult) => {
     Keyboard.dismiss();
@@ -175,7 +181,11 @@ export default function SearchScreen() {
         : r.precision === "postcode" && r.kind !== "postcode"
           ? "Routes to the postcode, which may cover several doors."
           : undefined;
-    choose({ point: [r.lng, r.lat], title: r.label, note, road: r.precision === "road" ? r.road : undefined }, query, r.borough);
+    choose(
+      { point: [r.lng, r.lat], title: r.label, note, road: r.precision === "road" ? r.road : undefined },
+      query,
+      r.borough,
+    );
   };
 
   const clear = () => {
@@ -185,6 +195,37 @@ export default function SearchScreen() {
     setQuery("");
     setShowOutside(false);
   };
+
+  // Refused for want of a GPS position: route as soon as the first fix arrives.
+  const hasFix = !!fix;
+  useEffect(() => {
+    if (!hasFix || !destination || state?.status !== "error" || !state.waitingForFix) return;
+    const t = setTimeout(() => routeTo(destination), 0);
+    return () => clearTimeout(t);
+    // Only when the first fix arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasFix]);
+
+  // Back from navigation: a plan from where the crew were before is never
+  // offered again. After arriving, or "New destination", start clean and
+  // ready to type; after End, work the routes out again from here.
+  const handledEnd = useRef(navigation.ended);
+  useEffect(() => {
+    const ended = navigation.ended;
+    if (!ended || handledEnd.current === ended) return;
+    const t = setTimeout(() => {
+      handledEnd.current = ended;
+      if (ended.reason === "end" && destination) {
+        routeTo(destination);
+        return;
+      }
+      clear();
+      input.current?.focus();
+    }, 0);
+    return () => clearTimeout(t);
+    // Only when navigation ends.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation.ended]);
 
   // Place markers for the chosen kinds of place, across the selected boroughs.
   const markers = useMemo<GeoJSON.FeatureCollection | null>(() => {
@@ -208,7 +249,7 @@ export default function SearchScreen() {
 
   // Blue-light routes only for someone who has said they drive for an emergency service.
   const shown = useMemo<PlanState | null>(
-    () => (state?.status === "ready" && !policeRoutes ? { status: "ready", plan: withoutPolice(state.plan) } : state),
+    () => (state?.status === "ready" && !policeRoutes ? { ...state, plan: withoutPolice(state.plan) } : state),
     [state, policeRoutes],
   );
   const plan = shown?.status === "ready" ? shown.plan : null;
@@ -416,15 +457,20 @@ export default function SearchScreen() {
             choose({ point: [b.lng, b.lat], title: `${b.name}, ${destination.road}` }, query, b.borough);
           }}
           onClose={clear}
+          onRetry={() => routeTo(destination)}
           onOpenExternal={(app) => destination.logId && log.setRoute(destination.logId, app)}
           onGo={(kind) => {
             if (shown.status !== "ready") return;
             if (destination.logId) log.setRoute(destination.logId, kind);
-            navigation.start(kind, shown.plan, {
-              lat: destination.point[1],
-              lng: destination.point[0],
-              title: destination.title ?? "Destination",
-            });
+            // An old plan, or one from somewhere else: go now, and re-route from here at once.
+            const stale = !shown.origin || planIsStale(shown.origin, fix, Date.now());
+            navigation.start(
+              kind,
+              shown.plan,
+              { lat: destination.point[1], lng: destination.point[0], title: destination.title ?? "Destination" },
+              undefined,
+              stale,
+            );
             router.push("/navigate");
           }}
         />
