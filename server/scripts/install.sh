@@ -78,7 +78,9 @@ STATS_TOKEN=${STATS_TOKEN:-}
 
 say "Installing Docker and basics"
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl git ufw dnsutils cron >/dev/null
+apt-get install -y -qq ca-certificates curl git ufw dnsutils cron unattended-upgrades >/dev/null
+# Security fixes for the operating system, installed automatically each day.
+printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' >/etc/apt/apt.conf.d/20auto-upgrades
 if ! command -v docker >/dev/null; then
   curl -fsSL https://get.docker.com | sh >/dev/null
 fi
@@ -128,7 +130,7 @@ cd "$DIR/server"
 [ -f docker-compose.yml ] || fail "No server code on branch $BRANCH. Merge the pull request into main first, or run with BRANCH=<branch>."
 
 umask 077
-printf 'DOMAIN=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\n' "$DOMAIN" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" >.env
+printf 'DOMAIN=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\nBRANCH=%s\nVERSION=%s\n' "$DOMAIN" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" "$BRANCH" "$(git -C "$DIR" rev-parse --short HEAD)" >.env
 [ -n "$GEOCODER_SETTINGS" ] && printf '%s\n' "$GEOCODER_SETTINGS" >>.env
 umask 022
 
@@ -157,12 +159,8 @@ if ! grep -q '^NOMINATIM_DATA=' .env; then
   bash scripts/build-geocoder.sh --background </dev/null
 fi
 
-say "Weekly map and places refresh (Sundays 03:15); nightly code update from $BRANCH (04:30)"
-cat >/etc/cron.d/blue-route <<EOF
-15 3 * * 0 root bash $DIR/server/scripts/rebuild-tiles.sh >> /var/log/blue-route-tiles.log 2>&1
-30 4 * * * root BRANCH=$BRANCH bash $DIR/server/scripts/update.sh >> /var/log/blue-route-update.log 2>&1
-EOF
-chmod 644 /etc/cron.d/blue-route
+say "New tested code from $BRANCH every 5 minutes; map and places refresh on Sundays (03:15)"
+bash scripts/cron.sh
 
 say "Checking HTTPS"
 for i in $(seq 1 20); do

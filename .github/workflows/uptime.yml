@@ -1,0 +1,37 @@
+# Checks the live server every 10 minutes: /health, a London route and
+# address search (server/scripts/check-server.sh). If a check fails, this
+# run fails, and GitHub emails about it (Settings → Notifications → Actions),
+# so a broken server is noticed before an officer finds it.
+# GitHub pauses scheduled workflows after 60 days with no commits; re-enable
+# it from the Actions tab if that happens.
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: server/scripts/check-server.sh
+          sparse-checkout-cone-mode: false
+      - name: Check https://${{ vars.SERVER_DOMAIN }}
+        env:
+          DOMAIN: ${{ vars.SERVER_DOMAIN }}
+        run: |
+          [ -n "$DOMAIN" ] || { echo "No SERVER_DOMAIN variable set: nothing to check."; exit 0; }
+          # One retry a minute later: a restart during an update takes seconds.
+          bash server/scripts/check-server.sh "https://$DOMAIN" ||
+            { sleep 60; bash server/scripts/check-server.sh "https://$DOMAIN"; }

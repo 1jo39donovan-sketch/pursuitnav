@@ -10,6 +10,10 @@ on:
         description: "Delete the existing server and build a fresh one (nothing officers rely on is stored on it)"
         type: boolean
         default: false
+      branch:
+        description: "Code to run: main for the live server. Another branch only for a test server."
+        type: string
+        default: main
 
 permissions:
   contents: read
@@ -32,7 +36,9 @@ jobs:
       DOMAIN: ${{ vars.SERVER_DOMAIN }}
       CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
       NAME: blue-route
-      BRANCH: ${{ github.ref_name }}
+      # The live server runs only main (merged, tested code); it then follows
+      # main by itself every 5 minutes (server/scripts/update.sh).
+      BRANCH: ${{ inputs.branch || 'main' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -74,7 +80,7 @@ jobs:
           fi
 
           if hcloud server describe "$NAME" >/dev/null 2>&1; then
-            echo "Server $NAME already exists; leaving it as it is (it updates itself nightly)."
+            echo "Server $NAME already exists; leaving it as it is (it takes new code from main every 5 minutes)."
           else
             # First boot runs the installer unattended. Only the domain and the
             # OS keys (and contact email) go to the server; the DuckDNS token stays here.
@@ -213,7 +219,7 @@ jobs:
               tidy
               exit 0
             fi
-            # A server still on older code only reports ok; it updates itself overnight.
+            # A server still on older code only reports ok; it updates itself within minutes.
             if grep -q '"ok":true' <<<"$health" && ! grep -q '"routing"' <<<"$health"; then
               echo "https://${DOMAIN} is up (older version: it can't report whether the map is built yet)."
               tidy

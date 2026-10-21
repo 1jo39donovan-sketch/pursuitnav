@@ -158,6 +158,7 @@ export function buildApp(
       addresses,
       learning: Boolean(learning),
       ...(closures ? { closures: closures.summary().active } : {}),
+      ...(config.version ? { version: config.version } : {}),
     };
   });
 

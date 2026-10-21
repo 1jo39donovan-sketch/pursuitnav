@@ -69,7 +69,7 @@ Add secret `ANDROID_KEYSTORE_PASSWORD`: a long random password (a password manag
 
 ## 6. Run it
 
-1. **Actions → Deploy server → Run workflow.** It rents the server, points the domain at it, installs everything and waits until `https://SERVER_DOMAIN` answers: usually 20–40 minutes.
+1. **Actions → Deploy server → Run workflow.** It rents the server, points the domain at it, installs everything and waits until `https://SERVER_DOMAIN` answers, with house-number search: about two hours the first time. Run it once: from then on the server takes each change merged to `main` by itself within about 5 minutes, checks it works, and goes back to the last good version if not (server/README.md, "Updates").
 2. **Actions → Android app → Run workflow.** About 20–30 minutes. Then open the **Android app** release page (Code → Releases) on the phone and install `blue-route.apk`.
 
 ## 7. Try it on any phone (optional, free)

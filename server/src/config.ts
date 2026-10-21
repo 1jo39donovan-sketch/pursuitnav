@@ -39,6 +39,8 @@ export interface ServerConfig {
   usageDb?: string;
   /** Bearer token for GET /stats; the endpoint is off without one. */
   statsToken?: string;
+  /** The code version running (a commit, set by scripts/update.sh), shown by GET /health. */
+  version?: string;
 }
 
 // Greater London with a margin, matching the app's region config.
@@ -79,5 +81,6 @@ export function loadConfig(): ServerConfig {
     learnedDir: process.env.LEARNED_DIR ?? "/data/learned",
     usageDb: process.env.USAGE_DB ?? "/data/usage/usage.sqlite",
     statsToken: process.env.STATS_TOKEN || undefined,
+    version: process.env.VERSION || undefined,
   };
 }

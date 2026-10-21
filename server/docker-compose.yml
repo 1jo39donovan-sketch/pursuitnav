@@ -44,6 +44,8 @@ services:
       TFL_APP_KEY: ${TFL_APP_KEY:-}
       # 1 accepts opt-in learning uploads. Do the privacy steps in docs/ROADMAP.md first.
       LEARNING: ${LEARNING:-0}
+      # The code version running (update.sh sets it), shown by GET /health.
+      VERSION: ${VERSION:-}
       # Bearer token for GET /stats (usage counts); /stats is off without it.
       STATS_TOKEN: ${STATS_TOKEN:-}
 

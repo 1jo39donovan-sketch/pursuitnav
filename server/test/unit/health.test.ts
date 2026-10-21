@@ -50,6 +50,14 @@ describe("GET /health", () => {
     }
   });
 
+  it("says which code version it runs", async () => {
+    const res = await buildApp({ ...config("http://127.0.0.1:1"), version: "c9d9b94" }, {} as Router).inject({
+      method: "GET",
+      url: "/health",
+    });
+    expect(res.json().version).toBe("c9d9b94");
+  });
+
   it("says when routing is ready", async () => {
     const valhalla = createServer((_req, res) => res.end("{}")).listen(0);
     try {
