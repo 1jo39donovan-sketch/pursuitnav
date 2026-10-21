@@ -14,6 +14,11 @@ on:
         description: "Code to run: main for the live server. Another branch only for a test server."
         type: string
         default: main
+      server_type:
+        description: "Hetzner server type: cx23 (4 GB, about €4 a month). cx33 (8 GB) costs more: only if agreed."
+        type: choice
+        options: [cx23, cx33]
+        default: cx23
 
 permissions:
   contents: read
@@ -123,9 +128,12 @@ jobs:
               ssh_args+=(--ssh-key blue-route-admin)
             fi
 
-            # Cheapest first; small plans sell out at times, so try a few.
+            # x86 only: the house-number database is built on GitHub's x86
+            # machines, and a database folder is only certain to work on the
+            # kind of machine it was built on. Small plans sell out at times,
+            # so a few locations are tried; never a bigger (dearer) type.
             created=0
-            for type in cx23 cax11 cx33 cax21; do
+            for type in "${{ inputs.server_type || 'cx23' }}"; do
               for location in nbg1 fsn1 hel1; do
                 echo "Trying $type in $location"
                 if hcloud server create --name "$NAME" --type "$type" --image ubuntu-24.04 --location "$location" \
@@ -151,7 +159,7 @@ jobs:
             done
             # Only needed while creating the server; the key itself stays with this run.
             hcloud ssh-key delete "$KEY_NAME" >/dev/null || true
-            [ "$created" = 1 ] || { echo "::error::Hetzner had no suitable server available. Try again later."; exit 1; }
+            [ "$created" = 1 ] || { echo "::error::Hetzner had no ${{ inputs.server_type || 'cx23' }} available in nbg1, fsn1 or hel1. Try again later (a bigger type costs more: only if agreed)."; exit 1; }
           fi
 
           IP=$(hcloud server ip "$NAME")

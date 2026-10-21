@@ -80,10 +80,15 @@ after_update() {
   if [ ! -s data/places/roads.txt.gz ]; then
     bash scripts/build-places.sh </dev/null || say "search data rebuild failed; the weekly refresh will retry"
   fi
-  # A server from before house-number search builds it now (in the
-  # background: it takes about an hour) rather than waiting for the weekly refresh.
+  # A server from before house-number search gets it now rather than at the
+  # next daily refresh: downloaded from GitHub, or else built here in the
+  # background (it takes about an hour).
   if ! grep -q '^NOMINATIM_DATA=' .env 2>/dev/null; then
-    bash scripts/build-geocoder.sh --background </dev/null || say "couldn't start the geocoder build"
+    code=0
+    bash scripts/fetch-data.sh </dev/null || code=$?
+    if [ "$code" = 2 ]; then
+      bash scripts/build-geocoder.sh --background </dev/null || say "couldn't start the geocoder build"
+    fi
   fi
   # Live closures need Valhalla's avoid-area limits raised (new map builds do it).
   if [ "$(bash scripts/valhalla-limits.sh data/valhalla || true)" = "changed" ]; then

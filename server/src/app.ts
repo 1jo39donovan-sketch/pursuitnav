@@ -11,6 +11,7 @@ import { BANDS, type LearningStore, type Sample } from "./learning.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
 import { privacyPage, supportPage } from "./pages.js";
+import { dataRelease, machineMemory } from "./serverInfo.js";
 import { PlacesError, type PlacesClient } from "./places.js";
 import { FollowWrongWayError, planFollow } from "./follow.js";
 import { NoSafeRouteError, planRoutes } from "./plan.js";
@@ -159,6 +160,7 @@ export function buildApp(
       learning: Boolean(learning),
       ...(closures ? { closures: closures.summary().active } : {}),
       ...(config.version ? { version: config.version } : {}),
+      ...(await dataRelease(config.placesFile).then((data) => (data ? { data } : {}))),
     };
   });
 
@@ -422,7 +424,7 @@ export function buildApp(
     if (!bearerMatches(req.headers.authorization, statsToken)) {
       return reply.code(401).header("www-authenticate", "Bearer").send({ error: "unauthorized" });
     }
-    return usage.stats();
+    return { ...usage.stats(), server: await machineMemory() };
   });
 
   // Team sessions. Blobs are sealed on the phones with a key the server never

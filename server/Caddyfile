@@ -1,5 +1,14 @@
-# HTTPS with an automatic Let's Encrypt certificate. Access logging is off
-# (Caddy's default): requests carry officers' positions.
+# HTTPS with an automatic certificate. Access logging is off (Caddy's
+# default): requests carry officers' positions.
+#
+# With an email, Caddy can also get the certificate from ZeroSSL when Let's
+# Encrypt refuses: Let's Encrypt allows only 5 certificates for one name a
+# week, and on 21 Oct 2026 rebuilt servers used them all, leaving the server
+# without HTTPS until the limit reset.
+{
+	email {$ACME_EMAIL}
+}
+
 {$DOMAIN} {
 	encode gzip
 	reverse_proxy api:3000

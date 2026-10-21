@@ -1,0 +1,89 @@
+# Builds London's map and search data each week on GitHub's machines (free
+# for a public repository, and far bigger than the server) and publishes them
+# as a release, data-YYYYMMDD-HHMM. Servers download the newest one daily
+# (server/scripts/fetch-data.sh) instead of building it themselves: minutes
+# instead of two hours, with nothing competing with officers' requests.
+#
+# What's built (the same scripts a server would run, server/scripts):
+#   - the routing map: Valhalla tiles with travel speeds (map-build.sh)
+#   - the places and named-roads lists the app keeps offline (map-build.sh)
+#   - the house-number search: a Nominatim database (geocoder-import.sh)
+# All of it is OpenStreetMap data (© OpenStreetMap contributors, ODbL),
+# already public; no officer or search data is involved.
+name: Map data
+
+on:
+  schedule:
+    # Sundays 01:00 UTC: Geofabrik's London extract is out by then.
+    - cron: "0 1 * * 0"
+  workflow_dispatch:
+  # A change to this workflow builds and publishes at once, so it's tried for real.
+  push:
+    paths: [".github/workflows/data.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: map-data
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    defaults:
+      run:
+        working-directory: server
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Room to build (toolchains this job doesn't use)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Tools
+        run: |
+          printf 'DOMAIN=localhost\n' > .env
+          docker compose build places
+
+      - name: Routing map and places
+        run: |
+          start=$(date +%s)
+          bash scripts/map-build.sh
+          echo "MAP_MINUTES=$(( ($(date +%s) - start + 59) / 60 ))" >> "$GITHUB_ENV"
+          du -sh data/valhalla-next data/places-next
+
+      - name: House-number search
+        run: |
+          # As root, as on a server: the database's files belong to its container's postgres user.
+          sudo env BUILD_REPORT="$RUNNER_TEMP/geocoder.json" GEOCODER_THREADS=4 bash scripts/geocoder-import.sh ./data/nominatim/a
+          cat "$RUNNER_TEMP/geocoder.json"
+
+      - name: Package
+        run: |
+          sudo bash scripts/data-package.sh ./data/nominatim/a data/release "$RUNNER_TEMP/geocoder.json"
+          ls -la data/release
+
+      - name: Publish
+        run: |
+          tag="data-$(date -u +%Y%m%d-%H%M)"
+          {
+            echo "London map and search data built $(date -u '+%d %b %Y %H:%M') UTC for Blue Route servers."
+            echo
+            echo "Servers download this themselves (server/scripts/fetch-data.sh); there's nothing to install by hand."
+            echo "Map build: ${MAP_MINUTES} min. House-number search: $(cat "$RUNNER_TEMP/geocoder.json")"
+            echo
+            echo "Map data © OpenStreetMap contributors, under the Open Database License."
+          } > "$RUNNER_TEMP/notes.md"
+          gh release create "$tag" data/release/* --title "Map data $(date -u +%Y-%m-%d)" \
+            --notes-file "$RUNNER_TEMP/notes.md" --prerelease --latest=false
+          echo "Published $tag"
+
+      - name: Keep the newest three
+        run: |
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^data-' | sort -r | tail -n +4 |
+            while read -r old; do gh release delete "$old" --yes --cleanup-tag; echo "Deleted $old"; done

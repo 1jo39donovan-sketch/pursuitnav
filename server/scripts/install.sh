@@ -78,7 +78,7 @@ STATS_TOKEN=${STATS_TOKEN:-}
 
 say "Installing Docker and basics"
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl git ufw dnsutils cron unattended-upgrades >/dev/null
+apt-get install -y -qq ca-certificates curl git ufw dnsutils cron unattended-upgrades zstd python3 >/dev/null
 # Security fixes for the operating system, installed automatically each day.
 printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' >/etc/apt/apt.conf.d/20auto-upgrades
 if ! command -v docker >/dev/null; then
@@ -134,11 +134,15 @@ printf 'DOMAIN=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=
 [ -n "$GEOCODER_SETTINGS" ] && printf '%s\n' "$GEOCODER_SETTINGS" >>.env
 umask 022
 
-say "Building the routing map and places list. This takes 20–40 minutes the first time."
 if [ -s data/valhalla/valhalla_tiles.tar ]; then
-  echo "Map already built; the weekly refresh keeps it current."
+  echo "Map already in place; the daily refresh keeps it current."
 else
-  bash scripts/build-map.sh </dev/null
+  say "Downloading London's map, places and house-number search (built on GitHub: a few minutes)"
+  bash scripts/fetch-data.sh </dev/null || true
+  if [ ! -s data/valhalla/valhalla_tiles.tar ]; then
+    say "Nothing to download: building the map and places here instead. 20–40 minutes."
+    bash scripts/build-map.sh </dev/null
+  fi
 fi
 
 say "Starting Valhalla, the API and HTTPS"
@@ -159,7 +163,7 @@ if ! grep -q '^NOMINATIM_DATA=' .env; then
   bash scripts/build-geocoder.sh --background </dev/null
 fi
 
-say "New tested code from $BRANCH every 5 minutes; map and places refresh on Sundays (03:15)"
+say "New tested code from $BRANCH every 5 minutes; newest map and search data daily (03:15)"
 bash scripts/cron.sh
 
 say "Checking HTTPS"
