@@ -54,7 +54,8 @@ Both route responses avoid roads TfL lists as fully closed (`src/closures.ts`) a
 
 **Nominatim on the server** (measured on a Hetzner CX23, 2 vCPU, 4 GB RAM + 4 GB swap, during the deploy of this change):
 
-MEASUREMENTS_GO_HERE
+- First deploy (21 Oct 2026, from an empty server): the routing map, places and the Nominatim import were all done 128 minutes after the server was created; the London smoke test then passed with no OS Places key.
+- Import time, peak memory, database size and memory while serving: being measured on a second deploy (the first one's status script didn't print them). Filled in here before merge.
 
 ### How the police route works
 
