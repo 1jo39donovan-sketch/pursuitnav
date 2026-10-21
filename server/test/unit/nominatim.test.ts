@@ -12,9 +12,11 @@ const house = (over: Partial<NominatimResult> = {}): NominatimResult => ({
   osm_id: 123456,
   lat: "51.5441",
   lon: "-0.1171",
-  category: "building",
-  type: "yes",
+  // A mapped building with only an address: Nominatim calls it place/house.
+  category: "place",
+  type: "house",
   importance: 0.3,
+  geojson: { type: "Polygon" },
   address: { house_number: "53", road: "Caledonian Road", postcode: "N7 9RN" },
   ...over,
 });
@@ -29,12 +31,9 @@ const street: NominatimResult = {
   name: "Caledonian Road",
   address: { road: "Caledonian Road" },
 };
-const interpolation = house({
-  osm_id: 999,
-  category: "place",
-  type: "house",
-  address: { house_number: "53", road: "Caledonian Road" },
-});
+// A number worked out along an addr:interpolation line: the same category, but only a point on a way.
+const interpolation = house({ osm_id: 999, geojson: { type: "Point" } });
+const doorNode = house({ osm_type: "node", osm_id: 5, geojson: { type: "Point" } });
 
 function client(results: unknown, status = 200) {
   const calls: string[] = [];
@@ -76,6 +75,7 @@ describe("Nominatim queries", () => {
     expect(url.searchParams.get("viewbox")).toBe("-0.52,51.28,0.34,51.70");
     expect(url.searchParams.get("countrycodes")).toBe("gb");
     expect(url.searchParams.get("format")).toBe("jsonv2");
+    expect(url.searchParams.get("polygon_geojson")).toBe("1");
   });
 });
 
@@ -91,6 +91,12 @@ describe("Nominatim precision", () => {
     // Another number, or another street: not what was asked for.
     expect(classify(house({ address: { house_number: "55", road: "Caledonian Road" } }), asked)).toBeNull();
     expect(classify(house({ address: { house_number: "53", road: "Holloway Road" } }), asked)).toBeNull();
+  });
+
+  it("calls a mapped building or node with the address the door, whatever Nominatim's category", () => {
+    expect(classify(house(), asked)?.precision).toBe("door");
+    expect(classify(doorNode, asked)?.precision).toBe("door");
+    expect(classify(house({ category: "building", type: "yes" }), asked)?.precision).toBe("door");
   });
 
   it("calls an interpolated number a point on the road", () => {

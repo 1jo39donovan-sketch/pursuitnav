@@ -16,6 +16,8 @@ export interface NominatimResult {
   type: string;
   name?: string;
   importance?: number;
+  /** With polygon_geojson=1: the object's shape (a building's outline, a node's point). */
+  geojson?: { type: string };
   address?: {
     house_number?: string;
     road?: string;
@@ -82,9 +84,14 @@ export function parseQuery(query: string): ParsedQuery {
   return { unit, q, number: numbered[1]!.toLowerCase(), street };
 }
 
-/** An interpolated number: a point worked out along an address line, not a mapped door. */
-function interpolated(r: NominatimResult): boolean {
-  return r.osm_type === "way" && r.category === "place" && r.type === "house";
+/**
+ * An interpolated number: a point worked out along an address line, not a
+ * mapped door. Its category is the same as a mapped building's (place/house),
+ * so it's told apart by shape: a way that's only a point. A mapped building
+ * comes back as its outline, a mapped node as a point on a node.
+ */
+export function interpolated(r: NominatimResult): boolean {
+  return r.osm_type === "way" && r.geojson?.type === "Point";
 }
 
 function osmId(r: NominatimResult): string {
@@ -142,6 +149,9 @@ export class NominatimClient implements PlacesClient {
       viewbox: LONDON_VIEWBOX,
       bounded: "1",
       limit: "10",
+      // Shapes, simplified (about 10 m), only to tell interpolated numbers from mapped doors.
+      polygon_geojson: "1",
+      polygon_threshold: "0.0001",
     });
     let res: Response;
     try {

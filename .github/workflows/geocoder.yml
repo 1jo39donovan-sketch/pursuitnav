@@ -57,11 +57,31 @@ jobs:
         run: |
           ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$(docker compose ps -q nominatim)")
           echo "NOMINATIM=http://$ip:8080" >> "$GITHUB_ENV"
-          for q in "53 Caledonian Road" "54 Caledonian Road" "Caledonian Road" "N7 8LA"; do
+          python -m venv /tmp/venv && /tmp/venv/bin/pip install -q "osmium==4.*"
+          # A number in the middle of a real addr:interpolation line, to check how it comes back.
+          interp=$(/tmp/venv/bin/python - data/osm/region.osm.pbf <<'PY'
+          import sys, osmium
+          numbers = {n.id: (n.tags.get("addr:housenumber"), n.tags.get("addr:street"))
+                     for n in osmium.FileProcessor(sys.argv[1], osmium.osm.NODE) if "addr:housenumber" in n.tags}
+          for w in osmium.FileProcessor(sys.argv[1], osmium.osm.WAY):
+              if w.tags.get("addr:interpolation") not in ("odd", "even", "all"):
+                  continue
+              (a, street), (b, _) = numbers.get(w.nodes[0].ref, (None, None)), numbers.get(w.nodes[-1].ref, (None, None))
+              if a and b and a.isdigit() and b.isdigit() and street and abs(int(a) - int(b)) >= 4:
+                  lo, hi = sorted((int(a), int(b)))
+                  mid = lo + 2 if w.tags.get("addr:interpolation") != "all" else lo + 1
+                  print(f"{mid} {street}")
+                  break
+          PY
+          )
+          echo "interpolated example: ${interp:-none in this cut}"
+          for q in "53 Caledonian Road" "54 Caledonian Road" "Caledonian Road" "N7 8LA" ${interp:+"$interp"}; do
             echo "== $q"
-            curl -fsS -G --data-urlencode "q=$q" -d format=jsonv2 -d addressdetails=1 -d limit=3 "http://$ip:8080/search" |
-              python3 -c 'import json,sys; [print(json.dumps({k: r.get(k) for k in ("osm_type","osm_id","category","type","addresstype","name","address")})) for r in json.load(sys.stdin)]'
+            curl -fsS -G --data-urlencode "q=$q" -d format=jsonv2 -d addressdetails=1 -d limit=3 \
+              -d polygon_geojson=1 -d polygon_threshold=0.0001 "http://$ip:8080/search" |
+              python3 -c 'import json,sys; [print(json.dumps({**{k: r.get(k) for k in ("osm_type","osm_id","category","type","name")}, "shape": (r.get("geojson") or {}).get("type"), "number": (r.get("address") or {}).get("house_number")})) for r in json.load(sys.stdin)]'
           done
+          echo "INTERP=$interp" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
@@ -75,5 +95,9 @@ jobs:
           NOMINATIM_URL="$NOMINATIM" TFL_CLOSURES=0 USAGE_DB= PORT=3999 npx tsx src/server.ts &
           for _ in $(seq 1 30); do curl -fsS localhost:3999/health && break; sleep 1; done
           echo
-          python -m venv /tmp/venv && /tmp/venv/bin/pip install -q "osmium==4.*"
           /tmp/venv/bin/python scripts/smoke_london.py --api http://localhost:3999 --pbf data/osm/region.osm.pbf --addresses-only
+          # The interpolated number: through the API it must be a point on the road, never the door.
+          if [ -n "$INTERP" ]; then
+            curl -fsS localhost:3999/v1/addresses -H 'content-type: application/json' -d "{\"query\": \"$INTERP\"}" |
+              python3 -c 'import json,sys; a=json.load(sys.stdin)["addresses"]; print([(x["label"], x["precision"]) for x in a[:3]]); sys.exit(1 if any(x["precision"] == "door" and x["label"].startswith(sys.argv[1]) for x in a) else 0)' "$INTERP"
+          fi
