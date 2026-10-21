@@ -84,7 +84,10 @@ function sameKey(a: Address): string {
   return normaliseStreet(a.precision === "door" ? a.label : a.label.split(",")[0]!);
 }
 
-/** Doors first, then postcodes, roads and places; duplicates within 30 m dropped; at most 30. */
+/**
+ * Doors first, then postcodes, roads and places; duplicates within 30 m
+ * dropped, and a road's sections shown once; at most 30.
+ */
 export function mergeResults(lists: Address[][]): Address[] {
   const all = lists
     .flat()
@@ -99,7 +102,12 @@ export function mergeResults(lists: Address[][]): Address[] {
     const key = sameKey(a);
     const dup = kept.some(
       (k) =>
-        k.precision === a.precision && sameKey(k) === key && distanceM([k.lng, k.lat], [a.lng, a.lat]) <= SAME_PLACE_M,
+        k.precision === a.precision &&
+        sameKey(k) === key &&
+        (distanceM([k.lng, k.lat], [a.lng, a.lat]) <= SAME_PLACE_M ||
+          // OS Names lists a long road once per section: the same name in the
+          // same borough and postcode district is one road to the operator.
+          (a.precision === "road" && k.borough === a.borough && k.label === a.label)),
     );
     if (!dup) kept.push(a);
     if (kept.length === MAX_RESULTS) break;

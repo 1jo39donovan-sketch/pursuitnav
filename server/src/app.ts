@@ -226,7 +226,9 @@ export function buildApp(
           .send({ error: "addresses-not-configured", message: "Full address search isn't set up on this server." });
       }
       try {
-        return { addresses: await places.search(req.body.query) };
+        // Older apps key each row by uprn; one per row keeps their lists right.
+        const addresses = (await places.search(req.body.query)).map((a) => ({ ...a, uprn: a.uprn ?? a.id }));
+        return { addresses };
       } catch (err) {
         if (err instanceof PlacesError) {
           // The status only: never the query.

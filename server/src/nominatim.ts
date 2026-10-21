@@ -2,6 +2,7 @@
 // (docker-compose.yml, scripts/build-geocoder.sh): imported from the same
 // London extract as the routing map, on the server's internal network, with
 // no query logs. The public nominatim.openstreetmap.org isn't for this.
+import { parseAddressQuery } from "./addressQuery.js";
 import type { BoroughLookup } from "./boroughArea.js";
 import { PlacesError, type Address, type AddressPrecision, type PlacesClient } from "./places.js";
 
@@ -28,11 +29,6 @@ export interface NominatimResult {
 
 /** Greater London, west,south,east,north, with a margin (the boundaries decide in the end). */
 const LONDON_VIEWBOX = "-0.52,51.28,0.34,51.70";
-
-/** "Flat 3, " / "Unit 2 " at the front: not in OpenStreetMap, so searched without, kept in the label. */
-const SUB_UNIT = /^\s*((?:flat|unit|apartment|apt|room|suite|studio)\s+[\w-]+)\s*,?\s*/i;
-/** "53 Caledonian Road", "53a, Caledonian Road". */
-const NUMBERED = /^(\d+[a-z]?)\s*,?\s+(.+)$/i;
 
 const ABBREVIATIONS: Record<string, string> = {
   rd: "road",
@@ -73,15 +69,18 @@ export interface ParsedQuery {
   street?: string;
 }
 
+/**
+ * What to ask Nominatim: the number and street, without a flat (not in
+ * OpenStreetMap; kept for the label) or a postcode (one that's wrong, or
+ * that OpenStreetMap files the door under differently, and it finds nothing).
+ */
 export function parseQuery(query: string): ParsedQuery {
-  const unitMatch = SUB_UNIT.exec(query);
-  const unit = unitMatch?.[1];
-  const q = unitMatch ? query.slice(unitMatch[0].length).trim() : query.trim();
-  const numbered = NUMBERED.exec(q);
-  if (!numbered) return { unit, q };
-  // The street is up to the first comma: "53 Caledonian Road, N7 8LA".
-  const street = numbered[2]!.split(",")[0]!.trim();
-  return { unit, q, number: numbered[1]!.toLowerCase(), street };
+  const p = parseAddressQuery(query);
+  if (!p.text) return { unit: p.unit, q: p.postcode ?? p.outward ?? query.trim() };
+  if (!p.number) return { unit: p.unit, q: p.text };
+  // The street is up to the first comma: "53 Caledonian Road, Islington".
+  const street = p.text.split(",")[0]!.trim();
+  return { unit: p.unit, q: `${p.number} ${p.text}`, number: p.number, street };
 }
 
 /**
@@ -122,9 +121,9 @@ export function classify(
     return { precision: "door", label: `${prefix}${a.house_number} ${a.road}` };
   }
   if (r.category === "highway") {
-    const road = a.road ?? r.name ?? "";
-    // A street found for a numbered address: the app warns it's the road, not the door.
-    return { precision: "road", label: asked.number ? `${prefix}${asked.number} ${road}` : road };
+    // A street found for a numbered address is labelled as the street alone:
+    // the number isn't mapped, and the label shouldn't suggest it was found.
+    return { precision: "road", label: a.road ?? r.name ?? "" };
   }
   const name = r.name || a.road;
   if (!name) return null;

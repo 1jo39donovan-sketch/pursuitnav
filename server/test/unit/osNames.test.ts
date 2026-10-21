@@ -53,12 +53,43 @@ describe("OS Names", () => {
     expect(f.calls[1]).toContain("fq=LOCAL_TYPE%3APostcode");
   });
 
+  it("asks for the street without the house number, and the postcode on its own", async () => {
+    const f = fakeFetch(() => json({ header: {} }));
+    const client = new OsNamesClient("KEY", boroughs, f.impl);
+    await client.search("Flat 3, 53 Caledonian Road, N7 8LA");
+    const queries = f.calls.map((u) => new URL(u).searchParams.get("query")).sort();
+    expect(queries).toEqual(["Caledonian Road", "N7 8LA"]);
+    f.calls.length = 0;
+    await client.search("53 Caledonian Road, N7");
+    expect(f.calls.map((u) => new URL(u).searchParams.get("query"))).toEqual(["Caledonian Road"]);
+  });
+
+  it("keeps only the postcode asked for, and no postcodes it guessed from a street name", async () => {
+    // What OS Names gave for "53 Caledonian Road, N7 8LA": every 8LA in London.
+    const pc = (id: string, name: string, x: number, y: number) =>
+      entry({ ID: id, NAME1: name, LOCAL_TYPE: "Postcode", GEOMETRY_X: x, GEOMETRY_Y: y });
+    const f = fakeFetch((url) =>
+      new URL(url).searchParams.get("fq")
+        ? json({ results: [pc("n7", "N7 8LA", 530666, 184480), pc("ec1y", "EC1Y 8LA", 532500, 182000)] })
+        : json({ results: [entry({}), pc("n1", "N1 8LA", 531500, 183500)] }),
+    );
+    const out = await new OsNamesClient("KEY", boroughs, f.impl).search("53 Caledonian Road, N7 8LA");
+    expect(out.map((a) => a.id)).toEqual(["os-names:n7", "os-names:osgb4000000074558316"]);
+  });
+
+  it("puts the district asked for first", async () => {
+    const f = fakeFetch(() =>
+      json({ results: [entry({ ID: "n1", POSTCODE_DISTRICT: "N1" }), entry({ ID: "n7", POSTCODE_DISTRICT: "N7" })] }),
+    );
+    const out = await new OsNamesClient("KEY", boroughs, f.impl).search("Caledonian Road, N7");
+    expect(out.map((a) => a.label)).toEqual(["Caledonian Road, N7", "Caledonian Road, N1"]);
+  });
+
   it("converts to latitude and longitude, names the borough, and drops places outside London", async () => {
     const f = fakeFetch(() =>
       json({
         results: [
           entry({}),
-          entry({ ID: "pc", NAME1: "N7 8LA", LOCAL_TYPE: "Postcode", GEOMETRY_X: 530666, GEOMETRY_Y: 184480 }),
           // No borough field we know: from the boundaries.
           entry({
             ID: "kx",
@@ -84,26 +115,42 @@ describe("OS Names", () => {
     const out = await new OsNamesClient("KEY", boroughs, f.impl).search("whatever");
     expect(out.map((a) => [a.id, a.precision, a.borough])).toEqual([
       ["os-names:osgb4000000074558316", "road", "Islington"],
-      ["os-names:pc", "postcode", "Islington"],
       ["os-names:kx", "place", "Camden"],
     ]);
     expect(out[0]).toMatchObject({ source: "os-names", label: "Caledonian Road, N7", postcode: "" });
     expect(out[0]!.lat).toBeCloseTo(51.547, 3);
     expect(out[0]!.lng).toBeCloseTo(-0.118, 3);
-    expect(out[1]).toMatchObject({ label: "N7 8LA", postcode: "N7 8LA" });
+    const pc = await new OsNamesClient(
+      "KEY",
+      boroughs,
+      fakeFetch(() =>
+        json({
+          results: [
+            entry({ ID: "pc", NAME1: "N7 8LA", LOCAL_TYPE: "Postcode", GEOMETRY_X: 530666, GEOMETRY_Y: 184480 }),
+          ],
+        }),
+      ).impl,
+    ).search("N7 8LA");
+    expect(pc[0]).toMatchObject({
+      id: "os-names:pc",
+      precision: "postcode",
+      label: "N7 8LA",
+      postcode: "N7 8LA",
+      borough: "Islington",
+    });
   });
 
   it("treats 400 as no matches, 429 as rate-limited, and anything else as unavailable", async () => {
     const at = (status: number) => new OsNamesClient("SECRET", boroughs, fakeFetch(() => json({}, status)).impl);
-    expect(await at(400).search("x")).toEqual([]);
-    await expect(at(429).search("x")).rejects.toMatchObject({ status: 429 });
-    await expect(at(502).search("x")).rejects.toMatchObject({ status: 503 });
+    expect(await at(400).search("Caledonian Road")).toEqual([]);
+    await expect(at(429).search("Caledonian Road")).rejects.toMatchObject({ status: 429 });
+    await expect(at(502).search("Caledonian Road")).rejects.toMatchObject({ status: 503 });
     const down = new OsNamesClient(
       "SECRET",
       boroughs,
       fakeFetch(() => Promise.reject(new TypeError("fetch failed"))).impl,
     );
-    await expect(down.search("x")).rejects.toMatchObject({ status: 503 });
+    await expect(down.search("Caledonian Road")).rejects.toMatchObject({ status: 503 });
   });
 
   it("gives up after its timeout", async () => {
@@ -113,13 +160,13 @@ describe("OS Names", () => {
         init.signal.addEventListener("abort", () => reject(init.signal.reason)),
       )) as unknown as typeof fetch;
     const client = new OsNamesClient("SECRET", boroughs, impl, undefined, 20);
-    await expect(client.search("x")).rejects.toMatchObject({ status: 503 });
+    await expect(client.search("Caledonian Road")).rejects.toMatchObject({ status: 503 });
   });
 
   it("never puts the key in an error", async () => {
     for (const status of [401, 429, 500]) {
       const err = await new OsNamesClient("SECRET-KEY", boroughs, fakeFetch(() => json({}, status)).impl)
-        .search("x")
+        .search("Caledonian Road")
         .catch((e: PlacesError) => e);
       expect(String((err as Error).message)).not.toContain("SECRET-KEY");
     }
@@ -128,7 +175,7 @@ describe("OS Names", () => {
       boroughs,
       fakeFetch(() => Promise.reject(new TypeError("x"))).impl,
     )
-      .search("x")
+      .search("Caledonian Road")
       .catch((e: Error) => e);
     expect((err as Error).message).not.toContain("SECRET-KEY");
   });

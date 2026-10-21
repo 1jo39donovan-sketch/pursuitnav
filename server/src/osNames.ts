@@ -5,7 +5,8 @@
 import { bngToWgs84, LONDON_BNG_BOUNDS } from "./bng.js";
 import type { BoroughLookup } from "./boroughArea.js";
 import { BOROUGH_NAMES } from "./boroughs.js";
-import { FULL_POSTCODE, PlacesError, type Address, type AddressPrecision, type PlacesClient } from "./places.js";
+import { parseAddressQuery } from "./addressQuery.js";
+import { PlacesError, type Address, type AddressPrecision, type PlacesClient } from "./places.js";
 
 /** The fields of an OS Names GAZETTEER_ENTRY we use. */
 export interface GazetteerEntry {
@@ -43,15 +44,34 @@ export class OsNamesClient implements PlacesClient {
   ) {}
 
   async search(query: string): Promise<Address[]> {
-    const compact = query.replace(/\s/g, "").toUpperCase();
-    const postcode = FULL_POSTCODE.test(compact);
+    const q = parseAddressQuery(query);
+    // Only what OS Names can answer: a postcode (exactly), and the street or
+    // place without its house number. Never the whole line: it guesses at
+    // every part, and a "53" or "8LA" brings back unrelated postcodes.
+    const [postcodes, named] = await Promise.all([
+      q.postcode ? this.find(q.postcode, "LOCAL_TYPE:Postcode") : Promise.resolve([]),
+      q.text.length >= 2 ? this.find(q.text) : Promise.resolve([]),
+    ]);
+    const exact = q.postcode?.replace(/\s/g, "");
+    const kept = [
+      ...postcodes.filter((a) => a.postcode.replace(/\s/g, "") === exact),
+      // Postcodes it guessed at from a street name aren't what was asked for.
+      ...named.filter((a) => a.precision !== "postcode"),
+    ];
+    // "Caledonian Road, N7": that district's sections of the road first.
+    if (!q.outward) return kept;
+    const inDistrict = (a: Address) => a.label.endsWith(`, ${q.outward}`);
+    return [...kept.filter(inDistrict), ...kept.filter((a) => !inDistrict(a))];
+  }
+
+  private async find(text: string, fq?: string): Promise<Address[]> {
     const params = new URLSearchParams({
-      query: postcode ? `${compact.slice(0, -3)} ${compact.slice(-3)}` : query,
+      query: text,
       maxresults: "50",
       bounds: LONDON_BNG_BOUNDS.join(","),
       key: this.key,
     });
-    if (postcode) params.set("fq", "LOCAL_TYPE:Postcode");
+    if (fq) params.set("fq", fq);
 
     let res: Response;
     try {

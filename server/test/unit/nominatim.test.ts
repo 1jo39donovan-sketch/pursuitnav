@@ -58,6 +58,10 @@ describe("Nominatim queries", () => {
       street: "Caledonian Rd",
     });
     expect(parseQuery("Caledonian Road")).toEqual({ unit: undefined, q: "Caledonian Road" });
+    // A postcode or district at the end isn't sent: a wrong one and Nominatim finds nothing.
+    expect(parseQuery("53 Caledonian Road, N7 8LA").q).toBe("53 Caledonian Road");
+    expect(parseQuery("53 Caledonian Road, N7").q).toBe("53 Caledonian Road");
+    expect(parseQuery("n7 8la").q).toBe("N7 8LA");
   });
 
   it("compares street names through common abbreviations", () => {
@@ -104,11 +108,8 @@ describe("Nominatim precision", () => {
     expect(classify(interpolation, asked)?.label).toMatch(/estimated/);
   });
 
-  it("calls a street found for a numbered address the road, labelled with the number", () => {
-    expect(classify(street, parseQuery("54 Caledonian Road"))).toEqual({
-      precision: "road",
-      label: "54 Caledonian Road",
-    });
+  it("calls a street found for a numbered address the road, labelled as the street alone", () => {
+    expect(classify(street, parseQuery("54 Caledonian Road"))).toEqual({ precision: "road", label: "Caledonian Road" });
     expect(classify(street, parseQuery("Caledonian Road"))).toEqual({ precision: "road", label: "Caledonian Road" });
   });
 

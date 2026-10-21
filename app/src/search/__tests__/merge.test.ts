@@ -73,7 +73,7 @@ describe("mergeAddresses", () => {
     ...over,
   });
 
-  it("keeps the server's precision and id, and ranks door, postcode, road, place above the phone's matches", () => {
+  it("keeps the server's precision and id: doors and postcodes above the phone's matches, roads and places below", () => {
     const merged = mergeAddresses(
       { inArea: [road], outside: [] },
       [
@@ -87,11 +87,29 @@ describe("mergeAddresses", () => {
     expect(merged.inArea.map((r) => [r.key, r.precision, r.kind])).toEqual([
       ["osm:W1", "door", "address"],
       ["os-names:pc", "postcode", "postcode"],
-      ["os-names:r", "road", "address"],
-      ["os-names:p", "place", "address"],
       [road.key, "road", "road"],
+      ["os-names:r", "road", "road"],
+      ["os-names:p", "place", "poi"],
     ]);
     expect(merged.inArea[0]!.detail).toBe("Islington");
+  });
+
+  it("doesn't list a road twice when the phone already has it in that borough", () => {
+    const merged = mergeAddresses(
+      { inArea: [{ ...road, road: "Caledonian Road" }], outside: [] },
+      [
+        server({ id: "os-names:r", source: "os-names", precision: "road", label: "Caledonian Road, N7" }),
+        server({
+          id: "os-names:c",
+          source: "os-names",
+          precision: "road",
+          label: "Caledonian Road",
+          borough: "Camden",
+        }),
+      ],
+      new Set<Borough>(["Islington", "Camden"]),
+    );
+    expect(merged.inArea.map((r) => r.key)).toEqual([road.key, "os-names:c"]);
   });
 
   it("keeps a numbered address found only as its road at road precision", () => {

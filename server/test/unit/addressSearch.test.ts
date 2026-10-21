@@ -67,11 +67,22 @@ describe("merging providers' answers", () => {
     expect(out.map((a) => a.id)).toEqual(["os-places:1", "osm:W1"]);
   });
 
-  it("keeps the same name further apart than 30 m: a long road, or two roads of one name", () => {
+  it("shows a road's sections once, but keeps roads of one name in other boroughs or districts", () => {
+    const section = (id: string, label: string, borough = "Islington", lat = 51.5441) =>
+      addr({ id, source: "os-names", precision: "road", label, borough, lat });
     const out = mergeResults([
-      [addr({ id: "a", precision: "road", label: "Caledonian Road" })],
-      [addr({ id: "b", precision: "road", label: "Caledonian Road", lat: 51.55 })], // ~650 m north
+      [
+        section("a", "Caledonian Road, N7"),
+        section("b", "Caledonian Road, N7", "Islington", 51.55), // another section, ~650 m north
+        section("c", "Caledonian Road, N1", "Islington", 51.535),
+        section("d", "Caledonian Road, N7", "Camden", 51.56),
+      ],
     ]);
+    expect(out.map((a) => a.id)).toEqual(["a", "c", "d"]);
+  });
+
+  it("keeps doors with the same label further apart than 30 m (two streets of one name)", () => {
+    const out = mergeResults([[addr({ id: "a" }), addr({ id: "b", lat: 51.55 })]]);
     expect(out).toHaveLength(2);
   });
 
@@ -199,6 +210,8 @@ describe("POST /v1/addresses with providers", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().addresses[0]).toMatchObject({ id: "osm:N1", precision: "door", borough: "Islington" });
+    // Older apps key their result rows by uprn: each row gets its own.
+    expect(res.json().addresses[0].uprn).toBe("osm:N1");
   });
 
   it("answers 503 addresses-unavailable when every provider fails", async () => {
