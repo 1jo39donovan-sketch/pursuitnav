@@ -12,8 +12,12 @@ export interface ServerConfig {
   minSavingFraction: number;
   /** Most Valhalla calls one request may spend finding restrictions. */
   restrictionCheckBudget: number;
-  /** OS Places API key; door-level address search is off without it. */
+  /** OS Places API key (paid, Premium only): optional, adds flats and named buildings. */
   osPlacesKey: string | undefined;
+  /** OS Names API key (free, OS OpenData): postcodes, roads and places. */
+  osNamesKey?: string;
+  /** Our own Nominatim (OpenStreetMap house numbers), e.g. http://nominatim:8080. Off without it. */
+  nominatimUrl?: string;
   /** Gzipped places file written by places/extract_places.py. */
   placesFile: string;
   /** Gzipped named-roads file written by places/extract_roads.py. */
@@ -64,6 +68,8 @@ export function loadConfig(): ServerConfig {
     minSavingFraction: num("MIN_SAVING_FRACTION", 0.05),
     restrictionCheckBudget: num("RESTRICTION_CHECK_BUDGET", 150),
     osPlacesKey: process.env.OS_PLACES_KEY || undefined,
+    osNamesKey: process.env.OS_NAMES_KEY || undefined,
+    nominatimUrl: process.env.NOMINATIM_URL || undefined,
     placesFile: process.env.PLACES_FILE ?? "/data/places/places.txt.gz",
     roadsFile: process.env.ROADS_FILE ?? "/data/places/roads.txt.gz",
     contactEmail: process.env.CONTACT_EMAIL || undefined,

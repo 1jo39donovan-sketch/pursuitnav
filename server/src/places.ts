@@ -1,16 +1,30 @@
-// Door-level address search through the OS Places API. The key stays on the
-// server; results are passed straight through and never stored or logged.
+// Address search providers share these types. This file has the optional,
+// paid OS Places provider (door level, flats, named buildings); the free
+// ones are OS Names (osNames.ts) and OpenStreetMap through our own Nominatim
+// (nominatim.ts), combined in addressSearch.ts. Keys stay on the server;
+// results are never stored on disk or logged.
 import { LONDON_CUSTODIANS } from "./boroughs.js";
 
+export type AddressSource = "os-places" | "os-names" | "osm";
+/** How exactly the point is the place asked for: the door, a postcode's centre, a point on the road, a named place. */
+export type AddressPrecision = "door" | "postcode" | "road" | "place";
+
 export interface Address {
-  uprn: string;
+  /** Stable: "os-places:<UPRN>", "os-names:<ID>", "osm:<N|W|R><id>". */
+  id: string;
+  source: AddressSource;
+  precision: AddressPrecision;
+  /** OS Places only. */
+  uprn?: string;
   /** "Flat 3, 54 Caledonian Road", or with a business first: "Tesco, 380 Holloway Road". */
   label: string;
+  /** May be empty. */
   postcode: string;
+  /** Always one of the London borough names (boroughs.ts). */
   borough: string;
   lat: number;
   lng: number;
-  /** OS match score, 0–1. */
+  /** Provider's match score, 0–1. */
   match: number;
 }
 
@@ -46,7 +60,8 @@ export class PlacesError extends Error {
   }
 }
 
-const FULL_POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$/;
+/** A full UK postcode, spaces removed and upper case: "N78LA". */
+export const FULL_POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$/;
 
 /** "CALEDONIAN ROAD" → "Caledonian Road"; keeps "3A" and "N7" as they are. */
 export function titleCase(s: string): string {
@@ -64,10 +79,19 @@ export function labelFor(r: DpaRecord): string {
   return titleCase(parts.join(", "));
 }
 
-export interface PlacesClient {
-  search(query: string): Promise<Address[]>;
+/** Which providers a server has, for /health. nominatim: it's answering. */
+export interface AddressStatus {
+  osNames: boolean;
+  nominatim: boolean;
+  osPlaces: boolean;
 }
 
+export interface PlacesClient {
+  search(query: string): Promise<Address[]>;
+  status?(): Promise<AddressStatus>;
+}
+
+/** OS Places: Premium only, paid per search. Used only when OS_PLACES_KEY is set. */
 export class OsPlacesClient implements PlacesClient {
   constructor(
     private readonly key: string,
@@ -103,6 +127,9 @@ export class OsPlacesClient implements PlacesClient {
       if (!r || !borough || typeof r.LAT !== "number" || typeof r.LNG !== "number") return [];
       return [
         {
+          id: `os-places:${r.UPRN}`,
+          source: "os-places" as const,
+          precision: "door" as const,
           uprn: String(r.UPRN),
           label: labelFor(r),
           postcode: r.POSTCODE,

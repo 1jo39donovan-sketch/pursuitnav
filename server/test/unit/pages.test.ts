@@ -24,6 +24,15 @@ describe("privacy and support pages", () => {
     expect(odd.body).not.toContain('a"<b>');
   });
 
+  it("says where address searches go, and that they're only kept in memory", async () => {
+    const res = await app().inject({ method: "GET", url: "/privacy" });
+    expect(res.body).toContain("OS Names API");
+    expect(res.body).toContain("only if the server is set up with it");
+    expect(res.body).toContain("in memory for up to 24 hours");
+    expect(res.body).toContain("never written to disk or logged");
+    expect(res.body).toContain("House-number search runs");
+  });
+
   it("points at GitHub issues without one", async () => {
     const res = await app().inject({ method: "GET", url: "/support" });
     expect(res.body).toContain("github.com/1jo39donovan-sketch/pursuitnav/issues");

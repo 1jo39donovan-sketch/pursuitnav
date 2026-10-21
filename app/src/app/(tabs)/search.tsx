@@ -21,6 +21,7 @@ import { routeOrigin, useLocation } from "../../location/LocationProvider";
 import { useNavigation } from "../../navigation/NavigationProvider";
 import { planIsStale } from "../../navigation/routeChoice";
 import type { SearchResult } from "../../search/engine";
+import { destinationNote } from "../../search/destinationNote";
 import { mergeAddresses } from "../../search/merge";
 import { DEFAULT_MARKER_GROUPS, GROUP_COLOR, MARKER_GROUPS } from "../../search/placeGroups";
 import type { PlaceGroup } from "../../search/places";
@@ -174,13 +175,7 @@ export default function SearchScreen() {
   const pick = (r: SearchResult) => {
     Keyboard.dismiss();
     setQuery(r.label);
-    const numbered = /\d/.test(r.label) && r.kind !== "postcode";
-    const note =
-      r.precision === "road" && numbered
-        ? "Routes to a point on the road, not the door. On a long road, check which end the number is."
-        : r.precision === "postcode" && r.kind !== "postcode"
-          ? "Routes to the postcode, which may cover several doors."
-          : undefined;
+    const note = destinationNote(r);
     choose(
       { point: [r.lng, r.lat], title: r.label, note, road: r.precision === "road" ? r.road : undefined },
       query,

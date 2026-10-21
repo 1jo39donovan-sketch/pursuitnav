@@ -1,4 +1,5 @@
-# Blue Route server: Valhalla routing, the API, and Caddy for HTTPS.
+# Blue Route server: Valhalla routing, the API, Nominatim for house-number
+# search, and Caddy for HTTPS.
 # See README.md for first-time setup.
 
 services:
@@ -31,7 +32,11 @@ services:
       - usage:/data/usage
     environment:
       VALHALLA_URL: http://valhalla:8002
-      # Door-level address search; leave empty to run with road-level search only.
+      # Address search. OS Names (free OS OpenData key): postcodes, roads, places.
+      OS_NAMES_KEY: ${OS_NAMES_KEY:-}
+      # Our own Nominatim (house numbers); build-geocoder.sh sets it once built.
+      NOMINATIM_URL: ${NOMINATIM_URL:-}
+      # OS Places (paid, optional): flats and named buildings. Leave empty to go without.
       OS_PLACES_KEY: ${OS_PLACES_KEY:-}
       # Contact address on the /privacy and /support pages.
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
@@ -41,6 +46,28 @@ services:
       LEARNING: ${LEARNING:-0}
       # Bearer token for GET /stats (usage counts); /stats is off without it.
       STATS_TOKEN: ${STATS_TOKEN:-}
+
+  # House numbers and streets from OpenStreetMap, for address search. Only on
+  # the internal network (no ports), and no logs: searches are addresses.
+  # scripts/build-geocoder.sh imports the London extract into a fresh
+  # database each week and then starts this on it; it's in the "geocoder"
+  # profile (COMPOSE_PROFILES in .env, set by that script) so it isn't
+  # started before there's a database to serve.
+  nominatim:
+    image: mediagis/nominatim:5.3
+    profiles: ["geocoder"]
+    restart: unless-stopped
+    shm_size: 1g
+    env_file: nominatim.env
+    volumes:
+      - ./data/osm:/osm:ro
+      - ${NOMINATIM_DATA:-./data/nominatim/a}:/var/lib/postgresql/16/main
+    # Measured serving use is in README.md; this leaves Valhalla its share of 4 GB.
+    mem_limit: 1g
+    # Postgres shuts down cleanly given time.
+    stop_grace_period: 60s
+    logging:
+      driver: none
 
   # Map tools (places list, travel speeds), run by scripts/build-map.sh and
   # scripts/build-places.sh, not by `docker compose up`.

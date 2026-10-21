@@ -1,9 +1,17 @@
-// Client for the server's POST /v1/addresses (OS Places, door level).
+// Client for the server's POST /v1/addresses: postcodes, roads and places from
+// OS Names, house numbers from OpenStreetMap, and (only where the server has
+// a paid key) flats and named buildings from OS Places. Each answer says how
+// exact it is.
 import { API_URL } from "../config";
 import { serverJson } from "./http";
 
 export interface Address {
-  uprn: string;
+  /** Stable, e.g. "osm:W123", "os-names:…", "os-places:<UPRN>". Older servers sent only uprn. */
+  id?: string;
+  /** Older servers (OS Places only) didn't send it: door level. */
+  precision?: "door" | "postcode" | "road" | "place";
+  source?: "os-places" | "os-names" | "osm";
+  uprn?: string;
   label: string;
   postcode: string;
   borough: string;
@@ -14,7 +22,7 @@ export interface Address {
 
 export type AddressLookup =
   | { status: "ok"; addresses: Address[] }
-  /** No server, or the server has no OS key: road-level search only. */
+  /** No server, or the server has no address search set up: road-level search from the phone only. */
   | { status: "not-configured" }
   /** No signal or the service is down; offline search still works. */
   | { status: "unavailable" };

@@ -34,6 +34,7 @@ cd "$DIR"
 echo "--- docker compose ps"
 docker compose ps -a --format 'table {{.Service}}\t{{.State}}\t{{.Status}}' 2>&1
 for service in valhalla api caddy; do
+  # (nominatim keeps no logs either: its requests are addresses.)
   echo "--- $service (last $LINES lines)"
   if [ "$service" = valhalla ]; then
     # Valhalla keeps no logs (they'd hold coordinates); ask it directly instead.
@@ -46,6 +47,14 @@ for service in valhalla api caddy; do
     docker compose logs --no-color --tail "$LINES" "$service" 2>&1
   fi
 done
+
+# The house-number search: its build's progress and measurements (no queries are logged).
+echo "--- geocoder (house-number search)"
+tail -n 12 /var/log/blue-route-geocoder.log 2>/dev/null || echo "(no build yet)"
+if docker ps --format '{{.Names}}' | grep -q '^blue-route-geocoder-build$'; then
+  echo "importing: $(docker stats --no-stream --format '{{.MemUsage}}' blue-route-geocoder-build 2>/dev/null)," \
+    "server $(free -m | awk '/^Mem:/ {print $3}') MiB used + $(free -m | awk '/^Swap:/ {print $3}') MiB swap"
+fi
 
 domain=$(grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2-)
 echo "--- HTTPS from the server itself"

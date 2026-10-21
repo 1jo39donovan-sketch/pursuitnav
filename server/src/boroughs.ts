@@ -35,3 +35,6 @@ export const LONDON_CUSTODIANS: Record<number, string> = {
   5960: "Wandsworth",
   5990: "Westminster",
 };
+
+/** The London borough names, exactly as the app has them (app/src/search/boroughs.ts). */
+export const BOROUGH_NAMES: ReadonlySet<string> = new Set(Object.values(LONDON_CUSTODIANS));

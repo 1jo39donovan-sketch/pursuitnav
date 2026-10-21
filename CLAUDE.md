@@ -38,7 +38,8 @@ Officers type what the control room gave them. All of these must work:
 
 Data sources:
 
-- **OS Places API** for full addresses down to door and flat level, including named buildings. Filter to the selected boroughs by local authority (local custodian code). Confirm the codes and the current free allowance and licence terms on the OS Data Hub before building on it.
+- **Free by default:** the **OS Names API** (OS OpenData, free key) for postcodes, roads and named places, and **OpenStreetMap house numbers** from our own Nominatim on the server for door level where OSM has the number. Each result says how exact it is (door, postcode, road, place).
+- **OS Places API** (optional, paid: Premium only, no free searches) adds full addresses down to flat level, including named buildings, only if a key is set. Filtered by local authority (local custodian code).
 - **OS Open Names** (free, Open Government Licence) as an offline fallback for road-level search, so search still works with no signal. The prototype bundled this, assigned to boroughs by point-in-polygon against London borough boundaries.
 - **Officer-saved places:** officers can add a block or estate and the road it's on. Stored on the phone, included in search.
 

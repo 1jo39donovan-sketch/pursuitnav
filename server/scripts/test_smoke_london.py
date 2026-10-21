@@ -79,3 +79,45 @@ def test_a_gate_only_counts_when_driven_through():
     assert smoke_london.uses_way(ways(1, 7, 2), 7)
     assert not smoke_london.uses_way(ways(7, 1, 2), 7)  # started on it
     assert not smoke_london.uses_way(ways(1, 2, 7), 7)  # ended on it
+
+
+def test_picks_a_mapped_door_with_one_plain_number(tmp_path):
+    make_fixture.main(str(tmp_path / "net.osm.pbf"), str(tmp_path / "points.json"))
+    doors = smoke_london.Doors()
+    doors.apply_file(str(tmp_path / "net.osm.pbf"), locations=True, idx="flex_mem")
+    numbers = sorted((d[0], d[1], d[3][0]) for d in doors.doors)
+    # "54-56" and "12A" aren't one plain number, so aren't doors to check.
+    assert numbers == [(7, "Other Street", "n"), (53, "Caledonian Road", "n"), (55, "Caledonian Road", "w")]
+    door = smoke_london.pick_door(doors.doors, "Caledonian Road")
+    assert door[:2] == (53, "Caledonian Road")
+    # No such street: one in the box instead, or none.
+    box = (0.39, 51.39, 0.41, 51.41)
+    assert smoke_london.pick_door(doors.doors, "Nowhere Road", box)[:2] == (7, "Other Street")
+    assert smoke_london.pick_door(doors.doors, "Nowhere Road", (0, 0, 0.1, 0.1)) is None
+
+
+def answer(label, precision, borough="Islington", lng=-0.1171, lat=51.5441, **extra):
+    return {"label": label, "precision": precision, "borough": borough, "lng": lng, "lat": lat, **extra}
+
+
+def test_a_door_from_osm_must_be_near_the_mapped_one():
+    results = [answer("53 Caledonian Road", "road"), answer("53 Caledonian Road", "door", lat=51.546)]
+    mapped = (-0.1171, 51.5441)
+    assert smoke_london.door_hit(results, "53 Caledonian Road", mapped) is None  # the door answer is ~210 m off
+    results.append(answer("53 Caledonian Road", "door"))
+    assert smoke_london.door_hit(results, "53 Caledonian Road", mapped)["lat"] == 51.5441
+
+
+def test_54_caledonian_road_without_os_places_is_the_road_in_islington():
+    q = "54 Caledonian Road"
+    ok, detail = smoke_london.judge_unmapped([answer("54 Caledonian Road", "road")], q, "Islington", os_places=False)
+    assert ok and "needs OS Places" in detail
+    assert not smoke_london.judge_unmapped([answer("Caledonian Road", "road", "Camden")], q, "Islington", False)[0]
+    assert not smoke_london.judge_unmapped([answer("Caledonian Road", "place")], q, "Islington", False)[0]
+    assert not smoke_london.judge_unmapped([answer("Holloway Road", "road")], q, "Islington", False)[0]
+
+
+def test_54_caledonian_road_with_os_places_is_the_door():
+    q = "54 Caledonian Road"
+    assert smoke_london.judge_unmapped([answer("54 Caledonian Road", "door")], q, "Islington", os_places=True)[0]
+    assert not smoke_london.judge_unmapped([answer("54 Caledonian Road", "road")], q, "Islington", os_places=True)[0]

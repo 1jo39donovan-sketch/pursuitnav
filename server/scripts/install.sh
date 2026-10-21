@@ -5,11 +5,12 @@
 #   curl -fsSL https://raw.githubusercontent.com/1jo39donovan-sketch/pursuitnav/main/server/scripts/install.sh | bash
 #
 # It asks for the domain name (already pointing at this server) and,
-# optionally, an OS Places API key. Safe to run again: it updates the code
-# and restarts.
+# optionally, a (free) OS Names API key. Safe to run again: it updates the
+# code and restarts.
 #
 # Unattended (the GitHub "Deploy server" workflow does this): set DOMAIN, and
-# optionally OS_PLACES_KEY and CONTACT_EMAIL, in the environment and nothing is asked.
+# optionally OS_NAMES_KEY, OS_PLACES_KEY and CONTACT_EMAIL, in the environment
+# and nothing is asked.
 # Everything is in main(), run on the last line: bash then reads the whole
 # script before running any of it. Run as "curl … | bash", bash reads the
 # script from the pipe as it goes, and a command that reads its input (docker
@@ -43,10 +44,17 @@ if [ -z "${DOMAIN:-}" ]; then
   # Questions come from the keyboard (/dev/tty) even when this script is piped from curl.
   read -rp "Domain name for the server${EXISTING_DOMAIN:+ [$EXISTING_DOMAIN]} (e.g. route.example.org): " DOMAIN </dev/tty
   DOMAIN=${DOMAIN:-$EXISTING_DOMAIN}
-  read -rp "OS Places API key (press Enter to skip; road-level search still works): " OS_PLACES_KEY </dev/tty
+  read -rp "OS Names API key (free, from the OS Data Hub; Enter to skip): " OS_NAMES_KEY </dev/tty
 fi
 [ -n "$DOMAIN" ] || fail "A domain name is needed for HTTPS."
 OS_PLACES_KEY=${OS_PLACES_KEY:-}
+OS_NAMES_KEY=${OS_NAMES_KEY:-}
+# Kept from an earlier install: the house-number search's database, once
+# build-geocoder.sh has made one, and where it is.
+GEOCODER_SETTINGS=""
+if [ -f "$DIR/server/.env" ]; then
+  GEOCODER_SETTINGS=$(grep -E '^(NOMINATIM_DATA|NOMINATIM_URL|COMPOSE_PROFILES|GEOCODER_CHECK)=' "$DIR/server/.env" || true)
+fi
 # Contact address for the /privacy and /support pages (the app stores need one).
 if [ -z "${CONTACT_EMAIL:-}" ] && [ -f "$DIR/server/.env" ]; then
   CONTACT_EMAIL=$(grep -E '^CONTACT_EMAIL=' "$DIR/server/.env" | cut -d= -f2- || true)
@@ -120,7 +128,8 @@ cd "$DIR/server"
 [ -f docker-compose.yml ] || fail "No server code on branch $BRANCH. Merge the pull request into main first, or run with BRANCH=<branch>."
 
 umask 077
-printf 'DOMAIN=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" >.env
+printf 'DOMAIN=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\n' "$DOMAIN" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" >.env
+[ -n "$GEOCODER_SETTINGS" ] && printf '%s\n' "$GEOCODER_SETTINGS" >>.env
 umask 022
 
 say "Building the routing map and places list. This takes 20–40 minutes the first time."
@@ -142,6 +151,11 @@ for i in $(seq 1 60); do
   [ "$i" -eq 60 ] && fail "Valhalla isn't answering. Check: docker compose ps"
   sleep 5
 done
+
+if ! grep -q '^NOMINATIM_DATA=' .env; then
+  say "Building the house-number search in the background (about an hour; log: /var/log/blue-route-geocoder.log)"
+  bash scripts/build-geocoder.sh --background </dev/null
+fi
 
 say "Weekly map and places refresh (Sundays 03:15); nightly code update from $BRANCH (04:30)"
 cat >/etc/cron.d/blue-route <<EOF

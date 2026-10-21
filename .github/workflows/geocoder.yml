@@ -1,0 +1,79 @@
+# The house-number search end to end, on a corner of London: the real
+# scripts/build-geocoder.sh imports an Islington cut of the London extract
+# into Nominatim and starts it with the API, then the smoke test's address
+# checks run against it (no OS keys, no routing map). Runs when the geocoder
+# or address search changes, or by hand from the Actions tab.
+name: Geocoder
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - server/nominatim.env
+      - server/docker-compose.yml
+      - server/scripts/build-geocoder.sh
+      - server/scripts/smoke_london.py
+      - server/src/nominatim.ts
+      - server/src/addressSearch.ts
+      - .github/workflows/geocoder.yml
+
+permissions:
+  contents: read
+
+jobs:
+  geocoder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: An Islington cut of the London extract
+        run: |
+          sudo apt-get install -y -qq osmium-tool >/dev/null
+          curl -fsSL --retry 3 -o /tmp/london.osm.pbf \
+            https://download.geofabrik.de/europe/united-kingdom/england/greater-london-latest.osm.pbf
+          mkdir -p data/osm
+          # Caledonian Road and around, with whole boundaries so addresses get their city.
+          osmium extract --overwrite -b -0.135,51.530,-0.100,51.560 -s smart -S types=multipolygon,boundary \
+            /tmp/london.osm.pbf -o data/osm/region.osm.pbf
+          ls -la data/osm
+
+      - name: Build the geocoder with the real script
+        run: |
+          printf 'DOMAIN=localhost\nGEOCODER_CHECK=Caledonian Road\n' > .env
+          sudo touch /var/log/blue-route-geocoder.log && sudo chmod 666 /var/log/blue-route-geocoder.log
+          # As root, as on the server: Postgres owns the database folders it makes.
+          sudo bash scripts/build-geocoder.sh 2>&1 | tee -a /var/log/blue-route-geocoder.log
+          cat .env
+          sudo docker compose ps
+
+      - name: What Nominatim answers (raw), for the precision rules in src/nominatim.ts
+        run: |
+          ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$(docker compose ps -q nominatim)")
+          echo "NOMINATIM=http://$ip:8080" >> "$GITHUB_ENV"
+          for q in "53 Caledonian Road" "54 Caledonian Road" "Caledonian Road" "N7 8LA"; do
+            echo "== $q"
+            curl -fsS -G --data-urlencode "q=$q" -d format=jsonv2 -d addressdetails=1 -d limit=3 "http://$ip:8080/search" |
+              python3 -c 'import json,sys; [print(json.dumps({k: r.get(k) for k in ("osm_type","osm_id","category","type","addresstype","name","address")})) for r in json.load(sys.stdin)]'
+          done
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Address checks against the API (no OS keys)
+        run: |
+          npm ci
+          NOMINATIM_URL="$NOMINATIM" TFL_CLOSURES=0 USAGE_DB= PORT=3999 npx tsx src/server.ts &
+          for _ in $(seq 1 30); do curl -fsS localhost:3999/health && break; sleep 1; done
+          echo
+          python -m venv /tmp/venv && /tmp/venv/bin/pip install -q "osmium==4.*"
+          /tmp/venv/bin/python scripts/smoke_london.py --api http://localhost:3999 --pbf data/osm/region.osm.pbf --addresses-only

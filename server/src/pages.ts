@@ -61,8 +61,10 @@ the way described under “Usage counts” below.</p>
 <ul>
   <li><strong>Routes:</strong> your current position (and direction of travel, when moving) and the destination’s
     position.</li>
-  <li><strong>Address search:</strong> the address you typed. The server passes it to Ordnance Survey’s OS Places API
-    to look it up.</li>
+  <li><strong>Address search:</strong> the address you typed. The server looks up house numbers itself, in its own
+    copy of OpenStreetMap, and passes the search to Ordnance Survey’s OS Names API for postcodes, roads and places
+    (and to OS Places too, only on a server set up with it). For speed, the server keeps searches and their answers
+    in memory for up to 24 hours; they’re never written to disk or logged.</li>
   <li><strong>Pursuit mode:</strong> your last few positions and direction of travel, to find the road and its speed
     limit.</li>
   <li><strong>Follow in</strong> (team sessions): your position and the colleague’s recent track, to work out the way
@@ -106,8 +108,9 @@ searches, callsigns or IP addresses are kept with these counts, and no third-par
     of the map is being shown.</li>
   <li><strong>TfL</strong>: the server reads TfL’s public road closures feed to route around closed roads. Nothing
     about you or your journeys is sent to TfL.</li>
-  <li><strong>Ordnance Survey</strong> receives address searches from the server (not your position or anything about
-    you).</li>
+  <li><strong>Ordnance Survey</strong> receives address searches from the server, through its OS Names API (and OS
+    Places, only if the server is set up with it): not your position or anything about you. House-number search runs
+    on the Blue Route server itself.</li>
   <li><strong>Open in Google Maps / Waze</strong> hands the destination to that app when you tap it; their own privacy
     policies apply.</li>
 </ul>

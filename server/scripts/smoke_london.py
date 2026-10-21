@@ -11,8 +11,15 @@ Checks real London cases against the live API, over HTTPS:
 2. A bus gate. Finds 24/7 bus gates in the extract and routes through one.
    The standard route must not use it; the blue-light route must, and must
    list it.
-3. 54 Caledonian Road. Door-level address search finds it, and the route
-   ends at that door, not somewhere along the road.
+3. Address search, free (OS Names and our own Nominatim; no OS Places key):
+   - a door from OpenStreetMap: a house-numbered address on Caledonian Road
+     taken from the same extract, found at door level within 40 m of the
+     mapped building, and both routes end within 40 m of it;
+   - a full postcode (N7 8LA) found as a postcode, in Islington;
+   - 54 Caledonian Road, which isn't in OpenStreetMap: without OS Places, the
+     top Caledonian Road answer is the road, in Islington (the app warns it
+     isn't the door); with OS Places (osPlaces in /health), the door itself,
+     and the route ends there.
 
 Every full route plan must also come back within 8 s, the app's timeout.
 Prints PASS/FAIL per check; exits 1 if anything failed.
@@ -178,6 +185,53 @@ class SecondPass(osmium.SimpleHandler):
             for part in (coords[i:], coords[: i + 1][::-1]):
                 if len(part) >= 2:
                     self.at.setdefault(r, []).append((tags.get("name", ""), part))
+
+
+# ---- the map: house-numbered addresses ----
+
+# Islington, roughly: where to look if the street asked for has no plain numbers.
+ISLINGTON_BOX = (-0.142, 51.518, -0.077, 51.575)
+
+
+def centre(coords):
+    return (sum(c[0] for c in coords) / len(coords), sum(c[1] for c in coords) / len(coords))
+
+
+class Doors(osmium.SimpleHandler):
+    """Mapped doors: nodes and buildings with one plain house number and a street."""
+
+    def __init__(self):
+        super().__init__()
+        self.doors = []  # (number, street, (lng, lat), "n123" / "w123")
+
+    def add(self, tags, where, ref):
+        number, street = tags.get("addr:housenumber", ""), tags.get("addr:street", "")
+        if number.isdigit() and street:
+            self.doors.append((int(number), street, where, ref))
+
+    def node(self, n):
+        if "addr:housenumber" in n.tags:
+            self.add({t.k: t.v for t in n.tags}, (n.location.lon, n.location.lat), f"n{n.id}")
+
+    def way(self, w):
+        if "addr:housenumber" not in w.tags:
+            return
+        try:
+            coords = [(n.lon, n.lat) for n in w.nodes]
+        except osmium.InvalidLocationError:
+            return
+        if coords:
+            self.add({t.k: t.v for t in w.tags}, centre(coords), f"w{w.id}")
+
+
+def pick_door(doors, street, box=ISLINGTON_BOX):
+    """A mapped door on the street (lowest number), else in the box; None if neither has one."""
+    on_street = sorted(d for d in doors if d[1] == street)
+    if on_street:
+        return on_street[0]
+    w, s, e, n = box
+    nearby = sorted(d for d in doors if w <= d[2][0] <= e and s <= d[2][1] <= n)
+    return nearby[0] if nearby else None
 
 
 # ---- the API ----
@@ -377,21 +431,19 @@ def is_address(query, label):
     return False
 
 
-def check_address(api, query, origin):
+def addresses(api, query, what):
+    """The server's answers for a query, or None (the check failed) if it didn't answer."""
     status, body, _ = call(api, "/v1/addresses", {"query": query})
     if status == 503 and (body or {}).get("error") == "addresses-not-configured":
-        report(False, f"'{query}' found at door level", "OS Places isn't set up on the server (OS_PLACES_KEY)")
-        return
+        report(False, what, "address search isn't set up on the server (OS_NAMES_KEY, or the geocoder)")
+        return None
     if status != 200:
-        report(False, f"'{query}' found at door level", f"HTTP {status} {body}")
-        return
-    hits = [a for a in body.get("addresses") or [] if is_address(query, a["label"])]
-    if not hits:
-        report(False, f"'{query}' found at door level",
-               f"got {[a['label'] for a in (body.get('addresses') or [])[:3]]}")
-        return
-    door = (hits[0]["lng"], hits[0]["lat"])
-    report(True, f"'{query}' found at door level", hits[0]["label"])
+        report(False, what, f"HTTP {status} {body}")
+        return None
+    return body.get("addresses") or []
+
+
+def check_route_ends(api, origin, door, query):
     status, plan_body, secs = plan(api, origin, door)
     if status != 200:
         report(False, f"route to {query}", f"HTTP {status} {plan_body}")
@@ -400,9 +452,75 @@ def check_address(api, query, origin):
         route = plan_body.get(kind)
         if not route:
             continue
-        end = tuple(route["shape"][-1])
-        d = metres(end, door)
+        d = metres(tuple(route["shape"][-1]), door)
         report(d <= 40, f"{kind} route ends at the door of {query}", f"{d:.0f} m from it, {secs:.1f} s to plan")
+
+
+def door_hit(results, query, near=None, within_m=40):
+    """The first door-level answer that is the address asked for (and near the mapped door, if given)."""
+    for a in results:
+        if a.get("precision", "door") != "door" or not is_address(query, a["label"]):
+            continue
+        if near is None or metres((a["lng"], a["lat"]), near) <= within_m:
+            return a
+    return None
+
+
+def check_osm_door(api, door, origin, routes=True):
+    number, street, where, ref = door
+    query = f"{number} {street}"
+    what = f"'{query}' (OpenStreetMap {ref}) found at door level within 40 m"
+    results = addresses(api, query, what)
+    if results is None:
+        return
+    hit = door_hit(results, query, where)
+    if not hit:
+        report(False, what, f"got {[(a['label'], a.get('precision')) for a in results[:3]]}")
+        return
+    report(True, what, f"{hit['label']}, {metres((hit['lng'], hit['lat']), where):.0f} m from the mapped door, {hit['borough']}")
+    if routes:
+        check_route_ends(api, origin, (hit["lng"], hit["lat"]), query)
+
+
+def check_postcode(api, postcode, borough):
+    what = f"'{postcode}' found as a postcode in {borough}"
+    results = addresses(api, postcode, what)
+    if results is None:
+        return
+    compact = postcode.replace(" ", "").upper()
+    hit = next((a for a in results if a.get("precision") == "postcode"
+                and (a.get("postcode") or a["label"]).replace(" ", "").upper() == compact), None)
+    if not hit:
+        report(False, what, f"got {[(a['label'], a.get('precision')) for a in results[:3]]}")
+        return
+    report(hit["borough"] == borough, what, f"{hit['label']} in {hit['borough']} (from {hit.get('source', '?')})")
+
+
+def judge_unmapped(results, query, borough, os_places):
+    """54 Caledonian Road isn't in OpenStreetMap. (ok, detail): with OS Places, the door; without,
+    the top answer on that street is the road, in the borough, so the app warns it isn't the door."""
+    if os_places:
+        hit = door_hit(results, query)
+        return (hit is not None, hit["label"] if hit else f"no door from OS Places; got {[a['label'] for a in results[:3]]}")
+    street = query.split(" ", 1)[1].upper()
+    top = next((a for a in results if street in a["label"].upper()), None)
+    if not top:
+        return False, f"nothing on {street.title()}; got {[a['label'] for a in results[:3]]}"
+    ok = top.get("precision") == "road" and top["borough"] == borough
+    note = " (door level needs OS Places or an OSM address)" if ok else ""
+    return ok, f"top answer '{top['label']}' is {top.get('precision')} in {top['borough']}{note}"
+
+
+def check_address(api, query, origin, os_places, borough="Islington", routes=True):
+    what = f"'{query}' found at door level" if os_places else f"'{query}' found as the road in {borough}"
+    results = addresses(api, query, what)
+    if results is None:
+        return
+    ok, detail = judge_unmapped(results, query, borough, os_places)
+    report(ok, what, detail)
+    if ok and os_places and routes:
+        hit = door_hit(results, query)
+        check_route_ends(api, origin, (hit["lng"], hit["lat"]), query)
 
 
 def main():
@@ -414,27 +532,47 @@ def main():
     ap.add_argument("--one-ways", type=int, default=6, help="how many other one-way streets")
     ap.add_argument("--gate-offset-m", type=float, default=80, help="start and end this far from the bus gate")
     ap.add_argument("--gate-tries", type=int, default=10)
-    ap.add_argument("--address", default="54 Caledonian Road")
+    ap.add_argument("--address", default="54 Caledonian Road",
+                    help="an address that isn't in OpenStreetMap: the road without OS Places, the door with it")
+    ap.add_argument("--door-street", default="Caledonian Road", help="street to take a mapped OpenStreetMap door from")
+    ap.add_argument("--postcode", default="N7 8LA")
+    ap.add_argument("--borough", default="Islington", help="where --address and --postcode are")
     ap.add_argument("--origin", default="-0.1037,51.5463", help="lng,lat to route to the address from (Highbury Corner)")
-    ap.add_argument("--skip-address", action="store_true", help="for test maps without OS Places")
+    ap.add_argument("--skip-address", action="store_true", help="skip the address checks (a test map with no address search)")
+    ap.add_argument("--addresses-only", action="store_true",
+                    help="only the address checks, without routes (the geocoder workflow: no routing map)")
     args = ap.parse_args()
     api = args.api.rstrip("/")
 
     status, health, _ = call(api, "/health")
-    healthy = status == 200 and (health or {}).get("routing") and (health or {}).get("places")
-    report(bool(healthy), "server is up with routing and places", json.dumps(health))
+    if args.addresses_only:
+        healthy = status == 200
+        report(healthy, "server is up", json.dumps(health))
+    else:
+        healthy = status == 200 and (health or {}).get("routing") and (health or {}).get("places")
+        report(bool(healthy), "server is up with routing and places", json.dumps(health))
     if not healthy:
         return 1
 
-    first = FirstPass()
-    first.apply_file(args.pbf, locations=True, idx="flex_mem")
-    print(f"      map: {len(first.oneways)} one-way ways, {len(first.gates)} bus gates", flush=True)
-
-    check_one_ways(api, first.oneways, args.street, args.near_m, args.one_ways)
-    check_bus_gate(api, args.pbf, first.oneways, first.gates, args.gate_offset_m, args.gate_tries)
+    if not args.addresses_only:
+        first = FirstPass()
+        first.apply_file(args.pbf, locations=True, idx="flex_mem")
+        print(f"      map: {len(first.oneways)} one-way ways, {len(first.gates)} bus gates", flush=True)
+        check_one_ways(api, first.oneways, args.street, args.near_m, args.one_ways)
+        check_bus_gate(api, args.pbf, first.oneways, first.gates, args.gate_offset_m, args.gate_tries)
     if not args.skip_address:
-        lng, lat = (float(x) for x in args.origin.split(","))
-        check_address(api, args.address, (lng, lat))
+        origin = tuple(float(x) for x in args.origin.split(","))
+        print(f"      addresses: {json.dumps((health or {}).get('addresses'))}", flush=True)
+        doors = Doors()
+        doors.apply_file(args.pbf, locations=True, idx="flex_mem")
+        door = pick_door(doors.doors, args.door_street)
+        if door:
+            check_osm_door(api, door, origin, routes=not args.addresses_only)
+        else:
+            report(False, "a house-numbered address in the map to search for", f"none on {args.door_street} or in Islington")
+        check_postcode(api, args.postcode, args.borough)
+        os_places = bool(((health or {}).get("addresses") or {}).get("osPlaces"))
+        check_address(api, args.address, origin, os_places, args.borough, routes=not args.addresses_only)
 
     print(f"\n{len(failures)} check(s) failed" if failures else "\nAll London checks passed")
     return 1 if failures else 0
