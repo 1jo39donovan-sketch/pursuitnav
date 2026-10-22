@@ -29,6 +29,7 @@ jobs:
     env:
       SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
       KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       GH_TOKEN: ${{ github.token }}
       PUBLISH: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     steps:
@@ -45,6 +46,24 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - run: npm ci
+
+      # With an Expo account (EXPO_TOKEN), the APK on the release page takes
+      # over-the-air updates from main ("App update" workflow). A test build
+      # of a pull request doesn't: main's updates would replace what's tested.
+      - name: Over-the-air updates
+        run: |
+          if [ "$PUBLISH" != "true" ]; then
+            echo "Test build: no over-the-air updates."
+            exit 0
+          fi
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::notice::No EXPO_TOKEN secret: this APK won't take over-the-air updates (DEPLOY.md, App updates)."
+            exit 0
+          fi
+          bash scripts/link-updates.sh
+          rv=$(npx expo-updates runtimeversion:resolve --platform android | python3 -c 'import json, sys; print(json.load(sys.stdin)["runtimeVersion"])')
+          echo "Runtime version: $rv"
+          echo "RUNTIME_VERSION=$rv" >> "$GITHUB_ENV"
 
       - name: Generate the Android project
         run: |
@@ -106,8 +125,8 @@ jobs:
         if: env.PUBLISH == 'true'
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/blue-route.apk"
-          notes=$(printf 'Built from %s on %s UTC. Server: %s.\n\nTo install: open this page on the Android phone, tap blue-route.apk, and allow installing from your browser when asked.' \
-            "${GITHUB_SHA::7}" "$(date -u +'%d %b %Y %H:%M')" "${EXPO_PUBLIC_API_URL:-none}")
+          notes=$(printf 'Built from %s on %s UTC. Server: %s. Runtime: %s.\n\nTo install: open this page on the Android phone, tap blue-route.apk, and allow installing from your browser when asked.' \
+            "${GITHUB_SHA::7}" "$(date -u +'%d %b %Y %H:%M')" "${EXPO_PUBLIC_API_URL:-none}" "${RUNTIME_VERSION:-no over-the-air updates}")
           if gh release view android-latest >/dev/null 2>&1; then
             gh release upload android-latest "$RUNNER_TEMP/blue-route.apk" --clobber
             gh release edit android-latest --notes "$notes"

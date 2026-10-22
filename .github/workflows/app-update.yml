@@ -1,0 +1,117 @@
+# Sends a change to the app's own code (screens, search, routing logic: the
+# JavaScript) to officers' phones over the air with EAS Update, in minutes
+# instead of a new install. Phones download it in the background when the
+# app opens and switch to it the next time it's opened; nothing waits on it,
+# and with no signal the app carries on as it is.
+#
+# Each update is made for one runtime version (a fingerprint of the native
+# code: app.json "runtimeVersion"), so it only reaches builds it works on.
+# A change to native code (a new library, a permission) needs a new build:
+# the Android app workflow builds one from the same push.
+#
+# To go back: run this workflow with "ref" set to the last good commit.
+# Setup (one secret) is in DEPLOY.md, "App updates".
+name: App update
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", ".github/workflows/app-update.yml"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit, tag or branch to send (leave empty for main; an older commit rolls back)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Check settings
+        id: settings
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::notice::No EXPO_TOKEN secret, so no over-the-air update: phones get this change by installing the next APK (DEPLOY.md, App updates)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The server address is built into the code; an update without it
+          # would leave every phone that takes it unable to route.
+          [ -n "$SERVER_DOMAIN" ] || { echo "::error::Add the SERVER_DOMAIN variable: an update needs the server address."; exit 1; }
+
+      - uses: actions/setup-node@v4
+        if: steps.settings.outputs.skip != 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install
+        if: steps.settings.outputs.skip != 'true'
+        run: npm ci
+
+      # The same checks as CI: an update reaches phones within minutes.
+      - name: Typecheck, lint and test
+        if: steps.settings.outputs.skip != 'true'
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+
+      - name: Link the Expo project
+        if: steps.settings.outputs.skip != 'true'
+        run: |
+          bash scripts/link-updates.sh
+          rv=$(npx expo-updates runtimeversion:resolve --platform android | python3 -c 'import json, sys; print(json.load(sys.stdin)["runtimeVersion"])')
+          echo "Runtime version (Android): $rv"
+          echo "RUNTIME_VERSION=$rv" >> "$GITHUB_ENV"
+
+      - name: Publish the update
+        if: steps.settings.outputs.skip != 'true'
+        env:
+          EXPO_PUBLIC_API_URL: https://${{ vars.SERVER_DOMAIN }}
+        run: |
+          sha=$(git rev-parse --short HEAD)
+          msg="$sha $(git log -1 --format=%s)"
+          npx --yes eas-cli@latest update --channel production --environment production \
+            --platform all --message "${msg:0:200}" --non-interactive
+
+      - name: Summary
+        if: steps.settings.outputs.skip != 'true'
+        working-directory: .
+        run: |
+          # Which runtime the APK on the release page was built for (android.yml writes it in the notes).
+          apk=$(gh release view android-latest --json body --jq .body 2>/dev/null | grep -oE 'Runtime: [0-9a-f]+' | cut -d' ' -f2 || true)
+          {
+            echo "## App update sent"
+            echo ""
+            echo "- Code: $(git rev-parse --short HEAD), server https://${SERVER_DOMAIN}"
+            echo "- Runtime version: \`${RUNTIME_VERSION}\`"
+            if [ -z "$apk" ]; then
+              echo "- The APK on the release page doesn't take over-the-air updates yet: install the next one built on main."
+            elif [ "$apk" = "$RUNTIME_VERSION" ]; then
+              echo "- Phones with the current APK get it the next time Blue Route is opened twice (it downloads on the first, switches on the second)."
+            else
+              echo "- **This changes native code**: phones need the new APK (the Android app workflow builds it from this push). The current APK carries on as it is."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

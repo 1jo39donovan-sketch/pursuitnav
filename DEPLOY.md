@@ -58,7 +58,20 @@ Using your own domain instead: set `SERVER_DOMAIN` to it, skip `DUCKDNS_TOKEN`, 
 
 Add secret `ANDROID_KEYSTORE_PASSWORD`: a long random password (a password manager can make one). It protects the key that signs the app, so only your builds can update it on officers' phones. Keep it somewhere safe; if it's lost, phones have to uninstall and reinstall the app, which deletes their log.
 
-## 5. Optional
+## 5. App updates (recommended, free)
+
+A change to the app's own code (screens, search, routing logic) then reaches phones over the air within minutes of being merged, instead of everyone installing a new APK. It uses Expo's EAS Update, which has a free plan; check its monthly limit at [expo.dev/pricing](https://expo.dev/pricing).
+
+1. Sign up at [expo.dev](https://expo.dev) (free) and go to **Account settings → Access tokens → Create token**.
+2. In GitHub, add the secret `EXPO_TOKEN` with the token as its value. (The store builds, STORE.md, use the same one.)
+3. Run **Actions → Android app → Run workflow** once and install that APK: it's the first one that takes updates.
+
+After that, every change to `app/` merged into `main` runs **App update**: it checks the code, sends it, and its summary says whether phones get it as an update or need the new APK. Phones download it in the background when Blue Route opens and switch to it the next time it's opened, so nothing changes under an officer mid-job, and with no signal the app carries on as it was. If an update crashes on start, the phone goes back to the version it had.
+
+- **Changes that need a new APK:** anything native, such as a new library or permission. The app's runtime version (a fingerprint of its native code) changes, updates for it don't reach older APKs, and the Android app workflow builds the new APK from the same push.
+- **Going back:** run **Actions → App update → Run workflow** with **ref** set to the last good commit (from the commit list on GitHub). Phones switch back the same way.
+
+## 6. Optional
 
 - Secret `OS_NAMES_KEY` (free; address search for postcodes, roads and places): at [osdatahub.os.uk](https://osdatahub.os.uk), sign up on the free OS OpenData plan, create a project (for example "Blue Route"), add the **OS Names API** to it, switch the project to **live** (development mode is limited to 50 searches a minute), copy the project's key and save it as the secret `OS_NAMES_KEY`. House numbers need no key: the server builds its own search from OpenStreetMap. On a server that already exists, add `OS_NAMES_KEY=...` to `/opt/blue-route/server/.env` and run `docker compose up -d` in that folder.
 - Secret `OS_PLACES_KEY` (paid, not needed): OS Places is Premium only, about £0.028 a search, with no free searches. It adds flats and named buildings, and doors OpenStreetMap hasn't mapped (such as 54 Caledonian Road). Leave it empty unless you've decided to pay for it.
@@ -67,12 +80,12 @@ Add secret `ANDROID_KEYSTORE_PASSWORD`: a long random password (a password manag
 - Secret `TFL_APP_KEY` (optional): live road closures work without it, but TfL may throttle the server. Free from [api-portal.tfl.gov.uk](https://api-portal.tfl.gov.uk): sign up, then Products → subscribe to the free one, and copy the primary key. On a server that already exists, add `TFL_APP_KEY=...` to `/opt/blue-route/server/.env` instead and run `docker compose up -d` in that folder.
 - Secret `SSH_PUBLIC_KEY`: your SSH public key, to log into the server yourself. Without it Hetzner emails you a root password.
 
-## 6. Run it
+## 7. Run it
 
 1. **Actions → Deploy server → Run workflow.** It rents the server, points the domain at it, installs everything and waits until `https://SERVER_DOMAIN` answers, with house-number search: about 10–15 minutes, as it downloads the map and search data GitHub builds each week (if there's no data release yet, run **Actions → Map data** first, about an hour; otherwise the server builds its own in about two hours). Run it once: from then on the server takes each change merged to `main` by itself within about 5 minutes, checks it works, and goes back to the last good version if not (server/README.md, "Updates").
 2. **Actions → Android app → Run workflow.** About 20–30 minutes. Then open the **Android app** release page (Code → Releases) on the phone and install `blue-route.apk`.
 
-## 7. Try it on any phone (optional, free)
+## 8. Try it on any phone (optional, free)
 
 The web version runs in a phone's browser (Safari on iPhone too) with real GPS, search and routes, connected to your server. It's handy for testing without an Android phone; officers should still use the store apps.
 
@@ -83,8 +96,9 @@ The web version runs in a phone's browser (Safari on iPhone too) with real GPS, 
 ## After that, it looks after itself
 
 - Map and places refresh from OpenStreetMap every Sunday night.
-- The server picks up new code from `main` each night.
-- Every change to the app on `main` builds a new APK on the same release page; install it over the old one and the log is kept.
+- The server picks up new code from `main` within about 5 minutes (server/README.md, "Updates").
+- Every change to the app on `main` builds a new APK on the same release page; install it over the old one and the log is kept. With `EXPO_TOKEN` set (section 5), phones also get the change over the air without installing anything.
+- Dependabot opens pull requests on Mondays when a library Blue Route uses has a new version (`.github/dependabot.yml`). Merge them once CI is green; the Expo SDK, Valhalla and Nominatim are upgraded by hand.
 
 Changing the OS key later: update the secret, then run **Deploy server** with **recreate** ticked. Nothing officers rely on is stored on the server, so a fresh one is safe.
 
