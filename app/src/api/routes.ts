@@ -23,6 +23,19 @@ export interface Route {
   maneuvers: Maneuver[];
   /** OpenStreetMap ways along the route by shape index, for timing roads (opt-in learning). */
   ways?: { wayId: number; beginShapeIndex: number; endShapeIndex: number }[];
+  /** Serious TfL holdups the route goes through: there was no cheap way round. */
+  delays?: TrafficDelay[];
+  /** Serious TfL holdups it was routed round. */
+  delaysAvoided?: TrafficDelay[];
+}
+
+/** A holdup TfL rates Serious or Severe (works, a collision, queues) on an open street. */
+export interface TrafficDelay {
+  street: string;
+  severity: "Serious" | "Severe";
+  /** TfL's latest update, e.g. "Southbound traffic is slow moving…". */
+  update: string;
+  location: { lat: number; lng: number };
 }
 
 export interface Restriction {

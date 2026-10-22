@@ -186,10 +186,45 @@ function StandardRow({ route, fastest, onGo }: { route: Route; fastest: boolean;
         <Text style={styles.meta} numberOfLines={1}>
           {formatDistance(route.distanceM)} · legal
         </Text>
+        <TrafficLine route={route} />
       </View>
       <Text style={styles.eta}>{formatDuration(route.durationS)}</Text>
       <GoButton onPress={onGo} color={colors.blue} label="Go on the standard route" />
     </View>
+  );
+}
+
+/**
+ * Live TfL holdups: one the route still goes through (amber, with TfL's
+ * update), or that it was routed round. Nothing when there are none.
+ */
+function TrafficLine({ route }: { route: Route }) {
+  const on = route.delays ?? [];
+  const avoided = route.delaysAvoided ?? [];
+  if (on.length) {
+    const d = on[0]!;
+    return (
+      <Text style={styles.traffic} numberOfLines={2}>
+        ⚠ {d.severity} holdup: {titleCase(d.street)}
+        {on.length > 1 ? ` (+${on.length - 1})` : ""}. {d.update}
+      </Text>
+    );
+  }
+  if (avoided.length) {
+    return (
+      <Text style={styles.trafficAvoided} numberOfLines={1}>
+        ↪ Round a TfL holdup: {titleCase(avoided[0]!.street)}
+        {avoided.length > 1 ? ` (+${avoided.length - 1})` : ""}
+      </Text>
+    );
+  }
+  return null;
+}
+
+/** TfL writes street names in capitals: "[A23] PURLEY WAY (CR0)" → "[A23] Purley Way (CR0)". */
+function titleCase(street: string): string {
+  return street.replace(/\b([A-Z])([A-Z']+)\b/g, (m, a: string, b: string) =>
+    /\d/.test(m) ? m : a + b.toLowerCase(),
   );
 }
 
@@ -231,6 +266,7 @@ function PoliceRow({
           <Text style={[styles.meta, styles.saving]} numberOfLines={1}>
             Saves {formatDuration(route.savingS)}
           </Text>
+          <TrafficLine route={route} />
         </View>
         <Text style={styles.eta}>{formatDuration(route.durationS)}</Text>
         <GoButton onPress={onGo} color={colors.amber} label="Go on the blue-light route" />
@@ -414,6 +450,8 @@ const styles = StyleSheet.create({
   },
   meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
   saving: { color: colors.amber, fontFamily: fonts.bodySemiBold },
+  traffic: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 12, lineHeight: 16, marginTop: 2 },
+  trafficAvoided: { color: colors.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 16, marginTop: 2 },
   relies: { color: colors.amber, fontFamily: fonts.body, fontSize: 13, lineHeight: 18, paddingVertical: 4 },
   restriction: { color: colors.fg, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   go: {

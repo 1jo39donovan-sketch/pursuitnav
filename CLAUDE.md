@@ -100,7 +100,7 @@ Every search and the route picked is saved on the phone (SQLite): time, what was
 
 ## Live road closures
 
-The server polls TfL's road disruption feed every 5 minutes and both routes avoid roads TfL lists as fully closed (Valhalla `exclude_polygons`). Closures by the start or destination are left to the officer; if no route avoids them all, the route is found without them and the app says so. Nothing about officers is sent to TfL.
+The server polls TfL's road disruption feed every 5 minutes and both routes avoid roads TfL lists as fully closed (Valhalla `exclude_polygons`). Closures by the start or destination are left to the officer; if no route avoids them all, the route is found without them and the app says so. Holdups TfL rates Serious or Severe on open streets are routed round when that costs little (up to 2 minutes or 15%), and the route says so; otherwise the route goes through and shows TfL's update. Nothing about officers is sent to TfL. Street-level live traffic (TomTom or HERE) is a later decision, pending their terms and cost.
 
 ## Team sessions
 
