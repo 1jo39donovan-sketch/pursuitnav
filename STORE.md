@@ -92,6 +92,8 @@ After this, **Store builds** uploads every new Android version to the closed tes
 
 Version numbers count up automatically.
 
+Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code reach store installs over the air too (DEPLOY.md, "App updates"), within the stores' rules for updates that fix and improve the app without changing what it is. A new store build is needed only when the App update summary says the change is native, or to change the listing.
+
 ## Store listing
 
 **Name:** Blue Route
@@ -170,10 +172,10 @@ On iPhone, use a 6.7" or 6.9" model if you can (otherwise Apple asks for that si
 Positions and searched addresses don't count as collected: the app sends them to the Blue Route server only to answer each request in real time, and nothing is kept. Apple doesn't count real-time processing that isn't retained as collection.
 
 Usage counts (README, "Usage data") do count. Answer:
-- **Identifiers → Device ID:** collected (the app's own random install ID, kept by the server only as salted hashes with a new salt each day and each week, deleted when the day or week ends).
+- **Identifiers → Device ID:** collected (the app's own random install ID, kept by the server only as salted hashes with a new salt each day and each week, deleted when the day or week ends; and the random ID Expo's update check sends, which Expo uses to deliver and count app updates).
   - Linked to the user: **No**.
   - Used for tracking: **No**.
-  - Purpose: **Analytics**.
+  - Purpose: **Analytics** and **App Functionality**.
 - **Usage Data → Product Interaction:** collected (counts of routes planned, navigation and pursuit sessions).
   - Linked to the user: **No**.
   - Used for tracking: **No**.
@@ -192,7 +194,7 @@ There's no tracking.
   - Processed ephemerally: **Yes**.
   - Required: **Yes**.
   - Purpose: **App functionality**.
-- **Device or other IDs:** Collected, not shared. Purpose: **Analytics**. (The app's own random install ID, resettable in the app, kept only as salted hashes with a new salt each day and each week, deleted when the day or week ends.)
+- **Device or other IDs:** Collected, not shared. Purpose: **Analytics**. (The app's own random install ID, resettable in the app, kept only as salted hashes with a new salt each day and each week, deleted when the day or week ends. Expo, which delivers app updates on our behalf, also sees a random ID the update check makes; a service provider acting for the developer doesn't count as sharing.)
 - **App activity → Other actions:** Collected, not shared. Purpose: **Analytics**. (Counts of routes planned, navigation and pursuit sessions.)
 - **App info and performance → Diagnostics:** Collected, not shared. Purpose: **Analytics**. (Counts of timeouts and failed requests.)
 - No other data types.

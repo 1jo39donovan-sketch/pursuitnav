@@ -4,6 +4,14 @@
     "slug": "blue-route",
     "scheme": "blueroute",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",

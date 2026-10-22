@@ -16,7 +16,8 @@ npm ci --no-audit --no-fund
 
 # Build against the real server without changing the file in git.
 cp eas.json "${TMPDIR:-/tmp}/eas.json.bak"
-trap 'cp "${TMPDIR:-/tmp}/eas.json.bak" eas.json' EXIT
+cp app.json "${TMPDIR:-/tmp}/app.json.bak"
+trap 'cp "${TMPDIR:-/tmp}/eas.json.bak" eas.json; cp "${TMPDIR:-/tmp}/app.json.bak" app.json' EXIT
 node -e '
 const fs = require("fs");
 const cfg = JSON.parse(fs.readFileSync("eas.json", "utf8"));
@@ -28,8 +29,8 @@ echo
 echo "== Sign in to your Expo account"
 npx --yes eas-cli@latest whoami >/dev/null 2>&1 || npx --yes eas-cli@latest login
 echo
-echo "== Link the Expo project"
-npx --yes eas-cli@latest init --force
+echo "== Link the Expo project (and turn on over-the-air updates)"
+bash scripts/link-updates.sh --interactive
 echo
 echo "== Build for iOS and send to TestFlight"
 echo "When asked, sign in with your Apple developer account and say yes to"
