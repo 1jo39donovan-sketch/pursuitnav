@@ -13,7 +13,7 @@ const WEB_DENIED =
   "Safari Websites → While Using the App (Precise Location on). Then reload.";
 const reload = () => window.location.reload();
 
-/** One line saying whether the GPS position can be trusted, with a fix when it can't. */
+/** A line when the GPS position can't be trusted, with a fix if there is one. Nothing when it's good. */
 export function GpsStatus() {
   const { status, fix, requestPermission, simulated } = useLocation();
   const { setDemoDrive } = useSession();
@@ -84,8 +84,10 @@ export function GpsStatus() {
       <Banner tone="muted" text="Waiting for GPS…" />
     );
   }
+  // A good position needs no line on screen: the map's space is worth more.
+  if (fix.accuracy != null && fix.accuracy <= 50) return null;
   const accuracy = fix.accuracy != null ? `±${Math.round(fix.accuracy)} m` : "accuracy unknown";
-  return <Banner tone={fix.accuracy != null && fix.accuracy > 50 ? "warn" : "ok"} text={`GPS ${accuracy}`} />;
+  return <Banner tone="warn" text={`GPS ${accuracy}: position may be off`} />;
 }
 
 function Banner({
@@ -123,6 +125,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     backgroundColor: colors.bg,
+    // Rounded, as it often floats over a map.
+    borderRadius: 12,
+    overflow: "hidden",
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   text: { flex: 1, color: colors.muted, fontFamily: fonts.mono, fontSize: 12 },

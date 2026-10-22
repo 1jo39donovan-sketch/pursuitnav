@@ -183,6 +183,8 @@ export default function NavigateScreen() {
 
   // Quick actions: one tap each, no second End tap needed.
   const [sheet, setSheet] = useState(false);
+  // How much of the map's top the floating turn card covers.
+  const [turnHeight, setTurnHeight] = useState(180);
   const newDestination = () => {
     setSheet(false);
     stop("new-destination");
@@ -287,10 +289,11 @@ export default function NavigateScreen() {
     </View>
   );
 
+  // Two rows, so nothing has to squeeze: arrival time and road, then the buttons.
   const etaPanel = (
     <View style={[styles.bottom, { paddingBottom: insets.bottom + 10 }]}>
-      <View style={styles.eta}>
-        <Text style={styles.etaClock}>
+      <View style={styles.etaRow}>
+        <Text style={styles.etaClock} numberOfLines={1}>
           {progress
             ? new Date(track.fixAt + progress.remainingS * 1000).toLocaleTimeString("en-GB", {
                 hour: "2-digit",
@@ -298,48 +301,48 @@ export default function NavigateScreen() {
               })
             : "—"}
         </Text>
-        <Text style={styles.etaMeta}>
-          {progress ? `${formatDuration(progress.remainingS)} · ${formatDistance(progress.remainingM)}` : ""}
-        </Text>
-        <Text style={styles.road} numberOfLines={1}>
-          On {progress?.current.streetNames[0] ?? "—"}
-        </Text>
-      </View>
-      <View style={styles.side}>
+        <View style={styles.eta}>
+          <Text style={styles.etaMeta} numberOfLines={1}>
+            {progress ? `${formatDuration(progress.remainingS)} · ${formatDistance(progress.remainingM)}` : ""}
+          </Text>
+          <Text style={styles.road} numberOfLines={1}>
+            On {progress?.current.streetNames[0] ?? "—"}
+          </Text>
+        </View>
         <Text style={[styles.badge, { color: routeColor, borderColor: routeColor }]}>
           {isPolice
-            ? `BLUE LIGHT · ${"restrictions" in active.route ? active.route.restrictions.length : 0} RESTR.`
+            ? `BLUE LIGHT · ${"restrictions" in active.route ? active.route.restrictions.length : 0}`
             : "STANDARD"}
         </Text>
-        <View style={styles.buttons}>
-          <Pressable
-            accessibilityRole="switch"
-            accessibilityState={{ checked: voiceOn }}
-            aria-checked={voiceOn}
-            accessibilityLabel="Spoken directions"
-            onPress={toggleVoice}
-            hitSlop={8}
-            style={[styles.voiceButton, !voiceOn && styles.voiceOff]}
-          >
-            <Text style={styles.voiceText}>{voiceOn ? "🔊" : "🔇"}</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Route options"
-            onPress={() => setSheet(true)}
-            style={styles.routeButton}
-          >
-            <Text style={styles.routeText}>Route</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityHint="Tap twice to end navigation"
-            onPress={() => (confirmEnd || progress?.arrived ? end() : setConfirmEnd(true))}
-            style={[styles.endButton, confirmEnd && styles.endConfirm]}
-          >
-            <Text style={styles.endText}>{confirmEnd ? "Tap to end" : "End"}</Text>
-          </Pressable>
-        </View>
+      </View>
+      <View style={styles.buttons}>
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: voiceOn }}
+          aria-checked={voiceOn}
+          accessibilityLabel="Spoken directions"
+          onPress={toggleVoice}
+          hitSlop={8}
+          style={[styles.voiceButton, !voiceOn && styles.voiceOff]}
+        >
+          <Text style={styles.voiceText}>{voiceOn ? "🔊" : "🔇"}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Route options"
+          onPress={() => setSheet(true)}
+          style={styles.routeButton}
+        >
+          <Text style={styles.routeText}>Route</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityHint="Tap twice to end navigation"
+          onPress={() => (confirmEnd || progress?.arrived ? end() : setConfirmEnd(true))}
+          style={[styles.endButton, confirmEnd && styles.endConfirm]}
+        >
+          <Text style={styles.endText}>{confirmEnd ? "Tap to end" : "End"}</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -374,9 +377,11 @@ export default function NavigateScreen() {
         </View>
       ) : (
         <>
-          {turnPanel}
+          {/* The map fills the screen; the next turn floats over its top. */}
           <View style={styles.map}>
             <LiveMap
+              overlayTop={turnHeight}
+              overlayBottom={18}
               team={teamMap}
               view={mapView}
               viewControl
@@ -391,6 +396,13 @@ export default function NavigateScreen() {
               labels={blockLabels}
               compact
             />
+            <View
+              style={styles.turnFloat}
+              pointerEvents="box-none"
+              onLayout={(e) => setTurnHeight(e.nativeEvent.layout.height + 8)}
+            >
+              {turnPanel}
+            </View>
           </View>
           {etaPanel}
         </>
@@ -476,9 +488,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 4,
-    borderBottomColor: colors.line,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
   },
+  turnFloat: { position: "absolute", top: 8, left: 8, right: 8 },
   turnOff: { backgroundColor: "#2a1d0a" },
   turnRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   arrow: { color: colors.amber, fontSize: 56, lineHeight: 64, fontWeight: "700" },
@@ -494,15 +511,15 @@ const styles = StyleSheet.create({
   then: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
   bottom: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    gap: 8,
     backgroundColor: colors.bg,
-    borderTopColor: colors.line,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    marginTop: -18,
   },
+  etaRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   eta: { flex: 1, minWidth: 0 },
   etaClock: {
     color: colors.fg,
@@ -511,9 +528,8 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     fontVariant: ["tabular-nums"],
   },
-  etaMeta: { color: colors.muted, fontFamily: fonts.mono, fontSize: 13 },
-  road: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, marginTop: 2 },
-  side: { alignItems: "flex-end", gap: 8 },
+  etaMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 14 },
+  road: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
   badge: {
     fontFamily: fonts.mono,
     fontSize: 11,
@@ -522,11 +538,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  buttons: { flexDirection: "row", gap: 10, alignItems: "center" },
+  buttons: { flexDirection: "row", gap: 8, alignItems: "stretch" },
   voiceButton: {
-    minWidth: 52,
+    width: 56,
     minHeight: 52,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.line,
     alignItems: "center",
@@ -535,20 +551,21 @@ const styles = StyleSheet.create({
   voiceOff: { borderColor: colors.warn },
   voiceText: { fontSize: 24 },
   endButton: {
+    flex: 1,
     backgroundColor: colors.warn,
-    borderRadius: 8,
+    borderRadius: 10,
     minHeight: 52,
     justifyContent: "center",
-    paddingHorizontal: 22,
+    alignItems: "center",
   },
   routeButton: {
-    minHeight: 56,
-    minWidth: 56,
-    borderRadius: 8,
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.line,
     justifyContent: "center",
-    paddingHorizontal: 14,
+    alignItems: "center",
   },
   routeText: {
     color: colors.fg,

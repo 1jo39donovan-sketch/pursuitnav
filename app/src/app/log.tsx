@@ -1,10 +1,11 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useLog } from "../../log/LogProvider";
-import type { LogEntry, LoggedRoute } from "../../storage/types";
-import { colors, fonts } from "../../theme";
+import { useLog } from "../log/LogProvider";
+import type { LogEntry, LoggedRoute } from "../storage/types";
+import { colors, fonts } from "../theme";
 
 const ROUTE_LABEL: Record<LoggedRoute, { text: string; color: string }> = {
   standard: { text: "STANDARD ROUTE", color: colors.blue },
@@ -23,8 +24,12 @@ function dayLabel(iso: string): string {
   return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
-/** Every search and the route picked. Kept on the phone until cleared here. */
+/**
+ * Every search and the route picked. Kept on the phone until cleared here.
+ * Opened from the Session tab.
+ */
 export default function LogScreen() {
+  const insets = useSafeAreaInsets();
   const { entries, clear } = useLog();
   const [confirming, setConfirming] = useState(false);
 
@@ -38,57 +43,68 @@ export default function LogScreen() {
   }, [entries]);
 
   return (
-    <SectionList
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      sections={sections}
-      keyExtractor={(e) => String(e.id)}
-      stickySectionHeadersEnabled={false}
-      ListHeaderComponent={
-        <View style={styles.intro}>
-          <Text style={styles.title}>Search log</Text>
-          <Text style={styles.hint}>
-            Every address searched and route picked, kept on this phone so you can refer back. Never cleared
-            automatically.
-          </Text>
-        </View>
-      }
-      renderSectionHeader={({ section }) => <Text style={styles.day}>{section.title}</Text>}
-      renderItem={({ item }) => <Entry entry={item} />}
-      ListEmptyComponent={<Text style={styles.empty}>Nothing logged yet. Searches appear here once you pick a destination.</Text>}
-      ListFooterComponent={
-        entries.length > 0 ? (
-          <View style={styles.footer}>
-            {confirming ? (
-              <View style={styles.confirm}>
-                <Text style={styles.confirmText}>
-                  Delete all {entries.length} entr{entries.length === 1 ? "y" : "ies"}? This can’t be undone.
-                </Text>
-                <View style={styles.confirmButtons}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => {
-                      clear();
-                      setConfirming(false);
-                    }}
-                    style={styles.delete}
-                  >
-                    <Text style={styles.deleteText}>Delete</Text>
-                  </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => setConfirming(false)} style={styles.keep}>
-                    <Text style={styles.keepText}>Keep</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <Pressable accessibilityRole="button" onPress={() => setConfirming(true)} style={styles.keep}>
-                <Text style={styles.keepText}>Clear log</Text>
-              </Pressable>
-            )}
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Back to Session"
+        onPress={() => (router.canGoBack() ? router.back() : router.navigate("/"))}
+        style={styles.back}
+        hitSlop={8}
+      >
+        <Text style={styles.backText}>‹ Session</Text>
+      </Pressable>
+      <SectionList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        sections={sections}
+        keyExtractor={(e) => String(e.id)}
+        stickySectionHeadersEnabled={false}
+        ListHeaderComponent={
+          <View style={styles.intro}>
+            <Text style={styles.title}>Search log</Text>
+            <Text style={styles.hint}>
+              Every address searched and route picked, kept on this phone so you can refer back. Never cleared
+              automatically.
+            </Text>
           </View>
-        ) : null
-      }
-    />
+        }
+        renderSectionHeader={({ section }) => <Text style={styles.day}>{section.title}</Text>}
+        renderItem={({ item }) => <Entry entry={item} />}
+        ListEmptyComponent={<Text style={styles.empty}>Nothing logged yet. Searches appear here once you pick a destination.</Text>}
+        ListFooterComponent={
+          entries.length > 0 ? (
+            <View style={styles.footer}>
+              {confirming ? (
+                <View style={styles.confirm}>
+                  <Text style={styles.confirmText}>
+                    Delete all {entries.length} entr{entries.length === 1 ? "y" : "ies"}? This can’t be undone.
+                  </Text>
+                  <View style={styles.confirmButtons}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => {
+                        clear();
+                        setConfirming(false);
+                      }}
+                      style={styles.delete}
+                    >
+                      <Text style={styles.deleteText}>Delete</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" onPress={() => setConfirming(false)} style={styles.keep}>
+                      <Text style={styles.keepText}>Keep</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <Pressable accessibilityRole="button" onPress={() => setConfirming(true)} style={styles.keep}>
+                  <Text style={styles.keepText}>Clear log</Text>
+                </Pressable>
+              )}
+            </View>
+          ) : null
+        }
+      />
+    </View>
   );
 }
 
@@ -125,6 +141,8 @@ function Entry({ entry }: { entry: LogEntry }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  back: { paddingHorizontal: 16, paddingVertical: 12, alignSelf: "flex-start" },
+  backText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 17 },
   content: { padding: 16, paddingBottom: 32 },
   intro: { gap: 6, marginBottom: 8 },
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26 },

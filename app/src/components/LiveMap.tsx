@@ -64,6 +64,8 @@ export function LiveMap({
   vehicleArrow = false,
   followZoom = 15,
   compact = false,
+  overlayTop = 0,
+  overlayBottom = 0,
   routes = [],
   destination,
   onLongPress,
@@ -91,11 +93,11 @@ export function LiveMap({
     if (!fitTo?.length) return;
     // Wait for the layout to settle (the route panel opening shrinks the map).
     const timer = setTimeout(
-      () => camera.current?.fitBounds(boundsOf(fitTo), { padding: FIT_PADDING, duration: 600 }),
+      () => camera.current?.fitBounds(boundsOf(fitTo), { padding: { ...FIT_PADDING, top: FIT_PADDING.top + overlayTop, bottom: FIT_PADDING.bottom + overlayBottom }, duration: 600 }),
       FIT_DELAY_MS,
     );
     return () => clearTimeout(timer);
-  }, [fitTo]);
+  }, [fitTo, overlayTop, overlayBottom]);
   const [mapFailed, setMapFailed] = useState(false);
 
   const position: LngLat | null = fix ? [fix.lng, fix.lat] : null;
@@ -127,7 +129,7 @@ export function LiveMap({
         logo={false}
         compass={!compact}
         attribution
-        attributionPosition={{ bottom: 8, left: 8 }}
+        attributionPosition={{ bottom: 8 + overlayBottom, left: 8 }}
         touchRotate={view === "north"}
         onDidFailLoadingMap={() => setMapFailed(true)}
         onDidFinishLoadingStyle={() => setMapFailed(false)}
@@ -250,14 +252,14 @@ export function LiveMap({
       )}
       <MapButtons
         showView={viewControl}
-        top={compact ? 12 : 56}
+        top={overlayTop + (compact ? 12 : 56)}
         onZoom={zoomControl ? (step) => setZoomOffset((z) => Math.max(-3, Math.min(3, z + step))) : undefined}
       />
       {!following && position && (
         <Pressable
           accessibilityRole="button"
           onPress={() => setFollowing(true)}
-          style={({ pressed }) => [styles.recentre, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.recentre, { bottom: 16 + overlayBottom }, pressed && styles.pressed]}
         >
           <Text style={styles.recentreText}>Recentre</Text>
         </Pressable>

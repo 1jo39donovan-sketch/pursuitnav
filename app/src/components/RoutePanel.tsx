@@ -318,15 +318,22 @@ function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
 }
 
 const styles = StyleSheet.create({
+  // A sheet over the bottom of the map, rounded and lifted, as in Google Maps.
   panel: {
     backgroundColor: colors.bg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    marginTop: -18,
     paddingHorizontal: 10,
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 8,
     gap: 6,
     maxHeight: "50%",
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 },
+    elevation: 8,
   },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
   headerText: { flex: 1, minWidth: 0 },

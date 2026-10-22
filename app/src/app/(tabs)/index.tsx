@@ -8,6 +8,7 @@ import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
 import { TeamSection } from "../../components/TeamSection";
 import { serverLearns } from "../../learning/queue";
+import { useLog } from "../../log/LogProvider";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { currentInstallId, newInstallId } from "../../usage/usage";
@@ -51,9 +52,23 @@ export default function SessionScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const { savedPlaces, deletePlace, places } = useSearch();
+  const logCount = useLog().entries.length;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {/* The search log lives here, one tap away, rather than taking a tab. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Search log, ${logCount} entries`}
+        onPress={() => router.push("/log")}
+        style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.logText}>Search log</Text>
+        <Text style={styles.logMeta}>
+          {logCount === 0 ? "empty" : `${logCount} entr${logCount === 1 ? "y" : "ies"}`} ›
+        </Text>
+      </Pressable>
+
       <View style={styles.intro}>
         <Text style={styles.title}>Start of shift</Text>
         <Text style={styles.hint}>
@@ -303,6 +318,20 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, gap: 20 },
   intro: { gap: 6 },
+  logRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 56,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    backgroundColor: colors.panel,
+    borderColor: colors.line,
+    borderWidth: 1,
+  },
+  logText: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 20 },
+  logMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26 },
   hint: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
   field: { gap: 10 },
