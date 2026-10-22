@@ -3,11 +3,24 @@ import { avoidingClosures, ClosureFeed } from "./closures.js";
 import { loadConfig } from "./config.js";
 import { LearningStore } from "./learning.js";
 import { UsageStore } from "./usage.js";
+import { AddressSearch, type Provider } from "./addressSearch.js";
+import { BoroughLookup } from "./boroughArea.js";
+import { NominatimClient } from "./nominatim.js";
+import { OsNamesClient } from "./osNames.js";
 import { OsPlacesClient } from "./places.js";
 import { ValhallaClient } from "./valhalla.js";
 
 const config = loadConfig();
-const places = config.osPlacesKey ? new OsPlacesClient(config.osPlacesKey) : undefined;
+// Address search: whatever this server has. With none, /v1/addresses says it isn't set up.
+const boroughs = BoroughLookup.fromFile();
+const providers: Provider[] = [];
+if (config.osNamesKey)
+  providers.push({ source: "os-names", client: new OsNamesClient(config.osNamesKey, boroughs), cacheable: true });
+if (config.nominatimUrl)
+  providers.push({ source: "osm", client: new NominatimClient(config.nominatimUrl, boroughs), cacheable: true });
+if (config.osPlacesKey)
+  providers.push({ source: "os-places", client: new OsPlacesClient(config.osPlacesKey), cacheable: false });
+const places = providers.length ? new AddressSearch(providers) : undefined;
 const valhalla = new ValhallaClient(config.valhallaUrl);
 const closures = config.tflClosures ? new ClosureFeed(undefined, config.tflAppKey) : undefined;
 closures?.start();

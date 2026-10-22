@@ -33,6 +33,11 @@ docker image prune -f >/dev/null
 if [ ! -s data/places/roads.txt.gz ]; then
   bash scripts/build-places.sh || echo "$(date -Is) search data rebuild failed; the weekly refresh will retry" >&2
 fi
+# A server from before house-number search builds it now (in the background:
+# it takes about an hour) rather than waiting for the weekly refresh.
+if ! grep -q '^NOMINATIM_DATA=' .env 2>/dev/null; then
+  bash scripts/build-geocoder.sh --background || echo "$(date -Is) couldn't start the geocoder build" >&2
+fi
 # Live closures need Valhalla's avoid-area limits raised (new map builds do it).
 if [ "$(bash scripts/valhalla-limits.sh data/valhalla || true)" = "changed" ]; then
   docker compose restart valhalla

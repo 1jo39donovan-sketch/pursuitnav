@@ -17,11 +17,19 @@ Each route has `durationS`, `distanceM`, `shape` (`[lng, lat]` points) and turn-
 
 Both route responses avoid roads TfL lists as fully closed (`src/closures.ts`) and say so in `closures: {active, updatedAt, ignored}`.
 
-`POST /v1/addresses` with `{"query": "Flat 3, 54 Caledonian Road"}` returns `{"addresses": [...]}`: door-level addresses from the OS Places API, each with `uprn`, `label`, `postcode`, `borough` and `lat`/`lng`. Only London addresses are returned; the app sorts them into the officer's boroughs and the rest. Without `OS_PLACES_KEY` this returns 503 `addresses-not-configured` and the app uses its offline road search alone.
+`POST /v1/addresses` with `{"query": "Flat 3, 53 Caledonian Road"}` returns `{"addresses": [...]}`, each with `id`, `source`, `precision`, `label`, `postcode` (may be empty), `borough` and `lat`/`lng` (and `uprn` from OS Places). Free by default; see "Address search" below. Only London addresses are returned, and every `borough` is one of the app's borough names; the app sorts them into the officer's boroughs and the rest. With no provider set up it returns 503 `addresses-not-configured`, and 503 `addresses-unavailable` only if every provider failed; either way the app falls back to its offline road search.
 
 `GET /v1/places-data` returns every named place in London (shops, cafés, schools, parks, blocks, estates…) as a gzipped text file for the app to keep offline. It has an ETag, so the app only downloads it when it changes. It's public OpenStreetMap data and the request carries nothing about the officer.
 
-`GET /health` returns `{"ok": true}`.
+`GET /health` returns, for example:
+
+```json
+{"ok": true, "routing": true, "places": true,
+ "addresses": {"osNames": true, "nominatim": true, "osPlaces": false},
+ "learning": false, "closures": 18}
+```
+
+`routing` and `places`: the map data is built. `addresses`: which address providers the server has; `nominatim` is true once its database is built and answering.
 
 ### Places
 
@@ -29,11 +37,26 @@ Both route responses avoid roads TfL lists as fully closed (`src/closures.ts`) a
 
 `places/extract_places.py` reads the London OSM extract and writes `data/places/places.txt.gz`: one line per named place with its type ("Coffee shop", "Corner shop", "School"…), group, borough (point-in-polygon against `places/london-boroughs.geojson`), a point inside it and its address where OSM has one. `places/categories.py` decides what counts as a place and what to call it. `scripts/build-places.sh` runs it in Docker; `build-map.sh` runs it after each map build. Tests: `pytest places` (needs `pip install -r places/requirements.txt`).
 
-### OS Places
+### Address search
 
-- Get a key from the [OS Data Hub](https://osdatahub.os.uk/) and set `OS_PLACES_KEY` in `.env`. Check the current free allowance and licence terms there before relying on it.
-- Boroughs are matched by local custodian code (`src/boroughs.ts`). Confirm the codes against the Data Hub's current list before v1.
-- Queries go to OS and the results come back; neither is stored or logged.
+`src/addressSearch.ts` asks every provider the server has, in parallel, and merges the answers: `door` first, then `postcode`, `road` and `place`; the same address or road from two providers within 30 m shown once (OS Places preferred, then OpenStreetMap, then OS Names); at most 30. One provider failing doesn't fail the search. A full postcode goes to OS first, and to OpenStreetMap only if OS has nothing.
+
+| Provider | Key | What it gives | Precision |
+|---|---|---|---|
+| **OS Names** (`src/osNames.ts`) | `OS_NAMES_KEY`, free (OS OpenData plan) | postcodes, roads, areas, stations, hospitals… | `postcode`, `road`, `place` |
+| **Nominatim**, our own (`src/nominatim.ts`) | none: `NOMINATIM_URL`, set by `build-geocoder.sh` | house numbers OpenStreetMap has mapped, streets | `door` (a mapped house with the number and street asked for), `road` (an interpolated number or the street), `postcode`, `place` |
+| **OS Places** (`src/places.ts`), optional | `OS_PLACES_KEY`, **paid** | every address, down to flats and named buildings | `door` |
+
+- **OS Names** is free for any use under the Open Government Licence, but needs a key from an OS Data Hub project on the OS OpenData plan, with the project switched to **live** (600 requests a minute; 50 in development mode). Results come in British National Grid; `src/bng.ts` converts them (inverse Transverse Mercator and OS's 7-parameter Helmert, a few metres at most). The borough comes from OS's `DISTRICT_BOROUGH`/`COUNTY_UNITARY` when it's one of ours, else from `places/london-boroughs.geojson`; anything outside London is dropped. It can't find house numbers ("21 Croxton Road").
+- **Nominatim** (`mediagis/nominatim:5.3`, amd64 and arm64) imports the same London extract as the routing map. `scripts/build-geocoder.sh` imports it into a fresh database after the weekly map build (never at the same time: both need most of the memory), checks it finds a known street, then switches the live service over and deletes the old copy. Settings are in `nominatim.env` (`IMPORT_STYLE=address`, `FREEZE=true`, GB postcodes, Postgres tuned down for 4 GB). It's on the internal network only, with logging off. Coverage is OpenStreetMap's: about 623,000 London objects carry a house number, far fewer than London's addresses, so many numbers come back as the road (the app then warns it isn't the door). 54 Caledonian Road, for example, isn't mapped.
+- **OS Places** is Premium only, about £0.028 a search, with no free searches. Used only if `OS_PLACES_KEY` is set, alongside the free providers, for flats and named buildings. Boroughs are matched by local custodian code (`src/boroughs.ts`). Its answers are never cached, as its licence on keeping results isn't clear for this use.
+- **Cache:** answers from OS Names and Nominatim are kept **in memory only**, for 24 hours (empty answers for 10 minutes), up to 5,000 queries, keyed by the query in lower case with spaces tidied. A repeat search makes no outbound call. Errors and incomplete answers aren't kept. Nothing about searches is written to disk or logged.
+
+**Nominatim on the server** (measured on a Hetzner CX23, 2 vCPU, 4 GB RAM + 4 GB swap, during the deploy of this change):
+
+- First deploy (21 Oct 2026, from an empty server): the routing map, places and the Nominatim import were all done 128 minutes after the server was created; the London smoke test then passed with no OS Places key.
+- Import (London, `IMPORT_STYLE=address`, 21 Oct 2026, on GitHub's 4-core build machine): 33 minutes; the import peaked at 1,336 MiB and the whole machine at 2,375 MiB with no swap, so it fits a 4 GB CX23. The database is 3.6 GB on disk (853 MB compressed). On the CX23 itself, early in an import: 528 MiB for the import, 1,012 MiB used on the whole server, no swap.
+- Memory while serving, with Valhalla and the API: reported by `GET /stats` (`server`) once servers run the code that adds it; the serving container is capped at 1 GB (`mem_limit`), and served in 171 MiB on an Islington-sized test.
 
 ### How the police route works
 
@@ -50,6 +73,7 @@ Requests contain officers' positions and control-room addresses. Nothing is stor
 - The API logs no requests and no request bodies, only failures without payloads.
 - Valhalla's logs are switched off in `docker-compose.yml` (it logs slow requests in full).
 - Caddy access logging is off.
+- Nominatim's logs are switched off too (its requests are addresses), and address answers are cached in memory only.
 
 ## Development
 
@@ -87,13 +111,21 @@ docker compose logs -f api      # Valhalla's own logs are off by design
 curl https://$DOMAIN/health
 ```
 
-Weekly refresh of the map data, with no downtime beyond a restart:
+London smoke test against a live server (the deploy runs it last): one-way streets, a bus gate, and address search with no OS Places key (a door OpenStreetMap has mapped on Caledonian Road, `N7 8LA` as a postcode, and `54 Caledonian Road` as the road in Islington, or as the door when OS Places is on):
+
+```bash
+server/scripts/smoke-london.sh https://$DOMAIN                     # everything
+server/scripts/smoke-london.sh https://$DOMAIN --skip-address      # a test server with no address search
+server/scripts/smoke-london.sh https://$DOMAIN --address "10 Downing Street" --borough Westminster
+```
+
+Weekly refresh of the map data and the house-number search, with no downtime beyond a restart:
 
 ```bash
 crontab -e
 15 3 * * 0  /opt/blue-route/server/scripts/rebuild-tiles.sh >> /var/log/blue-route-tiles.log 2>&1
 ```
 
-Settings (environment variables on the `api` service): `VALHALLA_URL`, `OS_PLACES_KEY`, `PORT`, `REGION_BOUNDS` (`west,south,east,north`, London by default), `MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`, `RESTRICTION_CHECK_BUDGET`, `TFL_APP_KEY` (optional key for the TfL closures feed), `TFL_CLOSURES` (`0` turns live closures off).
+Settings (environment variables on the `api` service): `VALHALLA_URL`, `OS_NAMES_KEY` (free, address search), `NOMINATIM_URL` (set by `build-geocoder.sh`), `OS_PLACES_KEY` (paid, optional), `PORT`, `REGION_BOUNDS` (`west,south,east,north`, London by default), `MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`, `RESTRICTION_CHECK_BUDGET`, `TFL_APP_KEY` (optional key for the TfL closures feed), `TFL_CLOSURES` (`0` turns live closures off).
 
 Map data © OpenStreetMap contributors, under the Open Database License.

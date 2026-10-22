@@ -73,7 +73,15 @@ describe("OsPlacesClient", () => {
       ["5300000001", "Islington"],
       ["3", "Haringey"],
     ]);
-    expect(out[0]).toMatchObject({ label: "54 Caledonian Road", postcode: "N7 8LA", lat: 51.5441, lng: -0.1171 });
+    expect(out[0]).toMatchObject({
+      id: "os-places:5300000001",
+      source: "os-places",
+      precision: "door",
+      label: "54 Caledonian Road",
+      postcode: "N7 8LA",
+      lat: 51.5441,
+      lng: -0.1171,
+    });
   });
 
   it("treats a query OS can't parse as no matches", async () => {
@@ -96,7 +104,18 @@ describe("POST /v1/addresses", () => {
   it("returns addresses from the places client", async () => {
     const places: PlacesClient = {
       search: async () => [
-        { uprn: "1", label: "54 Caledonian Road", postcode: "N7 8LA", borough: "Islington", lat: 51.5, lng: -0.1, match: 1 },
+        {
+          id: "os-places:1",
+          source: "os-places",
+          precision: "door",
+          uprn: "1",
+          label: "54 Caledonian Road",
+          postcode: "N7 8LA",
+          borough: "Islington",
+          lat: 51.5,
+          lng: -0.1,
+          match: 1,
+        },
       ],
     };
     const app = buildApp(config, router, places);

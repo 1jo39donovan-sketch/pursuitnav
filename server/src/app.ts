@@ -141,17 +141,21 @@ export function buildApp(
 
   // ok: the API is up. routing and places say whether the map data is built
   // yet (on a new server that takes 20–40 minutes after the API starts).
+  // addresses: which address providers this server has; nominatim, whether
+  // its house-number database is built and answering.
   app.get("/health", async () => {
     const routing = await fetch(`${config.valhallaUrl}/status`, { signal: AbortSignal.timeout(2000) })
       .then((res) => res.ok)
       .catch(() => false);
-    const places = await stat(config.placesFile)
+    const placesData = await stat(config.placesFile)
       .then(() => true)
       .catch(() => false);
+    const addresses = (await places?.status?.()) ?? { osNames: false, nominatim: false, osPlaces: false };
     return {
       ok: true,
       routing,
-      places,
+      places: placesData,
+      addresses,
       learning: Boolean(learning),
       ...(closures ? { closures: closures.summary().active } : {}),
     };
@@ -222,10 +226,13 @@ export function buildApp(
           .send({ error: "addresses-not-configured", message: "Full address search isn't set up on this server." });
       }
       try {
-        return { addresses: await places.search(req.body.query) };
+        // Older apps key each row by uprn; one per row keeps their lists right.
+        const addresses = (await places.search(req.body.query)).map((a) => ({ ...a, uprn: a.uprn ?? a.id }));
+        return { addresses };
       } catch (err) {
         if (err instanceof PlacesError) {
-          req.log.error({ status: err.status }, "OS Places error");
+          // The status only: never the query.
+          req.log.error({ status: err.status }, "Address search error");
           return reply.code(err.status).send({ error: "addresses-unavailable", message: "Address search is unavailable." });
         }
         throw err;

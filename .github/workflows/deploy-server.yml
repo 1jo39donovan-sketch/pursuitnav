@@ -19,10 +19,12 @@ concurrency: deploy-server
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 130
+    # The map build (20–40 min) and then the house-number import (see the wait step).
+    timeout-minutes: 200
     env:
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
       DUCKDNS_TOKEN: ${{ secrets.DUCKDNS_TOKEN }}
+      OS_NAMES_KEY: ${{ secrets.OS_NAMES_KEY }}
       OS_PLACES_KEY: ${{ secrets.OS_PLACES_KEY }}
       TFL_APP_KEY: ${{ secrets.TFL_APP_KEY }}
       STATS_TOKEN: ${{ secrets.STATS_TOKEN }}
@@ -75,10 +77,10 @@ jobs:
             echo "Server $NAME already exists; leaving it as it is (it updates itself nightly)."
           else
             # First boot runs the installer unattended. Only the domain and the
-            # OS key (and contact email) go to the server; the DuckDNS token stays here.
+            # OS keys (and contact email) go to the server; the DuckDNS token stays here.
             {
               echo '#!/bin/bash'
-              printf 'export DOMAIN=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q TFL_APP_KEY=%q STATS_TOKEN=%q BRANCH=%q\n' "$DOMAIN" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$TFL_APP_KEY" "$STATS_TOKEN" "$BRANCH"
+              printf 'export DOMAIN=%q OS_NAMES_KEY=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q TFL_APP_KEY=%q STATS_TOKEN=%q BRANCH=%q\n' "$DOMAIN" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$TFL_APP_KEY" "$STATS_TOKEN" "$BRANCH"
               printf 'URL=%q\n' "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/server/scripts/install.sh"
               # Download first, then run: piping curl into bash ran an empty
               # script, and reported success, whenever the download failed
@@ -180,7 +182,8 @@ jobs:
           IP: ${{ steps.server.outputs.ip }}
           IP6: ${{ steps.server.outputs.ip6 }}
         run: |
-          echo "Installing and building London's routing map and places: usually 20–40 minutes."
+          echo "Installing and building London's routing map and places (usually 20–40 minutes),"
+          echo "then the house-number search (Nominatim import, measured in README.md)."
           # On the server, through the one-off key (only for a server made by this run).
           remote() {
             [ -f deploy_key ] || return 1
@@ -194,10 +197,19 @@ jobs:
           hcloud firewall list 2>&1 | sed 's/^/    /'
           down=0
           moved=0
-          for i in $(seq 1 110); do
+          # 170 minutes: the map build, then the Nominatim import after it (they can't
+          # overlap on a 4 GB server). On the first measured run they took the
+          # times in README.md; this leaves room for a slower box or download.
+          for i in $(seq 1 170); do
             health=$(curl -fsS -m 10 "https://${DOMAIN}/health" 2>/dev/null || true)
-            if grep -q '"routing":true' <<<"$health" && grep -q '"places":true' <<<"$health"; then
-              echo "https://${DOMAIN} is up, with routing and places."
+            if grep -q '"routing":true' <<<"$health" && grep -q '"places":true' <<<"$health" &&
+               { grep -q '"nominatim":true' <<<"$health" || ! grep -q '"addresses"' <<<"$health"; }; then
+              echo "https://${DOMAIN} is up, with routing, places and house-number search: $health"
+              echo "Server type: $(hcloud server describe "$NAME" -o format='{{.ServerType.Name}}' 2>/dev/null || echo unknown)"
+              # The import's measurements (time, memory, database size), for README.md.
+              echo "::group::Server state and geocoder measurements"
+              status 20 || echo "(can't reach the server over SSH)"
+              echo "::endgroup::"
               tidy
               exit 0
             fi
@@ -252,12 +264,13 @@ jobs:
             esac
             sleep 60
           done
-          echo "::error::Not fully ready after 110 minutes (last answer: ${health:-none}). The server's state:"
+          echo "::error::Not fully ready after 170 minutes (last answer: ${health:-none}). The server's state:"
           status 100 || echo "(couldn't reach it over SSH)"
           exit 1
 
       # Real London cases against the live server: one-way streets (Stroud
-      # Green Road and its neighbours), a bus gate, and 54 Caledonian Road.
+      # Green Road and its neighbours), a bus gate, and address search (a
+      # door from OpenStreetMap, a postcode, and 54 Caledonian Road).
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

@@ -140,7 +140,7 @@ Version numbers count up automatically.
 >
 > To try it outside London: on the Session tab, turn on "Demo drive". It simulates driving through north London, so search, routes, turn-by-turn and the Pursuit tab all work. For example, search "Caledonian Road" or "N7", pick a result, and compare the routes.
 >
-> The second "Police" route (bus lanes, bus gates, ignoring turn restrictions, never against one-way streets) is off by default. It appears only after the user confirms, on the Session tab under Police routes, that they are a police officer driving under the emergency exemptions. Without that, the app gives standard, fully legal routes only. When a police route is shown, every restriction it uses is listed and the user chooses.
+> The second "Blue light" route (bus lanes, bus gates, ignoring turn restrictions, never against one-way streets) is on by default, by design: the app is for emergency-service drivers using the emergency exemptions. It can be turned off on the Session tab, and then the app gives standard, fully legal routes only. The standard route is always offered beside it; when a blue-light route is shown, every restriction it uses is listed and the user chooses.
 >
 > The app is independent and not affiliated with any police force. Location is used only while the app is open.
 
@@ -254,7 +254,7 @@ Launch free, so the 14-day plan isn't held up and officers join the test. Add th
 
 Collect feedback during the test before deciding. Good candidates are things that cost money to run or that heavy users value most:
 
-- door-level address search beyond the OS Places free allowance
+- door-level address search for flats and named buildings (OS Places is paid per search)
 - extra areas beyond London, when UK-wide coverage comes
 - longer or exportable logs
 - live traffic-aware journey times
@@ -281,6 +281,6 @@ Keep safety features free: the one-way protection, the "—" for unknown speed l
 
 ## If something goes wrong
 
-- **Apple rejects it under guideline 1.4 (physical harm) or 5 (legal) because of the police route.** Reply in Resolution Center explaining that police routes are off by default and only appear after the user declares they're a police driver under the emergency exemptions, and point to the reviewer notes. If Apple still says no, ask Claude to leave police routes out of the iOS store build only (a small change). Officers still get search, standard routes, navigation, pursuit mode and the log, and TestFlight can carry the full version.
+- **Apple rejects it under guideline 1.4 (physical harm) or 5 (legal) because of the police route.** Reply in Resolution Center explaining that blue-light routes are for emergency-service drivers under the emergency exemptions, are always offered beside a fully legal standard route with every restriction listed, and can be turned off on the Session tab, and point to the reviewer notes. If Apple still says no, ask Claude to leave police routes out of the iOS store build only (a small change). Officers still get search, standard routes, navigation, pursuit mode and the log, and TestFlight can carry the full version.
 - **The Play closed test is stuck in review.** New accounts are often slower. It usually clears within 7 days. In the meantime, Android officers can use the APK from the GitHub release page.
 - **Fewer than 12 Android testers join.** The production clock doesn't start until 12 are opted in. Testers have to join through the link, not just be on the list.

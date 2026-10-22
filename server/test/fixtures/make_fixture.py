@@ -145,10 +145,47 @@ point("main_east", 7, 1, 3)
 point("high_road_1", 7, 0.8, 1)  # a block of High Road, closed in the live-closure test
 point("high_road_2", 7, 0.8, 2)
 
+# House-numbered addresses, away from the street grids (the smoke test picks a
+# door-level address from these). Not roads, so routing ignores them.
+tagged_nodes = []  # (id, lat, lng, tags)
+ADDR_LAT, ADDR_LNG = 51.40, 0.40
+
+
+def address_node(number, street, dlat, **extra):
+    nid_ = next_id["n"]
+    next_id["n"] += 1
+    tags = {"addr:housenumber": number, "addr:street": street, **{k.replace("__", ":"): v for k, v in extra.items()}}
+    tagged_nodes.append((nid_, ADDR_LAT + dlat, ADDR_LNG, tags))
+    return nid_
+
+
+def address_building(number, street, dlat):
+    """A small square building tagged with the address."""
+    corners = []
+    for dy, dx in ((0, 0), (0, 0.0001), (0.0001, 0.0001), (0.0001, 0)):
+        nid_ = next_id["n"]
+        next_id["n"] += 1
+        tagged_nodes.append((nid_, ADDR_LAT + dlat + dy, ADDR_LNG + dx, {}))
+        corners.append(nid_)
+    wid = next_id["w"]
+    next_id["w"] += 1
+    ways.append((wid, corners + corners[:1], {"building": "yes", "addr:housenumber": number, "addr:street": street}))
+    return wid
+
+
+address_node("54-56", "Caledonian Road", 0.0000)  # a range: not one door
+address_node("53", "Caledonian Road", 0.0005)
+address_building("55", "Caledonian Road", 0.0010)
+address_node("12A", "Caledonian Road", 0.0015)  # not a plain number
+address_node("7", "Other Street", 0.0020)
+
+
 def main(pbf_path, points_path):
     writer = osmium.SimpleWriter(pbf_path, overwrite=True)
     for node_id, lat, lng in sorted(nodes.values()):
         writer.add_node(osmium.osm.mutable.Node(id=node_id, location=(lng, lat), version=1))
+    for node_id, lat, lng, tags in tagged_nodes:
+        writer.add_node(osmium.osm.mutable.Node(id=node_id, location=(lng, lat), tags=tags, version=1))
     for way_id, refs, tags in ways:
         writer.add_way(osmium.osm.mutable.Way(id=way_id, nodes=refs, tags=tags, version=1))
     for rel_id, members, tags in relations:
