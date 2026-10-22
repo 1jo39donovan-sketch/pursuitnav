@@ -75,6 +75,10 @@ jobs:
           fi
           echo "EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-}" >> "$GITHUB_ENV"
           CI=1 npx expo prebuild --platform android --no-install
+          # The template's Gradle memory (512 MB Metaspace) runs out with
+          # expo-updates' build plugin, and Gradle then hangs; the runner has 16 GB.
+          sed -i '/^org.gradle.jvmargs=/d; /^kotlin.daemon.jvmargs=/d' android/gradle.properties
+          printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8\nkotlin.daemon.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g\n' >> android/gradle.properties
 
       # Updates only install over the previous version if they're signed with
       # the same key. The key lives encrypted (with ANDROID_KEYSTORE_PASSWORD)
