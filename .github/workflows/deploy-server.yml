@@ -45,7 +45,7 @@ jobs:
       # main by itself every 5 minutes (server/scripts/update.sh).
       BRANCH: ${{ inputs.branch || 'main' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check settings
         run: |
@@ -285,7 +285,7 @@ jobs:
       # Real London cases against the live server: one-way streets (Stroud
       # Green Road and its neighbours), a bus gate, and address search (a
       # door from OpenStreetMap, a postcode, and 54 Caledonian Road).
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 

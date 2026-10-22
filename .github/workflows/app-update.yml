@@ -43,7 +43,7 @@ jobs:
       SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.sha }}
 
@@ -59,7 +59,7 @@ jobs:
           # would leave every phone that takes it unable to route.
           [ -n "$SERVER_DOMAIN" ] || { echo "::error::Add the SERVER_DOMAIN variable: an update needs the server address."; exit 1; }
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.settings.outputs.skip != 'true'
         with:
           node-version: 22
