@@ -126,7 +126,6 @@ export function RoutePanel({
               <Text style={styles.retryText}>Retry</Text>
             </Pressable>
           )}
-          {state.noSignal && <ExternalLinks lat={lat} lng={lng} onOpen={onOpenExternal} />}
         </View>
       )}
       {slots && state.status === "ready" && (

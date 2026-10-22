@@ -10,6 +10,8 @@ export interface RegionConfig {
   defaultZoom: number;
   /** The camera can't be panned far outside this box. */
   maxBounds: LngLatBounds;
+  /** Zooms the offline map (Session, "Map for offline use") must draw. */
+  offlineZooms: [number, number];
 }
 
 export const LONDON: RegionConfig = {
@@ -18,6 +20,7 @@ export const LONDON: RegionConfig = {
   defaultCentre: [-0.1276, 51.5072],
   defaultZoom: 11,
   maxBounds: [-0.8, 51.2, 0.6, 51.8],
+  offlineZooms: [10, 16],
 };
 
 export const region = LONDON;

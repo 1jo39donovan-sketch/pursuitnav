@@ -18,6 +18,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LocationProvider } from "../location/LocationProvider";
 import { LogProvider } from "../log/LogProvider";
 import { NavigationProvider } from "../navigation/NavigationProvider";
+import { OfflineMapProvider } from "../offline/OfflineMapProvider";
 import { SearchProvider } from "../search/SearchProvider";
 import { SessionProvider } from "../session/SessionProvider";
 import { TeamProvider } from "../team/TeamProvider";
@@ -52,30 +53,32 @@ export default function RootLayout() {
       <SessionProvider>
         <LogProvider>
           <SearchProvider>
-            <LocationProvider>
-              <TeamProvider>
-                <NavigationProvider>
-                  <StatusBar style="light" />
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  >
-                    <Stack.Screen name="(tabs)" />
-                    {/* The search log, opened from Session. */}
-                    <Stack.Screen name="log" />
-                    <Stack.Screen
-                      name="navigate"
-                      options={{
-                        gestureEnabled: false,
-                        animation: "slide_from_bottom",
+            <OfflineMapProvider>
+              <LocationProvider>
+                <TeamProvider>
+                  <NavigationProvider>
+                    <StatusBar style="light" />
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: colors.bg },
                       }}
-                    />
-                  </Stack>
-                </NavigationProvider>
-              </TeamProvider>
-            </LocationProvider>
+                    >
+                      <Stack.Screen name="(tabs)" />
+                      {/* The search log, opened from Session. */}
+                      <Stack.Screen name="log" />
+                      <Stack.Screen
+                        name="navigate"
+                        options={{
+                          gestureEnabled: false,
+                          animation: "slide_from_bottom",
+                        }}
+                      />
+                    </Stack>
+                  </NavigationProvider>
+                </TeamProvider>
+              </LocationProvider>
+            </OfflineMapProvider>
           </SearchProvider>
         </LogProvider>
       </SessionProvider>

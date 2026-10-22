@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MAP_STYLES, region } from "../config";
+import { useOfflineMap } from "../offline/OfflineMapProvider";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
@@ -75,6 +76,8 @@ export function LiveMap({
 }: LiveMapProps) {
   const { fix, facing } = useLocation();
   const { mapTheme } = useSession();
+  // The map kept on the phone, once downloaded: draws with no signal.
+  const offlineStyles = useOfflineMap().styles;
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
   const [zoomOffset, setZoomOffset] = useState(0);
@@ -125,7 +128,7 @@ export function LiveMap({
     <View style={styles.container}>
       <Map
         style={StyleSheet.absoluteFill}
-        mapStyle={MAP_STYLES[mapTheme]}
+        mapStyle={offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme]}
         logo={false}
         compass={!compact}
         attribution
