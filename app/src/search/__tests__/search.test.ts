@@ -10,6 +10,7 @@ import type { Borough } from "../boroughs";
 import { parsePostcodes, parseRoads, parseServerRoads } from "../data";
 import { SearchIndex } from "../engine";
 import { starterEstatePlaces } from "../estates";
+import { expandNicknames } from "../nicknames";
 import { parseQuery } from "../parse";
 import { matchScore, normalise } from "../text";
 
@@ -94,6 +95,28 @@ describe("blocks and estates", () => {
     ]);
     expect(top("harvist")).toMatchObject({ label: "Harvist Estate", kind: "saved", detail: "Islington · off Holloway Road" });
     index.setPlaces(starterEstatePlaces(index));
+  });
+});
+
+describe("nicknames", () => {
+  it("finds Caledonian Road from 'Cally Road' and 'the Cally'", () => {
+    expect(top("Cally Road")).toMatchObject({ label: "Caledonian Road", borough: "Islington" });
+    expect(top("54 Cally Rd")).toMatchObject({ label: "54 Caledonian Road", borough: "Islington" });
+    expect(top("the cally")).toMatchObject({ label: "Caledonian Road", borough: "Islington" });
+  });
+
+  it("spells out whole words only, and not what's already spelt out", () => {
+    expect(expandNicknames("Cally Road")).toBe("Caledonian Road");
+    expect(expandNicknames("Callywood Close")).toBeNull();
+    expect(expandNicknames("Elephant and Castle")).toBeNull();
+    expect(expandNicknames("the elephant")).toBe("Elephant and Castle");
+    expect(expandNicknames("Stroud Green Road")).toBeNull();
+  });
+
+  it("doesn't add roads that are only spelt like the nickname", () => {
+    const labels = index.search("Cally Road", ISLINGTON).inArea.map((r) => r.label);
+    expect(labels).not.toContain("Celia Road");
+    expect(labels).not.toContain("City Road");
   });
 });
 

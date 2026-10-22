@@ -1,5 +1,5 @@
-// Buttons on the map: day/night, and on the navigation and pursuit maps the
-// view (direction of travel up, tilted 3D, north up). Both are remembered.
+// Buttons on the map: day/night, and the view (tilted 3D, direction of travel
+// up, north up). Both are remembered; day and 3D until the operator changes them.
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MAP_VIEWS, useSession } from "../session/SessionProvider";

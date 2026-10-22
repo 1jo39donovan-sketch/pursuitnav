@@ -39,3 +39,21 @@ export async function watchLocation(onFix: (fix: Fix) => void, _onRefused: () =>
   );
   return () => sub.remove();
 }
+
+/**
+ * The phone's compass, for which way it's facing before the vehicle has
+ * moved. True north when the phone can work it out, else magnetic (a few
+ * degrees out in London). Returns a function that stops it.
+ */
+export async function watchCompass(onHeading: (degrees: number) => void): Promise<() => void> {
+  try {
+    const sub = await Location.watchHeadingAsync((h) => {
+      const deg = h.trueHeading >= 0 ? h.trueHeading : h.magHeading;
+      if (deg >= 0 && h.accuracy > 0) onHeading(deg);
+    });
+    return () => sub.remove();
+  } catch {
+    // No compass on this phone: the map shows a dot until the vehicle moves.
+    return () => {};
+  }
+}

@@ -13,7 +13,8 @@ import { AppState } from "react-native";
 import { DEMO_MODE } from "../config";
 import { demoFixAt } from "../demo/demoDrive";
 import { useSession } from "../session/SessionProvider";
-import { checkLocation, watchLocation } from "./locationSource";
+import { facing as facingFrom, isMoving } from "./facing";
+import { checkLocation, watchCompass, watchLocation } from "./locationSource";
 
 export type LocationStatus =
   | "checking"
@@ -43,6 +44,12 @@ interface LocationState {
   simulated: boolean;
   /** The most recent position, or null before the first fix. */
   fix: Fix | null;
+  /**
+   * Which way the vehicle is facing, degrees from true north: the direction
+   * of travel, held when stopped, or the compass before it has moved. Null
+   * when unknown. For the arrow on the maps (facing.ts).
+   */
+  facing: number | null;
   requestPermission: () => Promise<void>;
 }
 
@@ -59,7 +66,14 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const { demoDrive } = useSession();
   const simulated = DEMO_MODE || demoDrive;
   const [status, setStatus] = useState<LocationStatus>("checking");
-  const [gpsFix, setFix] = useState<Fix | null>(null);
+  const [gpsFix, setGpsFix] = useState<Fix | null>(null);
+  // The last direction of travel, kept when the vehicle stops.
+  const [lastCourse, setLastCourse] = useState<number | null>(null);
+  const [compass, setCompass] = useState<number | null>(null);
+  const setFix = useCallback((f: Fix) => {
+    setGpsFix(f);
+    if (isMoving(f)) setLastCourse(f.course);
+  }, []);
   const [demoFix, setDemoFix] = useState<Fix | null>(null);
   const subscription = useRef<(() => void) | null>(null);
 
@@ -74,7 +88,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       stopWatching();
       setStatus("denied");
     });
-  }, [stopWatching]);
+  }, [stopWatching, setFix]);
 
   const refresh = useCallback(
     async (ask: boolean) => {
@@ -111,26 +125,40 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     };
   }, [simulated, refresh, stopWatching]);
 
+  // The compass, only while there's permission and no direction of travel
+  // yet to go on: it costs battery, and once moving GPS says which way.
+  const needCompass = !simulated && status === "granted" && lastCourse === null;
+  useEffect(() => {
+    if (!needCompass) return;
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    // Whole degrees are plenty, and save a redraw for every flicker.
+    watchCompass((deg) => setCompass(Math.round(deg) % 360)).then((s) => {
+      if (cancelled) s();
+      else stop = s;
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [needCompass]);
+
   const requestPermission = useCallback(() => refresh(true), [refresh]);
 
   const value = useMemo(
     () =>
       simulated
-        ? { status: "granted" as const, simulated, fix: demoFix, requestPermission }
-        : { status, simulated, fix: gpsFix, requestPermission },
-    [simulated, status, demoFix, gpsFix, requestPermission],
+        ? { status: "granted" as const, simulated, fix: demoFix, facing: demoFix?.course ?? null, requestPermission }
+        : { status, simulated, fix: gpsFix, facing: facingFrom(gpsFix, lastCourse, compass), requestPermission },
+    [simulated, status, demoFix, gpsFix, lastCourse, compass, requestPermission],
   );
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
 }
 
-// GPS course is noise when standing still or walking.
-const MOVING_MS = 2;
-
 /** The fix as a route origin, with its direction of travel when moving. */
 export function routeOrigin(fix: Fix): { lat: number; lng: number; heading?: number } {
-  const moving = fix.course != null && fix.speed != null && fix.speed >= MOVING_MS;
-  return moving ? { lat: fix.lat, lng: fix.lng, heading: Math.round(fix.course!) % 360 } : { lat: fix.lat, lng: fix.lng };
+  return isMoving(fix) ? { lat: fix.lat, lng: fix.lng, heading: Math.round(fix.course!) % 360 } : { lat: fix.lat, lng: fix.lng };
 }
 
 export function useLocation(): LocationState {

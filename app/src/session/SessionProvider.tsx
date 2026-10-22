@@ -42,7 +42,7 @@ export type RoadChoice = "main" | "any";
 
 export type MapTheme = "night" | "day";
 export type MapView = "north" | "heading" | "3d";
-export const MAP_VIEWS: MapView[] = ["heading", "3d", "north"];
+export const MAP_VIEWS: MapView[] = ["3d", "heading", "north"];
 
 /** A setting kept on the phone, read once at launch. */
 function useSetting<T extends string>(key: string, allowed: readonly T[], fallback: T): [T, (v: T) => void] {
@@ -97,8 +97,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     store.setSetting("vehicle", v);
   }, []);
 
-  const [mapTheme, setMapTheme] = useSetting<MapTheme>("mapTheme", ["night", "day"], "night");
-  const [mapView, setMapView] = useSetting<MapView>("mapView", MAP_VIEWS, "heading");
+  const [mapTheme, setMapTheme] = useSetting<MapTheme>("mapTheme", ["night", "day"], "day");
+  const [mapView, setMapView] = useSetting<MapView>("mapView", MAP_VIEWS, "3d");
   // "voice" was first stored by the navigation screen as "1"/"0".
   const [voiceSetting, setVoiceSetting] = useSetting<"1" | "0">("voice", ["1", "0"], "1");
   const voice = voiceSetting === "1";

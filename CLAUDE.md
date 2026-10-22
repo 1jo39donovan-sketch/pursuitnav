@@ -35,6 +35,7 @@ Officers type what the control room gave them. All of these must work:
 - Outward code: `N7` (roads in that district)
 - Block or estate by name: `Bemerton Estate`, `Smith House, Holloway Road`
 - Misspellings: `Bedminton Estate` should find Bemerton Estate
+- Nicknames: `Cally Road` should find Caledonian Road (list in `app/src/search/nicknames.ts`)
 
 Data sources:
 

@@ -113,6 +113,17 @@ describe("Nominatim precision", () => {
     expect(classify(street, parseQuery("Caledonian Road"))).toEqual({ precision: "road", label: "Caledonian Road" });
   });
 
+  it("names a place by its own name, and drops one without a name", () => {
+    const shop: NominatimResult = { ...street, category: "shop", type: "convenience", name: "Cally Food Centre" };
+    expect(classify(shop, parseQuery("Cally Food"))).toEqual({
+      precision: "place",
+      label: "Cally Food Centre, Caledonian Road",
+    });
+    // A nameless building on the road was just "Caledonian Road" again, once per building.
+    const building: NominatimResult = { ...street, category: "building", type: "yes", name: "" };
+    expect(classify(building, parseQuery("Caledonian Road"))).toBeNull();
+  });
+
   it("knows postcodes", () => {
     const pc: NominatimResult = {
       ...street,

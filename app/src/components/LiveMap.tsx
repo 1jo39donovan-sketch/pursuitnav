@@ -71,7 +71,7 @@ export function LiveMap({
   markers,
   onMarkerPress,
 }: LiveMapProps) {
-  const { fix } = useLocation();
+  const { fix, facing } = useLocation();
   const { mapTheme } = useSession();
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
@@ -102,7 +102,7 @@ export function LiveMap({
 
   const lng = fix?.lng;
   const lat = fix?.lat;
-  const course = fix?.course ?? null;
+  const course = facing;
   const puck = useMemo<GeoJSON.Feature | null>(
     () => (lng != null && lat != null ? vehicleFeature(lng, lat, course) : null),
     [lng, lat, course],
@@ -113,7 +113,7 @@ export function LiveMap({
       ? {
           center: position,
           zoom: followAt,
-          ...cameraFor(view, fix?.course ?? null),
+          ...cameraFor(view, facing),
           duration: 800,
           easing: "ease" as const,
         }

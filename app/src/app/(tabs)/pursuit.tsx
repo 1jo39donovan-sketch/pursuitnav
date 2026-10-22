@@ -2,6 +2,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { Tabs, useIsFocused } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchPursuitInfo } from "../../api/pursuit";
 import { boroughAt, cardinal, generallyTowards } from "../../area/area";
@@ -48,6 +49,7 @@ export default function PursuitScreen() {
   const { data, places } = useSearch();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
+  const insets = useSafeAreaInsets();
 
   // Recent fixes for map matching, and the last real direction of travel.
   const [trace, setTrace] = useState<{ fixes: Fix[]; course: number | null }>({ fixes: [], course: null });
@@ -168,7 +170,7 @@ export default function PursuitScreen() {
   );
   const junctionCell = (
     <View style={[styles.cell, styles.grow]}>
-      <Text style={styles.label}>Next junction</Text>
+      <Text style={styles.label}>Approaching junction</Text>
       <Text style={styles.big} numberOfLines={2}>
         {pursuit?.nextJunction?.name ?? "—"}
       </Text>
@@ -233,9 +235,9 @@ export default function PursuitScreen() {
   );
 
   return (
-    <View style={styles.screen}>
-      {/* Every pixel of height counts in landscape: drop the app header there. */}
-      <Tabs.Screen options={{ headerShown: !landscape }} />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      {/* Every pixel counts here: no app header, the readouts and map start at the top. */}
+      <Tabs.Screen options={{ headerShown: false }} />
       <GpsStatus />
       {landscape ? (
         <View style={styles.row}>
