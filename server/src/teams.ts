@@ -46,14 +46,17 @@ export class TeamStore {
   constructor(private readonly now = () => Date.now()) {}
 
   /**
-   * Stores a member's sealed blob, creating the team on first use. The first
-   * write for a member sets its token; later writes must carry the same one,
-   * so nobody else in the team can overwrite you.
+   * Stores a member's sealed blob. A team is only made when its starter asks
+   * (`create`): a code typed wrong, or made up, is refused, rather than
+   * quietly starting a team nobody else is in. The first write for a member
+   * sets its token; later writes must carry the same one, so nobody else in
+   * the team can overwrite you.
    */
-  put(teamId: string, memberId: string, token: string, blob: string): { expiresAt: number } {
+  put(teamId: string, memberId: string, token: string, blob: string, create = false): { expiresAt: number } {
     this.sweep();
     let team = this.teams.get(teamId);
     if (!team || team.expiresAt < this.now()) {
+      if (!create) throw new NoSuchTeamError("No such team, or it has ended.");
       if (this.teams.size >= MAX_TEAMS) throw new TeamFullError("Too many teams right now.");
       team = { expiresAt: this.now() + TEAM_DAYS * 24 * 3600_000, members: new Map() };
       this.teams.set(teamId, team);

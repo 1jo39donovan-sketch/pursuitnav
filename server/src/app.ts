@@ -442,7 +442,7 @@ export function buildApp(
     },
   );
 
-  app.put<{ Params: { teamId: string; memberId: string }; Body: { token: string; blob: string } }>(
+  app.put<{ Params: { teamId: string; memberId: string }; Body: { token: string; blob: string; create?: boolean } }>(
     "/v1/teams/:teamId/members/:memberId",
     {
       bodyLimit: MAX_BLOB_CHARS + 1000,
@@ -452,14 +452,20 @@ export function buildApp(
           type: "object",
           required: ["token", "blob"],
           additionalProperties: false,
-          properties: { token, blob: { type: "string", minLength: 1, maxLength: MAX_BLOB_CHARS } },
+          properties: {
+            token,
+            blob: { type: "string", minLength: 1, maxLength: MAX_BLOB_CHARS },
+            // Only "Start a team" sends this: joining never makes a team.
+            create: { type: "boolean" },
+          },
         },
       },
     },
     async (req, reply) => {
       try {
-        return teams.put(req.params.teamId, req.params.memberId, req.body.token, req.body.blob);
+        return teams.put(req.params.teamId, req.params.memberId, req.body.token, req.body.blob, req.body.create === true);
       } catch (err) {
+        if (err instanceof NoSuchTeamError) return reply.code(404).send({ error: "no-team", message: err.message });
         if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
         if (err instanceof TeamFullError) return reply.code(429).send({ error: "team-full", message: err.message });
         throw err;

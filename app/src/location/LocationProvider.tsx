@@ -11,7 +11,7 @@ import {
 import { AppState } from "react-native";
 
 import { DEMO_MODE } from "../config";
-import { demoFixAt } from "../demo/demoDrive";
+import { demoFixNow } from "../demo/demoDrive";
 import { useSession } from "../session/SessionProvider";
 import { facing as facingFrom, isMoving } from "./facing";
 import { checkLocation, watchCompass, watchLocation } from "./locationSource";
@@ -102,8 +102,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!simulated) return;
-    const started = Date.now();
-    const tick = () => setDemoFix(demoFixAt((Date.now() - started) / 1000));
+    const tick = () => setDemoFix(demoFixNow());
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [simulated]);

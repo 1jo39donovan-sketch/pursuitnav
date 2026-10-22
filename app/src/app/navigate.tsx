@@ -28,6 +28,7 @@ import {
 } from "../navigation/reroute";
 import { nextCallout } from "../navigation/voice";
 import { recordEvent } from "../usage/usage";
+import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
 import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
 import { useTeam } from "../team/TeamProvider";
@@ -42,6 +43,8 @@ import {
   type Progress,
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
+
+const DEMO_GRACE_MS = 5000;
 
 interface Timing {
   prepared: PreparedRoute | null;
@@ -69,7 +72,7 @@ export default function NavigateScreen() {
   const { active, replan, rerouteNow, stop } = useNavigation();
   // Usage counts: one navigation session per time this screen opens.
   useEffect(() => recordEvent("navigation"), []);
-  const { fix } = useLocation();
+  const { fix, simulated } = useLocation();
   const { blockLabels } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes } = useSession();
   const { mapPoints: teamMap } = useTeam();
@@ -78,6 +81,15 @@ export default function NavigateScreen() {
   const landscape = width > height;
 
   const prepared = useMemo(() => (active ? prepare(active.route) : null), [active]);
+
+  // The demo drive follows the route being navigated, from its first point,
+  // and goes back on patrol afterwards.
+  const shape = active?.route.shape;
+  useEffect(() => {
+    if (!simulated || !shape) return;
+    setDemoPath(shape);
+    return () => setDemoPath(null);
+  }, [simulated, shape]);
 
   // Progress along the route, updated once per GPS fix. The last segment
   // carries forward so a route doubling back on itself snaps to the right leg.
@@ -94,7 +106,12 @@ export default function NavigateScreen() {
       prepared,
       fixAt: fix.timestamp,
       progress,
-      offCount: fresh ? 0 : offRouteCount(track.offCount, progress.offRouteBy, fix.accuracy),
+      // The demo car's first fixes can still be from before it was put on
+      // this route: never call those off route.
+      offCount:
+        fresh || (simulated && fix.timestamp - demoDriveStartedAt() < DEMO_GRACE_MS)
+          ? 0
+          : offRouteCount(track.offCount, progress.offRouteBy, fix.accuracy),
     });
   }
   const progress = track.prepared === prepared ? track.progress : null;
