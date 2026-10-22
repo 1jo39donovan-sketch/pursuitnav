@@ -119,11 +119,26 @@ server/scripts/smoke-london.sh https://$DOMAIN --skip-address      # a test serv
 server/scripts/smoke-london.sh https://$DOMAIN --address "10 Downing Street" --borough Westminster
 ```
 
-Weekly refresh of the map data and the house-number search, with no downtime beyond a restart:
+## Updates
+
+The server keeps itself up to date (`scripts/cron.sh` writes its schedule; install and every update re-apply it):
+
+- **Code, every 5 minutes** (`scripts/update.sh`): with nothing new on `main` it stops in a second. With a new commit it takes it, rebuilds the API, restarts, and runs `scripts/check-server.sh` (health, a London route, address search). If the checks fail it goes back to the version it was running, writes the failed commit to `data/update-failed` and doesn't try that commit again; the next commit on `main` gets its own try. Log: `/var/log/blue-route-update.log`. A merge is live about 5 minutes later; `GET /health` shows the `version` (commit) running.
+- **Map, places and house-number search, daily 03:15** (`scripts/rebuild-tiles.sh` → `scripts/fetch-data.sh`): GitHub builds them every Sunday (the "Map data" workflow, `.github/workflows/data.yml`) and publishes a `data-YYYYMMDD-HHMM` release; the server downloads the newest, checks the SHA-256 sums, unpacks it beside the live data, swaps it in and runs the same checks, going back to the previous map if they fail. Usually there's nothing new and it stops at once. A new server gets its data the same way in a few minutes (`install.sh`). The server builds them itself only when it can't use GitHub's (no release, a region other than London in `PBF_URL`, or learned speeds): `build-map.sh` (= `map-build.sh` + `map-switch.sh`) and `build-geocoder.sh` (= `geocoder-import.sh` + `geocoder-switch.sh`), on Sundays. `GET /health` shows the live release (`data`).
+- **Operating system security fixes, daily** (unattended-upgrades).
+
+The live server runs only `main`. The deploy workflow's `branch` input is for a separate test server, and its `server_type` stays `cx23` (x86, 4 GB): the downloaded house-number database is built on GitHub's x86 machines, and a bigger type costs more.
+
+**HTTPS:** Caddy gets the certificate from Let's Encrypt, which allows 5 for one name a week; with `CONTACT_EMAIL` set, it falls back to ZeroSSL. Rebuilding the server from empty uses one each time, so it's for a broken server only.
+
+**Sizing:** `GET /stats` (with `STATS_TOKEN`) includes `server`: the machine's memory and swap in use. Each data release's `manifest.json` records the house-number import's time, memory and database size.
+
+**Uptime check** (`.github/workflows/uptime.yml`): every 10 minutes GitHub runs `check-server.sh` against the live server; a failure fails the run and GitHub emails about it.
+
+**Compatibility:** `test/unit/contract.test.ts` pins what app versions already on phones read from the server. Phones don't all update at once, so CI fails a server change that would break them.
 
 ```bash
-crontab -e
-15 3 * * 0  /opt/blue-route/server/scripts/rebuild-tiles.sh >> /var/log/blue-route-tiles.log 2>&1
+server/scripts/check-server.sh https://$DOMAIN            # the same checks, by hand
 ```
 
 Settings (environment variables on the `api` service): `VALHALLA_URL`, `OS_NAMES_KEY` (free, address search), `NOMINATIM_URL` (set by `build-geocoder.sh`), `OS_PLACES_KEY` (paid, optional), `PORT`, `REGION_BOUNDS` (`west,south,east,north`, London by default), `MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`, `RESTRICTION_CHECK_BUDGET`, `TFL_APP_KEY` (optional key for the TfL closures feed), `TFL_CLOSURES` (`0` turns live closures off).

@@ -1,0 +1,3 @@
+# Left out of the runtime fingerprint (app.json runtimeVersion): builds rewrite
+# eas.json with the server address and store keys, which don't change native code.
+eas.json

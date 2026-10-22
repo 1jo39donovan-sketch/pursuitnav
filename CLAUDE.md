@@ -107,7 +107,7 @@ Opt-in. An officer starts a team and shares its code; members see each other on 
 
 ## Data handling
 
-Addresses from the control room stay on the phone. The server must not store request logs containing addresses or locations. Use HTTPS throughout. Team-session data is the one thing the server holds, and only end-to-end encrypted, in memory. Usage counts (README, "Usage data") are daily totals only: a random install ID per phone (resettable) and the app version ride on each request, and are kept only as salted hashes, with a new salt each day and each week (deleted with the hashes when the day or week is over), to count unique installs without linking one day to the next. Never positions, addresses or searches, and no third-party analytics SDK.
+Addresses from the control room stay on the phone. The server must not store request logs containing addresses or locations. Use HTTPS throughout. Team-session data is the one thing the server holds, and only end-to-end encrypted, in memory. Usage counts (README, "Usage data") are daily totals only: a random install ID per phone (resettable) and the app version ride on each request, and are kept only as salted hashes, with a new salt each day and each week (deleted with the hashes when the day or week is over), to count unique installs without linking one day to the next. Never positions, addresses or searches, and no third-party analytics SDK. App updates come over the air from Expo (EAS Update, `expo-updates`): its check sends the app's runtime version, platform and a random update ID (and Expo sees the IP address, like any website); nothing else.
 
 ## Learning (planned)
 

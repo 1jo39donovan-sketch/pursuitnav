@@ -1,0 +1,87 @@
+# Dependabot opens a pull request when something Blue Route depends on has a
+# new version, so security fixes don't wait for someone to notice. Each one
+# runs CI; merge it once CI is green. Grouped and weekly, so it's at most a
+# few pull requests a week, on Mondays.
+#
+# Left out on purpose:
+# - The app's Expo SDK set (expo, expo-*, react, react-native and friends):
+#   those versions move together, once a year or so, with
+#   "npx expo install --fix" when upgrading the SDK; one at a time breaks the
+#   app. Security fixes for them still come as Dependabot alerts.
+# - Valhalla and Nominatim: a new version changes the format of the data
+#   built for it (and Valhalla's image and the pyvalhalla CI uses must match),
+#   so they're upgraded by hand, with a data rebuild.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "eslint-config-expo"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "@types/react"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@react-native/*"
+      - dependency-name: "@maplibre/maplibre-react-native"
+        update-types: ["version-update:semver-major"]
+    groups:
+      app:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      server:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /server/places
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+
+  - package-ecosystem: docker
+    directories: [/server, /server/places]
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    ignore:
+      # Node and Python move a major version only when we choose to.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
+  - package-ecosystem: docker-compose
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "valhalla/valhalla-scripted"
+      - dependency-name: "ghcr.io/valhalla/valhalla-scripted"
+      - dependency-name: "mediagis/nominatim"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]

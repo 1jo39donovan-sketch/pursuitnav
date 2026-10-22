@@ -74,6 +74,11 @@ jobs:
           EOF
           docker run --rm -v /tmp:/data --entrypoint python blueroute-places extract_roads.py /data/tiny.osm /data/roads.txt.gz
           docker run --rm -v /tmp:/data --entrypoint python blueroute-places practical_speeds.py /data/tiny.osm /data/out.osm.pbf
+      - name: Caddyfile is valid (HTTPS depends on it)
+        run: |
+          docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" -e DOMAIN=route.example.org \
+            -e ACME_EMAIL=certificates@example.org caddy:2.10-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: API image starts and answers
         run: |
           docker build -t blueroute-api .

@@ -2,7 +2,7 @@
 // served by the API so they live at the same address as the server.
 
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
-const UPDATED = "20 October 2026";
+const UPDATED = "22 October 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -111,6 +111,9 @@ searches, callsigns or IP addresses are kept with these counts, and no third-par
   <li><strong>Ordnance Survey</strong> receives address searches from the server, through its OS Names API (and OS
     Places, only if the server is set up with it): not your position or anything about you. House-number search runs
     on the Blue Route server itself.</li>
+  <li><strong>App updates</strong> come from Expo (expo.dev). When the app opens it asks Expo whether there's a newer
+    version, sending the app's version, the phone's platform and a random ID made for update checks, and like any
+    website it sees the phone's IP address. Nothing about your location, searches or journeys is sent.</li>
   <li><strong>Open in Google Maps / Waze</strong> hands the destination to that app when you tap it; their own privacy
     policies apply.</li>
 </ul>

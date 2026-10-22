@@ -10,6 +10,15 @@ on:
         description: "Delete the existing server and build a fresh one (nothing officers rely on is stored on it)"
         type: boolean
         default: false
+      branch:
+        description: "Code to run: main for the live server. Another branch only for a test server."
+        type: string
+        default: main
+      server_type:
+        description: "Hetzner server type: cx23 (4 GB, about €4 a month). cx33 (8 GB) costs more: only if agreed."
+        type: choice
+        options: [cx23, cx33]
+        default: cx23
 
 permissions:
   contents: read
@@ -32,7 +41,9 @@ jobs:
       DOMAIN: ${{ vars.SERVER_DOMAIN }}
       CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
       NAME: blue-route
-      BRANCH: ${{ github.ref_name }}
+      # The live server runs only main (merged, tested code); it then follows
+      # main by itself every 5 minutes (server/scripts/update.sh).
+      BRANCH: ${{ inputs.branch || 'main' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -74,7 +85,7 @@ jobs:
           fi
 
           if hcloud server describe "$NAME" >/dev/null 2>&1; then
-            echo "Server $NAME already exists; leaving it as it is (it updates itself nightly)."
+            echo "Server $NAME already exists; leaving it as it is (it takes new code from main every 5 minutes)."
           else
             # First boot runs the installer unattended. Only the domain and the
             # OS keys (and contact email) go to the server; the DuckDNS token stays here.
@@ -117,9 +128,12 @@ jobs:
               ssh_args+=(--ssh-key blue-route-admin)
             fi
 
-            # Cheapest first; small plans sell out at times, so try a few.
+            # x86 only: the house-number database is built on GitHub's x86
+            # machines, and a database folder is only certain to work on the
+            # kind of machine it was built on. Small plans sell out at times,
+            # so a few locations are tried; never a bigger (dearer) type.
             created=0
-            for type in cx23 cax11 cx33 cax21; do
+            for type in "${{ inputs.server_type || 'cx23' }}"; do
               for location in nbg1 fsn1 hel1; do
                 echo "Trying $type in $location"
                 if hcloud server create --name "$NAME" --type "$type" --image ubuntu-24.04 --location "$location" \
@@ -145,7 +159,7 @@ jobs:
             done
             # Only needed while creating the server; the key itself stays with this run.
             hcloud ssh-key delete "$KEY_NAME" >/dev/null || true
-            [ "$created" = 1 ] || { echo "::error::Hetzner had no suitable server available. Try again later."; exit 1; }
+            [ "$created" = 1 ] || { echo "::error::Hetzner had no ${{ inputs.server_type || 'cx23' }} available in nbg1, fsn1 or hel1. Try again later (a bigger type costs more: only if agreed)."; exit 1; }
           fi
 
           IP=$(hcloud server ip "$NAME")
@@ -213,7 +227,7 @@ jobs:
               tidy
               exit 0
             fi
-            # A server still on older code only reports ok; it updates itself overnight.
+            # A server still on older code only reports ok; it updates itself within minutes.
             if grep -q '"ok":true' <<<"$health" && ! grep -q '"routing"' <<<"$health"; then
               echo "https://${DOMAIN} is up (older version: it can't report whether the map is built yet)."
               tidy

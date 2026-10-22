@@ -98,8 +98,9 @@ jobs:
           printf '%s\n' "$cfg" > eas.json
           echo "Server: https://${SERVER_DOMAIN}"
 
+      # Also turns on over-the-air updates ("App update" workflow).
       - name: Link the Expo project
-        run: npx --yes eas-cli@latest init --non-interactive --force
+        run: bash scripts/link-updates.sh
 
       - name: Build${{ inputs.submit && ' and send to the stores' || '' }}
         run: |
