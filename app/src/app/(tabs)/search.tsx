@@ -8,7 +8,7 @@ import { fetchRoutes, restrictionPoints, RouteError, withoutPolice } from "../..
 import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
-import { namedPoints, type MapRoute, type MarkerProperties } from "../../components/mapShared";
+import type { MapRoute, MarkerProperties } from "../../components/mapShared";
 import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
@@ -52,7 +52,7 @@ export default function SearchScreen() {
   const [topSpace, setTopSpace] = useState(insets.top + 72);
   const { boroughs, policeRoutes, vehicle, roads, mapView } = useSession();
   const { mapPoints: teamMap } = useTeam();
-  const { data, search, places, area: searchArea } = useSearch();
+  const { data, search, places, blockLabels, area: searchArea } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
   const [query, setQuery] = useState("");
@@ -274,13 +274,6 @@ export default function SearchScreen() {
   const destLng = destination?.point[0];
   const destLat = destination?.point[1];
   const destRoad = destination?.road;
-  const blockLabels = useMemo(
-    () =>
-      data.status === "ready" && places.status === "ready" && destLat != null && destLng != null
-        ? namedPoints(data.index.housingNear(destLat, destLng, 600))
-        : null,
-    [data, places, destLat, destLng],
-  );
   const blocks = useMemo(
     () =>
       data.status === "ready" && places.status === "ready" && destRoad && destLat != null && destLng != null

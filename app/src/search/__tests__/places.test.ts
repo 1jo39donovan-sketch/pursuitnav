@@ -140,4 +140,10 @@ Lower Holloway Road House||Block of flats|housing|11|5154600|-7500|1 Lower Hollo
     expect(names).toContain("Jones Court");
     expect(names).not.toContain("Lower Holloway Road House");
   });
+
+  it("gives every named block and estate in London for the map labels", () => {
+    const all = homes.allHousing();
+    expect(all.map((p) => p.name)).toEqual(expect.arrayContaining(["Smith House", "Jones Court", "Bemerton Estate"]));
+    expect(all.every((p) => p.group === "housing")).toBe(true);
+  });
 });

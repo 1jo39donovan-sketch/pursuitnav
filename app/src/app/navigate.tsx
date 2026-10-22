@@ -12,7 +12,7 @@ import { wayTimes, type Observation } from "../learning/timing";
 import { GpsStatus } from "../components/GpsStatus";
 import { useElapsed } from "../components/useElapsed";
 import { LiveMap } from "../components/LiveMap";
-import { namedPoints, type MapRoute } from "../components/mapShared";
+import type { MapRoute } from "../components/mapShared";
 import { ExternalLinks } from "../components/RoutePanel";
 import { formatDistance, formatDuration } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
@@ -70,7 +70,7 @@ export default function NavigateScreen() {
   // Usage counts: one navigation session per time this screen opens.
   useEffect(() => recordEvent("navigation"), []);
   const { fix } = useLocation();
-  const { data, places } = useSearch();
+  const { blockLabels } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const insets = useSafeAreaInsets();
@@ -222,16 +222,6 @@ export default function NavigateScreen() {
     return () => clearTimeout(t);
   }, [confirmEnd]);
 
-  // Named blocks and estates round the destination, so the crew can find the right one.
-  const destLat = active?.destination.lat;
-  const destLng = active?.destination.lng;
-  const blockLabels = useMemo(
-    () =>
-      data.status === "ready" && places.status === "ready" && destLat != null && destLng != null
-        ? namedPoints(data.index.housingNear(destLat, destLng, 600))
-        : null,
-    [data, places, destLat, destLng],
-  );
 
   if (!active || !prepared) {
     return (

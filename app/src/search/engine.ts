@@ -230,6 +230,11 @@ export class SearchIndex {
     return best;
   }
 
+  /** Every named block and estate, for labelling the maps at street zoom. */
+  allHousing(): PointOfInterest[] {
+    return this.pois.filter((p) => p.item.group === "housing").map((p) => p.item);
+  }
+
   /** Named blocks and estates within `metres` of a point, nearest first (for map labels). */
   housingNear(lat: number, lng: number, metres: number, limit = 150): PointOfInterest[] {
     const km = metres / 1000;
