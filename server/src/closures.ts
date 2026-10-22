@@ -10,6 +10,11 @@
 // closures and partial closures are passable, and an emergency vehicle can
 // often get past them anyway. A street closed in one direction is avoided in
 // both: the feed's segments don't say which carriageway.
+//
+// The same feed lists holdups TfL rates Serious or Severe (works, collisions,
+// slow traffic) on open streets. A route through one is tried again round
+// it; if that costs little it's taken and said, otherwise the route stays
+// and carries TfL's update, so the operator can decide.
 import { distanceM, type LngLat } from "./geo.js";
 import { ValhallaError, type Route, type RouteRequest, type Router } from "./valhalla.js";
 
@@ -18,6 +23,25 @@ export interface Closure {
   street: string;
   /** Thin boxes along the closed stretch, as closed rings of [lng, lat]. */
   rings: LngLat[][];
+}
+
+/** A serious holdup TfL lists on a street that's still open. */
+export interface Delay {
+  id: string;
+  street: string;
+  severity: "Serious" | "Severe";
+  /** TfL's latest word on it, e.g. "Southbound traffic is slow moving…". */
+  update: string;
+  /** The affected stretch, as lines of [lng, lat] (or just TfL's point for it). */
+  lines: LngLat[][];
+}
+
+/** What a route says about a holdup: on it, or routed round. */
+export interface DelayNote {
+  street: string;
+  severity: "Serious" | "Severe";
+  update: string;
+  location: { lat: number; lng: number };
 }
 
 export interface ClosureSummary {
@@ -62,6 +86,10 @@ export function parseDisruptions(json: unknown, now = new Date()): Closure[] {
 interface TflDisruption {
   id?: string;
   status?: string;
+  severity?: string;
+  point?: string;
+  comments?: string;
+  currentUpdate?: string;
   startDateTime?: string;
   endDateTime?: string;
   streets?: Array<{
@@ -69,6 +97,68 @@ interface TflDisruption {
     closure?: string;
     segments?: Array<{ lineString?: string }>;
   }>;
+}
+
+/** Holdups TfL rates Serious or Severe on streets that aren't closed (those are avoided outright). */
+export function parseDelays(json: unknown, now = new Date()): Delay[] {
+  if (!Array.isArray(json)) return [];
+  const delays: Delay[] = [];
+  for (const d of json as TflDisruption[]) {
+    if (!d || typeof d !== "object" || !isLive(d, now)) continue;
+    const severity = /^severe/i.test(d.severity ?? "") ? "Severe" : /^serious/i.test(d.severity ?? "") ? "Serious" : null;
+    if (!severity) continue;
+    const open = (d.streets ?? []).filter((s) => !isClosed(s?.closure));
+    let lines = open.flatMap((s) => (s.segments ?? []).map((seg) => parseLine(seg?.lineString)));
+    lines = lines.filter((l) => l.length >= 2);
+    if (!lines.length) {
+      const point = parseLine(`[${d.point ?? ""}]`);
+      if (!point.length) continue;
+      lines = [point];
+    }
+    delays.push({
+      id: d.id ?? "?",
+      street: open[0]?.name ?? (d.streets ?? [])[0]?.name ?? "",
+      severity,
+      update: shortUpdate(d.currentUpdate || d.comments || ""),
+      lines,
+    });
+  }
+  return delays;
+}
+
+/** TfL's update, to its first sentence or so. */
+function shortUpdate(text: string): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= 160) return t;
+  const cut = t.slice(0, 160);
+  const end = cut.lastIndexOf(". ");
+  return end > 60 ? cut.slice(0, end + 1) : `${cut.trimEnd()}…`;
+}
+
+// A holdup is on a route when its stretch passes this close to it.
+const ON_ROUTE_M = 25;
+
+/** The holdups a route passes through. */
+export function delaysOn(shape: LngLat[], delays: Delay[]): Delay[] {
+  if (!shape.length || !delays.length) return [];
+  // A cheap box round the route first: most holdups are nowhere near it.
+  const pad = 0.0005;
+  const lngs = shape.map((p) => p[0]);
+  const lats = shape.map((p) => p[1]);
+  const [w, e, s, n] = [Math.min(...lngs) - pad, Math.max(...lngs) + pad, Math.min(...lats) - pad, Math.max(...lats) + pad];
+  return delays.filter((d) =>
+    d.lines.some((line) =>
+      line.some(
+        (p) =>
+          p[0] >= w && p[0] <= e && p[1] >= s && p[1] <= n && shape.some((q) => distanceM(p, q) < ON_ROUTE_M),
+      ),
+    ),
+  );
+}
+
+export function delayNote(d: Delay): DelayNote {
+  const p = d.lines[0]![Math.floor(d.lines[0]!.length / 2)]!;
+  return { street: d.street, severity: d.severity, update: d.update, location: { lat: p[1], lng: p[0] } };
 }
 
 /**
@@ -193,6 +283,7 @@ function trimEnds(line: LngLat[], m: number): LngLat[] {
 /** Polls TfL and keeps the current closures in memory. */
 export class ClosureFeed {
   private closures: Closure[] = [];
+  private delays: Delay[] = [];
   private updatedAt?: Date;
   private timer?: NodeJS.Timeout;
 
@@ -220,15 +311,23 @@ export class ClosureFeed {
       if (this.appKey) url.searchParams.set("app_key", this.appKey);
       const res = await this.fetchFn(url, { signal: AbortSignal.timeout(20_000) });
       if (!res.ok) return; // keep the last good list
-      this.set(parseDisruptions(await res.json()));
+      const json = await res.json();
+      this.set(parseDisruptions(json), new Date(), parseDelays(json));
     } catch {
       // TfL unreachable: keep the last good list. Stale closures are dropped below.
     }
   }
 
-  set(closures: Closure[], at = new Date()) {
+  set(closures: Closure[], at = new Date(), delays: Delay[] = []) {
     this.closures = closures;
+    this.delays = delays;
     this.updatedAt = at;
+  }
+
+  /** Serious holdups on open streets; none once the feed is an hour old. */
+  currentDelays(now = new Date()): Delay[] {
+    if (!this.updatedAt || now.getTime() - this.updatedAt.getTime() > 60 * 60_000) return [];
+    return this.delays;
   }
 
   /** The closures to avoid; none if the feed hasn't been read for an hour (it may have reopened). */
@@ -246,31 +345,64 @@ export class ClosureFeed {
 /** A route that avoided no closures it should have: set when they had to be ignored to find one. */
 export interface ClosureAwareRoute extends Route {
   closuresIgnored?: boolean;
+  /** Serious TfL holdups the route still goes through (no cheap way round). */
+  delays?: DelayNote[];
+  /** Serious TfL holdups it was routed round. */
+  delaysAvoided?: DelayNote[];
 }
+
+// A way round a holdup is taken if it costs no more than this: TfL's
+// "Serious" means real queues, so a couple of minutes round is a fair bet.
+const DETOUR_MAX_S = 120;
+const DETOUR_MAX_FRACTION = 0.15;
 
 /**
  * Wraps a router so every route keeps clear of the current closures, except
  * ones right by the start or destination. If no route avoids them all, the
  * route is found without them and marked, rather than failing.
  */
-export function avoidingClosures(router: Router, feed: Pick<ClosureFeed, "current">, nearEndM = NEAR_END_M): Router {
+export function avoidingClosures(
+  router: Router,
+  feed: Pick<ClosureFeed, "current"> & Partial<Pick<ClosureFeed, "currentDelays">>,
+  nearEndM = NEAR_END_M,
+): Router {
+  const nearEnds = (req: RouteRequest, points: LngLat[]) =>
+    points.some((p) => [req.from.point, req.to.point].some((e) => distanceM(p, e) < nearEndM));
+
+  async function avoidClosures(req: RouteRequest): Promise<ClosureAwareRoute> {
+    const rings = feed
+      .current()
+      .filter((c) => !c.rings.some((r) => nearEnds(req, r)))
+      .flatMap((c) => c.rings)
+      .slice(0, MAX_RINGS);
+    if (!rings.length) return router.route(req);
+    try {
+      return await router.route({ ...req, avoidAreas: [...(req.avoidAreas ?? []), ...rings] });
+    } catch (err) {
+      // No way round them (442), or Valhalla refused the areas (its limits not
+      // yet raised on this server): route without them rather than fail.
+      if (!(err instanceof ValhallaError && err.httpStatus >= 400 && err.httpStatus < 500)) throw err;
+      return { ...(await router.route(req)), closuresIgnored: true };
+    }
+  }
+
   return {
     async route(req: RouteRequest): Promise<ClosureAwareRoute> {
-      const ends = [req.from.point, req.to.point];
-      const rings = feed
-        .current()
-        .filter((c) => !c.rings.some((r) => r.some((p) => ends.some((e) => distanceM(p, e) < nearEndM))))
-        .flatMap((c) => c.rings)
-        .slice(0, MAX_RINGS);
-      if (!rings.length) return router.route(req);
-      try {
-        return await router.route({ ...req, avoidAreas: [...(req.avoidAreas ?? []), ...rings] });
-      } catch (err) {
-        // No way round them (442), or Valhalla refused the areas (its limits not
-        // yet raised on this server): route without them rather than fail.
-        if (!(err instanceof ValhallaError && err.httpStatus >= 400 && err.httpStatus < 500)) throw err;
-        return { ...(await router.route(req)), closuresIgnored: true };
+      const route = await avoidClosures(req);
+      // Restriction checks only want distances: holdups don't matter there.
+      if (req.distanceOnly || !feed.currentDelays) return route;
+      // Holdups right by the start or destination are the officer's to judge.
+      const on = delaysOn(route.shape, feed.currentDelays()).filter((d) => !d.lines.some((l) => nearEnds(req, l)));
+      if (!on.length) return route;
+      const rings = on.flatMap((d) => d.lines.flatMap(boxesAlong));
+      const round = rings.length
+        ? await avoidClosures({ ...req, avoidAreas: [...(req.avoidAreas ?? []), ...rings] }).catch(() => null)
+        : null;
+      const allowed = route.durationS + Math.max(DETOUR_MAX_S, route.durationS * DETOUR_MAX_FRACTION);
+      if (round && round.durationS <= allowed && delaysOn(round.shape, on).length === 0) {
+        return { ...round, delaysAvoided: on.map(delayNote) };
       }
+      return { ...route, delays: on.map(delayNote) };
     },
     traceEdges: (shape, costing) => router.traceEdges(shape, costing),
     ...(router.sizeLimitsAt ? { sizeLimitsAt: (points) => router.sizeLimitsAt!(points) } : {}),
