@@ -49,6 +49,8 @@ jobs:
           EXPO_PUBLIC_API_URL="https://${SERVER_DOMAIN}" npx expo export --platform web --output-dir dist-web
           # Links straight to a tab (…/search) load the app too.
           cp dist-web/index.html dist-web/404.html
+          # Add to Home Screen opens it full screen, without Safari's bars.
+          node scripts/web-app-shell.mjs dist-web "$base"
 
       - uses: actions/upload-pages-artifact@v5
         with:

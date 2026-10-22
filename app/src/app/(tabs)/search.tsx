@@ -48,6 +48,8 @@ interface Destination {
 export default function SearchScreen() {
   const { fix } = useLocation();
   const insets = useSafeAreaInsets();
+  // Height of the floating search box (and any notes under it), from the top of the screen.
+  const [topSpace, setTopSpace] = useState(insets.top + 72);
   const { boroughs, policeRoutes, vehicle, roads, mapView } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const { data, search, places, area: searchArea } = useSearch();
@@ -321,43 +323,13 @@ export default function SearchScreen() {
   }, [entries]);
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      {/* No app header: the search box sits at the top and the map gets the rest. */}
+    <View style={styles.screen}>
+      {/* No app header: the map fills the screen and the search box floats on it. */}
       <Tabs.Screen options={{ headerShown: false }} />
-      <View style={styles.searchBar}>
-        <TextInput
-          ref={input}
-          value={query}
-          onChangeText={(t) => {
-            setQuery(t);
-            setShowOutside(false);
-            if (destination) {
-              request.current?.abort();
-              setDestination(null);
-              setState(null);
-            }
-          }}
-          placeholder="Address, postcode, or a place like Costa"
-          placeholderTextColor={colors.muted}
-          autoCorrect={false}
-          autoCapitalize="words"
-          returnKeyType="search"
-          accessibilityLabel="Address from the control room"
-          style={styles.input}
-        />
-        {query.length > 0 && (
-          <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={clear} style={styles.clear}>
-            <Text style={styles.clearText}>✕</Text>
-          </Pressable>
-        )}
-      </View>
-      {dataNote && <Text style={styles.dataNote}>{dataNote}</Text>}
-      {lookupNote && <Text style={styles.dataNote}>{lookupNote}</Text>}
-      {placesNote && <Text style={styles.dataNote}>{placesNote}</Text>}
-      <GpsStatus />
-
       <View style={styles.body}>
         <LiveMap
+          overlayTop={topSpace}
+          overlayBottom={destination ? 18 : 0}
           team={teamMap}
           view={mapView}
           viewControl
@@ -378,11 +350,13 @@ export default function SearchScreen() {
           onMarkerPress={(marker, point) => setTapped({ marker, point })}
         />
         {!showResults && !destination && (
-          <PlacesControl
-            groups={markerGroups}
-            onChange={setMarkerGroups}
-            shownCount={places.status === "ready" ? (markers?.features.length ?? 0) : null}
-          />
+          <View style={[styles.belowBar, { top: topSpace - 4 }]} pointerEvents="box-none">
+            <PlacesControl
+              groups={markerGroups}
+              onChange={setMarkerGroups}
+              shownCount={places.status === "ready" ? (markers?.features.length ?? 0) : null}
+            />
+          </View>
         )}
         {tapped && !destination && !showResults && (
           <MarkerCard
@@ -425,7 +399,7 @@ export default function SearchScreen() {
           </View>
         )}
         {showResults && (
-          <View style={styles.results}>
+          <View style={[styles.results, { paddingTop: topSpace }]}>
             <SearchResultsList
               results={results}
               showOutside={showOutside}
@@ -447,6 +421,44 @@ export default function SearchScreen() {
         )}
       </View>
 
+      <View
+        style={[styles.floating, { top: insets.top + 8 }]}
+        onLayout={(e) => setTopSpace(insets.top + 8 + e.nativeEvent.layout.height)}
+        pointerEvents="box-none"
+      >
+        <View style={styles.searchBar}>
+          <TextInput
+            ref={input}
+            value={query}
+            onChangeText={(t) => {
+              setQuery(t);
+              setShowOutside(false);
+              if (destination) {
+                request.current?.abort();
+                setDestination(null);
+                setState(null);
+              }
+            }}
+            placeholder="Address, postcode, or a place like Costa"
+            placeholderTextColor={colors.muted}
+            autoCorrect={false}
+            autoCapitalize="words"
+            returnKeyType="search"
+            accessibilityLabel="Address from the control room"
+            style={styles.input}
+          />
+          {query.length > 0 && (
+            <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={clear} style={styles.clear}>
+              <Text style={styles.clearText}>✕</Text>
+            </Pressable>
+          )}
+        </View>
+        {dataNote && <Text style={styles.dataNote}>{dataNote}</Text>}
+        {lookupNote && <Text style={styles.dataNote}>{lookupNote}</Text>}
+        {placesNote && <Text style={styles.dataNote}>{placesNote}</Text>}
+        <GpsStatus />
+
+      </View>
       {destination && shown && (
         <RoutePanel
           state={shown}
@@ -483,22 +495,45 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  searchBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 10, gap: 8 },
+  // The search box floats over the map, as a rounded bar with a shadow.
+  floating: { position: "absolute", left: 10, right: 10, gap: 6 },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.panel,
+    borderRadius: 28,
+    paddingLeft: 18,
+    paddingRight: 6,
+    minHeight: 56,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
+  },
   input: {
     flex: 1,
-    backgroundColor: colors.panel,
-    borderColor: colors.line,
-    borderWidth: 1,
-    borderRadius: 8,
     color: colors.fg,
     fontFamily: fonts.body,
-    fontSize: 17,
+    fontSize: 18,
+    paddingVertical: 14,
+    outlineStyle: "none",
+  } as object,
+  clear: { padding: 12 },
+  clearText: { color: colors.muted, fontSize: 20 },
+  dataNote: {
+    color: colors.fg,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+    backgroundColor: colors.panel,
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 8,
+    overflow: "hidden",
+    opacity: 0.95,
   },
-  clear: { padding: 10 },
-  clearText: { color: colors.muted, fontSize: 18 },
-  dataNote: { color: colors.muted, fontFamily: fonts.mono, fontSize: 12, paddingHorizontal: 16, paddingTop: 6 },
+  belowBar: { position: "absolute", left: 0, right: 0, bottom: 0 },
   body: { flex: 1 },
   results: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.bg },
   hint: {

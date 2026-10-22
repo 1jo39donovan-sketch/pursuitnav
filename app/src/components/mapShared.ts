@@ -48,6 +48,13 @@ export interface LiveMapProps {
   followZoom?: number;
   /** Hide map controls for small embedded maps. */
   compact?: boolean;
+  /**
+   * Height of whatever floats over the top of the map (a search box): the
+   * map's buttons start below it, and routes are framed clear of it.
+   */
+  overlayTop?: number;
+  /** The same for a sheet over the bottom of the map: Recentre and the credit sit above it. */
+  overlayBottom?: number;
   routes?: MapRoute[];
   destination?: LngLat | null;
   onLongPress?: (point: LngLat) => void;
