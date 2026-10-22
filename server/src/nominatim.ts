@@ -125,9 +125,11 @@ export function classify(
     // the number isn't mapped, and the label shouldn't suggest it was found.
     return { precision: "road", label: a.road ?? r.name ?? "" };
   }
-  const name = r.name || a.road;
-  if (!name) return null;
-  return { precision: "place", label: r.name && a.road && r.name !== a.road ? `${r.name}, ${a.road}` : name };
+  // Something with no name of its own (a building, a plot of land) says
+  // nothing a crew can use: labelled by its road it was just the road again,
+  // once for every building on it.
+  if (!r.name) return null;
+  return { precision: "place", label: a.road && r.name !== a.road ? `${r.name}, ${a.road}` : r.name };
 }
 
 export class NominatimClient implements PlacesClient {

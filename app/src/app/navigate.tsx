@@ -13,6 +13,7 @@ import { GpsStatus } from "../components/GpsStatus";
 import { useElapsed } from "../components/useElapsed";
 import { LiveMap } from "../components/LiveMap";
 import { namedPoints, type MapRoute } from "../components/mapShared";
+import { ExternalLinks } from "../components/RoutePanel";
 import { formatDistance, formatDuration } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation, type RouteKind } from "../navigation/NavigationProvider";
@@ -382,6 +383,7 @@ export default function NavigateScreen() {
               zoomControl
               autoZoom
               roadNames
+              vehicleArrow
               followZoom={16.5}
               routes={routes}
               destination={destination}
@@ -407,6 +409,7 @@ export default function NavigateScreen() {
             setSheet(false);
             rerouteNow();
           }}
+          destination={active.destination}
           bottomInset={insets.bottom}
         />
       )}
@@ -422,6 +425,7 @@ function RouteSheet({
   onNewDestination,
   onSwitch,
   onRerouteNow,
+  destination,
   bottomInset,
 }: {
   kind: RouteKind;
@@ -430,6 +434,7 @@ function RouteSheet({
   onNewDestination: () => void;
   onSwitch: (kind: "standard" | "police") => void;
   onRerouteNow: () => void;
+  destination: { lat: number; lng: number };
   bottomInset: number;
 }) {
   const action = (label: string, onPress: () => void, style?: object) => (
@@ -451,6 +456,8 @@ function RouteSheet({
         {kind === "police" && action("Switch to standard", () => onSwitch("standard"))}
         {kind === "standard" && blueLightOn && action("Switch to blue light", () => onSwitch("police"))}
         {action("Re-route now", onRerouteNow)}
+        {/* Handing over to another app leaves this navigation running underneath. */}
+        <ExternalLinks lat={destination.lat} lng={destination.lng} onOpen={onClose} />
         {action("Cancel", onClose, styles.sheetCancel)}
       </View>
     </View>

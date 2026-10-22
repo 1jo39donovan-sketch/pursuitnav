@@ -141,4 +141,34 @@ describe("mergeAddresses", () => {
     expect(merged.inArea.map((r) => r.key)).toEqual(["a"]);
     expect(merged.outside.map((r) => r.key)).toEqual(["c", "b"]);
   });
+
+  it("shows each thing once: road sections, a postcode the phone also has, a road it found the door on", () => {
+    const area = new Set<Borough>(["Islington"]);
+    const phoneRoad: SearchResult = { ...road, key: "road:53", label: "53 Caledonian Road", road: "Caledonian Road" };
+    const phonePostcode: SearchResult = {
+      ...road,
+      key: "pc:N78LA",
+      label: "N7 8LA",
+      detail: "Islington",
+      kind: "postcode",
+      precision: "postcode",
+    };
+    const at = { borough: "Islington", lat: 51.54, lng: -0.117, match: 1 };
+    const server: Address[] = [
+      { id: "osm:1", label: "53 Caledonian Road", postcode: "N1 9BU", precision: "door", ...at },
+      { id: "os:pc", label: "N7 8LA", postcode: "N7 8LA", precision: "postcode", ...at },
+      // Unnamed buildings along the road, from an older server.
+      { id: "osm:2", label: "Caledonian Road", postcode: "", precision: "place", ...at },
+      { id: "osm:3", label: "Caledonian Road", postcode: "", precision: "place", ...at },
+      { id: "osm:4", label: "Cally Pool and Gym", postcode: "", precision: "place", ...at },
+      { id: "osm:5", label: "Cally Pool and Gym", postcode: "", precision: "place", ...at },
+    ];
+    const merged = mergeAddresses({ inArea: [phoneRoad, phonePostcode], outside: [] }, server, area);
+    // The door replaces the road it's on; the road's nameless buildings go.
+    expect(merged.inArea.map((r) => [r.label, r.precision])).toEqual([
+      ["53 Caledonian Road", "door"],
+      ["N7 8LA", "postcode"],
+      ["Cally Pool and Gym", "place"],
+    ]);
+  });
 });

@@ -50,3 +50,11 @@ export async function watchLocation(onFix: (fix: Fix) => void, onRefused: () => 
   );
   return () => navigator.geolocation.clearWatch(id);
 }
+
+/**
+ * No compass in the web version: Safari only gives it after an extra
+ * permission prompt. The map shows the last direction of travel instead.
+ */
+export async function watchCompass(_onHeading: (degrees: number) => void): Promise<() => void> {
+  return () => {};
+}

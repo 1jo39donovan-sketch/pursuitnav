@@ -68,7 +68,7 @@ export function LiveMap({
   markers,
   onMarkerPress,
 }: LiveMapProps) {
-  const { fix } = useLocation();
+  const { fix, facing } = useLocation();
   const { mapTheme } = useSession();
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
@@ -107,9 +107,18 @@ export function LiveMap({
         [region.maxBounds[0], region.maxBounds[1]],
         [region.maxBounds[2], region.maxBounds[3]],
       ],
-      attributionControl: { compact: true },
+      // Added below, folded to its ⓘ button.
+      attributionControl: false,
       dragRotate: !rotates,
     });
+    // The map data's credit, which its licence requires, as a small ⓘ that
+    // opens on a tap, bottom-left clear of Recentre. maplibre-gl opens a
+    // compact credit at first; fold it straight away.
+    m.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
+    const foldCredit = () =>
+      m.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+    m.once("load", foldCredit);
+    m.once("idle", foldCredit);
     if (!compact) m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "top-right");
     m.on("load", () => {
       m.addSource("places", { type: "geojson", data: EMPTY });
@@ -309,11 +318,11 @@ export function LiveMap({
   useEffect(() => {
     const m = map.current;
     if (!m || !loaded || !fix) return;
-    (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(fix.lng, fix.lat, fix.course));
+    (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(fix.lng, fix.lat, facing));
     if (following) {
-      m.easeTo({ center: [fix.lng, fix.lat], zoom, ...cameraFor(view, fix.course), duration: 800 });
+      m.easeTo({ center: [fix.lng, fix.lat], zoom, ...cameraFor(view, facing), duration: 800 });
     }
-  }, [fix, loaded, following, zoom, view]);
+  }, [fix, facing, loaded, following, zoom, view]);
 
   return (
     <View style={styles.container}>

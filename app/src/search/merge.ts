@@ -19,6 +19,11 @@ const KIND = {
 /** "Caledonian Road, N7" → "caledonian road", for spotting a road the phone already lists. */
 const roadName = (label: string) => label.split(",")[0]!.trim().toLowerCase();
 
+/** "Flat 3, 53 Caledonian Road" → "caledonian road": the road a door is on. */
+const doorRoad = (label: string) => roadName(label.split(",").at(-1)!.trim().replace(/^\d+[a-z]?\s+/i, ""));
+
+const compact = (postcode: string) => postcode.replace(/\s/g, "").toUpperCase();
+
 /**
  * The server's doors and postcodes go above the phone's own matches: they're
  * the more exact answer when the control room gave a full address. Its roads
@@ -30,11 +35,17 @@ export function mergeAddresses(offline: SearchResults, addresses: Address[], are
   const listed = new Set(
     [...offline.inArea, ...offline.outside].flatMap((r) => (r.road ? [`${roadName(r.road)}|${r.borough}`] : [])),
   );
+  // The same thing twice from the server (a road in sections, say) is shown once.
+  const shown = new Set<string>();
   const results: SearchResult[] = addresses.flatMap((a) => {
     if (!isBorough(a.borough)) return [];
     // Older servers: OS Places only, door level, keyed by UPRN.
     const precision = a.precision ?? "door";
-    if (precision === "road" && listed.has(`${roadName(a.label)}|${a.borough}`)) return [];
+    // A road the phone already lists, under any label the server gives it.
+    if ((precision === "road" || precision === "place") && listed.has(`${roadName(a.label)}|${a.borough}`)) return [];
+    const same = `${precision}|${a.label.toLowerCase()}|${a.borough}`;
+    if (shown.has(same)) return [];
+    shown.add(same);
     return [
       {
         key: a.id ?? `uprn:${a.uprn}`,
@@ -56,9 +67,19 @@ export function mergeAddresses(offline: SearchResults, addresses: Address[], are
   const mine = (r: SearchResult) => area.has(r.borough) || (area.near?.(r.lat, r.lng) ?? false);
   const inArea = results.filter(mine).slice(0, MAX_ADDRESSES);
   const outside = results.filter((r) => !mine(r));
+  // The phone's own rows the server has said better: a postcode it also
+  // found, or a road it found the door on.
+  const postcodes = new Set(results.filter((r) => r.precision === "postcode").map((r) => compact(r.label)));
+  const doors = new Set(results.filter((r) => r.precision === "door").map((r) => `${doorRoad(r.label)}|${r.borough}`));
+  const better = (r: SearchResult) =>
+    (r.kind === "postcode" && postcodes.has(compact(r.label))) ||
+    (r.precision === "road" && !!r.road && doors.has(`${roadName(r.road)}|${r.borough}`));
+  const phoneIn = offline.inArea.filter((r) => !better(r));
+  const phoneOut = offline.outside.filter((r) => !better(r));
   return {
-    inArea: [...inArea.filter(exact), ...offline.inArea, ...inArea.filter((r) => !exact(r))],
-    outside: [...outside.filter(exact), ...offline.outside, ...outside.filter((r) => !exact(r))],
-    outsideCount: outside.length + (offline.outsideCount ?? offline.outside.length),
+    inArea: [...inArea.filter(exact), ...phoneIn, ...inArea.filter((r) => !exact(r))],
+    outside: [...outside.filter(exact), ...phoneOut, ...outside.filter((r) => !exact(r))],
+    outsideCount:
+      outside.length + (offline.outsideCount ?? offline.outside.length) - (offline.outside.length - phoneOut.length),
   };
 }

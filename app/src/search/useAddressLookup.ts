@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchAddresses, type AddressLookup } from "../api/addresses";
+import { expandNicknames } from "./nicknames";
 import { parseQuery } from "./parse";
 
 const DEBOUNCE_MS = 400;
@@ -21,7 +22,8 @@ export function useAddressLookup(query: string, enabled: boolean): { query: stri
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setResult({ query: q, state: { status: "searching" } });
-      fetchAddresses(q, controller.signal)
+      // The server doesn't know crews' nicknames: ask for the real name.
+      fetchAddresses(expandNicknames(q) ?? q, controller.signal)
         .then((state) => setResult({ query: q, state }))
         .catch(() => {
           // aborted: a newer query replaced this one

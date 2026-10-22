@@ -88,21 +88,28 @@ export function RoutePanel({
   const go = (kind: "standard" | "police") => {
     if (guard.allows(Date.now())) onGo(kind);
   };
+  const [showRestrictions, setShowRestrictions] = useState(false);
   return (
     <View style={styles.panel}>
+      {/* One line: where to, how fresh the plan is, and Clear. */}
       <View style={styles.header}>
-        <Text style={[styles.label, ageText && styles.labelOld]}>{ageText ?? "Routes from your position"}</Text>
+        <View style={styles.headerText}>
+          {title && (
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+          )}
+          {ageText && <Text style={[styles.label, styles.labelOld]}>{ageText}</Text>}
+        </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Clear destination" onPress={onClose} hitSlop={12}>
           <Text style={styles.close}>Clear</Text>
         </Pressable>
       </View>
-
-      {title && (
-        <Text style={styles.title} numberOfLines={2}>
-          {title}
+      {note && (
+        <Text style={styles.note} numberOfLines={2}>
+          {note}
         </Text>
       )}
-      {note && <Text style={styles.note}>{note}</Text>}
       {state.status === "loading" && <Text style={styles.status}>{planningText("routes", waited)}</Text>}
       {state.status === "error" && (
         <View style={styles.errorBox}>
@@ -120,11 +127,15 @@ export function RoutePanel({
       )}
       {slots && state.status === "ready" && (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-          {/* Fixed places, so a card never moves under a finger; blocks on the road below. */}
-          <View style={styles.cards}>
-            <PoliceCard slot={slots[0]} checkingText={planningText("blue-light", waited)} onGo={() => go("police")} />
-            <StandardCard route={slots[1].route} fastest={slots[1].fastest} onGo={() => go("standard")} />
-          </View>
+          {/* Fixed places, so a row never moves under a finger: blue light on top, standard below. */}
+          <PoliceRow
+            slot={slots[0]}
+            checkingText={planningText("blue-light", waited)}
+            onGo={() => go("police")}
+            expanded={showRestrictions}
+            onToggle={() => setShowRestrictions((v) => !v)}
+          />
+          <StandardRow route={slots[1].route} fastest={slots[1].fastest} onGo={() => go("standard")} />
           <ClosuresLine closures={state.plan.closures} />
           {blocks && blocks.length > 0 && (
             <View style={styles.blocks}>
@@ -146,26 +157,16 @@ export function RoutePanel({
         </ScrollView>
       )}
 
-      <View style={styles.links}>
-        <LinkButton
-          label="Open in Google Maps"
-          url={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`}
-          onPress={() => onOpenExternal?.("google-maps")}
-        />
-        <LinkButton
-          label="Open in Waze"
-          url={`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`}
-          onPress={() => onOpenExternal?.("waze")}
-        />
-      </View>
+      <ExternalLinks lat={lat} lng={lng} onOpen={onOpenExternal} />
     </View>
   );
 }
 
-function GoButton({ onPress, color }: { onPress: () => void; color: string }) {
+function GoButton({ onPress, color, label }: { onPress: () => void; color: string; label: string }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
       style={({ pressed }) => [styles.go, { backgroundColor: color }, pressed && { opacity: 0.85 }]}
     >
@@ -174,38 +175,47 @@ function GoButton({ onPress, color }: { onPress: () => void; color: string }) {
   );
 }
 
-/** Always takes its space, shown or not, so the card's contents never shift. */
-function FastestBadge({ shown }: { shown: boolean }) {
+function StandardRow({ route, fastest, onGo }: { route: Route; fastest: boolean; onGo: () => void }) {
   return (
-    <Text style={[styles.fastest, !shown && styles.hidden]} importantForAccessibility={shown ? "auto" : "no"}>
-      Fastest
-    </Text>
-  );
-}
-
-function StandardCard({ route, fastest, onGo }: { route: Route; fastest: boolean; onGo: () => void }) {
-  return (
-    <View style={[styles.card, fastest && styles.cardFastest]}>
-      <FastestBadge shown={fastest} />
-      <View style={styles.cardHead}>
-        <Text style={styles.cardTitle}>Standard</Text>
-        <Text style={[styles.tag, { color: colors.ok, borderColor: colors.ok }]}>LEGAL</Text>
+    <View style={[styles.row, fastest && styles.rowFastest]}>
+      <View style={[styles.swatch, { backgroundColor: colors.blue }]} />
+      <View style={styles.rowText}>
+        <Text style={styles.rowTitle}>
+          Standard{fastest ? <Text style={styles.fastest}> · fastest</Text> : null}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {formatDistance(route.distanceM)} · legal
+        </Text>
       </View>
       <Text style={styles.eta}>{formatDuration(route.durationS)}</Text>
-      <Text style={styles.meta}>{formatDistance(route.distanceM)} · follows all restrictions</Text>
-      <View style={[styles.swatch, { backgroundColor: colors.blue }]} />
-      <GoButton onPress={onGo} color={colors.blue} />
+      <GoButton onPress={onGo} color={colors.blue} label="Go on the standard route" />
     </View>
   );
 }
 
-function PoliceCard({ slot, checkingText, onGo }: { slot: PoliceSlot; checkingText: string; onGo: () => void }) {
+function PoliceRow({
+  slot,
+  checkingText,
+  onGo,
+  expanded,
+  onToggle,
+}: {
+  slot: PoliceSlot;
+  checkingText: string;
+  onGo: () => void;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   if (slot.state !== "route") {
     return (
-      <View style={[styles.card, styles.cardMuted]}>
-        <FastestBadge shown={false} />
-        <Text style={styles.cardTitle}>Blue light</Text>
-        <Text style={styles.meta}>{slot.state === "checking" ? checkingText : NO_POLICE[slot.reason]}</Text>
+      <View style={[styles.row, styles.rowMuted]}>
+        <View style={[styles.swatch, styles.swatchMuted]} />
+        <View style={styles.rowText}>
+          <Text style={styles.rowTitle}>Blue light</Text>
+          <Text style={styles.meta} numberOfLines={2}>
+            {slot.state === "checking" ? checkingText : NO_POLICE[slot.reason]}
+          </Text>
+        </View>
       </View>
     );
   }
@@ -213,25 +223,61 @@ function PoliceCard({ slot, checkingText, onGo }: { slot: PoliceSlot; checkingTe
   const count = route.restrictions.length;
   const countText = `${route.restrictionsComplete ? "" : "at least "}${count} restriction${count === 1 ? "" : "s"}`;
   return (
-    <View style={[styles.card, styles.cardPolice]}>
-      <FastestBadge shown={slot.fastest} />
-      <View style={styles.cardHead}>
-        <Text style={styles.cardTitle}>Blue light</Text>
-        <Text style={styles.tag}>{countText.toUpperCase()}</Text>
+    <View style={[styles.rowWrap, styles.rowPolice]}>
+      <View style={styles.rowInner}>
+        <View style={[styles.swatch, { backgroundColor: colors.amber }]} />
+        <View style={styles.rowText}>
+          <Text style={styles.rowTitle}>Blue light</Text>
+          <Text style={[styles.meta, styles.saving]} numberOfLines={1}>
+            Saves {formatDuration(route.savingS)}
+          </Text>
+        </View>
+        <Text style={styles.eta}>{formatDuration(route.durationS)}</Text>
+        <GoButton onPress={onGo} color={colors.amber} label="Go on the blue-light route" />
       </View>
-      <Text style={styles.eta}>{formatDuration(route.durationS)}</Text>
-      <Text style={[styles.meta, styles.saving]}>Saves {formatDuration(route.savingS)}</Text>
-      <View style={[styles.swatch, styles.swatchDashed]} />
-      {/* Go before the list, so it's in reach without scrolling. */}
-      <GoButton onPress={onGo} color={colors.amber} />
-      <Text style={[styles.meta, styles.reliesOn]}>
-        {formatDistance(route.distanceM)} · relies on {countText}:
-      </Text>
-      {route.restrictions.map((r, i) => (
-        <Text key={i} style={styles.restriction}>
-          • {r.description}
+      {/* Always says how many it relies on; tap for the list (they're on the map too). */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${countText}. ${expanded ? "Hide" : "Show"} the list`}
+        onPress={onToggle}
+        hitSlop={6}
+      >
+        <Text style={styles.relies}>
+          {formatDistance(route.distanceM)} · relies on {countText} {expanded ? "▴" : "▾"}
         </Text>
-      ))}
+      </Pressable>
+      {expanded &&
+        route.restrictions.map((r, i) => (
+          <Text key={i} style={styles.restriction}>
+            • {r.description}
+          </Text>
+        ))}
+    </View>
+  );
+}
+
+/** Hand the destination to Google Maps or Waze. Also on the navigation screen. */
+export function ExternalLinks({
+  lat,
+  lng,
+  onOpen,
+}: {
+  lat: number;
+  lng: number;
+  onOpen?: (app: "google-maps" | "waze") => void;
+}) {
+  return (
+    <View style={styles.links}>
+      <LinkButton
+        label="Google Maps"
+        url={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`}
+        onPress={() => onOpen?.("google-maps")}
+      />
+      <LinkButton
+        label="Waze"
+        url={`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`}
+        onPress={() => onOpen?.("waze")}
+      />
     </View>
   );
 }
@@ -240,13 +286,14 @@ function LinkButton({ label, url, onPress }: { label: string; url: string; onPre
   return (
     <Pressable
       accessibilityRole="link"
+      accessibilityLabel={`Open in ${label}`}
       onPress={() => {
         onPress?.();
         Linking.openURL(url);
       }}
       style={({ pressed }) => [styles.link, pressed && { opacity: 0.7 }]}
     >
-      <Text style={styles.linkText}>{label}</Text>
+      <Text style={styles.linkText}>Open in {label} ↗</Text>
     </Pressable>
   );
 }
@@ -264,9 +311,8 @@ function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
   if (!closures.updatedAt) return <Text style={styles.closures}>Live TfL closures unavailable right now.</Text>;
   const at = new Date(closures.updatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   return (
-    <Text style={styles.closures}>
-      Avoids {closures.active} full road {closures.active === 1 ? "closure" : "closures"} from TfL (checked {at}). Lane
-      closures and incidents TfL hasn’t listed yet aren’t included.
+    <Text style={styles.closures} numberOfLines={1}>
+      Avoids {closures.active} TfL full {closures.active === 1 ? "closure" : "closures"} (checked {at})
     </Text>
   );
 }
@@ -276,41 +322,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.line,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 12,
-    gap: 10,
-    maxHeight: "60%",
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 6,
+    maxHeight: "50%",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  headerText: { flex: 1, minWidth: 0 },
   label: {
     color: colors.muted,
     fontFamily: fonts.displaySemiBold,
-    fontSize: 13,
-    letterSpacing: 1.5,
+    fontSize: 12,
+    letterSpacing: 1.2,
     textTransform: "uppercase",
   },
   labelOld: { color: colors.amber },
-  title: {
-    color: colors.fg,
-    fontFamily: fonts.displaySemiBold,
-    fontSize: 24,
-    lineHeight: 26,
-  },
-  note: { color: colors.amber, fontFamily: fonts.body, fontSize: 13 },
-  closures: { color: colors.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 17 },
+  title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 21, lineHeight: 24 },
+  note: { color: colors.amber, fontFamily: fonts.body, fontSize: 12, lineHeight: 16 },
+  closures: { color: colors.muted, fontFamily: fonts.body, fontSize: 11, lineHeight: 15 },
   closuresWarn: { color: colors.amber, fontFamily: fonts.bodySemiBold },
-  close: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 15 },
-  status: {
-    color: colors.muted,
-    fontFamily: fonts.body,
-    fontSize: 15,
-    paddingVertical: 12,
-  },
+  close: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 16, paddingVertical: 4 },
+  status: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, paddingVertical: 10 },
   error: { color: colors.amber },
   errorBox: { gap: 4 },
   retry: {
@@ -328,80 +361,60 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   scroll: { flexGrow: 0 },
-  scrollContent: { gap: 12 },
-  // Stretch: the blue-light placeholder is the same size as the card beside it.
-  cards: { flexDirection: "row", gap: 10, alignItems: "stretch" },
-  card: {
-    flex: 1,
-    minWidth: 0,
+  scrollContent: { gap: 6 },
+  // A row: colour swatch, name, time, Go. The same height whatever it says.
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 64,
     backgroundColor: colors.panel,
     borderColor: colors.line,
-    // The same width whether fastest or not, so nothing inside shifts.
     borderWidth: 2,
     borderRadius: 10,
-    padding: 12,
+    paddingLeft: 10,
+    paddingRight: 4,
+    paddingVertical: 4,
+  },
+  rowWrap: {
+    backgroundColor: colors.panel,
+    borderWidth: 2,
+    borderRadius: 10,
+    paddingLeft: 10,
+    paddingRight: 4,
+    paddingVertical: 4,
     gap: 2,
   },
-  cardPolice: { borderColor: colors.amber },
-  cardMuted: { gap: 6 },
-  cardHead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 6,
-  },
-  cardTitle: {
+  rowInner: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 56 },
+  rowPolice: { borderColor: colors.amber },
+  rowFastest: { borderColor: colors.blue },
+  rowMuted: { opacity: 0.85 },
+  rowText: { flex: 1, minWidth: 0 },
+  rowTitle: {
     color: colors.fg,
     fontFamily: fonts.displayBold,
     fontSize: 18,
     letterSpacing: 0.8,
     textTransform: "uppercase",
   },
-  tag: {
-    color: colors.amber,
-    borderColor: colors.amber,
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    fontFamily: fonts.mono,
-    fontSize: 10,
-    flexShrink: 1,
-  },
+  swatch: { width: 6, alignSelf: "stretch", borderRadius: 3, marginVertical: 4 },
+  swatchMuted: { backgroundColor: colors.line },
   eta: {
     color: colors.fg,
     fontFamily: fonts.displayBold,
-    fontSize: 32,
+    fontSize: 28,
     fontVariant: ["tabular-nums"],
-    marginTop: 2,
   },
-  meta: {
-    color: colors.muted,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-  },
+  meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
   saving: { color: colors.amber, fontFamily: fonts.bodySemiBold },
-  restriction: {
-    color: colors.fg,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  swatch: { height: 4, borderRadius: 2, marginTop: 10 },
-  swatchDashed: {
-    borderTopWidth: 4,
-    borderStyle: "dashed",
-    borderColor: colors.amber,
-    height: 0,
-  },
+  relies: { color: colors.amber, fontFamily: fonts.body, fontSize: 13, lineHeight: 18, paddingVertical: 4 },
+  restriction: { color: colors.fg, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   go: {
     borderRadius: 10,
+    width: 76,
     minHeight: 56,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 10,
   },
   goText: {
     color: "#0c1220",
@@ -410,16 +423,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: "uppercase",
   },
-  cardFastest: { borderColor: colors.blue },
-  fastest: {
-    color: colors.ok,
-    fontFamily: fonts.displayBold,
-    fontSize: 12,
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
-  },
-  hidden: { opacity: 0 },
-  reliesOn: { marginTop: 8 },
+  fastest: { color: colors.ok, fontFamily: fonts.displayBold, fontSize: 13, letterSpacing: 1 },
   blocks: { gap: 6 },
   blocksLabel: { color: colors.muted, fontFamily: fonts.body, fontSize: 12 },
   blockRow: { gap: 8 },
@@ -431,20 +435,21 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   blockText: { color: "#93c5fd", fontFamily: fonts.bodySemiBold, fontSize: 15 },
-  links: { flexDirection: "row", gap: 10 },
+  links: { flexDirection: "row", gap: 8 },
   link: {
     flex: 1,
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: 8,
-    paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: "center",
     alignItems: "center",
   },
   linkText: {
     color: colors.fg,
     fontFamily: fonts.displaySemiBold,
-    fontSize: 15,
-    letterSpacing: 0.6,
+    fontSize: 14,
+    letterSpacing: 0.5,
     textTransform: "uppercase",
   },
 });

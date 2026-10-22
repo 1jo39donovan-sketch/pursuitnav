@@ -3,6 +3,7 @@
 // places from OpenStreetMap (shops, cafés, schools, parks, blocks…).
 
 import type { Borough } from "./boroughs";
+import { expandNicknames } from "./nicknames";
 import { formatPostcode, parseQuery } from "./parse";
 import { typesForQuery, type PlaceGroup, type PointOfInterest } from "./places";
 import { matchScore, normalise } from "./text";
@@ -278,7 +279,33 @@ export class SearchIndex {
     return this.postcodes.get(compact.replace(/\s/g, "").toUpperCase());
   }
 
+  /**
+   * Nicknames are spelt out ("Cally Road" is Caledonian Road) and searched
+   * first; what was typed is still searched for places actually called that
+   * (Cally Pool), but not for roads it's merely spelt like.
+   */
   search(raw: string, area: AreaFilter): SearchResults {
+    const expanded = expandNicknames(raw);
+    if (!expanded) return this.searchOnce(raw, area);
+    const full = this.searchOnce(expanded, area);
+    const typed = this.searchOnce(raw, area);
+    const named = (rs: SearchResult[]) => rs.filter((r) => r.kind === "poi");
+    const seen = new Set<string>();
+    const unique = (rs: SearchResult[]) =>
+      rs.filter((r) => {
+        if (seen.has(r.key)) return false;
+        seen.add(r.key);
+        return true;
+      });
+    const outside = unique([...full.outside, ...named(typed.outside)]);
+    return {
+      inArea: unique([...full.inArea, ...named(typed.inArea)]),
+      outside,
+      outsideCount: Math.max(outside.length, full.outsideCount ?? full.outside.length),
+    };
+  }
+
+  private searchOnce(raw: string, area: AreaFilter): SearchResults {
     if (raw.trim().length < 2) return { inArea: [], outside: [] };
     const types = typesForQuery(raw, this.poiTypes);
     const listed = this.listOfType(types, area);

@@ -1,7 +1,8 @@
 import type { LngLat } from "@maplibre/maplibre-react-native";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, Tabs, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchRoutes, restrictionPoints, RouteError, withoutPolice } from "../../api/routes";
 import { AddPlaceForm } from "../../components/AddPlaceForm";
@@ -46,7 +47,8 @@ interface Destination {
 // where the phone is now. A long press on the map also sets a destination.
 export default function SearchScreen() {
   const { fix } = useLocation();
-  const { boroughs, policeRoutes, vehicle, roads } = useSession();
+  const insets = useSafeAreaInsets();
+  const { boroughs, policeRoutes, vehicle, roads, mapView } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const { data, search, places, area: searchArea } = useSearch();
   const navigation = useNavigation();
@@ -319,7 +321,9 @@ export default function SearchScreen() {
   }, [entries]);
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      {/* No app header: the search box sits at the top and the map gets the rest. */}
+      <Tabs.Screen options={{ headerShown: false }} />
       <View style={styles.searchBar}>
         <TextInput
           ref={input}
@@ -355,6 +359,9 @@ export default function SearchScreen() {
       <View style={styles.body}>
         <LiveMap
           team={teamMap}
+          view={mapView}
+          viewControl
+          vehicleArrow
           routes={routes}
           restrictions={restrictionPoints(plan?.police)}
           labels={blockLabels}
