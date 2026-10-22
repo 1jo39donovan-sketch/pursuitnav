@@ -7,6 +7,7 @@
 # What's built (the same scripts a server would run, server/scripts):
 #   - the routing map: Valhalla tiles with travel speeds (map-build.sh)
 #   - the places and named-roads lists the app keeps offline (map-build.sh)
+#   - the map phones keep for no signal: tiles, styles, fonts (offline-map.sh)
 #   - the house-number search: a Nominatim database (geocoder-import.sh)
 # All of it is OpenStreetMap data (© OpenStreetMap contributors, ODbL),
 # already public; no officer or search data is involved.
@@ -60,6 +61,13 @@ jobs:
           echo "MAP_MINUTES=$(( ($(date +%s) - start + 59) / 60 ))" >> "$GITHUB_ENV"
           du -sh data/valhalla-next data/places-next
 
+      - name: Offline map for phones
+        run: |
+          start=$(date +%s)
+          bash scripts/offline-map.sh
+          echo "OFFLINE_MINUTES=$(( ($(date +%s) - start + 59) / 60 ))" >> "$GITHUB_ENV"
+          echo "OFFLINE_MB=$(python3 -c 'import json; print(round(json.load(open("data/places-next/offline/manifest.json"))["bytes"] / 1e6))')" >> "$GITHUB_ENV"
+
       - name: House-number search
         run: |
           # As root, as on a server: the database's files belong to its container's postgres user.
@@ -78,7 +86,7 @@ jobs:
             echo "London map and search data built $(date -u '+%d %b %Y %H:%M') UTC for Blue Route servers."
             echo
             echo "Servers download this themselves (server/scripts/fetch-data.sh); there's nothing to install by hand."
-            echo "Map build: ${MAP_MINUTES} min. House-number search: $(cat "$RUNNER_TEMP/geocoder.json")"
+            echo "Map build: ${MAP_MINUTES} min. Offline map: ${OFFLINE_MB} MB in ${OFFLINE_MINUTES} min. House-number search: $(cat "$RUNNER_TEMP/geocoder.json")"
             echo
             echo "Map data © OpenStreetMap contributors, under the Open Database License."
           } > "$RUNNER_TEMP/notes.md"

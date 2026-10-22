@@ -22,6 +22,8 @@ export interface ServerConfig {
   placesFile: string;
   /** Gzipped named-roads file written by places/extract_roads.py. */
   roadsFile?: string;
+  /** The offline map for phones (scripts/offline-map.sh): manifest.json and its files. */
+  offlineMapDir?: string;
   /** Shown on the privacy and support pages; without it they point at GitHub issues. */
   contactEmail?: string;
   /** Avoid TfL's live full road closures (default on; TFL_CLOSURES=0 turns it off). */
@@ -74,6 +76,7 @@ export function loadConfig(): ServerConfig {
     nominatimUrl: process.env.NOMINATIM_URL || undefined,
     placesFile: process.env.PLACES_FILE ?? "/data/places/places.txt.gz",
     roadsFile: process.env.ROADS_FILE ?? "/data/places/roads.txt.gz",
+    offlineMapDir: process.env.OFFLINE_MAP_DIR ?? "/data/places/offline",
     contactEmail: process.env.CONTACT_EMAIL || undefined,
     tflClosures: process.env.TFL_CLOSURES !== "0",
     tflAppKey: process.env.TFL_APP_KEY || undefined,

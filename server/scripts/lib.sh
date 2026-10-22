@@ -28,3 +28,26 @@ free_disk_mb() { df -Pm . | awk 'NR == 2 {print $4}'; }
 inactive_geocoder_slot() {
   if [ "$(setting NOMINATIM_DATA)" = ./data/nominatim/a ]; then echo ./data/nominatim/b; else echo ./data/nominatim/a; fi
 }
+
+# The area the server covers, west,south,east,north: REGION_BOUNDS from .env,
+# or Greater London with a margin (the default in src/config.ts).
+DEFAULT_REGION_BOUNDS=-0.8,51.2,0.6,51.8
+region_bounds() {
+  local b
+  b=$(setting REGION_BOUNDS)
+  echo "${b:-$DEFAULT_REGION_BOUNDS}"
+}
+
+# Puts data/places-next in place of data/places, file by file. A folder (the
+# offline map) replaces the old one whole, rather than landing inside it.
+swap_places() {
+  mkdir -p data/places
+  local f target
+  for f in data/places-next/*; do
+    [ -e "$f" ] || continue
+    target="data/places/$(basename "$f")"
+    if [ -d "$f" ]; then rm -rf "$target"; fi
+    mv -f "$f" "$target"
+  done
+  rmdir data/places-next
+}

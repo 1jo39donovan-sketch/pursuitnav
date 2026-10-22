@@ -18,8 +18,6 @@ else
   docker compose up -d valhalla </dev/null
 fi
 if [ -d data/places-next ]; then
-  mkdir -p data/places
-  for f in data/places-next/*; do mv -f "$f" "data/places/$(basename "$f")"; done
-  rmdir data/places-next
+  swap_places
 fi
 say "map live (previous tiles kept in data/valhalla-prev)"

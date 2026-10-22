@@ -10,6 +10,7 @@ import type { ServerConfig } from "./config.js";
 import { BANDS, type LearningStore, type Sample } from "./learning.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
+import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage } from "./pages.js";
 import { dataRelease, machineMemory } from "./serverInfo.js";
 import { PlacesError, type PlacesClient } from "./places.js";
@@ -303,6 +304,7 @@ export function buildApp(
     };
   app.get("/v1/places-data", dataFile(config.placesFile, "places-not-ready", "Place data"));
   app.get("/v1/roads-data", dataFile(config.roadsFile, "roads-not-ready", "The road list"));
+  offlineMapRoutes(app, config.offlineMapDir);
 
   // Follow-in: the way a colleague drove, from here. Their track comes from the
   // phone (decrypted there) and, like every request, isn't logged or kept.
