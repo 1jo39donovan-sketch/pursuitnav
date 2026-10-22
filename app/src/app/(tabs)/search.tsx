@@ -1,10 +1,11 @@
 import type { LngLat } from "@maplibre/maplibre-react-native";
+import { useNetworkState } from "expo-network";
 import { router, Tabs, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { fetchRoutes, restrictionPoints, RouteError, withoutPolice } from "../../api/routes";
+import { fetchRoutes, NoSignalRouteError, restrictionPoints, RouteError, withoutPolice } from "../../api/routes";
 import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
@@ -19,6 +20,7 @@ import { useLog } from "../../log/LogProvider";
 import { formatDistance } from "../../format";
 import { distanceM } from "../../geo";
 import { routeOrigin, useLocation } from "../../location/LocationProvider";
+import { NO_SIGNAL_ROUTE_START } from "../../navigation/connectivity";
 import { useNavigation } from "../../navigation/NavigationProvider";
 import { planIsStale } from "../../navigation/routeChoice";
 import type { SearchResult } from "../../search/engine";
@@ -138,6 +140,10 @@ export default function SearchScreen() {
           setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" }, origin });
           return;
         }
+        if (err instanceof NoSignalRouteError) {
+          setState({ status: "error", message: NO_SIGNAL_ROUTE_START, noSignal: true });
+          return;
+        }
         const message = err instanceof RouteError ? err.message : "Something went wrong working out routes.";
         setState({ status: "error", message });
       }
@@ -204,6 +210,26 @@ export default function SearchScreen() {
     // Only when the first fix arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasFix]);
+
+  // No signal when a destination was picked: try again the moment the phone
+  // has a network again, and every 15 s meanwhile (its network state can lag).
+  const connected = useNetworkState().isConnected;
+  const noSignal = state?.status === "error" && !!state.noSignal;
+  const wasConnected = useRef(connected);
+  useEffect(() => {
+    const back = wasConnected.current === false && connected === true;
+    wasConnected.current = connected;
+    if (!noSignal || !destination) return;
+    const again = () => routeTo(destination);
+    const t = back ? setTimeout(again, 500) : null;
+    const every = setInterval(again, 15_000);
+    return () => {
+      if (t) clearTimeout(t);
+      clearInterval(every);
+    };
+    // A new attempt only when signal comes back, or on the 15 s beat.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noSignal, connected]);
 
   // Back from navigation: a plan from where the crew were before is never
   // offered again. After arriving, or "New destination", start clean and

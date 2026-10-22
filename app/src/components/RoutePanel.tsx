@@ -4,6 +4,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-na
 import type { NoPoliceReason, Route, RoutePlan } from "../api/routes";
 import type { PointOfInterest } from "../search/places";
 import { formatDistance, formatDuration } from "../format";
+import { RETRYING_WHEN_BACK } from "../navigation/connectivity";
 import { planningText } from "../navigation/planning";
 import {
   cardSlots,
@@ -19,7 +20,8 @@ import { useElapsed } from "./useElapsed";
 export type PlanState =
   | { status: "loading" }
   /** waitingForFix: refused for want of a GPS position; routes when the first fix arrives. */
-  | { status: "error"; message: string; waitingForFix?: boolean }
+  /** noSignal: the network failed; the card offers the hand-offs and retries when signal is back. */
+  | { status: "error"; message: string; waitingForFix?: boolean; noSignal?: boolean }
   /**
    * checking: the standard route is here, the blue-light one is still being worked out.
    * origin: where and when the plan was made, to refresh an old one before it's followed.
@@ -114,6 +116,7 @@ export function RoutePanel({
       {state.status === "error" && (
         <View style={styles.errorBox}>
           <Text style={[styles.status, styles.error]}>{state.message}</Text>
+          {state.noSignal && <Text style={styles.status}>{RETRYING_WHEN_BACK}</Text>}
           {onRetry && !state.waitingForFix && (
             <Pressable
               accessibilityRole="button"
@@ -123,6 +126,7 @@ export function RoutePanel({
               <Text style={styles.retryText}>Retry</Text>
             </Pressable>
           )}
+          {state.noSignal && <ExternalLinks lat={lat} lng={lng} onOpen={onOpenExternal} />}
         </View>
       )}
       {slots && state.status === "ready" && (
