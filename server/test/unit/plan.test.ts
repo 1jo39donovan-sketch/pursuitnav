@@ -53,6 +53,42 @@ describe("detectRestrictions", () => {
   });
 });
 
+/** Metres along the test road (straight north from 51°) for a waypoint. */
+const alongOf = (point: LngLat) => Math.round(((point[1] - 51) / 0.0009) * 100);
+
+/** Fake router whose legal car route from a to b is `carDistance(a, b)` metres. */
+function carRouter(carDistance: (a: number, b: number) => number): Router {
+  return {
+    async route(req: RouteRequest) {
+      if (!req.distanceOnly) return route(100);
+      return { ...route(0), distanceM: carDistance(alongOf(req.from.point), alongOf(req.to.point)) };
+    },
+    async traceEdges() {
+      return edges;
+    },
+  };
+}
+
+describe("detectRestrictions: restrictions across several roads", () => {
+  it("invents nothing when a car only prefers longer, faster roads over a long stretch", async () => {
+    // Up to 400 m a car goes the same way; further, it takes main roads 20% longer.
+    const router = carRouter((a, b) => (b - a <= 400 ? b - a : (b - a) * 1.2));
+    const result = await detectRestrictions(router, shape, edges, 150);
+    expect(result.restrictions).toEqual([]);
+    expect(result.complete).toBe(true);
+  });
+
+  it("still finds a banned move through a short link road, as one short manoeuvre", async () => {
+    // Cars may not go from Road 4 through Road 5 into Road 6 (each pair is fine).
+    const router = carRouter((a, b) => (a < 500 && b > 600 ? (b - a) * 3 : b - a));
+    const result = await detectRestrictions(router, shape, edges, 150);
+    expect(result.restrictions).toHaveLength(1);
+    expect(result.restrictions[0]).toMatchObject({ kind: "manoeuvre" });
+    expect(result.restrictions[0]!.streets).toEqual(expect.arrayContaining(["Road 4", "Road 5", "Road 6"]));
+    expect(result.restrictions[0]!.streets.length).toBeLessThanOrEqual(4);
+  });
+});
+
 describe("planRoutes", () => {
   it("doesn't offer a faster police route when no restriction explains it", async () => {
     const plan = await planRoutes(fakeRouter({ carAlwaysDetours: false }), [0, 51], [0, 51.01], options);

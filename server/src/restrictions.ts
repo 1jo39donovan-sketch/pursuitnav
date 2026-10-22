@@ -59,6 +59,11 @@ export interface DetectionResult {
 // Any genuine detour round a block in London is far more than that.
 const SLACK_FRACTION = 1.02;
 const SLACK_METRES = 25;
+// A restriction spanning more than one road (a banned turn through a short
+// link road, say) is short. Over a longer stretch, a car route that isn't
+// "the same" usually just prefers faster main roads that are longer in
+// miles, which is no restriction at all.
+const MAX_MANOEUVRE_METRES = 400;
 
 const streetName = (edge: TraceEdge) => edge.names[0] ?? "unnamed road";
 
@@ -212,9 +217,30 @@ export async function detectRestrictions(
     const m = Math.floor((i + j) / 2);
     const [leftOk, rightOk] = await Promise.all([stretchIsLegal(i, m), stretchIsLegal(m, j)]);
     await Promise.all([leftOk ? null : locate(i, m), rightOk ? null : locate(m, j)]);
-    // Each half is fine on its own but not together: a restriction that
-    // spans the join, e.g. a banned turn via a short link road.
-    if (leftOk && rightOk) recordManoeuvre(i, j);
+    // Each half is fine on its own but not together: maybe a restriction
+    // that spans the join, e.g. a banned turn via a short link road.
+    if (leftOk && rightOk) await locateAcrossJoin(i, j, m);
+  }
+
+  /**
+   * Looks for a restriction across the join at edge m by testing short
+   * stretches round it, widening one edge each way. Found: recorded. None
+   * illegal before the stretch is too long to be one: the car only chose
+   * different (longer, faster) roads over the whole stretch, and nothing is
+   * recorded, rather than inventing a restriction.
+   */
+  async function locateAcrossJoin(i: number, j: number, m: number): Promise<void> {
+    for (let w = 1; ; w++) {
+      const lo = Math.max(i, m - w);
+      const hi = Math.min(j, m + w);
+      if (edgeEnd(hi) - edgeStart(lo) > MAX_MANOEUVRE_METRES) return;
+      if (!(await stretchIsLegal(lo, hi))) {
+        if (hi === lo + 1) recordTurn(lo, hi);
+        else recordManoeuvre(lo, hi);
+        return;
+      }
+      if (lo === i && hi === j) return;
+    }
   }
 
   if (edges.length > 0 && !(await stretchIsLegal(0, edges.length - 1))) {
