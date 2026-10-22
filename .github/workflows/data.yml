@@ -17,8 +17,11 @@ on:
     # Sundays 01:00 UTC: Geofabrik's London extract is out by then.
     - cron: "0 1 * * 0"
   workflow_dispatch:
-  # A change to this workflow builds and publishes at once, so it's tried for real.
+  # A change to this workflow on main builds and publishes at once, so it's
+  # tried for real. Only main: a branch (a Dependabot update, a pull request)
+  # mustn't publish data that servers then download.
   push:
+    branches: [main]
     paths: [".github/workflows/data.yml"]
 
 permissions:

@@ -4,6 +4,9 @@
 # few pull requests a week, on Mondays.
 #
 # Left out on purpose:
+# - Major versions (TypeScript 6 to 7, ESLint 9 to 10 and so on): they
+#   usually need code changes, so they're done by hand, together. Minor and
+#   patch updates, including security fixes, still come.
 # - The app's Expo SDK set (expo, expo-*, react, react-native and friends):
 #   those versions move together, once a year or so, with
 #   "npx expo install --fix" when upgrading the SDK; one at a time breaks the
@@ -20,6 +23,8 @@ updates:
       day: monday
     open-pull-requests-limit: 3
     ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "expo"
       - dependency-name: "expo-*"
       - dependency-name: "@expo/*"
@@ -31,7 +36,6 @@ updates:
       - dependency-name: "react-native-*"
       - dependency-name: "@react-native/*"
       - dependency-name: "@maplibre/maplibre-react-native"
-        update-types: ["version-update:semver-major"]
     groups:
       app:
         update-types: [minor, patch]
@@ -42,6 +46,9 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       server:
         update-types: [minor, patch]
@@ -52,6 +59,12 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      places:
+        patterns: ["*"]
 
   - package-ecosystem: docker
     directories: [/server, /server/places]
