@@ -1,3 +1,4 @@
+import type { TripEvent, TripRecord } from "../fieldtest/trip";
 import type { Borough } from "../search/boroughs";
 
 export interface SavedPlace {
@@ -40,4 +41,12 @@ export interface Store {
   /** Newest first. */
   listLog(): LogEntry[];
   clearLog(): void;
+  /** Field-test trips (fieldtest/): kept apart from the log, cleared separately. */
+  saveTrip(record: TripRecord): void;
+  addTripEvents(id: string, events: TripEvent[]): void;
+  /** Newest first. */
+  listTrips(): TripRecord[];
+  tripEvents(id: string): TripEvent[];
+  deleteTrips(): void;
+  tripStorage(): { trips: number; bytes: number };
 }

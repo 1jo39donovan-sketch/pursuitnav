@@ -1,6 +1,7 @@
 // On-phone storage in SQLite. Nothing here leaves the phone.
 import { openDatabaseSync, type SQLiteDatabase } from "expo-sqlite";
 
+import type { TripEvent, TripRecord } from "../fieldtest/trip";
 import type { LogEntry, LoggedRoute, SavedPlace, Store } from "./types";
 
 // Each entry upgrades the database by one version. Append; never edit.
@@ -26,6 +27,14 @@ const MIGRATIONS = [
      route TEXT
    );
    CREATE INDEX log_at ON log (at);`,
+  // Field-test trips: separate from the log, so Clear log leaves them alone.
+  `CREATE TABLE trips (id TEXT PRIMARY KEY NOT NULL, started_at INTEGER NOT NULL, record TEXT NOT NULL);
+   CREATE TABLE trip_events (
+     seq INTEGER PRIMARY KEY AUTOINCREMENT,
+     trip_id TEXT NOT NULL,
+     data TEXT NOT NULL
+   );
+   CREATE INDEX trip_events_trip ON trip_events (trip_id, seq);`,
 ];
 
 function migrate(db: SQLiteDatabase) {
@@ -98,5 +107,42 @@ export const store: Store = {
   },
   clearLog() {
     open().runSync("DELETE FROM log");
+  },
+  saveTrip(r) {
+    open().runSync(
+      "INSERT INTO trips (id, started_at, record) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET record = excluded.record",
+      r.header.id,
+      r.header.startedAt,
+      JSON.stringify(r),
+    );
+  },
+  addTripEvents(id, events) {
+    const d = open();
+    d.withTransactionSync(() => {
+      for (const e of events) d.runSync("INSERT INTO trip_events (trip_id, data) VALUES (?, ?)", id, JSON.stringify(e));
+    });
+  },
+  listTrips() {
+    return open()
+      .getAllSync<{ record: string }>("SELECT record FROM trips ORDER BY started_at DESC")
+      .map((r) => JSON.parse(r.record) as TripRecord);
+  },
+  tripEvents(id) {
+    return open()
+      .getAllSync<{ data: string }>("SELECT data FROM trip_events WHERE trip_id = ? ORDER BY seq", id)
+      .map((r) => JSON.parse(r.data) as TripEvent);
+  },
+  deleteTrips() {
+    const d = open();
+    d.withTransactionSync(() => {
+      d.runSync("DELETE FROM trip_events");
+      d.runSync("DELETE FROM trips");
+    });
+  },
+  tripStorage() {
+    const d = open();
+    const trips = d.getFirstSync<{ n: number; b: number }>("SELECT count(*) AS n, coalesce(sum(length(record)), 0) AS b FROM trips")!;
+    const events = d.getFirstSync<{ b: number }>("SELECT coalesce(sum(length(data)), 0) AS b FROM trip_events")!;
+    return { trips: trips.n, bytes: trips.b + events.b };
   },
 };
