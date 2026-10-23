@@ -17,6 +17,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { LocationProvider } from "../location/LocationProvider";
 import { LogProvider } from "../log/LogProvider";
+import { RecIndicator } from "../components/RecIndicator";
 import { NavigationProvider } from "../navigation/NavigationProvider";
 import { OfflineMapProvider } from "../offline/OfflineMapProvider";
 import { SearchProvider } from "../search/SearchProvider";
@@ -75,6 +76,7 @@ export default function RootLayout() {
                         }}
                       />
                     </Stack>
+                    <RecIndicator />
                   </NavigationProvider>
                 </TeamProvider>
               </LocationProvider>

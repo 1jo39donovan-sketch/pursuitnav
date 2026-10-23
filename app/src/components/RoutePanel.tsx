@@ -1,9 +1,10 @@
 import { useLayoutEffect, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import type { NoPoliceReason, Route, RoutePlan } from "../api/routes";
 import type { PointOfInterest } from "../search/places";
 import { formatDistance, formatDuration } from "../format";
+import { recorder, useRecorder } from "../fieldtest/instance";
 import { RETRYING_WHEN_BACK } from "../navigation/connectivity";
 import { planningText } from "../navigation/planning";
 import {
@@ -90,7 +91,9 @@ export function RoutePanel({
   useLayoutEffect(() => guard.see(shownKey, Date.now()), [guard, shownKey]);
   const go = (kind: "standard" | "police") => {
     if (guard.allows(Date.now())) onGo(kind);
+    else recorder.event({ type: "tap-ignored" });
   };
+  const { recording } = useRecorder();
   const [showRestrictions, setShowRestrictions] = useState(false);
   return (
     <View style={styles.panel}>
@@ -147,6 +150,7 @@ export function RoutePanel({
             onGo={() => go("standard")}
           />
           <ClosuresLine closures={state.plan.closures} />
+          {recording && <OtherEtas />}
           {blocks && blocks.length > 0 && (
             <View style={styles.blocks}>
               <Text style={styles.blocksLabel}>Blocks and estates on this road · tap to go there</Text>
@@ -168,6 +172,46 @@ export function RoutePanel({
       )}
 
       <ExternalLinks lat={lat} lng={lng} onOpen={onOpenExternal} />
+    </View>
+  );
+}
+
+/**
+ * Field-test recording: what other apps say for the same trip, in minutes,
+ * typed before Go or later on the Log. Skippable.
+ */
+function OtherEtas() {
+  const [blm, setBlm] = useState("");
+  const [google, setGoogle] = useState("");
+  const minutes = (v: string) => (/^\d{1,3}$/.test(v.trim()) ? Number(v.trim()) : null);
+  const field = (label: string, value: string, onChange: (v: string) => void) => (
+    <View style={styles.otherField}>
+      <Text style={styles.otherLabel}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        keyboardType="number-pad"
+        maxLength={3}
+        placeholder="min"
+        placeholderTextColor={colors.muted}
+        style={styles.otherInput}
+        accessibilityLabel={`${label} ETA in minutes`}
+      />
+    </View>
+  );
+  return (
+    <View style={styles.others}>
+      <Text style={styles.otherTitle}>Other apps’ ETA (optional)</Text>
+      <View style={styles.otherRow}>
+        {field("Blue Light Maps", blm, (v) => {
+          setBlm(v);
+          recorder.setOthers({ blueLightMaps: minutes(v), googleApple: minutes(google) });
+        })}
+        {field("Google/Apple", google, (v) => {
+          setGoogle(v);
+          recorder.setOthers({ blueLightMaps: minutes(blm), googleApple: minutes(v) });
+        })}
+      </View>
     </View>
   );
 }
@@ -459,6 +503,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     letterSpacing: 0.8,
     textTransform: "uppercase",
+  },
+  others: { gap: 6, paddingVertical: 4 },
+  otherTitle: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
+  otherRow: { flexDirection: "row", gap: 10 },
+  otherField: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 },
+  otherLabel: { color: colors.fg, fontFamily: fonts.body, fontSize: 13, flexShrink: 1 },
+  otherInput: {
+    width: 56,
+    minHeight: 40,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    color: colors.fg,
+    fontFamily: fonts.mono,
+    fontSize: 16,
+    textAlign: "center",
   },
   swatch: { width: 6, alignSelf: "stretch", borderRadius: 3, marginVertical: 4 },
   swatchMuted: { backgroundColor: colors.line },

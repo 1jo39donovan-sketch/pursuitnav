@@ -87,7 +87,8 @@ export function LiveMap({
   const [zoomOffset, setZoomOffset] = useState(0);
   const followAt =
     followZoom + zoomOffset + (autoZoom ? speedZoom(fix?.speed ?? null) : 0);
-  const [following, setFollowing] = useState(true);
+  // Following the vehicle, unless the map opens on something to frame.
+  const [following, setFollowing] = useState(!fitTo?.length);
   const camera = useRef<CameraRef>(null);
 
   // New points to show: stop following so the camera can frame them.

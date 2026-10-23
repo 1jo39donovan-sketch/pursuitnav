@@ -73,7 +73,11 @@ export class Recorder {
     return () => this.listeners.delete(fn);
   }
 
+  /** Goes up on every change the screens show (on/off, a trip starting or ending). */
+  version = 0;
+
   private notify() {
+    this.version++;
     for (const fn of this.listeners) fn();
   }
 

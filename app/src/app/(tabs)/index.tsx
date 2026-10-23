@@ -8,6 +8,7 @@ import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
 import { OfflineMapSection } from "../../components/OfflineMapSection";
 import { TeamSection } from "../../components/TeamSection";
+import { setRecording, useRecorder } from "../../fieldtest/instance";
 import { serverLearns } from "../../learning/queue";
 import { useLog } from "../../log/LogProvider";
 import { useSearch } from "../../search/SearchProvider";
@@ -54,6 +55,7 @@ export default function SessionScreen() {
   }, []);
   const { savedPlaces, deletePlace, places } = useSearch();
   const logCount = useLog().entries.length;
+  const recording = useRecorder();
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -203,6 +205,23 @@ export default function SessionScreen() {
       <TeamSection />
 
       <OfflineMapSection />
+
+      <View style={styles.field}>
+        <View style={styles.toggleRow}>
+          <Text style={[styles.label, styles.placeText]} nativeID="fieldtest-label">
+            Field-test recording
+          </Text>
+          <Switch
+            accessibilityLabelledBy="fieldtest-label"
+            value={recording.enabled}
+            onValueChange={setRecording}
+            trackColor={{ false: colors.line, true: colors.amber }}
+          />
+        </View>
+        <Text style={styles.placeMeta}>
+          Records your trips on this phone only, for testing. Nothing is sent anywhere. Export or delete from the Log.
+        </Text>
+      </View>
 
       <Pressable
         accessibilityRole="button"

@@ -30,6 +30,8 @@ import {
 import { nextCallout } from "../navigation/voice";
 import { recordEvent } from "../usage/usage";
 import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
+import { recorder, useRecorder } from "../fieldtest/instance";
+import { MARKS, type MarkTag } from "../fieldtest/trip";
 import {
   linkBanner,
   mayAnnounceReroute,
@@ -56,6 +58,7 @@ import {
 import { colors, fonts } from "../theme";
 
 const DEMO_GRACE_MS = 5000;
+const ARRIVAL_GRACE_MS = 10_000;
 
 interface Timing {
   prepared: PreparedRoute | null;
@@ -83,7 +86,11 @@ export default function NavigateScreen() {
   const { active, replan, rerouteNow, stop } = useNavigation();
   // Usage counts: one navigation session per time this screen opens.
   useEffect(() => recordEvent("navigation"), []);
-  const { fix, simulated, facing } = useLocation();
+  const { fix: lastFix, simulated, facing } = useLocation();
+  // When this screen opened. On a demo drive, a fix from before then is from
+  // the patrol, not the route the car is about to be put on: not used.
+  const [openedAt] = useState(() => Date.now());
+  const fix = simulated && lastFix && lastFix.timestamp < openedAt ? null : lastFix;
   const { blockLabels } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes } = useSession();
   const { mapPoints: teamMap } = useTeam();
@@ -158,6 +165,36 @@ export default function NavigateScreen() {
   }, [connected, onLink]);
   const handledReconnect = useRef(0);
 
+  // Field-test recording (off unless switched on): breadcrumbs, the first
+  // ETA once moving, each time off the line, and signal changes.
+  useEffect(() => {
+    if (fix)
+      recorder.event({ type: "fix", lat: fix.lat, lng: fix.lng, speed: fix.speed, heading: fix.course, accuracy: fix.accuracy });
+  }, [fix]);
+  const etaSaid = useRef<unknown>(null);
+  useEffect(() => {
+    if (!progress || etaSaid.current === prepared) return;
+    etaSaid.current = prepared;
+    recorder.event({ type: "eta", etaS: Math.round(progress.remainingS) });
+  }, [progress, prepared]);
+  useEffect(() => {
+    if (offRoute && fix && progress) {
+      recorder.event({ type: "off-route", offByM: Math.round(progress.offRouteBy), lat: fix.lat, lng: fix.lng });
+    }
+    // Once per time off the line.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offRoute]);
+  useEffect(() => {
+    recorder.event({ type: "signal", state: linkState.link });
+  }, [linkState.link]);
+  // Arriving ends the trip, whether or not End is tapped after; not in the
+  // first few seconds, when a stale fix (or the demo car before it's put on
+  // the route) can sit by the destination.
+  const arrived = !!progress?.arrived && !!fix && fix.timestamp - openedAt > ARRIVAL_GRACE_MS;
+  useEffect(() => {
+    if (arrived) recorder.end("arrived");
+  }, [arrived]);
+
   // Off route for a few seconds, or asked for (an old plan, "Re-route now"),
   // or signal back after a failure: get a new route from here, same kind.
   const inFlight = useRef<AbortController | null>(null);
@@ -191,11 +228,19 @@ export default function NavigateScreen() {
     if (voiceOn && !quiet && canReroute) {
       Speech.stop();
       Speech.speak("Re-routing", { language: "en-GB" });
+      recorder.event({ type: "speech", text: "Re-routing" });
     }
     const current = () => inFlight.current === controller && !controller.signal.aborted;
+    // Field-test recording: why, how long, how it went, and the route before and after.
+    const startedAt = Date.now();
+    const trigger = back && !asked ? "signal-back" : asked ? (active.rerouteReason ?? "reroute-now") : "auto";
+    const routeKind = (k: string, police: boolean) => (active.follow ? "follow" : k === "police" && police ? "police" : "standard");
+    const kindBefore = routeKind(active.kind, "restrictions" in active.route);
+    let kindAfter = kindBefore;
     const swapIn = (plan: RoutePlan, stage?: "checking" | "done") => {
       if (!current()) return;
       setRerouting(false);
+      kindAfter = routeKind(active.kind, !!plan.police);
       replan(plan, stage);
     };
     const from = routeOrigin(fix);
@@ -219,6 +264,7 @@ export default function NavigateScreen() {
         setFailed(null);
         onLink({ type: "answer" });
         last.current = { at: Date.now(), ok: true };
+        recorder.event({ type: "reroute", trigger, startedAt, ms: Date.now() - startedAt, outcome: "ok", kindBefore, kindAfter });
       })
       .catch((err: unknown) => {
         if (!current()) return;
@@ -226,6 +272,15 @@ export default function NavigateScreen() {
         setFailed(failure);
         onLink({ type: "failed", failure });
         last.current = { at: Date.now(), ok: false };
+        recorder.event({
+          type: "reroute",
+          trigger,
+          startedAt,
+          ms: Date.now() - startedAt,
+          outcome: failure ?? "error",
+          kindBefore,
+          kindAfter: kindBefore,
+        });
       })
       .finally(() => {
         if (inFlight.current !== controller) return;
@@ -247,16 +302,23 @@ export default function NavigateScreen() {
   useEffect(() => () => void flushTiming(timing.current, null), []);
 
   const end = () => {
-    stop(progress?.arrived ? "arrived" : "end");
+    const reason = progress?.arrived ? "arrived" : "end";
+    recorder.end(reason);
+    stop(reason);
     router.back();
   };
 
   // Quick actions: one tap each, no second End tap needed.
   const [sheet, setSheet] = useState(false);
+  // Field test: one-tap marks while recording ("Wrong instruction", …).
+  const { recording } = useRecorder();
+  const [marking, setMarking] = useState(false);
+  const [marked, setMarked] = useState(false);
   // How much of the map's top the floating turn card covers.
   const [turnHeight, setTurnHeight] = useState(180);
   const newDestination = () => {
     setSheet(false);
+    recorder.end("new-destination");
     stop("new-destination");
     // Back to Search, wherever navigation was started from (follow-in starts on Session).
     if (router.canGoBack()) router.back();
@@ -280,6 +342,7 @@ export default function NavigateScreen() {
     if (voiceOn) {
       Speech.stop();
       Speech.speak(callout.text, { language: "en-GB" });
+      recorder.event({ type: "speech", text: callout.text });
     }
   }, [progress, prepared, offRoute, voiceOn]);
   useEffect(() => () => void Speech.stop(), []);
@@ -414,6 +477,16 @@ export default function NavigateScreen() {
         >
           <Text style={styles.voiceText}>{voiceOn ? "🔊" : "🔇"}</Text>
         </Pressable>
+        {recording && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mark this spot for the field test"
+            onPress={() => setMarking(true)}
+            style={[styles.routeButton, styles.markButton]}
+          >
+            <Text style={[styles.routeText, styles.markText]}>{marked ? "✓" : "Mark"}</Text>
+          </Pressable>
+        )}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Route options"
@@ -496,6 +569,19 @@ export default function NavigateScreen() {
           {etaPanel}
         </>
       )}
+      {marking && (
+        <MarkSheet
+          bottomInset={insets.bottom}
+          onClose={() => setMarking(false)}
+          onMark={(tag) => {
+            setMarking(false);
+            if (recorder.mark(tag)) {
+              setMarked(true);
+              setTimeout(() => setMarked(false), 1500);
+            }
+          }}
+        />
+      )}
       {sheet && (
         <RouteSheet
           kind={active.kind}
@@ -514,6 +600,44 @@ export default function NavigateScreen() {
           bottomInset={insets.bottom}
         />
       )}
+    </View>
+  );
+}
+
+/** Field-test marks: one tap saves the time and place; a note can be added later on the Log. */
+function MarkSheet({
+  onMark,
+  onClose,
+  bottomInset,
+}: {
+  onMark: (tag: MarkTag) => void;
+  onClose: () => void;
+  bottomInset: number;
+}) {
+  return (
+    <View style={styles.sheetBackdrop}>
+      <Pressable style={{ flex: 1 }} accessibilityLabel="Close marks" onPress={onClose} />
+      <View style={[styles.sheet, { paddingBottom: bottomInset + 16 }]}>
+        <View style={styles.markGrid}>
+          {MARKS.map((m) => (
+            <Pressable
+              key={m.tag}
+              accessibilityRole="button"
+              onPress={() => onMark(m.tag)}
+              style={({ pressed }) => [styles.sheetButton, styles.markOption, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={styles.sheetText}>{m.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onClose}
+          style={({ pressed }) => [styles.sheetButton, styles.sheetCancel, pressed && { opacity: 0.8 }]}
+        >
+          <Text style={styles.sheetText}>Cancel</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -693,6 +817,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sheetCancel: { borderColor: colors.line },
+  markButton: { flex: 0, minWidth: 72, minHeight: 56, borderColor: "#e5484d" },
+  markText: { color: "#ff8a8d" },
+  markGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  markOption: { flexBasis: "47%", flexGrow: 1, borderColor: "#e5484d", paddingHorizontal: 6 },
   sheetText: {
     color: colors.fg,
     fontFamily: fonts.displayBold,

@@ -105,6 +105,9 @@ export function tripsCsv(trips: readonly TripRecord[]): string {
 function details(e: TripEvent, notes: Record<string, string>): string {
   const { t: _t, type: _type, ...rest } = e;
   const out: Record<string, unknown> = { ...rest };
+  // Position has its own columns.
+  delete out.lat;
+  delete out.lng;
   if (e.type === "mark") {
     out.label = MARKS.find((m) => m.tag === e.tag)?.label ?? e.tag;
     const note = notes[String(e.t)];
