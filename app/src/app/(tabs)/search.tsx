@@ -9,7 +9,7 @@ import { fetchRoutes, NoSignalRouteError, restrictionPoints, RouteError, without
 import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
-import type { MapRoute, MarkerProperties } from "../../components/mapShared";
+import { ROUTE_ALT, type MapRoute, type MarkerProperties } from "../../components/mapShared";
 import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
@@ -280,9 +280,13 @@ export default function SearchScreen() {
   const plan = shown?.status === "ready" ? shown.plan : null;
   const routes = useMemo<MapRoute[]>(() => {
     if (!plan) return [];
-    const out: MapRoute[] = [{ id: "standard", shape: plan.standard.shape, color: colors.blue }];
-    if (plan.police) out.push({ id: "police", shape: plan.police.shape, color: colors.amber, dashed: true });
-    return out;
+    // The blue-light route, when there is one, in blue on top; the standard
+    // route under it in grey. Alone, the standard route is the blue one.
+    if (!plan.police) return [{ id: "standard", shape: plan.standard.shape, color: colors.blue }];
+    return [
+      { id: "standard", shape: plan.standard.shape, color: ROUTE_ALT },
+      { id: "police", shape: plan.police.shape, color: colors.blue },
+    ];
   }, [plan]);
   // Frame the routes once they arrive; until then, the destination and where we are.
   const here = fix ? ([fix.lng, fix.lat] as LngLat) : null;

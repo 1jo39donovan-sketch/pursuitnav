@@ -95,13 +95,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     setActive((cur) => {
       if (!cur) return cur;
       const chosen = chooseRoute(cur.kind, plan, stage);
-      // A new police route may rely on different restrictions: say so, never silently.
-      const police = "restrictions" in chosen.route ? chosen.route : null;
-      const note =
-        chosen.note ??
-        (police
-          ? `Re-routed${cur.follow ? ` along ${cur.follow.callsign}’s way in` : ""}. ${cur.follow ? "It" : "Police route"} relies on ${police.restrictionsComplete ? "" : "at least "}${police.restrictions.length} restriction${police.restrictions.length === 1 ? "" : "s"}.`
-          : "Re-routed.");
+      // Only a change the crew must know about is said (a fall back to the
+      // standard route); the badge shows how many restrictions the route uses.
+      const note = chosen.note;
       return { ...cur, route: chosen.route, note };
     });
   }, []);

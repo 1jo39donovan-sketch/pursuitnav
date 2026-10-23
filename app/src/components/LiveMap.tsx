@@ -32,6 +32,9 @@ import {
   EMPTY_COLLECTION,
   FIT_DELAY_MS,
   FIT_PADDING,
+  LOOK_AHEAD,
+  ROUTE_CASING_PAINT,
+  ROUTE_LINE_PAINT,
   MARKER_CIRCLE_PAINT,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
@@ -68,6 +71,7 @@ export function LiveMap({
   overlayTop = 0,
   overlayBottom = 0,
   routes = [],
+  lookAhead = false,
   destination,
   onLongPress,
   fitTo,
@@ -113,19 +117,25 @@ export function LiveMap({
     [lng, lat, course],
   );
 
+  // Which way the map is turned, for the compass button; and its height, for looking ahead.
+  const [bearing, setBearing] = useState(0);
+  const [height, setHeight] = useState(0);
+  const ahead = lookAhead && view !== "north" ? Math.round(height * LOOK_AHEAD) : 0;
   const followCamera =
     following && position
       ? {
           center: position,
           zoom: followAt,
           ...cameraFor(view, facing),
+          // Navigating with the map turned: the vehicle sits low, showing the road ahead.
+          padding: { top: ahead + overlayTop / 2, bottom: overlayBottom / 2, left: 0, right: 0 },
           duration: 800,
           easing: "ease" as const,
         }
       : {};
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
       <Map
         style={StyleSheet.absoluteFill}
         mapStyle={offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme]}
@@ -140,6 +150,8 @@ export function LiveMap({
         onRegionWillChange={(e) => {
           if (e.nativeEvent.userInteraction) setFollowing(false);
         }}
+        onRegionIsChanging={(e) => setBearing(e.nativeEvent.bearing)}
+        onRegionDidChange={(e) => setBearing(e.nativeEvent.bearing)}
       >
         <Camera
           ref={camera}
@@ -168,12 +180,19 @@ export function LiveMap({
           />
         </GeoJSONSource>
         <GeoJSONSource id="routes" data={routesGeoJSON(routes)}>
+          {/* A white edge, so the line stands out on the day map and the night one. */}
+          <Layer
+            type="line"
+            id="route-casing"
+            layout={{ "line-cap": "round", "line-join": "round" }}
+            paint={ROUTE_CASING_PAINT}
+          />
           <Layer
             type="line"
             id="route-solid"
             filter={["==", ["get", "dashed"], false]}
             layout={{ "line-cap": "round", "line-join": "round" }}
-            paint={{ "line-color": ["get", "color"], "line-width": 5 }}
+            paint={ROUTE_LINE_PAINT}
           />
           <Layer
             type="line"
@@ -256,6 +275,7 @@ export function LiveMap({
       <MapButtons
         showView={viewControl}
         top={overlayTop + (compact ? 12 : 56)}
+        bearing={bearing}
         onNorth={() => void camera.current?.setStop({ bearing: 0, pitch: 0, duration: 400 })}
         onZoom={zoomControl ? (step) => setZoomOffset((z) => Math.max(-3, Math.min(3, z + step))) : undefined}
       />
