@@ -49,6 +49,9 @@ def publish(tmp_path, server, bin_, tag, content):
     (work / "data/places-next").mkdir(parents=True)
     (work / "data/places-next/places.txt.gz").write_text(f"places {content}")
     (work / "data/places-next/roads.txt.gz").write_text(f"roads {content}")
+    (work / "data/places-next/offline/fonts").mkdir(parents=True)
+    (work / "data/places-next/offline/manifest.json").write_text(f"offline {content}")
+    (work / f"data/places-next/offline/fonts/{content}.pbf").write_text(content)
     (work / "data/nominatim/a").mkdir(parents=True)
     (work / "data/nominatim/a/PG_VERSION").write_text(f"16 {content}")
     subprocess.run(["bash", str(work / "scripts/data-package.sh"), "./data/nominatim/a", "data/release"],
@@ -100,6 +103,9 @@ def test_a_running_server_swaps_in_the_newest_release(tmp_path):
     assert (server / "data/valhalla/valhalla_tiles.tar").read_text() == "tiles two"
     assert (server / "data/valhalla-prev/valhalla_tiles.tar").read_text() == "tiles one"
     assert (server / "data/places/places.txt.gz").read_text() == "places two"
+    # The offline map is replaced whole, not merged into the old one.
+    assert (server / "data/places/offline/manifest.json").read_text() == "offline two"
+    assert sorted(p.name for p in (server / "data/places/offline/fonts").iterdir()) == ["two.pbf"]
     # The other database folder, now live; the old one deleted once it answered.
     assert setting(server, "NOMINATIM_DATA") == "./data/nominatim/b"
     assert (server / "data/nominatim/b/PG_VERSION").read_text() == "16 two"

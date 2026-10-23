@@ -19,6 +19,7 @@ The clickable prototype (design reference only, not code to reuse) is at https:/
   - **Valhalla** routing engine, built from the Geofabrik Greater London OpenStreetMap extract, rebuilt weekly.
   - A small **TypeScript API** (Fastify or similar) that the app talks to. It calls Valhalla and the OS Places API, so API keys never ship in the app.
 - **Map tiles:** free vector tiles (OpenFreeMap, or a self-hosted Protomaps London extract). Dark style to match the app.
+- **Offline map:** the weekly data build also makes the region's tiles as one PMTiles file (Planetiler, the same OpenMapTiles layers) with the styles, fonts and icons; the app downloads it from Session (Wi-Fi only unless allowed) and draws from it with no signal. Turn-by-turn carries on along the last route without signal; only re-routes need the server.
 
 ## Session
 

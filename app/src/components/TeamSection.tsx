@@ -20,6 +20,7 @@ const STATUS: Record<string, string> = {
   connecting: "Connecting…",
   live: "Live: sharing every 15 seconds",
   offline: "No signal: will share again when it's back",
+  notfound: "Team not found. Check the code with whoever started it: it shows here once they share.",
   ended: "This team has ended. Leave it and start a new one.",
 };
 
@@ -129,7 +130,7 @@ export function TeamSection() {
       <Text style={styles.code} selectable numberOfLines={1} adjustsFontSizeToFit>
         {team.code}
       </Text>
-      <Text style={[styles.meta, team.status === "ended" && styles.error]}>
+      <Text style={[styles.meta, (team.status === "ended" || team.status === "notfound") && styles.error]}>
         {STATUS[team.status] ?? ""}
         {team.expiresAt && team.status === "live"
           ? ` · ends ${new Date(team.expiresAt).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" })}`

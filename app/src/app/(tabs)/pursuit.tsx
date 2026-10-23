@@ -8,7 +8,6 @@ import { fetchPursuitInfo } from "../../api/pursuit";
 import { boroughAt, cardinal, generallyTowards } from "../../area/area";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
-import { namedPoints } from "../../components/mapShared";
 import { formatDistance } from "../../format";
 import { useLocation, type Fix } from "../../location/LocationProvider";
 import { EMPTY_FEED, feedNote, nextFeed, shownInfo } from "../../navigation/serverFeed";
@@ -46,7 +45,7 @@ export default function PursuitScreen() {
   const { fix } = useLocation();
   const { mapView } = useSession();
   const { mapPoints: teamMap } = useTeam();
-  const { data, places } = useSearch();
+  const { data, places, blockLabels } = useSearch();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
   const insets = useSafeAreaInsets();
@@ -99,16 +98,6 @@ export default function PursuitScreen() {
     [data, places],
   );
 
-  // Named blocks and estates round the vehicle, refreshed every ~200 m.
-  const gridLat = fix ? Math.round(fix.lat * 500) / 500 : null;
-  const gridLng = fix ? Math.round(fix.lng * 300) / 300 : null;
-  const blockLabels = useMemo(
-    () =>
-      data.status === "ready" && places.status === "ready" && gridLat != null && gridLng != null
-        ? namedPoints(data.index.housingNear(gridLat, gridLng, 800))
-        : null,
-    [data, places, gridLat, gridLng],
-  );
 
   const speed = fix?.speed != null ? Math.round(mph(fix.speed)) : null;
   const pursuit = shownInfo(feed, now);

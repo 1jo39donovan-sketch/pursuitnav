@@ -98,8 +98,7 @@ rm -rf "$dl"
 # A new server: nothing running yet, so put it all in place; install.sh starts it.
 if [ ! -d data/valhalla ] && [ "$own_map" = 0 ]; then
   mv data/valhalla-next data/valhalla
-  mkdir -p data/places
-  mv -f data/places-next/* data/places/ && rmdir data/places-next
+  swap_places
   set_setting NOMINATIM_DATA "$slot"
   set_setting COMPOSE_PROFILES geocoder
   set_setting NOMINATIM_URL http://nominatim:8080
@@ -112,8 +111,7 @@ fi
 if [ "$own_map" = 0 ]; then
   bash scripts/map-switch.sh
 else
-  mkdir -p data/places
-  mv -f data/places-next/* data/places/ && rmdir data/places-next
+  swap_places
 fi
 bash scripts/geocoder-switch.sh "$slot" || say "the new house-number search didn't answer; the previous one carries on"
 

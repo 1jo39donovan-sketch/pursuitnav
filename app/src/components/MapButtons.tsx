@@ -12,9 +12,12 @@ export function MapButtons({
   showView,
   top = 12,
   onZoom,
+  onNorth,
 }: {
   showView: boolean;
   top?: number;
+  /** With showView: a North button, which turns the map north up (the map resets its rotation). */
+  onNorth?: () => void;
   /** With this, + and − buttons: +1 zooms in, −1 out. */
   onZoom?: (step: 1 | -1) => void;
 }) {
@@ -31,6 +34,21 @@ export function MapButtons({
         >
           <Text style={styles.label}>{VIEW_LABEL[mapView]}</Text>
           <Text style={styles.caption}>View</Text>
+        </Pressable>
+      )}
+      {showView && onNorth && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="North up"
+          accessibilityState={{ selected: mapView === "north" }}
+          onPress={() => {
+            setMapView("north");
+            onNorth();
+          }}
+          style={({ pressed }) => [styles.button, mapView === "north" && styles.on, pressed && styles.pressed]}
+        >
+          <Text style={[styles.label, styles.north]}>N</Text>
+          <Text style={styles.caption}>North</Text>
         </Pressable>
       )}
       <Pressable
@@ -72,6 +90,8 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
   pressed: { opacity: 0.7 },
+  on: { borderColor: colors.amber },
+  north: { color: colors.amber },
   label: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 18, lineHeight: 20 },
   zoom: { fontSize: 28, lineHeight: 30 },
   caption: { color: colors.muted, fontFamily: fonts.body, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5 },

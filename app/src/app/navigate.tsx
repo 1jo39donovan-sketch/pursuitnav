@@ -1,7 +1,8 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
+import { useNetworkState } from "expo-network";
 import * as Speech from "expo-speech";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,7 +13,7 @@ import { wayTimes, type Observation } from "../learning/timing";
 import { GpsStatus } from "../components/GpsStatus";
 import { useElapsed } from "../components/useElapsed";
 import { LiveMap } from "../components/LiveMap";
-import { namedPoints, type MapRoute } from "../components/mapShared";
+import type { MapRoute } from "../components/mapShared";
 import { ExternalLinks } from "../components/RoutePanel";
 import { formatDistance, formatDuration } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
@@ -28,6 +29,17 @@ import {
 } from "../navigation/reroute";
 import { nextCallout } from "../navigation/voice";
 import { recordEvent } from "../usage/usage";
+import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
+import {
+  linkBanner,
+  mayAnnounceReroute,
+  nextLink,
+  ONLINE,
+  onReconnect,
+  wayBack,
+  type LinkEvent,
+  type LinkState,
+} from "../navigation/connectivity";
 import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
 import { useTeam } from "../team/TeamProvider";
@@ -42,6 +54,8 @@ import {
   type Progress,
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
+
+const DEMO_GRACE_MS = 5000;
 
 interface Timing {
   prepared: PreparedRoute | null;
@@ -69,8 +83,8 @@ export default function NavigateScreen() {
   const { active, replan, rerouteNow, stop } = useNavigation();
   // Usage counts: one navigation session per time this screen opens.
   useEffect(() => recordEvent("navigation"), []);
-  const { fix } = useLocation();
-  const { data, places } = useSearch();
+  const { fix, simulated, facing } = useLocation();
+  const { blockLabels } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const insets = useSafeAreaInsets();
@@ -78,6 +92,15 @@ export default function NavigateScreen() {
   const landscape = width > height;
 
   const prepared = useMemo(() => (active ? prepare(active.route) : null), [active]);
+
+  // The demo drive follows the route being navigated, from its first point,
+  // and goes back on patrol afterwards.
+  const shape = active?.route.shape;
+  useEffect(() => {
+    if (!simulated || !shape) return;
+    setDemoPath(shape);
+    return () => setDemoPath(null);
+  }, [simulated, shape]);
 
   // Progress along the route, updated once per GPS fix. The last segment
   // carries forward so a route doubling back on itself snaps to the right leg.
@@ -94,14 +117,49 @@ export default function NavigateScreen() {
       prepared,
       fixAt: fix.timestamp,
       progress,
-      offCount: fresh ? 0 : offRouteCount(track.offCount, progress.offRouteBy, fix.accuracy),
+      // The demo car's first fixes can still be from before it was put on
+      // this route: never call those off route.
+      offCount:
+        fresh || (simulated && fix.timestamp - demoDriveStartedAt() < DEMO_GRACE_MS)
+          ? 0
+          : offRouteCount(track.offCount, progress.offRouteBy, fix.accuracy),
     });
   }
   const progress = track.prepared === prepared ? track.progress : null;
   const offRoute = track.prepared === prepared && track.offCount >= OFF_ROUTE_FIXES;
 
-  // Off route for a few seconds, or asked for (an old plan, "Re-route now"):
-  // get a new route from here, same kind.
+  // Signal. Guidance carries on without it (the route is on the phone); only
+  // re-routes need it. When it comes back: re-route at once if off the line,
+  // otherwise make the refresh that failed, quietly (navigation/connectivity.ts).
+  const [linkState, setLinkState] = useState<LinkState>(ONLINE);
+  const linkRef = useRef(linkState);
+  const onLink = useCallback((event: LinkEvent) => {
+    linkRef.current = nextLink(linkRef.current, event);
+    setLinkState(linkRef.current);
+  }, []);
+  const network = useNetworkState();
+  const connected = network.isConnected;
+  // Bumped when the network comes back with something to do: starts a re-route at once.
+  const [reconnected, setReconnected] = useState<{ n: number; quiet: boolean }>({ n: 0, quiet: false });
+  const wasConnected = useRef(connected);
+  const offRouteNow = useRef(offRoute);
+  useEffect(() => {
+    offRouteNow.current = offRoute;
+  }, [offRoute]);
+  useEffect(() => {
+    const before = wasConnected.current;
+    wasConnected.current = connected;
+    if (connected === false) onLink({ type: "network-down" });
+    else if (connected === true && before === false) {
+      const owed = onReconnect(linkRef.current, offRouteNow.current);
+      onLink({ type: "network-up" });
+      if (owed) setReconnected((r) => ({ n: r.n + 1, quiet: owed === "refresh" }));
+    }
+  }, [connected, onLink]);
+  const handledReconnect = useRef(0);
+
+  // Off route for a few seconds, or asked for (an old plan, "Re-route now"),
+  // or signal back after a failure: get a new route from here, same kind.
   const inFlight = useRef<AbortController | null>(null);
   const last = useRef<LastReroute | null>(null);
   const handledAsk = useRef(0);
@@ -112,16 +170,25 @@ export default function NavigateScreen() {
   const reroutingFor = useElapsed(rerouting);
   useEffect(() => {
     if (!active || !fix) return;
-    const forced = active.rerouteAsked !== handledAsk.current;
+    const asked = active.rerouteAsked !== handledAsk.current;
+    // Signal back: don't wait out the 10 s after the failure.
+    const back = reconnected.n !== handledReconnect.current;
+    const forced = asked || back;
     if (!forced && (!offRoute || inFlight.current)) return;
     if (!rerouteAllowed(last.current, Date.now(), forced)) return;
     handledAsk.current = active.rerouteAsked;
+    handledReconnect.current = reconnected.n;
+    // A refresh on the line, when signal returns, changes nothing on screen until the new route is in.
+    const quiet = back && !asked && reconnected.quiet && !offRoute;
     // Asked for now: what was in flight was for the old choice.
     inFlight.current?.abort();
     const controller = new AbortController();
     inFlight.current = controller;
-    setRerouting(true);
-    if (voiceOn) {
+    // With no signal it isn't re-routing, so it doesn't say so (it still
+    // tries, every 10 s, in case the phone's network state is behind).
+    const canReroute = mayAnnounceReroute(linkRef.current.link);
+    if (!quiet && canReroute) setRerouting(true);
+    if (voiceOn && !quiet && canReroute) {
       Speech.stop();
       Speech.speak("Re-routing", { language: "en-GB" });
     }
@@ -150,11 +217,14 @@ export default function NavigateScreen() {
       .then(() => {
         if (!current()) return;
         setFailed(null);
+        onLink({ type: "answer" });
         last.current = { at: Date.now(), ok: true };
       })
       .catch((err: unknown) => {
         if (!current()) return;
-        setFailed(rerouteFailure(err));
+        const failure = rerouteFailure(err);
+        setFailed(failure);
+        onLink({ type: "failed", failure });
         last.current = { at: Date.now(), ok: false };
       })
       .finally(() => {
@@ -162,7 +232,7 @@ export default function NavigateScreen() {
         inFlight.current = null;
         setRerouting(false);
       });
-  }, [active, fix, offRoute, replan, vehicle, roads, voiceOn]);
+  }, [active, fix, offRoute, replan, vehicle, roads, voiceOn, reconnected, onLink]);
   useEffect(() => () => inFlight.current?.abort(), []);
 
   // Opt-in learning: time each road of this route while on it. Only way IDs
@@ -222,16 +292,6 @@ export default function NavigateScreen() {
     return () => clearTimeout(t);
   }, [confirmEnd]);
 
-  // Named blocks and estates round the destination, so the crew can find the right one.
-  const destLat = active?.destination.lat;
-  const destLng = active?.destination.lng;
-  const blockLabels = useMemo(
-    () =>
-      data.status === "ready" && places.status === "ready" && destLat != null && destLng != null
-        ? namedPoints(data.index.housingNear(destLat, destLng, 600))
-        : null,
-    [data, places, destLat, destLng],
-  );
 
   if (!active || !prepared) {
     return (
@@ -253,6 +313,12 @@ export default function NavigateScreen() {
   const offRouteMsg = offRouteText(failed, RETRY_AFTER_FAILURE_MS / 1000, reroutingFor);
   // The off-route panel also shows while a re-route asked for on the line is worked out.
   const showOff = offRoute || rerouting;
+  const banner = linkBanner(linkState.link);
+  // Off the line with no signal: no new route is coming, so show the way back.
+  const back =
+    offRoute && linkState.link === "no-signal" && fix
+      ? wayBack(fix, facing, active.route.shape, active.destination)
+      : null;
   const turnPanel = (
     <View style={[styles.turn, showOff && styles.turnOff]}>
       {!progress ? (
@@ -262,6 +328,21 @@ export default function NavigateScreen() {
           <Text style={styles.distance}>⚑ Arrived</Text>
           <Text style={styles.instruction}>{active.destination.title}</Text>
         </>
+      ) : back ? (
+        <View accessibilityRole="alert">
+          <Text style={[styles.instruction, styles.noSignal]}>No signal: head back to the route</Text>
+          <View style={styles.turnRow}>
+            <Text style={[styles.arrow, { transform: [{ rotate: `${back.toRouteTurn}deg` }] }]}>↑</Text>
+            <Text style={styles.distance}>{formatDistance(back.toRouteM)}</Text>
+          </View>
+          <View style={styles.turnRow}>
+            <Text style={[styles.smallArrow, { transform: [{ rotate: `${back.toDestinationTurn}deg` }] }]}>↑</Text>
+            <Text style={styles.then}>
+              Destination {formatDistance(back.toDestinationM)}
+              {back.fromNorth ? " · arrows point from north" : ""}
+            </Text>
+          </View>
+        </View>
       ) : showOff ? (
         <View accessibilityRole={failed ? "alert" : undefined}>
           <Text style={[styles.distance, failed === "no-signal" && styles.noSignal]}>
@@ -286,6 +367,11 @@ export default function NavigateScreen() {
         </>
       )}
       {active.note && <Text style={styles.note}>{active.note}</Text>}
+      {banner && !back && (
+        <Text accessibilityRole="alert" style={styles.linkBanner}>
+          {banner}
+        </Text>
+      )}
     </View>
   );
 
@@ -507,6 +593,18 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   noSignal: { color: colors.amber },
+  smallArrow: { color: colors.amber, fontSize: 26, fontWeight: "700" },
+  linkBanner: {
+    color: colors.bg,
+    backgroundColor: colors.amber,
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 17,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 6,
+    overflow: "hidden",
+  },
   instruction: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26, lineHeight: 30 },
   then: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 14, marginTop: 4 },

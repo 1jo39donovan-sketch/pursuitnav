@@ -29,11 +29,19 @@ async function call(path: string, init?: RequestInit, timeoutMs?: number): Promi
   }
 }
 
-export async function putMember(teamId: string, memberId: string, token: string, blob: string): Promise<void> {
+/** Shares this phone's sealed blob. Only the phone that started the team sends `create`. */
+export async function putMember(
+  teamId: string,
+  memberId: string,
+  token: string,
+  blob: string,
+  create: boolean,
+): Promise<void> {
   const res = await call(`/v1/teams/${teamId}/members/${memberId}`, {
     method: "PUT",
-    body: JSON.stringify({ token, blob }),
+    body: JSON.stringify({ token, blob, create }),
   });
+  if (res.status === 404) throw new NoTeamError("No team with this code.");
   if (!res.ok) throw new RouteError(`Couldn't share with the team (${res.status}).`);
 }
 

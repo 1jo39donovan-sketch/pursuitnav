@@ -11,6 +11,7 @@ import {
 import postcodesAsset from "../../assets/data/postcodes.dat";
 import roadsAsset from "../../assets/data/roads.dat";
 import { nearBoroughs } from "../area/area";
+import { namedPoints } from "../components/mapShared";
 import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import type { SavedPlace } from "../storage/types";
@@ -32,6 +33,12 @@ interface SearchContextValue {
   data: DataState;
   places: PlacesInfo;
   search: (query: string) => SearchResults;
+  /**
+   * Every named block and estate as map labels (null until places load).
+   * Every map shows them from street zoom, so crews can read which block is
+   * which, as on Ordnance Survey maps.
+   */
+  blockLabels: GeoJSON.FeatureCollection | null;
   /** The officer's boroughs, and anywhere just over their boundaries. */
   area: AreaFilter;
   savedPlaces: SavedPlace[];
@@ -152,9 +159,14 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     setSavedPlaces(store.listPlaces());
   }, []);
 
+  const blockLabels = useMemo(
+    () => (data.status === "ready" && places.status === "ready" ? namedPoints(data.index.allHousing()) : null),
+    [data, places],
+  );
+
   const value = useMemo(
-    () => ({ data, places, search, area, savedPlaces, addPlace, deletePlace }),
-    [data, places, search, area, savedPlaces, addPlace, deletePlace],
+    () => ({ data, places, search, blockLabels, area, savedPlaces, addPlace, deletePlace }),
+    [data, places, search, blockLabels, area, savedPlaces, addPlace, deletePlace],
   );
   return <SearchContext.Provider value={value}>{children}</SearchContext.Provider>;
 }

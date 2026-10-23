@@ -28,7 +28,9 @@ export interface TeamMember {
   me: boolean;
 }
 
-export type TeamStatus = "off" | "connecting" | "live" | "offline" | "ended";
+// "notfound": no team has this code (yet), so nothing is shared. Joining
+// never makes a team: only "Start a team" does.
+export type TeamStatus = "off" | "connecting" | "live" | "offline" | "notfound" | "ended";
 
 interface TeamValue {
   /** The team code, formatted for sharing; null when not in a team. */
@@ -74,6 +76,11 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     memberId: store.getSetting("teamMember") ?? "",
     token: store.getSetting("teamToken") ?? "",
   });
+  // Whether this phone started the team. Its shares (re)make the team, so
+  // the team comes back if the server restarts; nobody else's can.
+  const starter = useRef(store.getSetting("teamStarter") === "1");
+  // Whether this team has been seen, so a 404 after that means it ended.
+  const seen = useRef(false);
   const track = useRef<TrackPoint[]>([]);
   const latest = useRef({ fix, callsign });
   useEffect(() => {
@@ -90,7 +97,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       });
   }, [code, fix]);
 
-  const enter = useCallback((normalised: string) => {
+  const enter = useCallback((normalised: string, started: boolean) => {
+    starter.current = started;
+    seen.current = false;
+    store.setSetting("teamStarter", started ? "1" : "");
     me.current = {
       memberId: randomHex(random, 16),
       token: randomHex(random, 24),
@@ -106,12 +116,12 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     setCode(normalised);
   }, []);
 
-  const create = useCallback(() => enter(normaliseCode(newTeamCode(random))!), [enter]);
+  const create = useCallback(() => enter(normaliseCode(newTeamCode(random))!, true), [enter]);
   const join = useCallback(
     (typed: string) => {
       const normalised = normaliseCode(typed);
       if (!normalised) return false;
-      if (normalised !== code) enter(normalised);
+      if (normalised !== code) enter(normalised, false);
       return true;
     },
     [code, enter],
@@ -144,7 +154,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
             t: f.timestamp,
             tr: encodeTrack(track.current),
           };
-          await putMember(teamId, me.current.memberId, me.current.token, seal(key, shared, random));
+          await putMember(teamId, me.current.memberId, me.current.token, seal(key, shared, random), starter.current);
         }
         const team = await getMembers(teamId);
         if (stopped) return;
@@ -155,12 +165,16 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           .sort((a, b) => b.at - a.at);
         setMembers(list);
         setMapPoints(teamPoints(list, Date.now()));
+        seen.current = true;
         setStatus("live");
       } catch (err) {
         if (stopped) return;
-        // Nobody has shared yet (or it ended): a new team shows as live once you have a position.
-        if (err instanceof NoTeamError) setStatus(f ? "ended" : "connecting");
-        else setStatus("offline");
+        if (!(err instanceof NoTeamError)) setStatus("offline");
+        // Your new team is made with your first position.
+        else if (starter.current) setStatus(f ? "ended" : "connecting");
+        // Keep checking: the code may be wrong, or whoever started the team
+        // hasn't shared yet. Once it's live, a 404 means it ended.
+        else setStatus(seen.current ? "ended" : "notfound");
       }
     };
     void tick();

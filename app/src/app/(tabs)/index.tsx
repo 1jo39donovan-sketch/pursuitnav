@@ -6,6 +6,7 @@ import { API_URL, DEMO_MODE } from "../../config";
 
 import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
+import { OfflineMapSection } from "../../components/OfflineMapSection";
 import { TeamSection } from "../../components/TeamSection";
 import { serverLearns } from "../../learning/queue";
 import { useLog } from "../../log/LogProvider";
@@ -200,6 +201,8 @@ export default function SessionScreen() {
       </View>
 
       <TeamSection />
+
+      <OfflineMapSection />
 
       <Pressable
         accessibilityRole="button"
