@@ -7,6 +7,8 @@ import { colors, fonts } from "../theme";
 
 const VIEW_LABEL = { heading: "▲", "3d": "3D", north: "N" } as const;
 const VIEW_NAME = { heading: "Direction of travel up", "3d": "Tilted 3D view", north: "North up" } as const;
+// Under the button: which view it's in, in two words.
+const VIEW_CAPTION = { heading: "Ahead up", "3d": "3D view", north: "North up" } as const;
 
 export function MapButtons({
   showView,
@@ -39,7 +41,9 @@ export function MapButtons({
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >
           <Text style={styles.label}>{VIEW_LABEL[mapView]}</Text>
-          <Text style={styles.caption}>View</Text>
+          <Text style={styles.caption} numberOfLines={1}>
+            {VIEW_CAPTION[mapView]}
+          </Text>
         </Pressable>
       )}
       {showView && onNorth && (
