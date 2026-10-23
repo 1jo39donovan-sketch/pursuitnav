@@ -165,7 +165,9 @@ export default function PursuitScreen() {
   );
   const junctionCell = (
     <View style={[styles.cell, styles.grow]}>
-      <Text style={styles.label}>Approaching junction</Text>
+      <Text style={styles.label} numberOfLines={1}>
+        Approaching junction
+      </Text>
       <Text style={styles.big} numberOfLines={2}>
         {pursuit?.nextJunction?.name ?? "—"}
       </Text>
@@ -285,7 +287,8 @@ const styles = StyleSheet.create({
   roundelUnknown: { color: "#777777" },
   pair: { flexDirection: "row", gap: 8 },
   grow: { flex: 1 },
-  label: { color: colors.muted, fontFamily: fonts.displaySemiBold, fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase" },
+  // Sentence case: shorter than capitals, so "Approaching junction" fits a half-width cell.
+  label: { color: colors.muted, fontFamily: fonts.displaySemiBold, fontSize: 13 },
   big: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 21, lineHeight: 25, flexShrink: 1 },
   amber: { color: colors.amber },
   dist: { color: colors.muted, fontFamily: fonts.mono, fontSize: 13 },

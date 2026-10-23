@@ -3,9 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
-    "@expo-google-fonts/barlow-condensed": "^0.4.1",
-    "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
-    "@expo-google-fonts/ibm-plex-sans": "^0.4.1",
+    "@expo-google-fonts/inter": "^0.4.2",
     "@expo/metro-runtime": "~57.0.16",
     "@maplibre/maplibre-react-native": "^11.5.0",
     "@noble/ciphers": "^2.4.0",

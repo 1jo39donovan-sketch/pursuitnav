@@ -393,7 +393,9 @@ function LinkButton({ label, url, onPress }: { label: string; url: string; onPre
       }}
       style={({ pressed }) => [styles.link, pressed && { opacity: 0.7 }]}
     >
-      <Text style={styles.linkText}>Open in {label} ↗</Text>
+      <Text style={styles.linkText} numberOfLines={1} adjustsFontSizeToFit>
+        {label} ↗
+      </Text>
     </Pressable>
   );
 }

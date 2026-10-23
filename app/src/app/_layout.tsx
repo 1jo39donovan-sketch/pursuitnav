@@ -1,14 +1,4 @@
-import {
-  BarlowCondensed_500Medium,
-  BarlowCondensed_600SemiBold,
-  BarlowCondensed_700Bold,
-} from "@expo-google-fonts/barlow-condensed";
-import { IBMPlexMono_500Medium } from "@expo-google-fonts/ibm-plex-mono";
-import {
-  IBMPlexSans_400Regular,
-  IBMPlexSans_500Medium,
-  IBMPlexSans_600SemiBold,
-} from "@expo-google-fonts/ibm-plex-sans";
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { useFonts } from "expo-font";
 import { SplashScreen, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -33,13 +23,10 @@ startUsage();
 export default function RootLayout() {
   // Fonts are bundled with the app, so this works with no signal.
   const [loaded, error] = useFonts({
-    BarlowCondensed_500Medium,
-    BarlowCondensed_600SemiBold,
-    BarlowCondensed_700Bold,
-    IBMPlexSans_400Regular,
-    IBMPlexSans_500Medium,
-    IBMPlexSans_600SemiBold,
-    IBMPlexMono_500Medium,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
   });
   const ready = loaded || error != null;
 

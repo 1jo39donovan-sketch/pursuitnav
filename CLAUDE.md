@@ -10,7 +10,7 @@ Officers install it on their own phones and use it off their own back. It is not
 
 Scope for v1 is **London only**. The whole UK comes next, then Ireland and beyond, so don't hard-code London where a config value would do. The plan is in `docs/ROADMAP.md`.
 
-The clickable prototype (design reference only, not code to reuse) is at https://claude.ai/artifact/Lu3d7jjV51VvAv5eHs2Lz6. Keep its look: dark navy background, amber accent, condensed display font for big numbers, bottom tab bar (Session / Search / Pursuit; the log opens from Session). Maps fill the screen with controls floating over them, as in Google Maps: few boxes, nothing that takes map space without earning it.
+The clickable prototype (design reference only, not code to reuse) is at https://claude.ai/artifact/Lu3d7jjV51VvAv5eHs2Lz6. Keep its look: dark navy background, amber accent, bottom tab bar (Session / Search / Pursuit; the log opens from Session). Maps fill the screen with controls floating over them, as in Google Maps: few boxes, nothing that takes map space without earning it. One clear, calm font, Inter, throughout (chosen over the prototype's condensed font after field testing).
 
 ## Stack
 

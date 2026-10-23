@@ -12,12 +12,14 @@ export const colors = {
   warn: "#ff5a4f",
 } as const;
 
+// Inter throughout: clear and calm at a glance, as in Google Maps. The
+// display names are for big numbers and headings, the body ones for text.
 export const fonts = {
-  displayMedium: "BarlowCondensed_500Medium",
-  displaySemiBold: "BarlowCondensed_600SemiBold",
-  displayBold: "BarlowCondensed_700Bold",
-  body: "IBMPlexSans_400Regular",
-  bodyMedium: "IBMPlexSans_500Medium",
-  bodySemiBold: "IBMPlexSans_600SemiBold",
-  mono: "IBMPlexMono_500Medium",
+  displayMedium: "Inter_500Medium",
+  displaySemiBold: "Inter_600SemiBold",
+  displayBold: "Inter_700Bold",
+  body: "Inter_400Regular",
+  bodyMedium: "Inter_500Medium",
+  bodySemiBold: "Inter_600SemiBold",
+  mono: "Inter_500Medium",
 } as const;
