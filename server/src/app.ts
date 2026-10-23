@@ -113,7 +113,8 @@ export function buildApp(
   // CORS preflight); let it keep the answer, so a first search doesn't pay for
   // an extra round trip every time. Browsers cap this (Safari at 10 minutes,
   // Chrome at 2 hours).
-  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"], maxAge: 86_400 });
+  // ETag readable from the web app, so it re-downloads the places file only when it has changed.
+  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"], maxAge: 86_400, exposedHeaders: ["etag"] });
 
   // Answers that mean "this feature isn't set up here" (no OS Places key, map
   // data not built yet). Deliberate, so not counted as server errors.

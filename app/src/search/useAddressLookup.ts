@@ -4,7 +4,7 @@ import { fetchAddresses, type AddressLookup } from "../api/addresses";
 import { expandNicknames } from "./nicknames";
 import { parseQuery } from "./parse";
 
-const DEBOUNCE_MS = 400;
+const DEBOUNCE_MS = 250;
 
 export type LookupState = AddressLookup | { status: "idle" } | { status: "searching" };
 
