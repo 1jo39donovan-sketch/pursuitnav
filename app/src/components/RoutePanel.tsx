@@ -15,6 +15,7 @@ import {
   type PoliceSlot,
 } from "../navigation/routeChoice";
 import { colors, fonts } from "../theme";
+import { ROUTE_ALT } from "./mapShared";
 import { useElapsed } from "./useElapsed";
 
 export type PlanState =
@@ -138,7 +139,13 @@ export function RoutePanel({
             expanded={showRestrictions}
             onToggle={() => setShowRestrictions((v) => !v)}
           />
-          <StandardRow route={slots[1].route} fastest={slots[1].fastest} onGo={() => go("standard")} />
+          <StandardRow
+            route={slots[1].route}
+            fastest={slots[1].fastest}
+            // Matches the map: grey under a blue-light route, blue on its own.
+            swatch={slots[0].state === "route" ? ROUTE_ALT : colors.blue}
+            onGo={() => go("standard")}
+          />
           <ClosuresLine closures={state.plan.closures} />
           {blocks && blocks.length > 0 && (
             <View style={styles.blocks}>
@@ -178,10 +185,20 @@ function GoButton({ onPress, color, label }: { onPress: () => void; color: strin
   );
 }
 
-function StandardRow({ route, fastest, onGo }: { route: Route; fastest: boolean; onGo: () => void }) {
+function StandardRow({
+  route,
+  fastest,
+  swatch,
+  onGo,
+}: {
+  route: Route;
+  fastest: boolean;
+  swatch: string;
+  onGo: () => void;
+}) {
   return (
     <View style={[styles.row, fastest && styles.rowFastest]}>
-      <View style={[styles.swatch, { backgroundColor: colors.blue }]} />
+      <View style={[styles.swatch, { backgroundColor: swatch }]} />
       <View style={styles.rowText}>
         <Text style={styles.rowTitle}>
           Standard{fastest ? <Text style={styles.fastest}> · fastest</Text> : null}
@@ -263,7 +280,7 @@ function PoliceRow({
   return (
     <View style={[styles.rowWrap, styles.rowPolice]}>
       <View style={styles.rowInner}>
-        <View style={[styles.swatch, { backgroundColor: colors.amber }]} />
+        <View style={[styles.swatch, { backgroundColor: colors.blue }]} />
         <View style={styles.rowText}>
           <Text style={styles.rowTitle}>Blue light</Text>
           <Text style={[styles.meta, styles.saving]} numberOfLines={1}>

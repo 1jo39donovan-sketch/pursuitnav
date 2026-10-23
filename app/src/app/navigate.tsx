@@ -306,7 +306,8 @@ export default function NavigateScreen() {
 
   const isPolice = "restrictions" in active.route;
   const routeColor = isPolice ? colors.amber : colors.blue;
-  const routes: MapRoute[] = [{ id: "nav", shape: active.route.shape, color: routeColor, dashed: isPolice }];
+  // The route always in solid blue with a white edge: easy to see on any map.
+  const routes: MapRoute[] = [{ id: "nav", shape: active.route.shape, color: colors.blue }];
   const destination: [number, number] = [active.destination.lng, active.destination.lat];
   const restrictions = "restrictions" in active.route ? restrictionPoints(active.route) : [];
 
@@ -445,6 +446,7 @@ export default function NavigateScreen() {
           </View>
           <View style={styles.map}>
             <LiveMap
+              lookAhead
               team={teamMap}
               view={mapView}
               viewControl
@@ -466,6 +468,7 @@ export default function NavigateScreen() {
           {/* The map fills the screen; the next turn floats over its top. */}
           <View style={styles.map}>
             <LiveMap
+              lookAhead
               overlayTop={turnHeight}
               overlayBottom={18}
               team={teamMap}

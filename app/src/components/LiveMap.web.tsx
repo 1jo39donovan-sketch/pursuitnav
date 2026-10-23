@@ -30,6 +30,7 @@ import {
   EMPTY_COLLECTION,
   FIT_DELAY_MS,
   FIT_PADDING,
+  LOOK_AHEAD,
   MARKER_CIRCLE_PAINT,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
@@ -38,6 +39,8 @@ import {
   RESTRICTION_CIRCLE_PAINT,
   RESTRICTION_LABEL_LAYOUT,
   RESTRICTION_LABEL_PAINT,
+  ROUTE_CASING_PAINT,
+  ROUTE_LINE_PAINT,
   routesGeoJSON,
   type LiveMapProps,
   type MarkerProperties,
@@ -64,6 +67,7 @@ export function LiveMap({
   overlayTop = 0,
   overlayBottom = 0,
   routes = [],
+  lookAhead = false,
   destination,
   onLongPress,
   fitTo,
@@ -98,20 +102,28 @@ export function LiveMap({
   const [mapFailed, setMapFailed] = useState(false);
   // The demo map only has borough outlines, which say nothing at street zoom.
   const zoom = DEMO_MODE ? 12 : followAt;
+  // Which way the map is turned, for the compass button.
+  const [bearing, setBearing] = useState(0);
+  // A new style (day/night) empties the map's own layers: drawn again on this.
+  const [styleVersion, setStyleVersion] = useState(0);
+  // Opens where the vehicle is, so a new screen doesn't fly in from the middle of London.
+  const startAt = useRef({ fix, zoom });
+  const style = DEMO_MODE ? demoMapStyle : MAP_STYLES[mapTheme];
+  const firstStyle = useRef(style);
 
   useEffect(() => {
+    const at = startAt.current;
     const m = new maplibregl.Map({
       container: container.current as unknown as HTMLElement,
-      style: DEMO_MODE ? demoMapStyle : MAP_STYLES[mapTheme],
-      center: region.defaultCentre,
-      zoom: region.defaultZoom,
+      style: firstStyle.current,
+      center: at.fix ? [at.fix.lng, at.fix.lat] : region.defaultCentre,
+      zoom: at.fix ? at.zoom : region.defaultZoom,
       maxBounds: [
         [region.maxBounds[0], region.maxBounds[1]],
         [region.maxBounds[2], region.maxBounds[3]],
       ],
       // Added below, folded to its ⓘ button.
       attributionControl: false,
-      dragRotate: !rotates,
     });
     // The map data's credit, which its licence requires, as a small ⓘ that
     // opens on a tap, bottom-left clear of Recentre. maplibre-gl opens a
@@ -122,7 +134,10 @@ export function LiveMap({
     m.once("load", foldCredit);
     m.once("idle", foldCredit);
     if (!compact) m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "top-right");
-    m.on("load", () => {
+    m.on("rotate", () => setBearing(m.getBearing()));
+    // On the first style and on each change of style (day/night), which
+    // keeps the camera where it is but drops what was added to the map.
+    m.on("style.load", () => {
       m.addSource("places", { type: "geojson", data: EMPTY });
       m.addLayer({ id: "places-dot", type: "circle", source: "places", minzoom: 11, paint: MARKER_CIRCLE_PAINT });
       // The offline demo style has no glyphs to draw labels with.
@@ -145,13 +160,21 @@ export function LiveMap({
       m.on("mouseenter", "places-dot", () => (m.getCanvas().style.cursor = "pointer"));
       m.on("mouseleave", "places-dot", () => (m.getCanvas().style.cursor = ""));
       m.addSource("routes", { type: "geojson", data: EMPTY });
+      // A white edge, so the line stands out on the day map and the night one.
+      m.addLayer({
+        id: "route-casing",
+        type: "line",
+        source: "routes",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: ROUTE_CASING_PAINT,
+      });
       m.addLayer({
         id: "route-solid",
         type: "line",
         source: "routes",
         filter: ["==", ["get", "dashed"], false],
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": ["get", "color"], "line-width": 5 },
+        paint: ROUTE_LINE_PAINT,
       });
       m.addLayer({
         id: "route-dashed",
@@ -266,6 +289,7 @@ export function LiveMap({
         }
       }
       setLoaded(true);
+      setStyleVersion((v) => v + 1);
       setMapFailed(false);
     });
     // An error before the style has loaded means the map itself is unusable.
@@ -291,7 +315,31 @@ export function LiveMap({
       // A new map (different style or view) has to load before it's drawn on.
       setLoaded(false);
     };
-  }, [rotates, compact, mapTheme, roadNames, vehicleArrow]);
+    // Day/night, the view and the labels change the map in place (below):
+    // making a new one would jump the camera back to the middle of London.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compact, roadNames, vehicleArrow]);
+
+  // Day or night: the new style, same camera.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || style === firstStyle.current) return;
+    firstStyle.current = style;
+    m.setStyle(style);
+  }, [style]);
+
+  // Turning by hand only in the north-up view; the others turn with the vehicle.
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    if (rotates) {
+      m.dragRotate.disable();
+      m.touchZoomRotate.disableRotation();
+    } else {
+      m.dragRotate.enable();
+      m.touchZoomRotate.enableRotation();
+    }
+  }, [rotates, loaded]);
 
   useEffect(() => {
     const m = map.current;
@@ -303,7 +351,7 @@ export function LiveMap({
     set("restrictions", pointsGeoJSON(restrictions));
     set("labels", labels ?? EMPTY_COLLECTION);
     set("team", team ?? EMPTY_COLLECTION);
-  }, [routes, destination, markers, restrictions, labels, team, loaded]);
+  }, [routes, destination, markers, restrictions, labels, team, loaded, styleVersion]);
 
   // The credit's corner sits above a sheet over the bottom of the map.
   useEffect(() => {
@@ -328,9 +376,18 @@ export function LiveMap({
     if (!m || !loaded || !fix) return;
     (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(fix.lng, fix.lat, facing));
     if (following) {
-      m.easeTo({ center: [fix.lng, fix.lat], zoom, ...cameraFor(view, facing), duration: 800 });
+      // Navigating with the map turned: the vehicle sits low on the screen,
+      // so most of what shows is the road ahead.
+      const ahead = lookAhead && rotates ? Math.round(m.getContainer().clientHeight * LOOK_AHEAD) : 0;
+      m.easeTo({
+        center: [fix.lng, fix.lat],
+        zoom,
+        ...cameraFor(view, facing),
+        padding: { top: ahead + overlayTop / 2, bottom: overlayBottom / 2, left: 0, right: 0 },
+        duration: 800,
+      });
     }
-  }, [fix, facing, loaded, following, zoom, view]);
+  }, [fix, facing, loaded, following, zoom, view, lookAhead, rotates, overlayTop, overlayBottom, styleVersion]);
 
   return (
     <View style={styles.container}>
@@ -346,6 +403,7 @@ export function LiveMap({
         <MapButtons
           showView={viewControl}
           top={overlayTop + (compact ? 12 : 56)}
+          bearing={bearing}
           onNorth={() => map.current?.easeTo({ bearing: 0, pitch: 0, duration: 400 })}
           onZoom={zoomControl ? (step) => setZoomOffset((z) => Math.max(-3, Math.min(3, z + step))) : undefined}
         />

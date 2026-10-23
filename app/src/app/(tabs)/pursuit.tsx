@@ -209,6 +209,7 @@ export default function PursuitScreen() {
   const map = (
     <View style={styles.map}>
       <LiveMap
+        lookAhead
         team={teamMap}
         view={mapView}
         viewControl

@@ -55,6 +55,55 @@ export async function watchLocation(onFix: (fix: Fix) => void, onRefused: () => 
  * No compass in the web version: Safari only gives it after an extra
  * permission prompt. The map shows the last direction of travel instead.
  */
-export async function watchCompass(_onHeading: (degrees: number) => void): Promise<() => void> {
-  return () => {};
+/**
+ * The phone's compass in the browser, so the arrow points the right way
+ * before the vehicle moves. iPhones ask first ("motion and orientation"),
+ * and only from a tap, so the first tap anywhere asks. Readings come many
+ * times a second; passed on only when they turn 3° or more, at most 4 a second.
+ */
+export async function watchCompass(onHeading: (degrees: number) => void): Promise<() => void> {
+  if (typeof window === "undefined" || !("DeviceOrientationEvent" in window)) return () => {};
+  let last: number | null = null;
+  let lastAt = 0;
+  const pass = (deg: number) => {
+    const now = Date.now();
+    const turned = last === null ? 360 : Math.abs(((deg - last + 540) % 360) - 180);
+    if (turned < 3 || now - lastAt < 250) return;
+    last = deg;
+    lastAt = now;
+    onHeading(deg);
+  };
+  // iPhone: degrees from north. Others: alpha counts anticlockwise from north, when absolute.
+  const onEvent = (e: DeviceOrientationEvent) => {
+    const ios = (e as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
+    if (typeof ios === "number" && Number.isFinite(ios)) return pass(ios);
+    if (e.absolute && typeof e.alpha === "number") pass((360 - e.alpha) % 360);
+  };
+  const listen = () => {
+    window.addEventListener("deviceorientationabsolute", onEvent as EventListener);
+    window.addEventListener("deviceorientation", onEvent);
+  };
+  const ask = (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission;
+  let onTap: (() => void) | null = null;
+  if (ask) {
+    onTap = () => {
+      document.removeEventListener("touchend", onTap!);
+      document.removeEventListener("click", onTap!);
+      ask()
+        .then((answer) => answer === "granted" && listen())
+        .catch(() => {});
+    };
+    document.addEventListener("touchend", onTap);
+    document.addEventListener("click", onTap);
+  } else {
+    listen();
+  }
+  return () => {
+    if (onTap) {
+      document.removeEventListener("touchend", onTap);
+      document.removeEventListener("click", onTap);
+    }
+    window.removeEventListener("deviceorientationabsolute", onEvent as EventListener);
+    window.removeEventListener("deviceorientation", onEvent);
+  };
 }

@@ -1,6 +1,7 @@
 // Pieces shared by the phone (LiveMap.tsx) and browser (LiveMap.web.tsx) maps.
 import type {
   CircleLayerSpecification,
+  LineLayerSpecification,
   LngLat,
   SymbolLayerSpecification,
 } from "@maplibre/maplibre-react-native";
@@ -56,6 +57,8 @@ export interface LiveMapProps {
   /** The same for a sheet over the bottom of the map: Recentre and the credit sit above it. */
   overlayBottom?: number;
   routes?: MapRoute[];
+  /** Navigating: with the map turned to the way of travel, the vehicle sits low on the screen to show the road ahead. */
+  lookAhead?: boolean;
   destination?: LngLat | null;
   onLongPress?: (point: LngLat) => void;
   /** When this changes to a set of points, stop following and show them all. */
@@ -94,6 +97,19 @@ export const MARKER_LABEL_PAINT: SymbolLayerSpecification["paint"] = {
   "text-halo-color": "#0c1220",
   "text-halo-width": 1.5,
 };
+
+/** Navigating with the map turned: the vehicle this far down from the middle, as a share of the map's height. */
+export const LOOK_AHEAD = 0.45;
+
+/** Routes: a solid line with a white edge, clear on the day and night maps. */
+export const ROUTE_LINE_PAINT: LineLayerSpecification["paint"] = { "line-color": ["get", "color"], "line-width": 6 };
+export const ROUTE_CASING_PAINT: LineLayerSpecification["paint"] = {
+  "line-color": "#ffffff",
+  "line-width": 10,
+  "line-opacity": 0.9,
+};
+/** The route not picked out, under the other, on Search. */
+export const ROUTE_ALT = "#8a97b0";
 
 export function routesGeoJSON(routes: MapRoute[]): GeoJSON.FeatureCollection {
   return {
