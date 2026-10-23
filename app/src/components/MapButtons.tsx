@@ -1,8 +1,9 @@
 // Buttons on the map: day/night, and the view (tilted 3D, direction of travel
 // up, north up). Both are remembered; day and 3D until the operator changes them.
+// The View button swaps 3D and flat ahead-up; north up is the compass's job.
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { MAP_VIEWS, useSession } from "../session/SessionProvider";
+import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 
 const VIEW_LABEL = { heading: "▲", "3d": "3D", north: "N" } as const;
@@ -30,7 +31,7 @@ export function MapButtons({
   onZoom?: (step: 1 | -1) => void;
 }) {
   const { mapTheme, setMapTheme, mapView, setMapView } = useSession();
-  const next = MAP_VIEWS[(MAP_VIEWS.indexOf(mapView) + 1) % MAP_VIEWS.length]!;
+  const next = mapView === "3d" ? "heading" : "3d";
   return (
     <View style={[styles.column, { top }]} pointerEvents="box-none">
       {showView && (
