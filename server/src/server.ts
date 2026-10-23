@@ -38,7 +38,8 @@ setInterval(() => {
   }
 }, 60 * 60_000).unref();
 const nearestDoor = nominatim ? cachedNearestDoor((lat, lng) => nominatim.nearestDoor(lat, lng)) : undefined;
-const app = buildApp(config, router, places, valhalla, closures, undefined, learning, usage, nearestDoor);
+const whereIs = nominatim ? (lat: number, lng: number) => nominatim.reverse(lat, lng) : undefined;
+const app = buildApp(config, router, places, valhalla, closures, undefined, learning, usage, nearestDoor, whereIs);
 
 /** The usage database; routing carries on without counts if it can't be opened. */
 function openUsage(file: string | undefined): UsageStore | undefined {

@@ -10,7 +10,7 @@ import type { ServerConfig } from "./config.js";
 import { BANDS, type LearningStore, type Sample } from "./learning.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
-import type { NearestDoor } from "./nominatim.js";
+import type { NearestDoor, WhereIs } from "./nominatim.js";
 import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage } from "./pages.js";
 import { dataRelease, machineMemory } from "./serverInfo.js";
@@ -99,6 +99,8 @@ export function buildApp(
   usage?: UsageStore,
   /** The house number by a point, for Pursuit; left out without our own Nominatim. */
   nearestDoor?: NearestDoor,
+  /** What's at a point (door, road, postcode), for "Where am I"; left out without our own Nominatim. */
+  whereIs?: WhereIs,
 ): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
@@ -289,6 +291,23 @@ export function buildApp(
         }
         throw err;
       }
+    },
+  );
+
+  // "Where am I": the address at the officer's position, to read out or
+  // share. Like every request, the position isn't logged or kept.
+  app.post<{ Body: { lat: number; lng: number } }>(
+    "/v1/where",
+    { schema: { body: point } },
+    async (req, reply) => {
+      if (!whereIs) {
+        notSetUp.add(req);
+        return reply.code(503).send({ error: "where-unavailable", message: "Address lookup isn't set up on this server." });
+      }
+      if (!inBounds(req.body)) {
+        return reply.code(422).send({ error: "outside-area", message: "Outside the area Blue Route covers." });
+      }
+      return whereIs(req.body.lat, req.body.lng).catch(() => ({ door: null, road: null, postcode: null }));
     },
   );
 

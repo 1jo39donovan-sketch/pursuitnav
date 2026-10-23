@@ -22,6 +22,7 @@ import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
 import { SearchResultsList } from "../../components/SearchResultsList";
+import { WhereAmI } from "../../components/WhereAmI";
 import { boroughAt } from "../../area/area";
 import { DEMO_MODE } from "../../config";
 import { useLog } from "../../log/LogProvider";
@@ -364,6 +365,9 @@ export default function SearchScreen() {
     }, []),
   );
 
+  // "Where am I": the officer's exact position, to read out or share.
+  const [whereOpen, setWhereOpen] = useState(false);
+
   // The last few places routed to, one tap away: shown under the search bar
   // while it's being typed in, so they don't cover the map otherwise.
   const [typing, setTyping] = useState(false);
@@ -391,6 +395,10 @@ export default function SearchScreen() {
       <Tabs.Screen options={{ headerShown: false }} />
       <View style={styles.body}>
         <LiveMap
+          onWhereAmI={() => {
+            Keyboard.dismiss();
+            setWhereOpen(true);
+          }}
           overlayTop={topSpace}
           overlayBottom={destination ? 18 : 0}
           team={teamMap}
@@ -559,6 +567,14 @@ export default function SearchScreen() {
             );
             router.push("/navigate");
           }}
+        />
+      )}
+      {whereOpen && (
+        <WhereAmI
+          fix={fix}
+          index={data.status === "ready" ? data.index : null}
+          onClose={() => setWhereOpen(false)}
+          bottomInset={8}
         />
       )}
     </View>

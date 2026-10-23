@@ -143,6 +143,7 @@ function metresBetween(lat1: number, lng1: number, lat2: number, lng2: number): 
 }
 
 export type NearestDoor = (lat: number, lng: number) => Promise<string | null>;
+export type WhereIs = (lat: number, lng: number) => Promise<{ door: string | null; road: string | null; postcode: string | null }>;
 
 /**
  * Pursuit asks every second or so while the car moves a few metres: answers
@@ -223,11 +224,11 @@ export class NominatimClient implements PlacesClient {
   }
 
   /**
-   * The house number nearest a point, as "123 Maida Vale", for Pursuit: where
-   * a chase passes, or something was thrown from a car. Null where no number
-   * is mapped close by (within NEAREST_DOOR_M): never a guess.
+   * What's at a point: the nearest mapped house number (as "123 Maida Vale"),
+   * the road and the postcode, for "Where am I" and Pursuit. door is null
+   * where no number is mapped close by (within NEAREST_DOOR_M): never a guess.
    */
-  async nearestDoor(lat: number, lng: number): Promise<string | null> {
+  async reverse(lat: number, lng: number): Promise<{ door: string | null; road: string | null; postcode: string | null }> {
     const params = new URLSearchParams({
       lat: String(lat),
       lon: String(lng),
@@ -237,12 +238,19 @@ export class NominatimClient implements PlacesClient {
       zoom: "18",
     });
     const res = await this.fetchImpl(`${this.baseUrl}/reverse?${params}`, { signal: AbortSignal.timeout(1500) });
-    if (!res.ok) return null;
-    const r = (await res.json().catch(() => null)) as NominatimResult | null;
+    const r = res.ok ? ((await res.json().catch(() => null)) as NominatimResult | null) : null;
     const a = r?.address;
-    if (!r || !a?.house_number || !a.road) return null;
-    if (metresBetween(lat, lng, Number(r.lat), Number(r.lon)) > NEAREST_DOOR_M) return null;
-    return `${a.house_number.split(/[;,]/)[0]!.trim()} ${a.road}`;
+    const close = !!r && metresBetween(lat, lng, Number(r.lat), Number(r.lon)) <= NEAREST_DOOR_M;
+    return {
+      door: a?.house_number && a.road && close ? `${a.house_number.split(/[;,]/)[0]!.trim()} ${a.road}` : null,
+      road: a?.road ?? null,
+      postcode: a?.postcode ?? null,
+    };
+  }
+
+  /** The house number nearest a point, for Pursuit; null where none is mapped close by. */
+  async nearestDoor(lat: number, lng: number): Promise<string | null> {
+    return (await this.reverse(lat, lng)).door;
   }
 
   /** True when Nominatim is up and its database is ready. */

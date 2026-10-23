@@ -92,3 +92,21 @@ describe("offline map", () => {
     expect(shell).toEqual(ts);
   });
 });
+
+describe("where am I", () => {
+  const config = { bounds: [-1, 51, 1, 52], placesFile: "/nonexistent" } as unknown as ServerConfig;
+  const build = (whereIs?: Parameters<typeof buildApp>[9]) =>
+    buildApp(config, { route: async () => ({}) as never, traceEdges: async () => [] }, undefined, undefined, undefined, undefined, undefined, undefined, undefined, whereIs);
+
+  it("answers with the door, road and postcode at a point", async () => {
+    const app = build(async () => ({ door: "123 Maida Vale", road: "Maida Vale", postcode: "W9 1QE" }));
+    const res = await app.inject({ method: "POST", url: "/v1/where", payload: { lat: 51.53, lng: -0.18 } });
+    expect(res.json()).toEqual({ door: "123 Maida Vale", road: "Maida Vale", postcode: "W9 1QE" });
+  });
+
+  it("refuses a point outside the area, and says when it isn't set up", async () => {
+    const app = build(async () => ({ door: null, road: null, postcode: null }));
+    expect((await app.inject({ method: "POST", url: "/v1/where", payload: { lat: 53.4, lng: -2.2 } })).statusCode).toBe(422);
+    expect((await build().inject({ method: "POST", url: "/v1/where", payload: { lat: 51.53, lng: -0.18 } })).statusCode).toBe(503);
+  });
+});
