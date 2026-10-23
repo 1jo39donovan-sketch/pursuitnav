@@ -7,6 +7,8 @@ export interface PursuitInfo {
   /** Signed limit from OSM; null when the road has none tagged. Never guessed. */
   speedLimitMph: number | null;
   nextJunction: { name: string; distanceM: number } | null;
+  /** The mapped house number by the car ("123 Maida Vale"); null when none is close. Older servers leave it out. */
+  near?: string | null;
 }
 
 export type PursuitLookup =

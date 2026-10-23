@@ -132,6 +132,12 @@ export default function PursuitScreen() {
       <Text style={styles.big} numberOfLines={2}>
         {pursuit?.road ?? "—"}
       </Text>
+      {/* The nearest numbered door: for a foot chase, or where something was thrown. */}
+      {pursuit?.near && (
+        <Text style={styles.dist} numberOfLines={1}>
+          by {pursuit.near}
+        </Text>
+      )}
     </View>
   );
   const headingCell = (

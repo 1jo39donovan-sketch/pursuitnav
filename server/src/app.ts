@@ -10,6 +10,7 @@ import type { ServerConfig } from "./config.js";
 import { BANDS, type LearningStore, type Sample } from "./learning.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
+import type { NearestDoor } from "./nominatim.js";
 import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage } from "./pages.js";
 import { dataRelease, machineMemory } from "./serverInfo.js";
@@ -96,6 +97,8 @@ export function buildApp(
   learning?: LearningStore,
   /** Usage counts (no positions, no addresses); not counted without it. */
   usage?: UsageStore,
+  /** The house number by a point, for Pursuit; left out without our own Nominatim. */
+  nearestDoor?: NearestDoor,
 ): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
@@ -271,7 +274,13 @@ export function buildApp(
         return reply.code(422).send({ error: "outside-area", message: "Outside the area Blue Route covers." });
       }
       try {
-        return await pursuitInfo(matcher, points.map((p) => [p.lng, p.lat] as LngLat), heading);
+        const here = points[points.length - 1]!;
+        // Both at once: the house number never holds up the road and limit.
+        const [info, near] = await Promise.all([
+          pursuitInfo(matcher, points.map((p) => [p.lng, p.lat] as LngLat), heading),
+          nearestDoor ? nearestDoor(here.lat, here.lng).catch(() => null) : Promise.resolve(null),
+        ]);
+        return { ...info, near };
       } catch (err) {
         if (err instanceof ValhallaError) {
           req.log.error({ status: err.httpStatus, code: err.code }, "routing engine error");
