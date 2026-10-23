@@ -68,6 +68,7 @@ export function LiveMap({
   overlayBottom = 0,
   routes = [],
   lookAhead = false,
+  onWhereAmI,
   destination,
   onLongPress,
   fitTo,
@@ -82,7 +83,8 @@ export function LiveMap({
   const followAt =
     followZoom + zoomOffset + (autoZoom ? speedZoom(fix?.speed ?? null) : 0);
   const rotates = view !== "north";
-  const [following, setFollowing] = useState(true);
+  // Following the vehicle, unless the map opens on something to frame.
+  const [following, setFollowing] = useState(!fitTo?.length);
   const longPress = useRef(onLongPress);
   const markerPress = useRef(onMarkerPress);
   useEffect(() => {
@@ -404,6 +406,7 @@ export function LiveMap({
           showView={viewControl}
           top={overlayTop + (compact ? 12 : 56)}
           bearing={bearing}
+          onWhereAmI={onWhereAmI}
           onNorth={() => map.current?.easeTo({ bearing: 0, pitch: 0, duration: 400 })}
           onZoom={zoomControl ? (step) => setZoomOffset((z) => Math.max(-3, Math.min(3, z + step))) : undefined}
         />

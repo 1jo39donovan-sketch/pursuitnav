@@ -5,7 +5,15 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { fetchRoutes, NoSignalRouteError, restrictionPoints, RouteError, withoutPolice } from "../../api/routes";
+import {
+  fetchRoutes,
+  NoSignalRouteError,
+  restrictionPoints,
+  RouteError,
+  withoutPolice,
+  type PoliceRoute,
+  type Route,
+} from "../../api/routes";
 import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
@@ -14,13 +22,16 @@ import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
 import { SearchResultsList } from "../../components/SearchResultsList";
+import { WhereAmI } from "../../components/WhereAmI";
 import { boroughAt } from "../../area/area";
 import { DEMO_MODE } from "../../config";
 import { useLog } from "../../log/LogProvider";
 import { formatDistance } from "../../format";
 import { distanceM } from "../../geo";
 import { routeOrigin, useLocation } from "../../location/LocationProvider";
+import { APP_VERSION, PLATFORM, recorder } from "../../fieldtest/instance";
 import { NO_SIGNAL_ROUTE_START } from "../../navigation/connectivity";
+import { rerouteFailure } from "../../navigation/reroute";
 import { useNavigation } from "../../navigation/NavigationProvider";
 import { planIsStale } from "../../navigation/routeChoice";
 import type { SearchResult } from "../../search/engine";
@@ -48,7 +59,7 @@ interface Destination {
 // Type what the control room gave, pick the match, get both routes from
 // where the phone is now. A long press on the map also sets a destination.
 export default function SearchScreen() {
-  const { fix } = useLocation();
+  const { fix, simulated } = useLocation();
   const insets = useSafeAreaInsets();
   // Height of the floating search box (and any notes under it), from the top of the screen.
   const [topSpace, setTopSpace] = useState(insets.top + 72);
@@ -116,6 +127,19 @@ export default function SearchScreen() {
       // takes longer to check, so show the standard route as soon as it's here.
       const quick = fetchRoutes(from, to, vehicle, controller.signal, true, roads);
       const full = policeRoutes ? fetchRoutes(from, to, vehicle, controller.signal, false, roads) : null;
+      // Field-test recording (off unless switched on): how long each part of the plan took.
+      quick.then((p) => recorder.event({ type: "plan-standard", ms: recorder.sinceStart(), standard: offered(p.standard) }), () => {});
+      (full ?? quick).then(
+        (p) =>
+          recorder.event({
+            type: "plan-full",
+            ms: recorder.sinceStart(),
+            standard: offered(p.standard),
+            police: p.police ? offered(p.police) : null,
+            fastest: p.police && p.police.durationS < p.standard.durationS ? "police" : "standard",
+          }),
+        (err: unknown) => recorder.event({ type: "plan-failed", ms: recorder.sinceStart(), outcome: rerouteFailure(err) ?? "error" }),
+      );
       let fullDone = false;
       quick
         .then((plan) => {
@@ -155,6 +179,17 @@ export default function SearchScreen() {
 
   /** Logs what was typed and what was chosen, then works out routes there. */
   const choose = (dest: Destination, typed: string, borough: string | null) => {
+    // A field-test trip, if recording is on: one per destination picked.
+    recorder.begin({
+      appVersion: APP_VERSION,
+      platform: PLATFORM,
+      vehicle,
+      blueLight: policeRoutes,
+      demo: simulated,
+      query: typed,
+      destination: { title: dest.title ?? "Destination", lat: dest.point[1], lng: dest.point[0] },
+      gpsAccuracyM: fix?.accuracy ?? null,
+    });
     const logId = log.record({
       query: typed,
       chosen: dest.title ?? "Destination",
@@ -330,6 +365,9 @@ export default function SearchScreen() {
     }, []),
   );
 
+  // "Where am I": the officer's exact position, to read out or share.
+  const [whereOpen, setWhereOpen] = useState(false);
+
   // The last few places routed to, one tap away: shown under the search bar
   // while it's being typed in, so they don't cover the map otherwise.
   const [typing, setTyping] = useState(false);
@@ -357,6 +395,10 @@ export default function SearchScreen() {
       <Tabs.Screen options={{ headerShown: false }} />
       <View style={styles.body}>
         <LiveMap
+          onWhereAmI={() => {
+            Keyboard.dismiss();
+            setWhereOpen(true);
+          }}
           overlayTop={topSpace}
           overlayBottom={destination ? 18 : 0}
           team={teamMap}
@@ -515,6 +557,7 @@ export default function SearchScreen() {
             if (destination.logId) log.setRoute(destination.logId, kind);
             // An old plan, or one from somewhere else: go now, and re-route from here at once.
             const stale = !shown.origin || planIsStale(shown.origin, fix, Date.now());
+            recorder.event({ type: "go", kind, staleRefresh: stale });
             navigation.start(
               kind,
               shown.plan,
@@ -526,8 +569,25 @@ export default function SearchScreen() {
           }}
         />
       )}
+      {whereOpen && (
+        <WhereAmI
+          fix={fix}
+          index={data.status === "ready" ? data.index : null}
+          onClose={() => setWhereOpen(false)}
+          bottomInset={8}
+        />
+      )}
     </View>
   );
+}
+
+/** A route as the field-test recorder keeps it. */
+function offered(r: Route | PoliceRoute) {
+  return {
+    etaS: Math.round(r.durationS),
+    distanceM: Math.round(r.distanceM),
+    ...("restrictions" in r ? { restrictions: r.restrictions.map((x) => x.description) } : {}),
+  };
 }
 
 const styles = StyleSheet.create({

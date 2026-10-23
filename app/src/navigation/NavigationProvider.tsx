@@ -17,6 +17,8 @@ export interface ActiveNavigation {
   follow?: { callsign: string; track: { lat: number; lng: number }[] };
   /** Goes up by one each time a re-route from here is asked for (stale plan, "Re-route now"). */
   rerouteAsked: number;
+  /** Why the last re-route was asked for, for field-test recording. */
+  rerouteReason?: "reroute-now" | "switch" | "stale-refresh";
 }
 
 /** Why navigation ended: Search clears or refreshes its plan to match. */
@@ -86,7 +88,15 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       const note = follow
         ? `Following ${follow.callsign}’s way in. ${n ? `Uses ${n} restriction${n === 1 ? "" : "s"} (R on the map).` : "No restrictions found on it."}`
         : chosen.note;
-      setActive({ kind, destination, follow, ...chosen, note, rerouteAsked: refresh ? 1 : 0 });
+      setActive({
+        kind,
+        destination,
+        follow,
+        ...chosen,
+        note,
+        rerouteAsked: refresh ? 1 : 0,
+        ...(refresh ? { rerouteReason: "stale-refresh" as const } : {}),
+      });
     },
     [],
   );
@@ -109,6 +119,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
           ...cur,
           kind: cur.kind === "follow" ? cur.kind : (kind ?? cur.kind),
           rerouteAsked: cur.rerouteAsked + 1,
+          rerouteReason: kind && kind !== cur.kind ? "switch" : "reroute-now",
         },
     );
   }, []);

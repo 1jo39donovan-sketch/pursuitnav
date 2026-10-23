@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { BoroughLookup } from "../../src/boroughArea.js";
-import { classify, NominatimClient, normaliseStreet, parseQuery, type NominatimResult } from "../../src/nominatim.js";
+import {
+  cachedNearestDoor,
+  classify,
+  NominatimClient,
+  normaliseStreet,
+  parseQuery,
+  type NominatimResult,
+} from "../../src/nominatim.js";
 
 const boroughs = BoroughLookup.fromFile();
 
@@ -154,5 +161,43 @@ describe("NominatimClient", () => {
     const down = new NominatimClient("http://127.0.0.1:1", boroughs);
     await expect(down.search("x")).rejects.toMatchObject({ status: 503 });
     expect(await down.ready(500)).toBe(false);
+  });
+});
+
+describe("nearest house number (Pursuit)", () => {
+  const client = (answer: unknown, ok = true) =>
+    new NominatimClient("http://nominatim.test", boroughs, (async (url: string) => {
+      expect(String(url)).toContain("/reverse?");
+      return new Response(JSON.stringify(answer), { status: ok ? 200 : 500 });
+    }) as unknown as typeof fetch);
+
+  it("names the door by the car", async () => {
+    const c = client(house({ lat: "51.5441", lon: "-0.1171", address: { house_number: "123", road: "Maida Vale" } }));
+    expect(await c.nearestDoor(51.5442, -0.1172)).toBe("123 Maida Vale");
+  });
+
+  it("says nothing rather than guess: no number, too far, or no answer", async () => {
+    expect(await client(street).nearestDoor(51.547, -0.118)).toBeNull();
+    // 0.001° of latitude is about 110 m.
+    expect(await client(house()).nearestDoor(51.5451, -0.1171)).toBeNull();
+    expect(await client({}, false).nearestDoor(51.5441, -0.1171)).toBeNull();
+  });
+
+  it("asks once per ~10 m square a minute", async () => {
+    let asked = 0;
+    let now = 0;
+    const find = cachedNearestDoor(
+      async () => {
+        asked++;
+        return "1 Test Road";
+      },
+      () => now,
+    );
+    await find(51.54412, -0.11712);
+    await find(51.54414, -0.11714); // same square
+    expect(asked).toBe(1);
+    now = 61_000;
+    await find(51.54412, -0.11712);
+    expect(asked).toBe(2);
   });
 });

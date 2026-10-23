@@ -132,6 +132,36 @@ export function classify(
   return { precision: "place", label: a.road && r.name !== a.road ? `${r.name}, ${a.road}` : r.name };
 }
 
+/** A house number further than this from the car isn't "where it is". */
+export const NEAREST_DOOR_M = 40;
+
+function metresBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const rad = Math.PI / 180;
+  const x = (lng2 - lng1) * rad * Math.cos(((lat1 + lat2) / 2) * rad);
+  const y = (lat2 - lat1) * rad;
+  return Math.hypot(x, y) * 6371000;
+}
+
+export type NearestDoor = (lat: number, lng: number) => Promise<string | null>;
+export type WhereIs = (lat: number, lng: number) => Promise<{ door: string | null; road: string | null; postcode: string | null }>;
+
+/**
+ * Pursuit asks every second or so while the car moves a few metres: answers
+ * are kept a minute for each ~10 m square, so Nominatim is asked far less.
+ */
+export function cachedNearestDoor(find: NearestDoor, now: () => number = Date.now, ttlMs = 60_000): NearestDoor {
+  const cache = new Map<string, { at: number; value: string | null }>();
+  return async (lat, lng) => {
+    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+    const hit = cache.get(key);
+    if (hit && now() - hit.at < ttlMs) return hit.value;
+    const value = await find(lat, lng).catch(() => null);
+    if (cache.size > 500) cache.clear();
+    cache.set(key, { at: now(), value });
+    return value;
+  };
+}
+
 export class NominatimClient implements PlacesClient {
   constructor(
     private readonly baseUrl: string,
@@ -191,6 +221,36 @@ export class NominatimClient implements PlacesClient {
         },
       ];
     });
+  }
+
+  /**
+   * What's at a point: the nearest mapped house number (as "123 Maida Vale"),
+   * the road and the postcode, for "Where am I" and Pursuit. door is null
+   * where no number is mapped close by (within NEAREST_DOOR_M): never a guess.
+   */
+  async reverse(lat: number, lng: number): Promise<{ door: string | null; road: string | null; postcode: string | null }> {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lng),
+      format: "jsonv2",
+      addressdetails: "1",
+      // Buildings and addresses, not just the street.
+      zoom: "18",
+    });
+    const res = await this.fetchImpl(`${this.baseUrl}/reverse?${params}`, { signal: AbortSignal.timeout(1500) });
+    const r = res.ok ? ((await res.json().catch(() => null)) as NominatimResult | null) : null;
+    const a = r?.address;
+    const close = !!r && metresBetween(lat, lng, Number(r.lat), Number(r.lon)) <= NEAREST_DOOR_M;
+    return {
+      door: a?.house_number && a.road && close ? `${a.house_number.split(/[;,]/)[0]!.trim()} ${a.road}` : null,
+      road: a?.road ?? null,
+      postcode: a?.postcode ?? null,
+    };
+  }
+
+  /** The house number nearest a point, for Pursuit; null where none is mapped close by. */
+  async nearestDoor(lat: number, lng: number): Promise<string | null> {
+    return (await this.reverse(lat, lng)).door;
   }
 
   /** True when Nominatim is up and its database is ready. */

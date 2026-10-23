@@ -3,7 +3,9 @@ import { useMemo, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useRecorder } from "../fieldtest/instance";
 import { useLog } from "../log/LogProvider";
+import { store } from "../storage/store";
 import type { LogEntry, LoggedRoute } from "../storage/types";
 import { colors, fonts } from "../theme";
 
@@ -32,6 +34,8 @@ export default function LogScreen() {
   const insets = useSafeAreaInsets();
   const { entries, clear } = useLog();
   const [confirming, setConfirming] = useState(false);
+  const recordingOn = useRecorder().enabled;
+  const tripCount = store.tripStorage().trips;
 
   const sections = useMemo(() => {
     const byDay = new Map<string, LogEntry[]>();
@@ -61,6 +65,19 @@ export default function LogScreen() {
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
           <View style={styles.intro}>
+            {/* Field-test trips: kept and cleared apart from the log. */}
+            {(tripCount > 0 || recordingOn) && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/trips")}
+                style={({ pressed }) => [styles.tripsRow, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.tripsText}>Field trips</Text>
+                <Text style={styles.tripsMeta}>
+                  {tripCount} recorded ›
+                </Text>
+              </Pressable>
+            )}
             <Text style={styles.title}>Search log</Text>
             <Text style={styles.hint}>
               Every address searched and route picked, kept on this phone so you can refer back. Never cleared
@@ -145,6 +162,19 @@ const styles = StyleSheet.create({
   backText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 17 },
   content: { padding: 16, paddingBottom: 32 },
   intro: { gap: 6, marginBottom: 8 },
+  tripsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    minHeight: 52,
+    marginBottom: 12,
+  },
+  tripsText: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 18 },
+  tripsMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 14 },
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26 },
   hint: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
   day: {

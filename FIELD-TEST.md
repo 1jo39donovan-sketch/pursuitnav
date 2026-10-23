@@ -8,6 +8,8 @@ Follow `DEPLOY.md`: GitHub sets up the server and builds the Android app; you in
 
 ## 3. Checklist
 
+Turn on **Field-test recording** on Session first: each trip's routes, timings, re-routes and your one-tap Marks are kept on the phone, for export from Log → Field trips (trips.csv, events.csv, GPX).
+
 Tick each one; note anything odd with time and place, and send the notes back.
 
 ### Must pass (from the brief)

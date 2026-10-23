@@ -10,6 +10,7 @@ import type { ServerConfig } from "./config.js";
 import { BANDS, type LearningStore, type Sample } from "./learning.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
+import type { NearestDoor, WhereIs } from "./nominatim.js";
 import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage } from "./pages.js";
 import { dataRelease, machineMemory } from "./serverInfo.js";
@@ -96,6 +97,10 @@ export function buildApp(
   learning?: LearningStore,
   /** Usage counts (no positions, no addresses); not counted without it. */
   usage?: UsageStore,
+  /** The house number by a point, for Pursuit; left out without our own Nominatim. */
+  nearestDoor?: NearestDoor,
+  /** What's at a point (door, road, postcode), for "Where am I"; left out without our own Nominatim. */
+  whereIs?: WhereIs,
 ): FastifyInstance {
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
@@ -110,7 +115,8 @@ export function buildApp(
   // CORS preflight); let it keep the answer, so a first search doesn't pay for
   // an extra round trip every time. Browsers cap this (Safari at 10 minutes,
   // Chrome at 2 hours).
-  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"], maxAge: 86_400 });
+  // ETag readable from the web app, so it re-downloads the places file only when it has changed.
+  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"], maxAge: 86_400, exposedHeaders: ["etag"] });
 
   // Answers that mean "this feature isn't set up here" (no OS Places key, map
   // data not built yet). Deliberate, so not counted as server errors.
@@ -271,7 +277,13 @@ export function buildApp(
         return reply.code(422).send({ error: "outside-area", message: "Outside the area Blue Route covers." });
       }
       try {
-        return await pursuitInfo(matcher, points.map((p) => [p.lng, p.lat] as LngLat), heading);
+        const here = points[points.length - 1]!;
+        // Both at once: the house number never holds up the road and limit.
+        const [info, near] = await Promise.all([
+          pursuitInfo(matcher, points.map((p) => [p.lng, p.lat] as LngLat), heading),
+          nearestDoor ? nearestDoor(here.lat, here.lng).catch(() => null) : Promise.resolve(null),
+        ]);
+        return { ...info, near };
       } catch (err) {
         if (err instanceof ValhallaError) {
           req.log.error({ status: err.httpStatus, code: err.code }, "routing engine error");
@@ -279,6 +291,23 @@ export function buildApp(
         }
         throw err;
       }
+    },
+  );
+
+  // "Where am I": the address at the officer's position, to read out or
+  // share. Like every request, the position isn't logged or kept.
+  app.post<{ Body: { lat: number; lng: number } }>(
+    "/v1/where",
+    { schema: { body: point } },
+    async (req, reply) => {
+      if (!whereIs) {
+        notSetUp.add(req);
+        return reply.code(503).send({ error: "where-unavailable", message: "Address lookup isn't set up on this server." });
+      }
+      if (!inBounds(req.body)) {
+        return reply.code(422).send({ error: "outside-area", message: "Outside the area Blue Route covers." });
+      }
+      return whereIs(req.body.lat, req.body.lng).catch(() => ({ door: null, road: null, postcode: null }));
     },
   );
 

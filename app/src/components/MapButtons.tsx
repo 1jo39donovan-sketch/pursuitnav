@@ -14,6 +14,7 @@ export function MapButtons({
   onZoom,
   onNorth,
   bearing = 0,
+  onWhereAmI,
 }: {
   showView: boolean;
   top?: number;
@@ -21,6 +22,8 @@ export function MapButtons({
   onNorth?: () => void;
   /** Which way the map is turned, degrees: the compass needle turns with it. */
   bearing?: number;
+  /** With this, a button under Night: exactly where the officer is, to read out or share. */
+  onWhereAmI?: () => void;
   /** With this, + and − buttons: +1 zooms in, −1 out. */
   onZoom?: (step: 1 | -1) => void;
 }) {
@@ -67,6 +70,17 @@ export function MapButtons({
         <Text style={styles.label}>{mapTheme === "night" ? "☀" : "☾"}</Text>
         <Text style={styles.caption}>{mapTheme === "night" ? "Day" : "Night"}</Text>
       </Pressable>
+      {onWhereAmI && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Where am I: address, postcode, grid reference, share"
+          onPress={onWhereAmI}
+          style={({ pressed }) => [styles.button, styles.where, pressed && styles.pressed]}
+        >
+          <Text style={[styles.label, styles.whereIcon]}>◎</Text>
+          <Text style={styles.caption}>Where</Text>
+        </Pressable>
+      )}
       {onZoom &&
         ([1, -1] as const).map((step) => (
           <Pressable
@@ -97,6 +111,8 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
   pressed: { opacity: 0.7 },
+  where: { borderColor: colors.blue },
+  whereIcon: { color: colors.blue, fontSize: 22 },
   compass: {
     width: 44,
     height: 44,

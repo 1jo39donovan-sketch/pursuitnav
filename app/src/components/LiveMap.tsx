@@ -72,6 +72,7 @@ export function LiveMap({
   overlayBottom = 0,
   routes = [],
   lookAhead = false,
+  onWhereAmI,
   destination,
   onLongPress,
   fitTo,
@@ -87,7 +88,8 @@ export function LiveMap({
   const [zoomOffset, setZoomOffset] = useState(0);
   const followAt =
     followZoom + zoomOffset + (autoZoom ? speedZoom(fix?.speed ?? null) : 0);
-  const [following, setFollowing] = useState(true);
+  // Following the vehicle, unless the map opens on something to frame.
+  const [following, setFollowing] = useState(!fitTo?.length);
   const camera = useRef<CameraRef>(null);
 
   // New points to show: stop following so the camera can frame them.
@@ -276,6 +278,7 @@ export function LiveMap({
         showView={viewControl}
         top={overlayTop + (compact ? 12 : 56)}
         bearing={bearing}
+        onWhereAmI={onWhereAmI}
         onNorth={() => void camera.current?.setStop({ bearing: 0, pitch: 0, duration: 400 })}
         onZoom={zoomControl ? (step) => setZoomOffset((z) => Math.max(-3, Math.min(3, z + step))) : undefined}
       />

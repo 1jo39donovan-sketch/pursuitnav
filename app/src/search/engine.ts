@@ -280,6 +280,12 @@ export class SearchIndex {
     return this.roads.filter((r) => boroughs.has(r.item.borough)).map((r) => r.item);
   }
 
+  /** The nearest postcode centre to a point, and how far it is (metres): works with no signal. */
+  postcodeNear(lat: number, lng: number): { point: PostcodePoint; distanceM: number } | null {
+    const point = this.nearestPostcode({ lat, lng });
+    return point ? { point, distanceM: Math.round(distanceKm({ lat, lng }, point) * 1000) } : null;
+  }
+
   postcode(compact: string): PostcodePoint | undefined {
     return this.postcodes.get(compact.replace(/\s/g, "").toUpperCase());
   }

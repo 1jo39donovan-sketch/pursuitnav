@@ -57,6 +57,8 @@ export interface LiveMapProps {
   /** The same for a sheet over the bottom of the map: Recentre and the credit sit above it. */
   overlayBottom?: number;
   routes?: MapRoute[];
+  /** A "Where am I" button with the map's buttons (Search). */
+  onWhereAmI?: () => void;
   /** Navigating: with the map turned to the way of travel, the vehicle sits low on the screen to show the road ahead. */
   lookAhead?: boolean;
   destination?: LngLat | null;
