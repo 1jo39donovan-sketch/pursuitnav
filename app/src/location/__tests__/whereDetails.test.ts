@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shareText, whereDetails } from "../../location/whereDetails";
+import { shareText, shouldLookUp, whereDetails } from "../../location/whereDetails";
 
 const fix = { lat: 51.52801, lng: -0.18421, accuracy: 6.4, speed: 0, course: null, timestamp: Date.UTC(2026, 9, 23, 14, 5, 22) };
 
@@ -27,5 +27,15 @@ describe("where am I", () => {
     expect(text).toContain("OS grid TQ");
     expect(text).toContain("51.52801, -0.18421 (±6 m");
     expect(text.endsWith("https://maps.google.com/?q=51.52801,-0.18421")).toBe(true);
+  });
+});
+
+describe("keeping up while open", () => {
+  it("looks the address up again after 15 m or 20 s, not on every fix", () => {
+    const last = { lat: 51.528, lng: -0.1842, at: 0 };
+    expect(shouldLookUp(null, last, 0)).toBe(true);
+    expect(shouldLookUp(last, { lat: 51.52805, lng: -0.1842 }, 5000)).toBe(false); // ~6 m, 5 s
+    expect(shouldLookUp(last, { lat: 51.5282, lng: -0.1842 }, 5000)).toBe(true); // ~22 m
+    expect(shouldLookUp(last, last, 20_000)).toBe(true);
   });
 });

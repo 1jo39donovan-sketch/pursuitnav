@@ -50,3 +50,24 @@ export function shareText(d: WhereDetails): string {
     .join("\n");
 }
 
+
+/** Ask the server again once moved this far, or after this long, while the panel is open. */
+export const LOOKUP_AGAIN_M = 15;
+export const LOOKUP_AGAIN_MS = 20_000;
+
+/** Whether the address should be looked up again for this fix. */
+export function shouldLookUp(
+  last: { lat: number; lng: number; at: number } | null,
+  fix: { lat: number; lng: number },
+  now: number,
+): boolean {
+  if (!last) return true;
+  return now - last.at >= LOOKUP_AGAIN_MS || metresApart(last, fix) >= LOOKUP_AGAIN_M;
+}
+
+function metresApart(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const rad = Math.PI / 180;
+  const x = (b.lng - a.lng) * rad * Math.cos(((a.lat + b.lat) / 2) * rad);
+  const y = (b.lat - a.lat) * rad;
+  return Math.hypot(x, y) * 6371000;
+}
