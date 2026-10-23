@@ -5,7 +5,7 @@
 import type { Borough } from "./boroughs";
 import { expandNicknames } from "./nicknames";
 import { formatPostcode, parseQuery } from "./parse";
-import { typesForQuery, type PlaceGroup, type PointOfInterest } from "./places";
+import { splitKind, typesForQuery, type PlaceGroup, type PointOfInterest } from "./places";
 import { matchScore, normalise } from "./text";
 
 export interface Road {
@@ -290,6 +290,28 @@ export class SearchIndex {
    * (Cally Pool), but not for roads it's merely spelt like.
    */
   search(raw: string, area: AreaFilter): SearchResults {
+    const results = this.searchNicknames(raw, area);
+    // "Angel tube station": the station called Angel, first.
+    const kind = splitKind(expandNicknames(raw) ?? raw, this.poiTypes);
+    if (!kind) return results;
+    const named = this.searchOnce(kind.name, area);
+    const ofKind = (rs: SearchResult[]) => rs.filter((r) => r.kind === "poi" && kind.types.includes(r.placeType ?? ""));
+    const seen = new Set<string>();
+    const unique = (rs: SearchResult[]) =>
+      rs.filter((r) => {
+        if (seen.has(r.key)) return false;
+        seen.add(r.key);
+        return true;
+      });
+    const outside = unique([...ofKind(named.outside), ...results.outside]);
+    return {
+      inArea: unique([...ofKind(named.inArea), ...results.inArea]),
+      outside,
+      outsideCount: Math.max(outside.length, results.outsideCount ?? results.outside.length),
+    };
+  }
+
+  private searchNicknames(raw: string, area: AreaFilter): SearchResults {
     const expanded = expandNicknames(raw);
     if (!expanded) return this.searchOnce(raw, area);
     const full = this.searchOnce(expanded, area);

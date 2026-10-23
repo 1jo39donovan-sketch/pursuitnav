@@ -25,9 +25,15 @@ const TAGS: Partial<Record<SearchResult["kind"], { text: string; color: string }
   address: { text: "ADDRESS", color: colors.ok },
 };
 
-/** Matches in the officer's boroughs, with others behind "Show N outside your area". */
+/**
+ * Matches in the officer's boroughs, with others behind "Show N outside your
+ * area". With none in the area, the others show straight away: a hospital or
+ * station across London is still where they're going.
+ */
 export function SearchResultsList({ results, showOutside, onToggleOutside, onPick, footer, emptyText, from }: Props) {
-  const rows = showOutside ? [...results.inArea, ...results.outside.slice(0, 30)] : results.inArea;
+  const onlyOutside = results.inArea.length === 0 && results.outside.length > 0;
+  const rows =
+    showOutside || onlyOutside ? [...results.inArea, ...results.outside.slice(0, 30)] : results.inArea;
   const outsideCount = results.outsideCount ?? results.outside.length;
   return (
     <FlatList
@@ -43,10 +49,13 @@ export function SearchResultsList({ results, showOutside, onToggleOutside, onPic
           away={from ? formatDistance(distanceM(from, item)) : undefined}
         />
       )}
+      ListHeaderComponent={
+        onlyOutside ? <Text style={styles.empty}>None in your area. Matches elsewhere:</Text> : null
+      }
       ListEmptyComponent={<Text style={styles.empty}>{emptyText}</Text>}
       ListFooterComponent={
         <View>
-          {outsideCount > 0 && (
+          {outsideCount > 0 && !onlyOutside && (
             <Pressable accessibilityRole="button" onPress={onToggleOutside} style={styles.toggle}>
               <Text style={styles.toggleText}>
                 {showOutside

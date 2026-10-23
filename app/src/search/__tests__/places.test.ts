@@ -11,7 +11,7 @@ import { SearchIndex } from "../engine";
 import { starterEstatePlaces } from "../estates";
 import { parsePlacesFile, typesForQuery } from "../places";
 
-const SAMPLE = `#blueroute-places v1 2026-10-09 7
+const SAMPLE = `#blueroute-places v1 2026-10-09 10
 Coffee Corner||Coffee shop|food|18|5154660|-10350|12 Holloway Road, N7 8LA
 Costa||Coffee shop|food|18|5153800|-10260|Upper Street
 Costa||Coffee shop|food|18|5155500|-11500|
@@ -19,6 +19,9 @@ Dalston Beans||Coffee shop|food|11|5154600|-7500|
 Nag's Head Food & Wine|Costcutter|Corner shop|shop|18|5155600|-11600|
 Highbury Fields||Park|leisure|18|5154900|-10200|
 Smith House||Block of flats|housing|18|5155200|-11300|
+Angel||Station|transport|18|5153249|-10604|Islington High Street, N1 9LQ
+Angel Curry Centre||Restaurant|food|18|5153300|-10620|
+The Whittington Hospital||Hospital|health|18|5156656|-13935|Magdala Avenue, N19 5NF
 `;
 
 const dataDir = join(__dirname, "..", "..", "..", "assets", "data");
@@ -39,7 +42,7 @@ describe("parsePlacesFile", () => {
   it("reads the header date and every place", () => {
     const file = parsePlacesFile(SAMPLE);
     expect(file.builtOn).toBe("2026-10-09");
-    expect(file.places).toHaveLength(7);
+    expect(file.places).toHaveLength(10);
     expect(file.places[0]).toMatchObject({ name: "Coffee Corner", type: "Coffee shop", group: "food", borough: "Islington" });
     expect(file.places[4]!.otherNames).toEqual(["Costcutter"]);
   });
@@ -145,5 +148,21 @@ Lower Holloway Road House||Block of flats|housing|11|5154600|-7500|1 Lower Hollo
     const all = homes.allHousing();
     expect(all.map((p) => p.name)).toEqual(expect.arrayContaining(["Smith House", "Jones Court", "Bemerton Estate"]));
     expect(all.every((p) => p.group === "housing")).toBe(true);
+  });
+});
+
+describe("a name with the kind of place after it", () => {
+  it("finds the station called Angel for Angel tube station", () => {
+    for (const q of ["Angel tube station", "angel station", "Angel underground", "angel tube"]) {
+      expect(top(q), q).toMatchObject({ label: "Angel", placeType: "Station" });
+    }
+  });
+
+  it("finds The Whittington Hospital as Whittington Hospital", () => {
+    expect(top("Whittington Hospital")).toMatchObject({ label: "The Whittington Hospital" });
+  });
+
+  it("still lists a kind on its own", () => {
+    expect(index.search("hospitals", ISLINGTON).inArea.map((r) => r.label)).toContain("The Whittington Hospital");
   });
 });

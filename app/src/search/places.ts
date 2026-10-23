@@ -97,7 +97,16 @@ const SYNONYMS: Record<string, string[]> = {
   temple: ["Place of worship"],
   gurdwara: ["Place of worship"],
   tube: ["Station"],
+  "tube station": ["Station"],
+  underground: ["Station"],
+  "underground station": ["Station"],
+  overground: ["Station"],
+  "overground station": ["Station"],
   "train station": ["Station"],
+  "rail station": ["Station"],
+  "railway station": ["Station"],
+  dlr: ["Station"],
+  "dlr station": ["Station"],
   bookies: ["Bookmaker"],
   "betting shop": ["Bookmaker"],
   estate: ["Housing estate"],
@@ -120,6 +129,22 @@ function singulars(q: string): string[] {
 
 // Keyed the way queries are normalised ("A&E" becomes "a e").
 const SYNONYMS_BY_FORM = new Map(Object.entries(SYNONYMS).map(([k, v]) => [normalise(k), v]));
+
+/**
+ * A name followed by the kind of place it is, as people say it: "Angel tube
+ * station", "Whittington hospital", "Red Lion pub". OpenStreetMap names the
+ * station "Angel", so the kind is split off and used to pick the right one.
+ * Null when the query doesn't end in a kind, or is only a kind ("schools").
+ */
+export function splitKind(query: string, knownTypes: ReadonlySet<string>): { name: string; types: string[] } | null {
+  const words = query.trim().split(/\s+/);
+  for (let k = Math.min(3, words.length - 1); k >= 1; k--) {
+    const types = typesForQuery(words.slice(-k).join(" "), knownTypes);
+    const name = words.slice(0, -k).join(" ");
+    if (types.length && normalise(name).length >= 2) return { name, types };
+  }
+  return null;
+}
 
 /**
  * If the query names a kind of place ("coffee shops", "schools", "corner

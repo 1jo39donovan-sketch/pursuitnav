@@ -326,7 +326,13 @@ export default function SearchScreen() {
     }, []),
   );
 
-  // The last few places routed to, one tap away.
+  // The last few places routed to, one tap away: shown under the search bar
+  // while it's being typed in, so they don't cover the map otherwise.
+  const [typing, setTyping] = useState(false);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+  }, []);
   const entries = log.entries;
   const recent = useMemo(() => {
     const seen = new Set<string>();
@@ -390,8 +396,8 @@ export default function SearchScreen() {
             }}
           />
         )}
-        {!destination && !showResults && !tapped && recent.length > 0 && (
-          <View style={styles.recent}>
+        {typing && !destination && !showResults && !tapped && recent.length > 0 && (
+          <View style={[styles.recent, { top: topSpace + 6 }]}>
             <Text style={styles.recentLabel}>Recent</Text>
             {recent.map((e) => (
               <Pressable
@@ -463,6 +469,14 @@ export default function SearchScreen() {
             autoCorrect={false}
             autoCapitalize="words"
             returnKeyType="search"
+            onFocus={() => {
+              if (blurTimer.current) clearTimeout(blurTimer.current);
+              setTyping(true);
+            }}
+            // A moment's grace, so a tap on a recent place lands before the list goes.
+            onBlur={() => {
+              blurTimer.current = setTimeout(() => setTyping(false), 250);
+            }}
             accessibilityLabel="Address from the control room"
             style={styles.input}
           />
@@ -571,7 +585,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 12,
     right: 12,
-    bottom: 12,
     backgroundColor: colors.panel,
     borderColor: colors.line,
     borderWidth: 1,

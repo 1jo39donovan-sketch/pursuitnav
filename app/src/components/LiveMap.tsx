@@ -256,6 +256,7 @@ export function LiveMap({
       <MapButtons
         showView={viewControl}
         top={overlayTop + (compact ? 12 : 56)}
+        onNorth={() => void camera.current?.setStop({ bearing: 0, pitch: 0, duration: 400 })}
         onZoom={zoomControl ? (step) => setZoomOffset((z) => Math.max(-3, Math.min(3, z + step))) : undefined}
       />
       {!following && position && (
