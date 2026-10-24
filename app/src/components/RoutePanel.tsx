@@ -23,7 +23,8 @@ export type PlanState =
   | { status: "loading" }
   /** waitingForFix: refused for want of a GPS position; routes when the first fix arrives. */
   /** noSignal: the network failed; the card offers the hand-offs and retries when signal is back. */
-  | { status: "error"; message: string; waitingForFix?: boolean; noSignal?: boolean }
+  /** serverDown: the server is down or didn't answer; the hand-offs come first, big. */
+  | { status: "error"; message: string; waitingForFix?: boolean; noSignal?: boolean; serverDown?: boolean }
   /**
    * checking: the standard route is here, the blue-light one is still being worked out.
    * origin: where and when the plan was made, to refresh an old one before it's followed.
@@ -94,6 +95,8 @@ export function RoutePanel({
   };
   const { recording } = useRecorder();
   const [showRestrictions, setShowRestrictions] = useState(false);
+  // No route from Blue Route: Google Maps and Waze become the main buttons, so a crew is never stuck.
+  const handOff = state.status === "error" && (!!state.noSignal || !!state.serverDown);
   return (
     <View style={styles.panel}>
       {/* One line: where to, how fresh the plan is, and Clear. */}
@@ -119,13 +122,14 @@ export function RoutePanel({
         <View style={styles.errorBox}>
           <Text style={[styles.status, styles.error]}>{state.message}</Text>
           {state.noSignal && <Text style={styles.status}>{RETRYING_WHEN_BACK}</Text>}
+          {handOff && <ExternalLinks lat={lat} lng={lng} onOpen={onOpenExternal} prominent />}
           {onRetry && !state.waitingForFix && (
             <Pressable
               accessibilityRole="button"
               onPress={onRetry}
-              style={({ pressed }) => [styles.retry, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [handOff ? styles.retryQuiet : styles.retry, pressed && { opacity: 0.85 }]}
             >
-              <Text style={styles.retryText}>Retry</Text>
+              <Text style={handOff ? styles.retryQuietText : styles.retryText}>Retry</Text>
             </Pressable>
           )}
         </View>
@@ -173,7 +177,7 @@ export function RoutePanel({
         </ScrollView>
       )}
 
-      <ExternalLinks lat={lat} lng={lng} onOpen={onOpenExternal} />
+      {!handOff && <ExternalLinks lat={lat} lng={lng} onOpen={onOpenExternal} />}
     </View>
   );
 }
@@ -363,10 +367,13 @@ export function ExternalLinks({
   lat,
   lng,
   onOpen,
+  prominent = false,
 }: {
   lat: number;
   lng: number;
   onOpen?: (app: "google-maps" | "waze") => void;
+  /** Big, as the main way on: when Blue Route can't give a route. */
+  prominent?: boolean;
 }) {
   return (
     <View style={styles.links}>
@@ -374,17 +381,29 @@ export function ExternalLinks({
         label="Google Maps"
         url={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`}
         onPress={() => onOpen?.("google-maps")}
+        prominent={prominent}
       />
       <LinkButton
         label="Waze"
         url={`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`}
         onPress={() => onOpen?.("waze")}
+        prominent={prominent}
       />
     </View>
   );
 }
 
-function LinkButton({ label, url, onPress }: { label: string; url: string; onPress?: () => void }) {
+function LinkButton({
+  label,
+  url,
+  onPress,
+  prominent,
+}: {
+  label: string;
+  url: string;
+  onPress?: () => void;
+  prominent?: boolean;
+}) {
   return (
     <Pressable
       accessibilityRole="link"
@@ -393,9 +412,9 @@ function LinkButton({ label, url, onPress }: { label: string; url: string; onPre
         onPress?.();
         Linking.openURL(url);
       }}
-      style={({ pressed }) => [styles.link, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.link, prominent && styles.linkProminent, pressed && { opacity: 0.7 }]}
     >
-      <Text style={styles.linkText} numberOfLines={1} adjustsFontSizeToFit>
+      <Text style={[styles.linkText, prominent && styles.linkTextProminent]} numberOfLines={1} adjustsFontSizeToFit>
         {label} ↗
       </Text>
     </Pressable>
@@ -451,6 +470,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.blue,
   },
+  retryQuiet: {
+    borderRadius: 999,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.panel,
+  },
+  retryQuietText: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
   retryText: {
     color: "#0c1220",
     fontFamily: fonts.displayBold,
@@ -562,4 +589,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   linkText: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
+  linkProminent: { backgroundColor: colors.blue, borderRadius: 12, minHeight: 60 },
+  linkTextProminent: { color: "#0c1220", fontFamily: fonts.displayBold, fontSize: 20 },
 });

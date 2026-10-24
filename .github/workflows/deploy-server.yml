@@ -39,6 +39,12 @@ jobs:
       STATS_TOKEN: ${{ secrets.STATS_TOKEN }}
       SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
       DOMAIN: ${{ vars.SERVER_DOMAIN }}
+      # Optional: other names the server also answers on, space-separated (e.g.
+      # the old DuckDNS name while apps move to a new domain).
+      ALSO_SERVE: ${{ vars.SERVER_ALSO_SERVE }}
+      # Optional: lets this run point a non-DuckDNS name (Cloudflare DNS) at a
+      # new server by itself. A token limited to Zone → DNS → Edit on that zone.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
       NAME: blue-route
       # The live server runs only main (merged, tested code); it then follows
@@ -52,9 +58,11 @@ jobs:
           missing=0
           [ -n "$HCLOUD_TOKEN" ] || { echo "::error::Add the HCLOUD_TOKEN secret (DEPLOY.md, step 2)."; missing=1; }
           [ -n "$DOMAIN" ] || { echo "::error::Add the SERVER_DOMAIN variable, e.g. blueroute-yourname.duckdns.org (DEPLOY.md, step 3)."; missing=1; }
-          case "$DOMAIN" in
-            *.duckdns.org) [ -n "$DUCKDNS_TOKEN" ] || { echo "::error::SERVER_DOMAIN is a DuckDNS name: add the DUCKDNS_TOKEN secret."; missing=1; } ;;
-          esac
+          for name in $DOMAIN $ALSO_SERVE; do
+            case "$name" in
+              *.duckdns.org) [ -n "$DUCKDNS_TOKEN" ] || { echo "::error::$name is a DuckDNS name: add the DUCKDNS_TOKEN secret."; missing=1; } ;;
+            esac
+          done
           exit $missing
 
       - name: Install the Hetzner command-line tool
@@ -91,7 +99,7 @@ jobs:
             # OS keys (and contact email) go to the server; the DuckDNS token stays here.
             {
               echo '#!/bin/bash'
-              printf 'export DOMAIN=%q OS_NAMES_KEY=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q TFL_APP_KEY=%q STATS_TOKEN=%q BRANCH=%q\n' "$DOMAIN" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$TFL_APP_KEY" "$STATS_TOKEN" "$BRANCH"
+              printf 'export DOMAIN=%q ALSO_SERVE=%q OS_NAMES_KEY=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q TFL_APP_KEY=%q STATS_TOKEN=%q BRANCH=%q\n' "$DOMAIN" "$ALSO_SERVE" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$TFL_APP_KEY" "$STATS_TOKEN" "$BRANCH"
               printf 'URL=%q\n' "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/server/scripts/install.sh"
               # Download first, then run: piping curl into bash ran an empty
               # script, and reported success, whenever the download failed
@@ -172,24 +180,56 @@ jobs:
           IP: ${{ steps.server.outputs.ip }}
           IP6: ${{ steps.server.outputs.ip6 }}
         run: |
-          case "$DOMAIN" in
-            *.duckdns.org)
-              SUB=${DOMAIN%.duckdns.org}
-              # IPv6 too: a stale AAAA record sends phones on IPv6 mobile networks to the wrong place.
-              result=$(curl -fsS "https://www.duckdns.org/update?domains=${SUB}&token=${DUCKDNS_TOKEN}&ip=${IP}&ipv6=${IP6}")
-              [ "$result" = "OK" ] || { echo "::error::DuckDNS refused the update. Check DUCKDNS_TOKEN and that ${SUB} is one of your DuckDNS domains."; exit 1; }
-              echo "$DOMAIN now points at $IP${IP6:+ and $IP6}"
-              ;;
-            *)
-              echo "Make sure $DOMAIN has an A record pointing at $IP. Waiting for it…"
-              for _ in $(seq 1 40); do
-                [ "$(dig +short A "$DOMAIN" @1.1.1.1 | tail -n 1)" = "$IP" ] && { echo "OK"; exit 0; }
-                sleep 30
-              done
-              echo "::error::$DOMAIN doesn't point at $IP. Add the A record and run this again."
-              exit 1
-              ;;
-          esac
+          # Cloudflare: update (or add) the name's A and AAAA records, DNS only
+          # (not proxied: positions never pass through Cloudflare).
+          cf() { curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "$@"; }
+          cloudflare() {
+            local name=$1 zone="" try=$1 type ip rec body
+            # The zone is the name or a parent of it: api.example.org → example.org.
+            while [[ "$try" == *.* ]]; do
+              zone=$(cf "https://api.cloudflare.com/client/v4/zones?name=$try" | jq -r '.result[0].id // empty')
+              [ -n "$zone" ] && break
+              try=${try#*.}
+            done
+            [ -n "$zone" ] || { echo "::error::CLOUDFLARE_API_TOKEN can't see a Cloudflare zone for $name."; return 1; }
+            for type in A AAAA; do
+              ip=$IP; [ "$type" = AAAA ] && ip=$IP6
+              [ -n "$ip" ] || continue
+              rec=$(cf "https://api.cloudflare.com/client/v4/zones/$zone/dns_records?type=$type&name=$name" | jq -r '.result[0].id // empty')
+              body=$(jq -nc --arg t "$type" --arg n "$name" --arg c "$ip" '{type:$t,name:$n,content:$c,ttl:1,proxied:false}')
+              if [ -n "$rec" ]; then
+                cf -X PATCH "https://api.cloudflare.com/client/v4/zones/$zone/dns_records/$rec" --data "$body" >/dev/null
+              else
+                cf -X POST "https://api.cloudflare.com/client/v4/zones/$zone/dns_records" --data "$body" >/dev/null
+              fi || { echo "::error::Cloudflare refused the $type record for $name."; return 1; }
+            done
+            echo "$name now points at $IP${IP6:+ and $IP6} (Cloudflare, DNS only)"
+          }
+          point() {
+            local name=$1
+            case "$name" in
+              *.duckdns.org)
+                SUB=${name%.duckdns.org}
+                # IPv6 too: a stale AAAA record sends phones on IPv6 mobile networks to the wrong place.
+                result=$(curl -fsS "https://www.duckdns.org/update?domains=${SUB}&token=${DUCKDNS_TOKEN}&ip=${IP}&ipv6=${IP6}")
+                [ "$result" = "OK" ] || { echo "::error::DuckDNS refused the update. Check DUCKDNS_TOKEN and that ${SUB} is one of your DuckDNS domains."; return 1; }
+                echo "$name now points at $IP${IP6:+ and $IP6}"
+                ;;
+              *)
+                if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+                  cloudflare "$name" || return 1
+                fi
+                echo "Waiting for $name to point at $IP…"
+                for _ in $(seq 1 40); do
+                  [ "$(dig +short A "$name" @1.1.1.1 | tail -n 1)" = "$IP" ] && { echo "OK"; return 0; }
+                  sleep 30
+                done
+                echo "::error::$name doesn't point at $IP. Add the A record (or the CLOUDFLARE_API_TOKEN secret) and run this again."
+                return 1
+                ;;
+            esac
+          }
+          for name in $DOMAIN $ALSO_SERVE; do point "$name"; done
 
       - name: Wait for the server to be ready
         env:

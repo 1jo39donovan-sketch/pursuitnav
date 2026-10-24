@@ -7,7 +7,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   fetchRoutes,
+  NoAnswerRouteError,
   NoSignalRouteError,
+  ServerDownRouteError,
   restrictionPoints,
   RouteError,
   withoutPolice,
@@ -24,13 +26,14 @@ import { RoutePanel, type PlanState } from "../../components/RoutePanel";
 import { SearchResultsList } from "../../components/SearchResultsList";
 import { WhereAmI } from "../../components/WhereAmI";
 import { boroughAt } from "../../area/area";
-import { DEMO_MODE } from "../../config";
+import { API_URL, DEMO_MODE } from "../../config";
 import { useLog } from "../../log/LogProvider";
 import { formatDistance } from "../../format";
 import { distanceM } from "../../geo";
 import { routeOrigin, useLocation } from "../../location/LocationProvider";
 import { APP_VERSION, PLATFORM, recorder } from "../../fieldtest/instance";
-import { NO_SIGNAL_ROUTE_START } from "../../navigation/connectivity";
+import { NO_SIGNAL_ROUTE_START, SERVER_DOWN_ROUTE_START } from "../../navigation/connectivity";
+import { PREFETCH_PAUSE_MS, prefetchKey, prefetchTarget, usable, type Prefetch } from "../../navigation/prefetch";
 import { rerouteFailure } from "../../navigation/reroute";
 import { useNavigation } from "../../navigation/NavigationProvider";
 import { planIsStale } from "../../navigation/routeChoice";
@@ -74,6 +77,8 @@ export default function SearchScreen() {
   const [destination, setDestination] = useState<Destination | null>(null);
   const [state, setState] = useState<PlanState | null>(null);
   const request = useRef<AbortController | null>(null);
+  // Routes asked for before the tap, for the likely match (navigation/prefetch.ts).
+  const prefetch = useRef<Prefetch | null>(null);
   const [markerGroups, setMarkerGroupsState] = useState<PlaceGroup[]>(() => loadMarkerGroups());
   const [tapped, setTapped] = useState<{ marker: MarkerProperties; point: LngLat } | null>(null);
   const setMarkerGroups = (groups: PlaceGroup[]) => {
@@ -117,16 +122,21 @@ export default function SearchScreen() {
         setState({ status: "error", message: "Waiting for a GPS position to route from.", waitingForFix: true });
         return;
       }
-      const controller = new AbortController();
+      const to = { lat: dest.point[1], lng: dest.point[0] };
+      // Already asked for before the tap? Then carry on with that.
+      const pre = prefetch.current;
+      prefetch.current = null;
+      const ready = pre && usable(pre, prefetchKey(to, vehicle, roads, policeRoutes), fix, Date.now()) ? pre : null;
+      if (pre && !ready) pre.controller.abort();
+      const controller = ready?.controller ?? new AbortController();
       request.current = controller;
       setState({ status: "loading" });
-      const to = { lat: dest.point[1], lng: dest.point[0] };
-      const from = routeOrigin(fix);
-      const origin = { madeAt: Date.now(), from };
+      const from = ready?.origin.from ?? routeOrigin(fix);
+      const origin = ready?.origin ?? { madeAt: Date.now(), from };
       // The standard route comes back in a second or so; the blue-light one
       // takes longer to check, so show the standard route as soon as it's here.
-      const quick = fetchRoutes(from, to, vehicle, controller.signal, true, roads);
-      const full = policeRoutes ? fetchRoutes(from, to, vehicle, controller.signal, false, roads) : null;
+      const quick = ready?.quick ?? fetchRoutes(from, to, vehicle, controller.signal, true, roads);
+      const full = ready ? ready.full : policeRoutes ? fetchRoutes(from, to, vehicle, controller.signal, false, roads) : null;
       // Field-test recording (off unless switched on): how long each part of the plan took.
       quick.then((p) => recorder.event({ type: "plan-standard", ms: recorder.sinceStart(), standard: offered(p.standard) }), () => {});
       (full ?? quick).then(
@@ -168,6 +178,10 @@ export default function SearchScreen() {
           setState({ status: "error", message: NO_SIGNAL_ROUTE_START, noSignal: true });
           return;
         }
+        if (err instanceof NoAnswerRouteError || err instanceof ServerDownRouteError) {
+          setState({ status: "error", message: SERVER_DOWN_ROUTE_START, serverDown: true });
+          return;
+        }
         const message = err instanceof RouteError ? err.message : "Something went wrong working out routes.";
         setState({ status: "error", message });
       }
@@ -176,6 +190,33 @@ export default function SearchScreen() {
   );
 
   useEffect(() => () => request.current?.abort(), []);
+
+  // Before the tap: once typing pauses on a likely match, ask for its routes.
+  const target = showResults && fix && API_URL ? prefetchTarget(results) : null;
+  const targetKey = target ? prefetchKey(target, vehicle, roads, policeRoutes) : null;
+  useEffect(() => {
+    if (!target || !targetKey || !fix) return;
+    const t = setTimeout(() => {
+      if (usable(prefetch.current, targetKey, fix, Date.now())) return;
+      prefetch.current?.controller.abort();
+      const controller = new AbortController();
+      const from = routeOrigin(fix);
+      const to = { lat: target.lat, lng: target.lng };
+      const quick = fetchRoutes(from, to, vehicle, controller.signal, true, roads);
+      const full = policeRoutes ? fetchRoutes(from, to, vehicle, controller.signal, false, roads) : null;
+      const entry: Prefetch = { key: targetKey, origin: { madeAt: Date.now(), from }, quick, full, controller, failed: false };
+      const failed = () => {
+        entry.failed = true;
+      };
+      quick.catch(failed);
+      full?.catch(failed);
+      prefetch.current = entry;
+    }, PREFETCH_PAUSE_MS);
+    return () => clearTimeout(t);
+    // Only when the likely match (or a choice that changes its route) changes, not on every GPS fix.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey]);
+  useEffect(() => () => prefetch.current?.controller.abort(), []);
 
   /** Logs what was typed and what was chosen, then works out routes there. */
   const choose = (dest: Destination, typed: string, borough: string | null) => {
