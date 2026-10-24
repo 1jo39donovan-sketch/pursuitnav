@@ -2,7 +2,7 @@
 // served by the API so they live at the same address as the server.
 
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
-const UPDATED = "22 October 2026";
+const UPDATED = "24 October 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -58,8 +58,8 @@ export function privacyPage(email?: string): string {
     `<p class="muted">BlueRoute · last updated ${UPDATED}</p>
 
 <p>BlueRoute is a navigation app for police, fire and ambulance crews. It’s an independent app, not a police force or emergency service
-system. It has no accounts, no adverts, no third-party analytics and no tracking. It counts how much it's used, in
-the way described under “Usage counts” below.</p>
+system. It has no accounts, no adverts and no third-party analytics. It counts how much it's used, in the way described
+under “Usage counts” below.</p>
 
 <h2>Kept on your phone only</h2>
 <ul>
@@ -115,6 +115,12 @@ next. Within an hour of a day ending, its totals are saved and its scrambled IDs
 week ends. Nothing more than a week's worth is ever held. No positions, addresses,
 searches, callsigns or IP addresses are kept with these counts, and no third-party analytics service is used.</p>
 
+<h2>Waitlist and emails to us</h2>
+<p>If you email us to join the waitlist, we use your email address (and the service or role, if you give it) only to
+tell you when BlueRoute is in the App Store and Google Play. It isn't used for marketing or anything else, isn't
+shared, and is deleted once we've told you, or sooner if you ask. If you email us for support or about using
+BlueRoute in your service, we use your message only to reply.</p>
+
 <h2>Other services</h2>
 <ul>
   <li><strong>Map tiles</strong> come from OpenFreeMap. Like any website, it sees your phone’s IP address and which part
@@ -147,8 +153,9 @@ published here.</p>`,
 export function supportPage(email?: string): string {
   return page(
     "Support",
-    `<p>BlueRoute gives officers on patrol in London address and place search filtered to their boroughs, a standard
-route and (for emergency-service drivers) a faster blue-light route, sized to their vehicle, turn-by-turn navigation with spoken directions, and a pursuit screen.</p>
+    `<p>BlueRoute gives emergency-service crews address and place search filtered to the area they're working, a standard
+route and (for emergency-service drivers) a faster blue-light route, sized to their vehicle, turn-by-turn navigation
+with spoken directions, and a pursuit screen. Maps and search cover London for now.</p>
 
 <h2>Getting help or reporting a problem</h2>
 <p>${contact(email).replace(/^./, (c) => c.toUpperCase())}. Say what you searched for or tapped, what you expected,

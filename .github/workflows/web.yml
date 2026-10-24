@@ -75,9 +75,30 @@ jobs:
               url ? `<a class="store" href="${url}"><small>${where}</small><b>${name}</b></a>`
                   : `<span class="store soon"><small>Coming soon to</small><b>${name}</b></span>`;
             const stores = store(e.APP_STORE_URL, "Download on the", "App Store") + store(e.PLAY_STORE_URL, "Get it on", "Google Play");
+            // Demo screenshots, if any are in site/screenshots (e.g. "1-search.png" → "Search · demo").
+            const dir = "../site/screenshots";
+            const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.(png|jpe?g|webp)$/i.test(f)).sort() : [];
+            if (files.length) fs.mkdirSync("../site-out/screenshots");
+            const figs = files.map((f) => {
+              fs.copyFileSync(`${dir}/${f}`, `../site-out/screenshots/${f}`);
+              const name = f.replace(/^\d+-/, "").replace(/\.\w+$/, "").replace(/-/g, " ");
+              const label = name.charAt(0).toUpperCase() + name.slice(1);
+              return `<figure><img src="/screenshots/${f}" alt="${label}, from the demo" loading="lazy" /><figcaption>${label} · demo</figcaption></figure>`;
+            });
+            const shots = figs.length ? `<div class="shots">${figs.join("")}</div>` : "";
             const html = fs.readFileSync("../site/index.html", "utf8")
-              .replaceAll("__SERVER_DOMAIN__", e.SERVER_DOMAIN).replaceAll("__WEB_DOMAIN__", e.WEB_DOMAIN).replace("__STORES__", stores);
+              .replaceAll("__SERVER_DOMAIN__", e.SERVER_DOMAIN).replaceAll("__WEB_DOMAIN__", e.WEB_DOMAIN)
+              .replace("__STORES__", stores).replace("__SHOTS__", shots);
             fs.writeFileSync("../site-out/index.html", html);
+            // /privacy and /support here too: they open the pages on the server, so there is one copy of each.
+            for (const page of ["privacy", "support"]) {
+              const url = `https://${e.SERVER_DOMAIN}/${page}`;
+              fs.mkdirSync(`../site-out/${page}`);
+              fs.writeFileSync(`../site-out/${page}/index.html`,
+                `<!doctype html><meta charset="utf-8"><title>BlueRoute</title><link rel="canonical" href="${url}">` +
+                `<meta http-equiv="refresh" content="0; url=${url}"><body style="background:#0c1220;color:#e8edf6;font-family:sans-serif">` +
+                `<p><a style="color:#ffb627" href="${url}">Open the BlueRoute ${page} page</a></p>`);
+            }
             // The test app: unlisted, so search engines leave it out.
             for (const f of ["../site-out/app/index.html", "../site-out/app/404.html"]) {
               fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace("<head>", "<head><meta name=\"robots\" content=\"noindex\">"));
