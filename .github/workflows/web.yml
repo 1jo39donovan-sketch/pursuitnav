@@ -3,13 +3,18 @@
 # with real GPS, search and routes. Not a replacement for the store apps:
 # a browser can't keep GPS running with the screen off.
 #
-# One-off setup: Settings → Pages → Build and deployment → Source: GitHub Actions.
+# With the WEB_DOMAIN variable (e.g. bluerouteapp.com) the site is a front
+# page at / (site/index.html) and the app at /app/; without it, the app alone
+# at https://<owner>.github.io/<repo>/.
+#
+# One-off setup: Settings → Pages → Build and deployment → Source: GitHub Actions
+# (and, with WEB_DOMAIN, the same name under Custom domain, Enforce HTTPS on).
 name: Web app
 
 on:
   push:
     branches: [main]
-    paths: ["app/**", ".github/workflows/web.yml"]
+    paths: ["app/**", "site/**", ".github/workflows/web.yml"]
   workflow_dispatch:
 
 permissions:
@@ -30,6 +35,7 @@ jobs:
         working-directory: app
     env:
       SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
+      WEB_DOMAIN: ${{ vars.WEB_DOMAIN }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -42,8 +48,8 @@ jobs:
       - name: Build
         run: |
           [ -n "$SERVER_DOMAIN" ] || { echo "::error::Add the SERVER_DOMAIN variable (DEPLOY.md, step 3)."; exit 1; }
-          # Pages serves the site under /<repository name>/.
-          base="/${GITHUB_REPOSITORY#*/}"
+          # On its own domain the app is at /app; on github.io, Pages serves the site under /<repository name>/.
+          if [ -n "$WEB_DOMAIN" ]; then base=/app; else base="/${GITHUB_REPOSITORY#*/}"; fi
           jq --arg base "$base" '.expo.experiments = ((.expo.experiments // {}) + {baseUrl: $base})' app.json > app.json.tmp
           mv app.json.tmp app.json
           EXPO_PUBLIC_API_URL="https://${SERVER_DOMAIN}" npx expo export --platform web --output-dir dist-web
@@ -52,9 +58,26 @@ jobs:
           # Add to Home Screen opens it full screen, without Safari's bars.
           node scripts/web-app-shell.mjs dist-web "$base"
 
+      - name: Front page (own domain only)
+        run: |
+          mkdir -p ../site-out
+          if [ -z "$WEB_DOMAIN" ]; then cp -r dist-web/. ../site-out/; exit 0; fi
+          cp -r dist-web ../site-out/app
+          sed "s/__SERVER_DOMAIN__/${SERVER_DOMAIN}/g" ../site/index.html > ../site-out/index.html
+          cp assets/icon.png ../site-out/icon.png
+          # Any other path opens the app: /app/… as it is, and old links
+          # (/search, /pursuitnav/search) moved under /app.
+          node -e '
+            const fs = require("fs");
+            const go = "<script>(function(){var p=location.pathname;if(p===\"/app\"||p.indexOf(\"/app/\")===0)return;" +
+              "if(p.indexOf(\"/pursuitnav\")===0)p=p.slice(11)||\"/\";location.replace(\"/app\"+p+location.search+location.hash);})();</script>";
+            fs.writeFileSync("../site-out/404.html", fs.readFileSync("dist-web/404.html", "utf8").replace("<head>", "<head>" + go));
+          '
+          grep -q 'location.replace("/app"' ../site-out/404.html || { echo "::error::404 redirect not added"; exit 1; }
+
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: app/dist-web
+          path: site-out
 
   deploy:
     needs: build
