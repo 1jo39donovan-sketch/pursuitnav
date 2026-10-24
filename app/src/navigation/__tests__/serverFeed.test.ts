@@ -39,6 +39,6 @@ describe("pursuit server feed", () => {
 
   it("tells a build with no server apart from a connection problem", () => {
     const feed = nextFeed(EMPTY_FEED, { status: "unavailable" }, 1000);
-    expect(feedNote(feed, 1000)).toEqual({ title: null, text: expect.stringMatching(/need the Blue Route server/) });
+    expect(feedNote(feed, 1000)).toEqual({ title: null, text: expect.stringMatching(/need the BlueRoute server/) });
   });
 });

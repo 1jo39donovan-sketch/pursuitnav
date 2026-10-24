@@ -109,8 +109,8 @@ export default function SearchScreen() {
   const placesNote =
     showResults && places.status !== "ready"
       ? DEMO_MODE
-        ? "This demo has no shops, cafés or other places: they come from the Blue Route server."
-        : "Shops, cafés and other places aren't on this phone yet. They download from the Blue Route server."
+        ? "This demo has no shops, cafés or other places: they come from the BlueRoute server."
+        : "Shops, cafés and other places aren't on this phone yet. They download from the BlueRoute server."
       : null;
 
   const routeTo = useCallback(

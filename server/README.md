@@ -1,4 +1,4 @@
-# Blue Route server
+# BlueRoute server
 
 A small TypeScript API (Fastify) in front of a [Valhalla](https://github.com/valhalla/valhalla) routing engine built from the OpenStreetMap extract for Greater London. The app talks only to the API; API keys and the routing engine stay on the server.
 

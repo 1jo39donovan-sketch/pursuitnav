@@ -1,6 +1,6 @@
 # Website
 
-Blue Route's public front page: what it is, and where to get it (the App
+BlueRoute's public front page: what it is, and where to get it (the App
 Store and Google Play). Published by `.github/workflows/web.yml` when the
 `WEB_DOMAIN` variable is set (e.g. `bluerouteapp.com`):
 

@@ -1,4 +1,4 @@
-# Rents and sets up the Blue Route server on Hetzner Cloud, then waits until
+# Rents and sets up the BlueRoute server on Hetzner Cloud, then waits until
 # it answers over HTTPS. Run it from the Actions tab ("Run workflow").
 # One-off setup (accounts, secrets) is in DEPLOY.md.
 name: Deploy server
@@ -76,7 +76,7 @@ jobs:
           if ! hcloud server-type list -o noheader -o columns=name > types.txt 2> check.log; then
             cat check.log
             if grep -qiE 'unauthorized|unable to authenticate|invalid token|token' check.log; then
-              echo "::error::Hetzner refused the HCLOUD_TOKEN secret. Make a new API token (Read & Write) in the Blue Route project and paste it into the secret again (DEPLOY.md, step 2)."
+              echo "::error::Hetzner refused the HCLOUD_TOKEN secret. Make a new API token (Read & Write) in the BlueRoute project and paste it into the secret again (DEPLOY.md, step 2)."
             else
               echo "::error::Couldn't reach Hetzner with HCLOUD_TOKEN (message above)."
             fi
@@ -339,7 +339,7 @@ jobs:
           IP: ${{ steps.server.outputs.ip }}
         run: |
           {
-            echo "## Blue Route server is up"
+            echo "## BlueRoute server is up"
             echo ""
             echo "- Address: https://${DOMAIN}"
             echo "- Server IP: ${IP}"

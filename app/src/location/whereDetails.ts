@@ -40,7 +40,7 @@ export function whereDetails(
 export function shareText(d: WhereDetails): string {
   const time = new Date(d.at).toLocaleTimeString("en-GB");
   return [
-    "My location (Blue Route)",
+    "My location (BlueRoute)",
     [d.address, d.postcode, d.borough].filter(Boolean).join(", "),
     d.grid ? `OS grid ${d.grid}` : null,
     `${d.latLng} (±${d.accuracyM ?? "?"} m at ${time})`,

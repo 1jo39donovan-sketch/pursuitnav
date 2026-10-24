@@ -83,7 +83,7 @@ jobs:
         run: |
           tag="data-$(date -u +%Y%m%d-%H%M)"
           {
-            echo "London map and search data built $(date -u '+%d %b %Y %H:%M') UTC for Blue Route servers."
+            echo "London map and search data built $(date -u '+%d %b %Y %H:%M') UTC for BlueRoute servers."
             echo
             echo "Servers download this themselves (server/scripts/fetch-data.sh); there's nothing to install by hand."
             echo "Map build: ${MAP_MINUTES} min. Offline map: ${OFFLINE_MB} MB in ${OFFLINE_MINUTES} min. House-number search: $(cat "$RUNNER_TEMP/geocoder.json")"

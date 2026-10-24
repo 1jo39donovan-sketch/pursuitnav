@@ -117,7 +117,7 @@ export function OfflineMapProvider({ children }: { children: ReactNode }) {
   const styles = loaded && loaded.version === readyVersion ? loaded.styles : null;
 
   const fetchManifest = useCallback(async (): Promise<OfflineManifest> => {
-    if (!API_URL) throw new Error("The offline map comes from the Blue Route server, which isn't set up in this build.");
+    if (!API_URL) throw new Error("The offline map comes from the BlueRoute server, which isn't set up in this build.");
     const res = await serverJson(`${API_URL}/v1/offline-map`);
     if (res.status === 503) throw new Error("The server hasn't built an offline map yet.");
     if (!res.ok || !isManifest(res.body)) throw new Error(`Couldn't get the offline map (${res.status}).`);

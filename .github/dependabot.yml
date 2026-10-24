@@ -1,4 +1,4 @@
-# Dependabot opens a pull request when something Blue Route depends on has a
+# Dependabot opens a pull request when something BlueRoute depends on has a
 # new version, so security fixes don't wait for someone to notice. Each one
 # runs CI; merge it once CI is green. Grouped and weekly, so it's at most a
 # few pull requests a week, on Mondays.

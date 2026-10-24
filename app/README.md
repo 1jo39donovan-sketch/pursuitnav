@@ -1,4 +1,4 @@
-# Blue Route app
+# BlueRoute app
 
 React Native (Expo SDK 57, TypeScript, Expo Router) with MapLibre for the map.
 
@@ -17,7 +17,7 @@ npm start                 # then open the dev build on the phone
 
 ## Routing server
 
-Routes come from the Blue Route server (`../server`). The app reads its address from `EXPO_PUBLIC_API_URL` when it's bundled; nothing is checked in. Point it at your server when starting:
+Routes come from the BlueRoute server (`../server`). The app reads its address from `EXPO_PUBLIC_API_URL` when it's bundled; nothing is checked in. Point it at your server when starting:
 
 ```bash
 EXPO_PUBLIC_API_URL=https://your-server.example npm start

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# London smoke test for a live Blue Route server: one-way streets (Stroud
+# London smoke test for a live BlueRoute server: one-way streets (Stroud
 # Green Road and its neighbours), a bus gate, and arrival at 54 Caledonian
 # Road. Exits non-zero if any check fails. The deploy workflow runs it last.
 #

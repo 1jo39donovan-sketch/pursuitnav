@@ -110,7 +110,7 @@ jobs:
             if [ -z "$apk" ]; then
               echo "- The APK on the release page doesn't take over-the-air updates yet: install the next one built on main."
             elif [ "$apk" = "$RUNTIME_VERSION" ]; then
-              echo "- Phones with the current APK get it the next time Blue Route is opened twice (it downloads on the first, switches on the second)."
+              echo "- Phones with the current APK get it the next time BlueRoute is opened twice (it downloads on the first, switches on the second)."
             else
               echo "- **This changes native code**: phones need the new APK (the Android app workflow builds it from this push). The current APK carries on as it is."
             fi

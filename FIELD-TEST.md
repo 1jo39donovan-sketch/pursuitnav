@@ -1,4 +1,4 @@
-# Field test: Blue Route on a real phone in a car
+# Field test: BlueRoute on a real phone in a car
 
 Everything here has been tested on a synthetic street network and in a browser. This is the checklist for the first runs on real London streets. Do it as a passenger: the operator uses the app, the driver drives.
 

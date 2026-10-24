@@ -4,7 +4,7 @@
 # a browser can't keep GPS running with the screen off.
 #
 # With the WEB_DOMAIN variable (e.g. bluerouteapp.com) the site is a public
-# front page at / (site/index.html: what Blue Route is, App Store and Google
+# front page at / (site/index.html: what BlueRoute is, App Store and Google
 # Play buttons), with this test version of the app unlisted at /app/ (not
 # linked, kept out of search engines); without it, the app alone at
 # https://<owner>.github.io/<repo>/.

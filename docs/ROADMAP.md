@@ -1,6 +1,6 @@
-# Blue Route roadmap: learning from drives, and beyond London
+# BlueRoute roadmap: learning from drives, and beyond London
 
-The key aim: get the officer or crew from A to B quickly and safely. Both pieces below serve that aim. Learning makes journey times and route choices match real blue-light driving. Expansion takes Blue Route to wherever crews drive.
+The key aim: get the officer or crew from A to B quickly and safely. Both pieces below serve that aim. Learning makes journey times and route choices match real blue-light driving. Expansion takes BlueRoute to wherever crews drive.
 
 ## Where things stand (October 2026)
 
@@ -15,7 +15,7 @@ The key aim: get the officer or crew from A to B quickly and safely. Both pieces
 
 - How fast each road is actually driven on blue lights, at different times of day.
 - Which junctions and roads crews avoid, and which shortcuts they take.
-- Over time, which route crews really choose between two points, compared with what Blue Route suggested.
+- Over time, which route crews really choose between two points, compared with what BlueRoute suggested.
 
 ### Privacy rules (non-negotiable)
 

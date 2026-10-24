@@ -9,7 +9,7 @@ set -euo pipefail
 DIR=$(cd "$(dirname "$0")/../.." && pwd)
 # main, unless this is a test server set up from another branch (install.sh's BRANCH).
 BRANCH=$( (grep -E '^BRANCH=' "$DIR/server/.env" 2>/dev/null || true) | cut -d= -f2-)
-want="# Blue Route server schedule, written by server/scripts/cron.sh. Edit that, not this.
+want="# BlueRoute server schedule, written by server/scripts/cron.sh. Edit that, not this.
 */5 * * * * root BRANCH=${BRANCH:-main} bash $DIR/server/scripts/update.sh >> /var/log/blue-route-update.log 2>&1
 15 3 * * * root bash $DIR/server/scripts/rebuild-tiles.sh >> /var/log/blue-route-tiles.log 2>&1"
 if [ "$(cat /etc/cron.d/blue-route 2>/dev/null)" != "$want" ]; then

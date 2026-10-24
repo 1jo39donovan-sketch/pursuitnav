@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Blue Route",
+    "name": "BlueRoute",
     "slug": "blue-route",
     "scheme": "blueroute",
     "version": "1.0.0",
@@ -50,7 +50,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Blue Route uses your location to show where you are and to work out routes and journey times from your current position.",
+          "locationWhenInUsePermission": "BlueRoute uses your location to show where you are and to work out routes and journey times from your current position.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false
         }

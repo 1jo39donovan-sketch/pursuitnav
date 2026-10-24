@@ -32,7 +32,7 @@ export function GpsStatus() {
 
   if (status === "needs-permission") {
     return (
-      <Banner tone="warn" text="Location is off for Blue Route. Routes start from your position.">
+      <Banner tone="warn" text="Location is off for BlueRoute. Routes start from your position.">
         <Action label="Allow" onPress={requestPermission} />
       </Banner>
     );

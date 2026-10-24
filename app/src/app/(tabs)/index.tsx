@@ -302,7 +302,7 @@ export default function SessionScreen() {
       <Text style={styles.attribution}>
         {places.status === "ready"
           ? `Places: ${places.count.toLocaleString("en-GB")} shops, cafés, schools, parks and more, from ${places.builtOn}.`
-          : "Places (shops, cafés, schools, parks…) download from the Blue Route server when it’s connected."}
+          : "Places (shops, cafés, schools, parks…) download from the BlueRoute server when it’s connected."}
       </Text>
       <Text style={styles.attribution}>
         Search data: contains OS data © Crown copyright and database right; Royal Mail data © Royal Mail copyright and
@@ -320,7 +320,7 @@ function UsageNote() {
     <View style={styles.field}>
       <Text style={styles.label}>Usage data</Text>
       <Text style={styles.placeMeta}>
-        To see how many crews use Blue Route, each request to the server carries a random install ID made on this phone
+        To see how many crews use BlueRoute, each request to the server carries a random install ID made on this phone
         and the app version. The server counts, per day: installs, routes planned, navigation and pursuit sessions, and
         requests that timed out or failed. Nothing else: no positions, addresses, searches or callsign. It keeps only
         a scrambled form of the ID, scrambled differently each day and each week so days can&apos;t be linked, and

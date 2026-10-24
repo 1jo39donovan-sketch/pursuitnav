@@ -65,7 +65,7 @@ bundle = bundle.replace(/"\/assets\/assets\/data\/([a-z]+)\.[0-9a-f]+\.dat"/g, (
 // Keep "</script" inside the bundle from closing the inline script tag.
 const inlineJs = bundle.replace(/<\/script/gi, "<\\/script");
 
-const page = `<title>Blue Route Demo</title>
+const page = `<title>BlueRoute Demo</title>
 <style>
 :root{color-scheme:dark}
 html,body{height:100%;margin:0;background:#0c1220}

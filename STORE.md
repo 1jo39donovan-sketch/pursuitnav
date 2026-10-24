@@ -1,4 +1,4 @@
-# Getting Blue Route onto the App Store and Google Play
+# Getting BlueRoute onto the App Store and Google Play
 
 Plan written 10 October 2026, for officers installing it from the stores by **Friday 23 October**.
 
@@ -26,9 +26,9 @@ Charging officers nothing is fine on both stores: list it as a free app.
 
 - **Use a personal developer account.** Your name will show as the seller. An organisation account needs a D-U-N-S number, which can take weeks.
 - **Don't use Met or police branding.** Don't use the Met name, crest or logos, and don't say "official". The listing below says it's independent and lists the police route as needing the user's declaration. Apple and Google both reject apps that look as if they're from an organisation they aren't.
-- **The name.** "Blue Route" may already be taken on one of the stores. If it is, use "Blue Route Patrol" (only the name on the store changes).
+- **The name.** "BlueRoute" may already be taken on one of the stores. If it is, use "BlueRoute Patrol" (only the name on the store changes).
 - **The server must be up first** (DEPLOY.md). The stores need the privacy policy at `https://SERVER_DOMAIN/privacy`.
-- **Optionally set a contact address.** In GitHub, add the variable `CONTACT_EMAIL` (for example a new Gmail address just for Blue Route) so it appears on the privacy and support pages, then run **Deploy server** with **recreate** ticked. Without it, the pages point to GitHub issues.
+- **Optionally set a contact address.** In GitHub, add the variable `CONTACT_EMAIL` (for example a new Gmail address just for BlueRoute) so it appears on the privacy and support pages, then run **Deploy server** with **recreate** ticked. Without it, the pages point to GitHub issues.
 
 ## One-off setup
 
@@ -53,7 +53,7 @@ Charging officers nothing is fine on both stores: list it as a free app.
 3. In [App Store Connect](https://appstoreconnect.apple.com), open the new app. The number in the address after `/apps/` is its **App ID**.
 4. Create an API key:
    1. Go to **Users and Access → Integrations → App Store Connect API → Team Keys → +**.
-   2. Name it "Blue Route builds" and give it the **App Manager** role.
+   2. Name it "BlueRoute builds" and give it the **App Manager** role.
    3. Download the `.p8` file. You can only download it once.
 5. In GitHub, add these:
    - Variable `ASC_APP_ID`: the App ID from step 3.
@@ -67,12 +67,12 @@ After this, every iOS build runs from GitHub with no questions. Once a year, whe
 ### Google
 
 1. Sign up at [play.google.com/console](https://play.google.com/console) with a **personal** account and pay the US$25. Identity verification can take a few days, so start on day 1.
-2. **Create app**: name Blue Route, English (UK), App, Free.
+2. **Create app**: name BlueRoute, English (UK), App, Free.
 3. Work through **Dashboard → Set up your app**, using the answers in "Store listing" and "Privacy answers" below.
 4. **Service account** (lets GitHub upload builds):
    1. In [Google Cloud console](https://console.cloud.google.com), create a project, enable the **Google Play Android Developer API**, and create a **service account**.
    2. On the service account, create a **JSON key** and download it.
-   3. In Play Console, go to **Users and permissions → Invite new users**, add the service account's email address, and give it **Release to testing tracks** and **Manage testing tracks** for Blue Route.
+   3. In Play Console, go to **Users and permissions → Invite new users**, add the service account's email address, and give it **Release to testing tracks** and **Manage testing tracks** for BlueRoute.
    4. In GitHub, add the secret `PLAY_SERVICE_ACCOUNT_JSON` and paste the whole JSON file into it.
 5. **First upload by hand** (Google requires this once):
    1. In GitHub, run **Actions → Store builds** with platform **android** and **send to stores** unticked.
@@ -96,9 +96,9 @@ Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code r
 
 ## Store listing
 
-**Name:** Blue Route
-**Subtitle (Apple, 30 characters):** Patrol navigation for London
-**Short description (Google, 80 characters):** Address search, routes and a pursuit screen for police officers in London.
+**Name:** BlueRoute
+**Subtitle (Apple, 30 characters):** Blue-light navigation
+**Short description (Google, 80 characters):** Blue-light navigation for emergency services: police, ambulance and fire.
 **Category:** Navigation (Apple) / Maps & Navigation (Google)
 **Price:** Free · no ads · no in-app purchases
 **Age rating:** 4+ / Everyone (no objectionable content). Target audience on Google: 18 and over.
@@ -107,7 +107,7 @@ Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code r
 
 **Description:**
 
-> Blue Route is navigation built for police officers on patrol in London, by officers' needs rather than a general sat-nav.
+> BlueRoute is blue-light navigation built for emergency services (police, ambulance and fire), around crews' needs rather than a general sat-nav.
 >
 > SEARCH THE WAY CONTROL GIVES IT
 > Type what the control room says: a road, "54 Caledonian Rd", "Flat 3, 54 Caledonian Road", a postcode, an outward code like N7, or an estate or block by name. Misspellings are forgiven. Pick the boroughs you're working at the start of a shift and their results come first, so you get the right Church Street first time. Road search works with no signal.
@@ -130,21 +130,21 @@ Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code r
 > PRIVATE BY DESIGN
 > No accounts, adverts or tracking. Addresses and your log stay on your phone; the server works out routes without keeping anything.
 >
-> Blue Route is independent and is not affiliated with or endorsed by the Metropolitan Police Service or any police force. Police routes are for police drivers using the emergency exemptions only. Covers London.
+> BlueRoute is independent and is not affiliated with or endorsed by any police, ambulance or fire service. Blue-light routes are for emergency-service drivers using the exemptions only. Maps and search start in London, with more areas to come.
 
-**Keywords (Apple, 100 characters):** `police,patrol,London,borough,sat nav,route,bus lane,pursuit,address,postcode,officer,navigation`
+**Keywords (Apple, 100 characters):** `blue light,emergency,police,ambulance,fire,satnav,route,bus lane,pursuit,address,postcode,navigation`
 
-**What's new (first release):** First release for officers in London.
+**What's new (first release):** First release.
 
 ### Notes for the reviewers (App Review Information / App access)
 
-> Blue Route is navigation for police officers in London. No account or login is needed.
+> BlueRoute is blue-light navigation for emergency services (police, ambulance and fire). Maps and search cover London for now. No account or login is needed.
 >
 > To try it outside London: on the Session tab, turn on "Demo drive". It simulates driving through north London, so search, routes, turn-by-turn and the Pursuit tab all work. For example, search "Caledonian Road" or "N7", pick a result, and compare the routes.
 >
 > The second "Blue light" route (bus lanes, bus gates, ignoring turn restrictions, never against one-way streets) is on by default, by design: the app is for emergency-service drivers using the emergency exemptions. It can be turned off on the Session tab, and then the app gives standard, fully legal routes only. The standard route is always offered beside it; when a blue-light route is shown, every restriction it uses is listed and the user chooses.
 >
-> The app is independent and not affiliated with any police force. Location is used only while the app is open.
+> The app is independent and not affiliated with any police, ambulance or fire service. Location is used only while the app is open.
 
 Google's **App access** question: choose "All or some functionality is restricted" and paste the same text, so the reviewer knows how to see police routes.
 
@@ -169,7 +169,7 @@ On iPhone, use a 6.7" or 6.9" model if you can (otherwise Apple asks for that si
 
 ### Apple: App Privacy
 
-Positions and searched addresses don't count as collected: the app sends them to the Blue Route server only to answer each request in real time, and nothing is kept. Apple doesn't count real-time processing that isn't retained as collection.
+Positions and searched addresses don't count as collected: the app sends them to the BlueRoute server only to answer each request in real time, and nothing is kept. Apple doesn't count real-time processing that isn't retained as collection.
 
 Usage counts (README, "Usage data") do count. Answer:
 - **Identifiers → Device ID:** collected (the app's own random install ID, kept by the server only as salted hashes with a new salt each day and each week, deleted when the day or week ends; and the random ID Expo's update check sends, which Expo uses to deliver and count app updates).
@@ -273,7 +273,7 @@ Keep safety features free: the one-way protection, the "—" for unknown speed l
    3. Google: in Play Console, go to **Settings → Payments profile** and set it up.
 
    Verification can take several days.
-4. **Create the subscription in both stores.** For example "Blue Route Plus", £3.99 a month, one-month free trial, sold in the UK only.
+4. **Create the subscription in both stores.** For example "BlueRoute Plus", £3.99 a month, one-month free trial, sold in the UK only.
 5. **Create a RevenueCat account** (free) and connect it to App Store Connect and Play Console. Its setup screens walk you through this.
 6. **Ask Claude to build it.** Claude adds RevenueCat, the subscribe and restore screens, a terms of use page, and the privacy policy changes, then locks the chosen features. If any of them run on the server, the server checks the subscription too.
 7. **Update the privacy answers:**

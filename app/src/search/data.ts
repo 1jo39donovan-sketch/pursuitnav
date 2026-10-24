@@ -31,7 +31,7 @@ export function parseRoads(text: string): Road[] {
  */
 export function parseServerRoads(text: string): Road[] {
   const [header, ...lines] = text.split("\n");
-  if (!header?.startsWith("#blueroute-roads v1")) throw new Error("Not a Blue Route roads file");
+  if (!header?.startsWith("#blueroute-roads v1")) throw new Error("Not a BlueRoute roads file");
   const out: Road[] = [];
   for (const line of lines) {
     if (!line) continue;

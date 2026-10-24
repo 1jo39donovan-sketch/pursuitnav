@@ -1,4 +1,4 @@
-// Every call to the Blue Route server goes through here, so none can hang:
+// Every call to the BlueRoute server goes through here, so none can hang:
 // a request with no answer in time is given up, and the screen says so
 // instead of waiting for ever. Two different failures, told apart:
 //   - no signal: the network itself failed (fetch couldn't send at all);
@@ -14,7 +14,7 @@ export const ROUTE_TIMEOUT_MS = 30_000;
 /** The network failed: the request couldn't be sent. */
 export class NoSignalError extends Error {
   constructor() {
-    super("No signal: can't reach the Blue Route server.");
+    super("No signal: can't reach the BlueRoute server.");
     this.name = "NoSignalError";
   }
 }
@@ -22,7 +22,7 @@ export class NoSignalError extends Error {
 /** The request went, but no answer came back within the timeout. */
 export class NoAnswerError extends Error {
   constructor() {
-    super("The Blue Route server didn't answer in time.");
+    super("The BlueRoute server didn't answer in time.");
     this.name = "NoAnswerError";
   }
 }

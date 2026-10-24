@@ -1,5 +1,5 @@
 // Team sessions: everyone on the job shares where they are, and the way they
-// drove there, with the rest of the team, while Blue Route is open.
+// drove there, with the rest of the team, while BlueRoute is open.
 //
 // Shares are sealed on this phone with the team code's key (team/crypto.ts),
 // so the server can't read them. The team code, member ID and token are kept
