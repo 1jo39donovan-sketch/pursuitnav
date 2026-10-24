@@ -36,6 +36,9 @@ interface Session {
   /** Opt-in: time roads on drives to improve journey times (off unless turned on). */
   learning: boolean;
   setLearning: (on: boolean) => void;
+  /** The Pursuit tab: on unless hidden (crews who never pursue, e.g. fire and ambulance). */
+  showPursuit: boolean;
+  setShowPursuit: (on: boolean) => void;
 }
 
 export type RoadChoice = "main" | "any";
@@ -106,6 +109,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const setVoice = useCallback((on: boolean) => setVoiceSetting(on ? "1" : "0"), [setVoiceSetting]);
   const [learningSetting, setLearningSetting] = useSetting<"1" | "0">("learning", ["1", "0"], "0");
   const learning = learningSetting === "1";
+  const [pursuitSetting, setPursuitSetting] = useSetting<"1" | "0">("showPursuit", ["1", "0"], "1");
+  const showPursuit = pursuitSetting === "1";
+  const setShowPursuit = useCallback((on: boolean) => setPursuitSetting(on ? "1" : "0"), [setPursuitSetting]);
   // Sends road times that have waited long enough: at launch, then every half hour.
   useEffect(() => {
     if (!learning) return;
@@ -163,8 +169,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setRoads,
       learning,
       setLearning,
+      showPursuit,
+      setShowPursuit,
     }),
     [
+      showPursuit,
+      setShowPursuit,
       learning,
       setLearning,
       callsign,

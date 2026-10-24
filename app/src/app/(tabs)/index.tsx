@@ -34,6 +34,8 @@ export default function SessionScreen() {
     setVehicle,
     voice,
     setVoice,
+    showPursuit,
+    setShowPursuit,
     mapTheme,
     setMapTheme,
     roads,
@@ -151,7 +153,7 @@ export default function SessionScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Map and voice</Text>
+        <Text style={styles.label}>Map, voice and tabs</Text>
         <View style={styles.toggleRow}>
           <Text style={[styles.placeName, styles.placeText]} nativeID="voice-label">
             Spoken directions
@@ -160,6 +162,17 @@ export default function SessionScreen() {
             accessibilityLabelledBy="voice-label"
             value={voice}
             onValueChange={setVoice}
+            trackColor={{ false: colors.line, true: colors.amber }}
+          />
+        </View>
+        <View style={styles.toggleRow}>
+          <Text style={[styles.placeName, styles.placeText]} nativeID="pursuit-label">
+            Pursuit tab
+          </Text>
+          <Switch
+            accessibilityLabelledBy="pursuit-label"
+            value={showPursuit}
+            onValueChange={setShowPursuit}
             trackColor={{ false: colors.line, true: colors.amber }}
           />
         </View>
