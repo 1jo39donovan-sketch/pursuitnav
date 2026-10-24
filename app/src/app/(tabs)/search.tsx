@@ -241,8 +241,9 @@ export default function SearchScreen() {
     routeTo({ ...dest, logId });
   };
 
-  // "Route there again" from the Log tab arrives as params.
-  const params = useLocalSearchParams<{ lat?: string; lng?: string; title?: string; from?: string }>();
+  // "Route there again" from the Log, or a place picked on the BCU screen,
+  // arrives as params: a point to route to, or (q) something to search for.
+  const params = useLocalSearchParams<{ lat?: string; lng?: string; title?: string; q?: string; from?: string }>();
   const handledParams = useRef<string | null>(null);
   useEffect(() => {
     if (!params.from || !params.lat || !params.lng || handledParams.current === params.from) return;
@@ -276,6 +277,19 @@ export default function SearchScreen() {
     setQuery("");
     setShowOutside(false);
   };
+
+  // Something to search for, from the BCU screen (a custody suite not mapped as a police station).
+  useEffect(() => {
+    if (!params.from || !params.q || params.lat || handledParams.current === params.from) return;
+    handledParams.current = params.from;
+    const q = params.q;
+    const t = setTimeout(() => {
+      clear();
+      setQuery(q);
+    }, 0);
+    return () => clearTimeout(t);
+    // clear() is recreated each render; only new params should trigger this.
+  }, [params.from, params.q, params.lat]);
 
   // Refused for want of a GPS position: route as soon as the first fix arrives.
   const hasFix = !!fix;

@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { BOROUGHS, type Borough } from "../search/boroughs";
 import { clearQueue, uploadDue } from "../learning/queue";
 import { store } from "../storage/store";
-import { isVehicle, type VehicleType } from "../vehicles";
+import { isService, isVehicle, vehiclesFor, type ServiceType, type VehicleType } from "../vehicles";
 
 interface Session {
   callsign: string;
@@ -18,6 +18,10 @@ interface Session {
   /** Offer blue-light routes beside standard ones (on unless switched off). */
   policeRoutes: boolean;
   setPoliceRoutes: (on: boolean) => void;
+  /** Police, ambulance, fire or other: null until chosen. */
+  service: ServiceType | null;
+  /** Choosing a service also picks a vehicle it uses and shows Pursuit only for police (both can be changed after). */
+  setService: (s: ServiceType) => void;
   /** What's being driven; routes avoid limits it can't take. */
   vehicle: VehicleType;
   setVehicle: (v: VehicleType) => void;
@@ -36,6 +40,9 @@ interface Session {
   /** Opt-in: time roads on drives to improve journey times (off unless turned on). */
   learning: boolean;
   setLearning: (on: boolean) => void;
+  /** The Pursuit tab: on unless hidden (crews who never pursue, e.g. fire and ambulance). */
+  showPursuit: boolean;
+  setShowPursuit: (on: boolean) => void;
 }
 
 export type RoadChoice = "main" | "any";
@@ -97,6 +104,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     store.setSetting("vehicle", v);
   }, []);
 
+  const [service, setServiceState] = useState<ServiceType | null>(() => {
+    const saved = store.getSetting("service");
+    return isService(saved) ? saved : null;
+  });
+
   const [mapTheme, setMapTheme] = useSetting<MapTheme>("mapTheme", ["night", "day"], "day");
   const [mapView, setMapView] = useSetting<MapView>("mapView", MAP_VIEWS, "3d");
   // "voice" was first stored by the navigation screen as "1"/"0".
@@ -106,6 +118,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const setVoice = useCallback((on: boolean) => setVoiceSetting(on ? "1" : "0"), [setVoiceSetting]);
   const [learningSetting, setLearningSetting] = useSetting<"1" | "0">("learning", ["1", "0"], "0");
   const learning = learningSetting === "1";
+  const [pursuitSetting, setPursuitSetting] = useSetting<"1" | "0">("showPursuit", ["1", "0"], "1");
+  const showPursuit = pursuitSetting === "1";
+  const setShowPursuit = useCallback((on: boolean) => setPursuitSetting(on ? "1" : "0"), [setPursuitSetting]);
   // Sends road times that have waited long enough: at launch, then every half hour.
   useEffect(() => {
     if (!learning) return;
@@ -140,8 +155,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setService = useCallback(
+    (s: ServiceType) => {
+      setServiceState(s);
+      store.setSetting("service", s);
+      const offered = vehiclesFor(s);
+      if (!offered.includes(vehicle)) setVehicle(offered[0]!);
+      setShowPursuit(s === "police");
+    },
+    [vehicle, setVehicle, setShowPursuit],
+  );
+
   const value = useMemo(
     () => ({
+      service,
+      setService,
       callsign,
       boroughs,
       setCallsign,
@@ -163,8 +191,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setRoads,
       learning,
       setLearning,
+      showPursuit,
+      setShowPursuit,
     }),
     [
+      service,
+      setService,
+      showPursuit,
+      setShowPursuit,
       learning,
       setLearning,
       callsign,

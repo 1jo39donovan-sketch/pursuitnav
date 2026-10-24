@@ -58,7 +58,7 @@ export function privacyPage(email?: string): string {
     `<p class="muted">BlueRoute · last updated ${UPDATED}</p>
 
 <p>BlueRoute is a navigation app for police, fire and ambulance crews. It’s an independent app, not a police force or emergency service
-system. It has no accounts, no adverts and no third-party analytics. It counts how much it's used, in the way described
+system. It has no accounts and no third-party analytics. It counts how much it's used, in the way described
 under “Usage counts” below.</p>
 
 <h2>Kept on your phone only</h2>

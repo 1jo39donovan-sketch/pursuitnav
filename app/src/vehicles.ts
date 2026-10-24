@@ -12,6 +12,24 @@ export const VEHICLES = [
 
 export type VehicleType = (typeof VEHICLES)[number]["id"];
 
+// The crew's service, chosen first on Session: it decides which vehicles are
+// offered, and whether Pursuit and the Met's BCUs are shown.
+export const SERVICES = [
+  { id: "police", label: "Police", vehicles: ["car", "suv", "van", "carrier"] },
+  { id: "ambulance", label: "Ambulance", vehicles: ["car", "ambulance"] },
+  { id: "fire", label: "Fire", vehicles: ["car", "fire"] },
+  { id: "other", label: "Other", vehicles: ["car", "suv", "van"] },
+] as const satisfies readonly { id: string; label: string; vehicles: readonly VehicleType[] }[];
+
+export type ServiceType = (typeof SERVICES)[number]["id"];
+
+export const isService = (s: string | null | undefined): s is ServiceType => SERVICES.some((x) => x.id === s);
+
+/** The vehicles to offer: the service's, or every vehicle before a service is chosen. */
+export function vehiclesFor(service: ServiceType | null): readonly VehicleType[] {
+  return service ? SERVICES.find((s) => s.id === service)!.vehicles : VEHICLES.map((v) => v.id);
+}
+
 export const isVehicle = (v: string | null | undefined): v is VehicleType => VEHICLES.some((x) => x.id === v);
 
 export const vehicleLabel = (v: VehicleType) => VEHICLES.find((x) => x.id === v)!.label;

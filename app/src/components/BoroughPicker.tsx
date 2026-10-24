@@ -1,6 +1,7 @@
 // The operating area on Session: a one-line summary once chosen, opening
-// to the boroughs grouped by Met BCU (Basic Command Unit). Tapping an area's name
-// selects (or clears) all of its boroughs; each borough can be set alone.
+// to the boroughs. For police they're grouped by Met BCU (Basic Command Unit),
+// and tapping a BCU selects (or clears) all of its boroughs; for other
+// services they're one A–Z list. Each borough can be set alone.
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -22,7 +23,9 @@ function summary(chosen: readonly Borough[]): string {
 }
 
 export function BoroughPicker() {
-  const { boroughs, toggleBorough, setBoroughs } = useSession();
+  const { boroughs, toggleBorough, setBoroughs, service } = useSession();
+  // BCUs are the Met's; other services see plain boroughs.
+  const byBcu = service === "police" || service === null;
   const { fix } = useLocation();
   const [open, setOpen] = useState(boroughs.length === 0);
   const chosen = new Set(boroughs);
@@ -52,13 +55,31 @@ export function BoroughPicker() {
               <Button key={a.name} label={a.name} onPress={() => setBoroughs(a.boroughs)} />
             ))}
           </View>
-          <Text style={styles.subLabel}>Or by BCU and borough</Text>
+          <Text style={styles.subLabel}>{byBcu ? "Or by BCU and borough" : "Or by borough"}</Text>
           <View style={styles.quickRow}>
             {here && !chosen.has(here) && <Button label={`+ Where I am (${here})`} onPress={() => toggleBorough(here)} />}
             {inOrder.length > 0 && <Button label="Clear all" variant="danger" onPress={() => setBoroughs([])} />}
           </View>
 
-          {BOROUGH_GROUPS.map((g) => {
+          {!byBcu && (
+            <View style={styles.chips}>
+              {BOROUGHS.map((b) => {
+                const on = chosen.has(b);
+                return (
+                  <Pressable
+                    key={b}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on }}
+                    onPress={() => toggleBorough(b)}
+                    style={[styles.chip, on && styles.chipOn]}
+                  >
+                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{b}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+          {byBcu && BOROUGH_GROUPS.map((g) => {
             const count = g.boroughs.filter((b) => chosen.has(b)).length;
             const all = count === g.boroughs.length;
             return (

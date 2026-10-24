@@ -26,6 +26,15 @@ export const BOROUGH_GROUPS: BoroughGroup[] = [
   { code: "", name: "City of London Police", boroughs: ["City of London"] },
 ];
 
+/** The Met's 12 BCUs (without the City, which has its own force). */
+export const BCUS: BoroughGroup[] = BOROUGH_GROUPS.filter((g) => g.code !== "");
+
+/** The BCU most of the chosen boroughs are in, or the first. */
+export function bcuFor(boroughs: readonly Borough[]): BoroughGroup {
+  const score = (g: BoroughGroup) => g.boroughs.filter((b) => boroughs.includes(b)).length;
+  return [...BCUS].sort((a, b) => score(b) - score(a))[0]!;
+}
+
 /**
  * Big areas for units that work across London (TSG, firearms, traffic…):
  * one tap picks every borough in them. Neighbouring areas overlap.
