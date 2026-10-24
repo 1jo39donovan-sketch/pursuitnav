@@ -47,6 +47,11 @@ if [ -z "${DOMAIN:-}" ]; then
   read -rp "OS Names API key (free, from the OS Data Hub; Enter to skip): " OS_NAMES_KEY </dev/tty
 fi
 [ -n "$DOMAIN" ] || fail "A domain name is needed for HTTPS."
+# Other names the server also answers on (e.g. an old address while apps move over).
+if [ -z "${ALSO_SERVE:-}" ] && [ -f "$DIR/server/.env" ]; then
+  ALSO_SERVE=$(grep -E '^ALSO_SERVE=' "$DIR/server/.env" | cut -d= -f2- || true)
+fi
+ALSO_SERVE=${ALSO_SERVE:-}
 OS_PLACES_KEY=${OS_PLACES_KEY:-}
 OS_NAMES_KEY=${OS_NAMES_KEY:-}
 # Kept from an earlier install: the house-number search's database, once
@@ -130,7 +135,7 @@ cd "$DIR/server"
 [ -f docker-compose.yml ] || fail "No server code on branch $BRANCH. Merge the pull request into main first, or run with BRANCH=<branch>."
 
 umask 077
-printf 'DOMAIN=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\nBRANCH=%s\nVERSION=%s\n' "$DOMAIN" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" "$BRANCH" "$(git -C "$DIR" rev-parse --short HEAD)" >.env
+printf 'DOMAIN=%s\nALSO_SERVE=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\nBRANCH=%s\nVERSION=%s\n' "$DOMAIN" "$ALSO_SERVE" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" "$BRANCH" "$(git -C "$DIR" rev-parse --short HEAD)" >.env
 [ -n "$GEOCODER_SETTINGS" ] && printf '%s\n' "$GEOCODER_SETTINGS" >>.env
 umask 022
 

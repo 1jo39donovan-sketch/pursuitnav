@@ -89,6 +89,8 @@ services:
       - "443:443"
     environment:
       DOMAIN: ${DOMAIN:?Set DOMAIN in .env to the server's domain name}
+      # Other names it also answers on (see Caddyfile); usually empty.
+      ALSO_SERVE: ${ALSO_SERVE:-}
       # For the certificate providers (CONTACT_EMAIL in .env); see Caddyfile.
       ACME_EMAIL: ${CONTACT_EMAIL:-certificates@blueroute.invalid}
     volumes:

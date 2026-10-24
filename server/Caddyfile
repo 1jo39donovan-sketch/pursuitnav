@@ -9,7 +9,9 @@
 	email {$ACME_EMAIL}
 }
 
-{$DOMAIN} {
+# ALSO_SERVE (.env, optional): more names for the same server, space-separated,
+# e.g. the old address while apps move to a new one. Each gets its own certificate.
+{$DOMAIN} {$ALSO_SERVE} {
 	encode gzip
 	reverse_proxy api:3000
 }

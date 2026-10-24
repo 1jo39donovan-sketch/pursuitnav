@@ -102,4 +102,11 @@ The web version runs in a phone's browser (Safari on iPhone too) with real GPS, 
 
 Changing the OS key later: update the secret, then run **Deploy server** with **recreate** ticked. Nothing officers rely on is stored on the server, so a fresh one is safe.
 
+Moving the server to your own domain (e.g. from DuckDNS to `api.example.org` on Cloudflare):
+
+1. In Cloudflare, make an API token limited to **Zone → DNS → Edit** on that zone, and save it as the secret `CLOUDFLARE_API_TOKEN`. Then the deploy points the name at each new server by itself (DNS only, never proxied: positions mustn't pass through Cloudflare). Without it, add the A record by hand when the run asks.
+2. Set the variable `SERVER_DOMAIN` to the new name, and `SERVER_ALSO_SERVE` to the old one, so phones still on the old address keep working.
+3. Run **Deploy server** with **recreate** ticked (a few minutes without the server). Then run **Web app** (and **Android app**) so new builds use the new name.
+4. Once every phone has the new build, empty `SERVER_ALSO_SERVE` and recreate again to drop the old name.
+
 Putting the app on the App Store and Google Play: see STORE.md.
