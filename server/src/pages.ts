@@ -14,6 +14,14 @@ function contact(email: string | undefined): string {
     : `open an issue at <a href="${ISSUES_URL}">${ISSUES_URL}</a> (don’t include addresses or anything identifying)`;
 }
 
+// The logo (brand/logo.svg), inline: no extra request, and it's also the tab icon.
+const LOGO =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" rx="180" fill="#0c1220"/>' +
+  '<path d="M300 700V520a120 120 0 0 1 120-120h180" fill="none" stroke="#ffb627" stroke-width="88"/>' +
+  '<circle cx="300" cy="760" r="106" fill="#0c1220"/><circle cx="300" cy="760" r="78" fill="#3d8bff"/>' +
+  '<polygon points="600,290 760,400 600,508" fill="#fff" stroke="#fff" stroke-width="36" stroke-linejoin="round"/></svg>';
+const FAVICON = `data:image/svg+xml,${encodeURIComponent(LOGO)}`;
+
 function page(title: string, body: string): string {
   return `<!doctype html>
 <html lang="en-GB">
@@ -21,6 +29,7 @@ function page(title: string, body: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title} · Blue Route</title>
+<link rel="icon" href="${FAVICON}">
 <style>
   :root { color-scheme: dark; }
   body { margin: 0; background: #0c1220; color: #e6ebf5; font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -29,10 +38,14 @@ function page(title: string, body: string): string {
   h2 { font-size: 1.15rem; margin: 28px 0 6px; }
   a { color: #f5b301; }
   .muted { color: #8a96ad; font-size: 0.9rem; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-weight: 700; font-size: 1.1rem; }
+  .brand svg { width: 40px; height: 40px; }
+  .brand b { color: #3d8bff; }
   li { margin: 4px 0; }
 </style>
 </head>
 <body><main>
+<div class="brand">${LOGO}<span>Blue<b>Route</b></span></div>
 <h1>${title}</h1>
 ${body}
 </main></body>

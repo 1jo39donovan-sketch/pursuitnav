@@ -3,11 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Blue Route</title>
-    <meta name="description" content="Navigation for police officers and emergency crews in London: address search the way control gives it, blue-light routes, turn-by-turn and a pursuit screen." />
+    <title>BlueRoute</title>
+    <meta name="description" content="Blue-light navigation for emergency services: address search the way control gives it, blue-light routes, turn-by-turn and a pursuit screen." />
     <meta name="theme-color" content="#0c1220" />
     <link rel="icon" href="/icon.png" />
     <link rel="apple-touch-icon" href="/icon.png" />
+    <!-- The card shown when the link is shared (messages, social). -->
+    <meta property="og:title" content="BlueRoute" />
+    <meta property="og:description" content="Blue-light navigation for emergency services." />
+    <meta property="og:image" content="https://__WEB_DOMAIN__/share.png" />
+    <meta property="og:url" content="https://__WEB_DOMAIN__/" />
+    <meta name="twitter:card" content="summary_large_image" />
     <style>
       :root {
         --bg: #0c1220;
@@ -30,6 +36,7 @@
       header { display: flex; align-items: center; gap: 12px; }
       header img { width: 44px; height: 44px; border-radius: 10px; }
       header span { font-weight: 700; font-size: 20px; letter-spacing: 0.5px; }
+      header b { color: var(--blue); }
       h1 { font-size: clamp(30px, 7vw, 44px); line-height: 1.15; margin: 36px 0 12px; }
       h1 em { font-style: normal; color: var(--amber); }
       .lead { color: var(--muted); font-size: 18px; margin: 0 0 24px; }
@@ -60,11 +67,11 @@
   </head>
   <body>
     <main>
-      <header><img src="/icon.png" alt="" /><span>Blue Route</span></header>
+      <header><img src="/icon.png" alt="" /><span>Blue<b>Route</b></span></header>
 
       <h1>Get to the call <em>quickly and safely.</em></h1>
       <p class="lead">
-        Navigation built for police officers and emergency crews in London. Type the address the way control gives
+        Blue-light navigation built for emergency services: police, ambulance and fire. Type the address the way control gives
         it, compare a standard and a blue-light route, and follow big, glanceable directions.
       </p>
       <div class="stores">__STORES__</div>
@@ -102,9 +109,9 @@
           <a href="https://__SERVER_DOMAIN__/privacy">Privacy</a>
           <a href="https://__SERVER_DOMAIN__/support">Support</a>
         </nav>
-        Blue Route is independent and is not affiliated with or endorsed by the Metropolitan Police Service or any
-        police force. Blue-light routes are for emergency-service drivers using the exemptions only; following force
-        policy is the driver's responsibility. Covers London.
+        BlueRoute is independent and is not affiliated with or endorsed by any police, ambulance or fire service.
+        Blue-light routes are for emergency-service drivers using the exemptions only; following service policy is
+        the driver's responsibility.
       </footer>
     </main>
   </body>
