@@ -96,7 +96,7 @@ Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code r
 
 ## Store listing
 
-**Name:** BlueRoute
+**Name (both stores, 30 characters):** BlueRoute – Response Sat Nav. The name under the icon on the phone stays **BlueRoute**. The store name can be changed later: Google Play at any time, Apple with the next version sent for review.
 **Subtitle (Apple, 30 characters):** Blue-light navigation
 **Short description (Google, 80 characters):** Blue-light navigation for emergency services: police, ambulance and fire.
 **Category:** Navigation (Apple) / Maps & Navigation (Google)
