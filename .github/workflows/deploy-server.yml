@@ -325,7 +325,7 @@ jobs:
       # Real London cases against the live server: one-way streets (Stroud
       # Green Road and its neighbours), a bus gate, and address search (a
       # door from OpenStreetMap, a postcode, and 54 Caledonian Road).
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
