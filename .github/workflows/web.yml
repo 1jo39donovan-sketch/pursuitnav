@@ -3,13 +3,20 @@
 # with real GPS, search and routes. Not a replacement for the store apps:
 # a browser can't keep GPS running with the screen off.
 #
-# One-off setup: Settings → Pages → Build and deployment → Source: GitHub Actions.
+# With the WEB_DOMAIN variable (e.g. bluerouteapp.com) the site is a public
+# front page at / (site/index.html: what Blue Route is, App Store and Google
+# Play buttons), with this test version of the app unlisted at /app/ (not
+# linked, kept out of search engines); without it, the app alone at
+# https://<owner>.github.io/<repo>/.
+#
+# One-off setup: Settings → Pages → Build and deployment → Source: GitHub Actions
+# (and, with WEB_DOMAIN, the same name under Custom domain, Enforce HTTPS on).
 name: Web app
 
 on:
   push:
     branches: [main]
-    paths: ["app/**", ".github/workflows/web.yml"]
+    paths: ["app/**", "site/**", ".github/workflows/web.yml"]
   workflow_dispatch:
 
 permissions:
@@ -30,6 +37,10 @@ jobs:
         working-directory: app
     env:
       SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
+      WEB_DOMAIN: ${{ vars.WEB_DOMAIN }}
+      # The front page's store buttons: "Coming soon" until these are set.
+      APP_STORE_URL: ${{ vars.APP_STORE_URL }}
+      PLAY_STORE_URL: ${{ vars.PLAY_STORE_URL }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -42,8 +53,8 @@ jobs:
       - name: Build
         run: |
           [ -n "$SERVER_DOMAIN" ] || { echo "::error::Add the SERVER_DOMAIN variable (DEPLOY.md, step 3)."; exit 1; }
-          # Pages serves the site under /<repository name>/.
-          base="/${GITHUB_REPOSITORY#*/}"
+          # On its own domain the app is at /app; on github.io, Pages serves the site under /<repository name>/.
+          if [ -n "$WEB_DOMAIN" ]; then base=/app; else base="/${GITHUB_REPOSITORY#*/}"; fi
           jq --arg base "$base" '.expo.experiments = ((.expo.experiments // {}) + {baseUrl: $base})' app.json > app.json.tmp
           mv app.json.tmp app.json
           EXPO_PUBLIC_API_URL="https://${SERVER_DOMAIN}" npx expo export --platform web --output-dir dist-web
@@ -52,9 +63,41 @@ jobs:
           # Add to Home Screen opens it full screen, without Safari's bars.
           node scripts/web-app-shell.mjs dist-web "$base"
 
+      - name: Front page (own domain only)
+        run: |
+          mkdir -p ../site-out
+          if [ -z "$WEB_DOMAIN" ]; then cp -r dist-web/. ../site-out/; exit 0; fi
+          cp -r dist-web ../site-out/app
+          node -e '
+            const fs = require("fs");
+            const e = process.env;
+            const store = (url, where, name) =>
+              url ? `<a class="store" href="${url}"><small>${where}</small><b>${name}</b></a>`
+                  : `<span class="store soon"><small>Coming soon to</small><b>${name}</b></span>`;
+            const stores = store(e.APP_STORE_URL, "Download on the", "App Store") + store(e.PLAY_STORE_URL, "Get it on", "Google Play");
+            const html = fs.readFileSync("../site/index.html", "utf8")
+              .replaceAll("__SERVER_DOMAIN__", e.SERVER_DOMAIN).replace("__STORES__", stores);
+            fs.writeFileSync("../site-out/index.html", html);
+            // The test app: unlisted, so search engines leave it out.
+            for (const f of ["../site-out/app/index.html", "../site-out/app/404.html"]) {
+              fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace("<head>", "<head><meta name=\"robots\" content=\"noindex\">"));
+            }
+          '
+          printf "User-agent: *\nDisallow: /app/\n" > ../site-out/robots.txt
+          cp assets/icon.png ../site-out/icon.png
+          # Any other path opens the app: /app/… as it is, and old links
+          # (/search, /pursuitnav/search) moved under /app.
+          node -e '
+            const fs = require("fs");
+            const go = "<script>(function(){var p=location.pathname;if(p===\"/app\"||p.indexOf(\"/app/\")===0)return;" +
+              "if(p.indexOf(\"/pursuitnav\")===0)p=p.slice(11)||\"/\";location.replace(\"/app\"+p+location.search+location.hash);})();</script>";
+            fs.writeFileSync("../site-out/404.html", fs.readFileSync("dist-web/404.html", "utf8").replace("<head>", "<head>" + go));
+          '
+          grep -q 'location.replace("/app"' ../site-out/404.html || { echo "::error::404 redirect not added"; exit 1; }
+
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: app/dist-web
+          path: site-out
 
   deploy:
     needs: build

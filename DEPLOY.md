@@ -109,4 +109,6 @@ Moving the server to your own domain (e.g. from DuckDNS to `api.example.org` on 
 3. Run **Deploy server** with **recreate** ticked (a few minutes without the server). Then run **Web app** (and **Android app**) so new builds use the new name.
 4. Once every phone has the new build, empty `SERVER_ALSO_SERVE` and recreate again to drop the old name.
 
+A website on your own domain (a public front page at `/` with App Store and Google Play buttons; the browser test version unlisted at `/app/`): set the variable `WEB_DOMAIN` (e.g. `bluerouteapp.com`), point the domain at GitHub Pages (A records `185.199.108.153`, `.109.153`, `.110.153`, `.111.153`, and AAAA `2606:50c0:8000::153`, `8001::153`, `8002::153`, `8003::153`, DNS only; `www` as a CNAME to `<owner>.github.io`), enter it under Settings → Pages → Custom domain with Enforce HTTPS, and run **Web app**. Once the store listings are live, set `APP_STORE_URL` and `PLAY_STORE_URL` and run it again. See site/README.md.
+
 Putting the app on the App Store and Google Play: see STORE.md.
