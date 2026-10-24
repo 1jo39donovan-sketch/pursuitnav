@@ -35,7 +35,7 @@ interface Props {
   destination: { lat: number; lng: number };
   /** What was picked, e.g. "54 Caledonian Road". */
   title?: string;
-  /** A caution about the destination, e.g. that it's the road, not the door. */
+  /** A caution about the destination, e.g. that it's a postcode, not the door. */
   note?: string;
   onClose: () => void;
   /** Try again after an error, to the same destination. */

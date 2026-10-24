@@ -29,7 +29,7 @@ const compact = (postcode: string) => postcode.replace(/\s/g, "").toUpperCase();
  * the more exact answer when the control room gave a full address. Its roads
  * and places go below them, and a road the phone already lists in that
  * borough isn't shown twice. Each keeps the precision the server gave it, so
- * a house number found only as its road still gets the "not the door" warning.
+ * a house number found only as its road still says ROAD.
  */
 export function mergeAddresses(offline: SearchResults, addresses: Address[], area: AreaFilter): SearchResults {
   const listed = new Set(
