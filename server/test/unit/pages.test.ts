@@ -33,6 +33,12 @@ describe("privacy and support pages", () => {
     expect(res.body).toContain("House-number search runs");
   });
 
+  it("says waitlist emails are only for telling people when the app is in the stores", async () => {
+    const res = await app().inject({ method: "GET", url: "/privacy" });
+    expect(res.body).toContain("only to\ntell you when BlueRoute is in the App Store and Google Play");
+    expect(res.body).not.toContain("no tracking");
+  });
+
   it("points at GitHub issues without one", async () => {
     const res = await app().inject({ method: "GET", url: "/support" });
     expect(res.body).toContain("github.com/1jo39donovan-sketch/pursuitnav/issues");
