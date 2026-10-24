@@ -55,6 +55,7 @@ export default function RootLayout() {
                       <Stack.Screen name="(tabs)" />
                       {/* The search log, opened from Session. */}
                       <Stack.Screen name="log" />
+                      <Stack.Screen name="bcu" />
                       <Stack.Screen
                         name="navigate"
                         options={{

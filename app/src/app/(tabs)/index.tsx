@@ -15,6 +15,7 @@ import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { currentInstallId, newInstallId } from "../../usage/usage";
 import { colors, fonts } from "../../theme";
+import { bcuFor } from "../../search/boroughGroups";
 import { SERVICES, VEHICLES, vehiclesFor } from "../../vehicles";
 
 // Once a shift is set up, the app opens on Search: the job is usually to type
@@ -143,6 +144,21 @@ export default function SessionScreen() {
       </View>
 
       <BoroughPicker />
+
+      {service === "police" && (
+        // Custody, stations and A&Es for the BCU being worked, one tap from a route.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${bcuFor(boroughs).name} BCU: custody, police stations and A&E`}
+          onPress={() => router.push({ pathname: "/bcu", params: { code: bcuFor(boroughs).code } })}
+          style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.logText}>
+            {bcuFor(boroughs).name} <Text style={styles.logMeta}>{bcuFor(boroughs).code}</Text>
+          </Text>
+          <Text style={styles.logMeta}>Custody · stations · A&E ›</Text>
+        </Pressable>
+      )}
 
       <View style={styles.field}>
         <Text style={styles.label}>Roads</Text>
