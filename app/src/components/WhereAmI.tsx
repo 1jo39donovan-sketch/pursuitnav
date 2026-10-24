@@ -3,12 +3,12 @@
 // grid reference, latitude and longitude, and how accurate the fix is.
 // Worked out on the phone where it can be (grid reference, borough, nearest
 // postcode), so it still says something with no signal.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 
 import { fetchWhere, type WhereAnswer } from "../api/where";
 import type { Fix } from "../location/LocationProvider";
-import { shareText, whereDetails } from "../location/whereDetails";
+import { shareText, shouldLookUp, whereDetails } from "../location/whereDetails";
 import type { SearchIndex } from "../search/engine";
 import { colors, fonts } from "../theme";
 
@@ -41,23 +41,37 @@ export function WhereAmI({
   onClose: () => void;
   bottomInset: number;
 }) {
-  // Asked once, for where the officer was when they tapped.
-  const [asked] = useState(fix);
-  const [answer, setAnswer] = useState<WhereAnswer | null | "loading">("loading");
-  const [shared, setShared] = useState<string | null>(null);
+  // Follows the officer while open: grid reference, position and accuracy
+  // on every fix; the address looked up again every 15 m or 20 s, keeping
+  // the last one on screen meanwhile.
+  const [lookup, setLookup] = useState<{ lat: number; lng: number; at: number; answer: WhereAnswer | null } | null>(
+    null,
+  );
+  const inFlight = useRef(false);
+  const open = useRef(true);
+  useEffect(
+    () => () => {
+      open.current = false;
+    },
+    [],
+  );
   useEffect(() => {
-    if (!asked) return;
-    let live = true;
-    void fetchWhere(asked.lat, asked.lng).then((a) => live && setAnswer(a));
-    return () => {
-      live = false;
-    };
-  }, [asked]);
+    if (!fix || inFlight.current || !shouldLookUp(lookup, fix, Date.now())) return;
+    inFlight.current = true;
+    const at = { lat: fix.lat, lng: fix.lng, at: Date.now() };
+    void fetchWhere(fix.lat, fix.lng)
+      .then((answer) => open.current && setLookup({ ...at, answer }))
+      .finally(() => {
+        inFlight.current = false;
+      });
+  }, [fix, lookup]);
+  const [shared, setShared] = useState<string | null>(null);
 
-  const near = asked && index ? index.postcodeNear(asked.lat, asked.lng) : null;
-  const d = asked
-    ? whereDetails(asked, answer === "loading" ? null : answer, near && { postcode: near.point.postcode, distanceM: near.distanceM })
+  const near = fix && index ? index.postcodeNear(fix.lat, fix.lng) : null;
+  const d = fix
+    ? whereDetails(fix, lookup?.answer ?? null, near && { postcode: near.point.postcode, distanceM: near.distanceM })
     : null;
+  const answer = lookup ? lookup.answer : "loading";
 
   const row = (label: string, value: string | null, note?: string | null, big = false) => (
     <View style={styles.row} key={label}>
@@ -74,7 +88,10 @@ export function WhereAmI({
   return (
     <View style={[styles.panel, { paddingBottom: bottomInset + 14 }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Where am I</Text>
+        <View>
+          <Text style={styles.title}>Where am I</Text>
+          <Text style={styles.note}>Updates as you move</Text>
+        </View>
         <Pressable accessibilityRole="button" onPress={onClose} hitSlop={12}>
           <Text style={styles.close}>Close</Text>
         </Pressable>

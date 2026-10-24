@@ -90,6 +90,13 @@ export function LiveMap({
     followZoom + zoomOffset + (autoZoom ? speedZoom(fix?.speed ?? null) : 0);
   // Following the vehicle, unless the map opens on something to frame.
   const [following, setFollowing] = useState(!fitTo?.length);
+  // A new view (3D, direction up, north up) is shown at once: back to the
+  // vehicle, in that view, even if the map had been moved by hand.
+  const [lastView, setLastView] = useState(view);
+  if (view !== lastView) {
+    setLastView(view);
+    setFollowing(true);
+  }
   const camera = useRef<CameraRef>(null);
 
   // New points to show: stop following so the camera can frame them.
