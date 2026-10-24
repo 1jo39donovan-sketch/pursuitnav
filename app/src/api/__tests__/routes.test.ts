@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchRoutes, NoAnswerRouteError, NoSignalRouteError, RouteError } from "../routes";
+import { fetchRoutes, NoAnswerRouteError, NoSignalRouteError, RouteError, ServerDownRouteError } from "../routes";
 
 vi.mock("../../config", () => ({ API_URL: "https://server.test", DEMO_MODE: false }));
 
@@ -34,6 +34,16 @@ describe("fetchRoutes", () => {
     const err = await fetchRoutes(from, to, "car").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(NoSignalRouteError);
     expect((err as Error).message).toMatch(/^No signal/);
+  });
+
+  it("tells a server that's down from a reason about the route", async () => {
+    // Caddy's answer while the API is restarting or down.
+    vi.stubGlobal("fetch", async () => new Response("", { status: 502 }));
+    expect(await fetchRoutes(from, to, "car").catch((e: unknown) => e)).toBeInstanceOf(ServerDownRouteError);
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ error: "routing-unavailable" }), { status: 503 }));
+    expect(await fetchRoutes(from, to, "car").catch((e: unknown) => e)).toBeInstanceOf(ServerDownRouteError);
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ error: "no-route" }), { status: 422 }));
+    expect(await fetchRoutes(from, to, "car").catch((e: unknown) => e)).not.toBeInstanceOf(ServerDownRouteError);
   });
 
   it("keeps the server's own reasons distinct from no signal", async () => {

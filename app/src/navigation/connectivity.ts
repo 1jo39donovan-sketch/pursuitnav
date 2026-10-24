@@ -62,6 +62,8 @@ export function linkBanner(link: Link): string | null {
 
 /** Picking a destination with no signal: said on the route card, with the hand-offs and Retry. */
 export const NO_SIGNAL_ROUTE_START = "No signal: can't plan a route. Open in Google Maps / Waze, or try again.";
+/** Picking a destination while the server is down or not answering: the hand-off comes first. */
+export const SERVER_DOWN_ROUTE_START = "Blue Route's server isn't answering. Use Google Maps or Waze for now, or try again.";
 export const RETRYING_WHEN_BACK = "Trying again by itself when signal is back.";
 
 /** "Re-routing" is only said when a re-route can actually happen. */

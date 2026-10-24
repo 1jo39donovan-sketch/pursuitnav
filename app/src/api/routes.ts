@@ -93,6 +93,13 @@ export class NoAnswerRouteError extends RouteError {
   }
 }
 
+/** The server answered, but with a fault of its own (it's down, restarting or broken), not a reason about the route. */
+export class ServerDownRouteError extends RouteError {
+  constructor() {
+    super("Blue Route's server isn't working right now.");
+  }
+}
+
 /** A failed request to the server as the route error to show. */
 export function routeFailure(err: unknown): unknown {
   if (isNoSignal(err)) return new NoSignalRouteError();
@@ -143,6 +150,7 @@ export async function fetchRoutes(
   }
   if (!res.ok || !res.body) {
     const error = (res.body as { error?: string } | null)?.error ?? "";
+    if (error === "routing-unavailable" || (res.status >= 500 && !MESSAGES[error])) throw new ServerDownRouteError();
     throw new RouteError(MESSAGES[error] ?? `Routing failed (${res.status}).`);
   }
   return res.body as RoutePlan;
