@@ -1,4 +1,4 @@
-# Blue Route
+# BlueRoute
 
 Patrol and pursuit navigation for Met Police officers. `CLAUDE.md` is the brief.
 
@@ -9,7 +9,7 @@ Patrol and pursuit navigation for Met Police officers. `CLAUDE.md` is the brief.
 
 ## Usage data
 
-Blue Route counts how much it's used, with no third-party analytics and nothing personal:
+BlueRoute counts how much it's used, with no third-party analytics and nothing personal:
 
 - **What the app sends.** Every request to the server carries a random install ID, made on the phone on first launch, and the app version. The ID can be reset on the Session tab. The app also sends three numbers now and then: navigation sessions started, pursuit sessions started, and requests that got no answer within 8 seconds.
 - **What the server keeps, per day.**

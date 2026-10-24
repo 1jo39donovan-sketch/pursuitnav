@@ -55,7 +55,7 @@ jobs:
           open=$(gh issue list --state open --search 'in:title "Server down"' --json number --jq '.[0].number // empty')
           now=$(date -u +'%d %b %Y %H:%M UTC')
           if [ "$OUTCOME" = failure ] && [ -z "$open" ]; then
-            gh issue create --title "Server down: $DOMAIN" --body "The uptime check failed at $now (and again a minute later). Officers can't get routes or full addresses from Blue Route; the app offers Google Maps and Waze instead.
+            gh issue create --title "Server down: $DOMAIN" --body "The uptime check failed at $now (and again a minute later). Officers can't get routes or full addresses from BlueRoute; the app offers Google Maps and Waze instead.
 
           What failed: $RUN_URL
 

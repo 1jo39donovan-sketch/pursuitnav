@@ -274,7 +274,7 @@ export function buildApp(
       }
       const { points, heading } = req.body;
       if (!points.every(inBounds)) {
-        return reply.code(422).send({ error: "outside-area", message: "Outside the area Blue Route covers." });
+        return reply.code(422).send({ error: "outside-area", message: "Outside the area BlueRoute covers." });
       }
       try {
         const here = points[points.length - 1]!;
@@ -305,7 +305,7 @@ export function buildApp(
         return reply.code(503).send({ error: "where-unavailable", message: "Address lookup isn't set up on this server." });
       }
       if (!inBounds(req.body)) {
-        return reply.code(422).send({ error: "outside-area", message: "Outside the area Blue Route covers." });
+        return reply.code(422).send({ error: "outside-area", message: "Outside the area BlueRoute covers." });
       }
       return whereIs(req.body.lat, req.body.lng).catch(() => ({ door: null, road: null, postcode: null }));
     },

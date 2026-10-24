@@ -95,7 +95,7 @@ export function RoutePanel({
   };
   const { recording } = useRecorder();
   const [showRestrictions, setShowRestrictions] = useState(false);
-  // No route from Blue Route: Google Maps and Waze become the main buttons, so a crew is never stuck.
+  // No route from BlueRoute: Google Maps and Waze become the main buttons, so a crew is never stuck.
   const handOff = state.status === "error" && (!!state.noSignal || !!state.serverDown);
   return (
     <View style={styles.panel}>
@@ -372,7 +372,7 @@ export function ExternalLinks({
   lat: number;
   lng: number;
   onOpen?: (app: "google-maps" | "waze") => void;
-  /** Big, as the main way on: when Blue Route can't give a route. */
+  /** Big, as the main way on: when BlueRoute can't give a route. */
   prominent?: boolean;
 }) {
   return (

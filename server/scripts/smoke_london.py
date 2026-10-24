@@ -1,4 +1,4 @@
-"""London smoke test for a live Blue Route server. Run by smoke-london.sh.
+"""London smoke test for a live BlueRoute server. Run by smoke-london.sh.
 
 Checks real London cases against the live API, over HTTPS:
 

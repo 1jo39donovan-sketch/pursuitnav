@@ -17,7 +17,7 @@ export class NoTeamError extends Error {}
 type Answer = { ok: boolean; status: number; body: unknown };
 
 async function call(path: string, init?: RequestInit, timeoutMs?: number): Promise<Answer> {
-  if (!API_URL) throw new RouteError("Team sessions need the Blue Route server, which isn't set up in this build.");
+  if (!API_URL) throw new RouteError("Team sessions need the BlueRoute server, which isn't set up in this build.");
   try {
     return await serverJson(
       `${API_URL}${path}`,

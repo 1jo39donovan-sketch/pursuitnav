@@ -116,7 +116,7 @@ export function TeamSection() {
         )}
         {badCode && <Text style={styles.error}>That isn’t a team code: it’s 24 letters and numbers.</Text>}
         <Text style={styles.small}>
-          Shares only while Blue Route is open. Positions are encrypted on your phone; the server can’t read them. Not a
+          Shares only while BlueRoute is open. Positions are encrypted on your phone; the server can’t read them. Not a
           force system: follow your force’s policy, and use your radio.
         </Text>
       </View>
@@ -142,7 +142,7 @@ export function TeamSection() {
           variant="primary"
           onPress={() =>
             void Share.share({
-              message: `Join my Blue Route team. Code: ${team.code}`,
+              message: `Join my BlueRoute team. Code: ${team.code}`,
             })
           }
         />

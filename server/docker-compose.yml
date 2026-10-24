@@ -1,4 +1,4 @@
-# Blue Route server: Valhalla routing, the API, Nominatim for house-number
+# BlueRoute server: Valhalla routing, the API, Nominatim for house-number
 # search, and Caddy for HTTPS.
 # See README.md for first-time setup.
 

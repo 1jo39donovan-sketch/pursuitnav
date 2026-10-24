@@ -22,8 +22,8 @@ writeFileSync(
   join(dir, "manifest.json"),
   JSON.stringify(
     {
-      name: "Blue Route",
-      short_name: "Blue Route",
+      name: "BlueRoute",
+      short_name: "BlueRoute",
       start_url: `${prefix}/`,
       scope: `${prefix}/`,
       display: "standalone",
@@ -44,7 +44,7 @@ const tags = [
   `<meta name="apple-mobile-web-app-capable" content="yes" />`,
   `<meta name="mobile-web-app-capable" content="yes" />`,
   `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />`,
-  `<meta name="apple-mobile-web-app-title" content="Blue Route" />`,
+  `<meta name="apple-mobile-web-app-title" content="BlueRoute" />`,
   `<meta name="theme-color" content="${BG}" />`,
   `<link rel="manifest" href="${prefix}/manifest.json" />`,
   `<link rel="apple-touch-icon" href="${prefix}/icon.png" />`,

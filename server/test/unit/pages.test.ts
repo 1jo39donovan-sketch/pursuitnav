@@ -13,7 +13,7 @@ describe("privacy and support pages", () => {
       const res = await app().inject({ method: "GET", url });
       expect(res.statusCode).toBe(200);
       expect(res.headers["content-type"]).toContain("text/html");
-      expect(res.body).toContain("Blue Route");
+      expect(res.body).toContain("BlueRoute");
     }
   });
 

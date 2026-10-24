@@ -190,7 +190,7 @@ describe("export files", () => {
     expect(out).toBe(
       [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<gpx version="1.1" creator="Blue Route" xmlns="http://www.topografix.com/GPX/1/1">',
+        '<gpx version="1.1" creator="BlueRoute" xmlns="http://www.topografix.com/GPX/1/1">',
         '  <wpt lat="51.531000" lon="-0.121000"><time>2026-10-23T12:01:00.000Z</time><name>Wrong instruction</name><desc>Said &quot;left&quot;, meant right</desc></wpt>',
         "  <trk><name>54 Caledonian Road, Islington (t1)</name>",
         "    <trkseg>",

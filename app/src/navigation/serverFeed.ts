@@ -41,7 +41,7 @@ export function feedNote(feed: PursuitFeed, now: number): FeedNote | null {
   if (feed.trouble === "no-signal") return { title: "NO SIGNAL", text: `No connection: ${then}` };
   if (feed.trouble === "no-answer") return { title: "NO ANSWER", text: `The server isn’t answering: ${then}` };
   if (!shown) {
-    return { title: null, text: "Road, limit and junction need the Blue Route server. Showing “—” until it answers." };
+    return { title: null, text: "Road, limit and junction need the BlueRoute server. Showing “—” until it answers." };
   }
   return null;
 }

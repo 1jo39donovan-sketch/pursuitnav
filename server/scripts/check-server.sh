@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Does the Blue Route server work? Quick checks of what officers rely on:
+# Does the BlueRoute server work? Quick checks of what officers rely on:
 # /health says routing and places are ready, a London route plans, and
 # address search answers. Exits 0 if all pass, 1 otherwise, printing why.
 #

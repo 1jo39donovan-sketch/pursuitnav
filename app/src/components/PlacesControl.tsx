@@ -33,7 +33,7 @@ export function PlacesControl({ groups, onChange, shownCount }: Props) {
       {open && (
         <View style={styles.sheet}>
           {shownCount === null ? (
-            <Text style={styles.note}>Place data hasn’t downloaded yet. It comes from the Blue Route server.</Text>
+            <Text style={styles.note}>Place data hasn’t downloaded yet. It comes from the BlueRoute server.</Text>
           ) : (
             <Text style={styles.note}>
               {groups.length ? `${shownCount.toLocaleString("en-GB")} shown in your boroughs` : "Pick what to show"}

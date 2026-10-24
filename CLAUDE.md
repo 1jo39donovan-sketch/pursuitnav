@@ -1,10 +1,10 @@
-# Blue Route: police patrol and pursuit navigation
+# BlueRoute: police patrol and pursuit navigation
 
 ## What this is
 
 **Key aim: get the officer or crew from A to B quickly and safely.** Every feature and screen is judged against that, and against being usable in the heat of going to a call: few taps, big targets, glanceable text, spoken directions.
 
-A phone app for Met Police officers on patrol and in pursuits, widening to fire and ambulance crews. Officers currently use Google Maps, which doesn't understand borough boundaries, police routing or pursuit needs. Blue Route fixes that.
+A phone app for Met Police officers on patrol and in pursuits, widening to fire and ambulance crews. Officers currently use Google Maps, which doesn't understand borough boundaries, police routing or pursuit needs. BlueRoute fixes that.
 
 Officers install it on their own phones and use it off their own back. It is not a force system. The passenger, the **operator**, normally runs the app and gives the driver directions, on the way to calls as well as in pursuits, so screens can be information-dense.
 
@@ -113,7 +113,7 @@ Addresses from the control room stay on the phone. The server must not store req
 
 ## Learning (planned)
 
-Blue Route should learn from real drives: opt-in, anonymised, totals per road only, never raw GPS or addresses. The rules and build steps are in `docs/ROADMAP.md`. Learned speeds feed the map build through `data/learned/practical_speeds.csv`.
+BlueRoute should learn from real drives: opt-in, anonymised, totals per road only, never raw GPS or addresses. The rules and build steps are in `docs/ROADMAP.md`. Learned speeds feed the map build through `data/learned/practical_speeds.csv`.
 
 ## Out of scope for v1
 

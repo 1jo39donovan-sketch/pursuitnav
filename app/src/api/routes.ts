@@ -96,7 +96,7 @@ export class NoAnswerRouteError extends RouteError {
 /** The server answered, but with a fault of its own (it's down, restarting or broken), not a reason about the route. */
 export class ServerDownRouteError extends RouteError {
   constructor() {
-    super("Blue Route's server isn't working right now.");
+    super("BlueRoute's server isn't working right now.");
   }
 }
 
@@ -108,7 +108,7 @@ export function routeFailure(err: unknown): unknown {
 }
 
 const MESSAGES: Record<string, string> = {
-  "outside-area": "That's outside the area Blue Route covers.",
+  "outside-area": "That's outside the area BlueRoute covers.",
   "no-route": "No route found to there.",
   "no-road-near": "No road found near there.",
   "routing-unavailable": "The routing server is having problems. Try again.",

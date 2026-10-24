@@ -4,7 +4,7 @@
 # a browser can't keep GPS running with the screen off.
 #
 # With the WEB_DOMAIN variable (e.g. bluerouteapp.com) the site is a public
-# front page at / (site/index.html: what Blue Route is, App Store and Google
+# front page at / (site/index.html: what BlueRoute is, App Store and Google
 # Play buttons), with this test version of the app unlisted at /app/ (not
 # linked, kept out of search engines); without it, the app alone at
 # https://<owner>.github.io/<repo>/.
@@ -76,7 +76,7 @@ jobs:
                   : `<span class="store soon"><small>Coming soon to</small><b>${name}</b></span>`;
             const stores = store(e.APP_STORE_URL, "Download on the", "App Store") + store(e.PLAY_STORE_URL, "Get it on", "Google Play");
             const html = fs.readFileSync("../site/index.html", "utf8")
-              .replaceAll("__SERVER_DOMAIN__", e.SERVER_DOMAIN).replace("__STORES__", stores);
+              .replaceAll("__SERVER_DOMAIN__", e.SERVER_DOMAIN).replaceAll("__WEB_DOMAIN__", e.WEB_DOMAIN).replace("__STORES__", stores);
             fs.writeFileSync("../site-out/index.html", html);
             // The test app: unlisted, so search engines leave it out.
             for (const f of ["../site-out/app/index.html", "../site-out/app/404.html"]) {
@@ -85,6 +85,7 @@ jobs:
           '
           printf "User-agent: *\nDisallow: /app/\n" > ../site-out/robots.txt
           cp assets/icon.png ../site-out/icon.png
+          cp ../site/share.png ../site-out/share.png
           # Any other path opens the app: /app/… as it is, and old links
           # (/search, /pursuitnav/search) moved under /app.
           node -e '

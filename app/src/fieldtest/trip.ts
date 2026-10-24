@@ -1,5 +1,5 @@
 // Field-test recording: what happened on each trip, kept on the phone for
-// comparing Blue Route with other apps afterwards (Session, "Field-test
+// comparing BlueRoute with other apps afterwards (Session, "Field-test
 // recording"; exported from the Log). Pure data and sums here; recorder.ts
 // collects and stores them. Nothing in fieldtest/ talks to the network (a
 // test checks): the trips never leave the phone unless the officer exports.

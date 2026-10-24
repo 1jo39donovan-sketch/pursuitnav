@@ -1,4 +1,4 @@
-// Privacy-first usage counts: how many installs use Blue Route, and how much.
+// Privacy-first usage counts: how many installs use BlueRoute, and how much.
 //
 // Each app install sends a random ID (made on the phone, resettable there)
 // and its version with every request. The server keeps:

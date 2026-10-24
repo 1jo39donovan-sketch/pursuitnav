@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sets up the Blue Route server on a fresh Ubuntu (22.04 or 24.04) VPS.
+# Sets up the BlueRoute server on a fresh Ubuntu (22.04 or 24.04) VPS.
 #
 # Run as root, on the server:
 #   curl -fsSL https://raw.githubusercontent.com/1jo39donovan-sketch/pursuitnav/main/server/scripts/install.sh | bash
@@ -175,7 +175,7 @@ say "Checking HTTPS"
 for i in $(seq 1 20); do
   if curl -fsS "https://$DOMAIN/health" >/dev/null 2>&1; then
     echo "https://$DOMAIN/health is answering."
-    printf '\n\033[1;32mBlue Route server is up at https://%s\033[0m\n' "$DOMAIN"
+    printf '\n\033[1;32mBlueRoute server is up at https://%s\033[0m\n' "$DOMAIN"
     echo "Next: put https://$DOMAIN into app/eas.json (or tell Claude) and build the app."
     exit 0
   fi

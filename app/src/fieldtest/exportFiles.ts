@@ -172,7 +172,7 @@ export function gpx(trips: readonly { record: TripRecord; events: readonly TripE
   }
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<gpx version="1.1" creator="Blue Route" xmlns="http://www.topografix.com/GPX/1/1">\n` +
+    `<gpx version="1.1" creator="BlueRoute" xmlns="http://www.topografix.com/GPX/1/1">\n` +
     [...wpts, ...trks].join("\n") +
     `\n</gpx>\n`
   );

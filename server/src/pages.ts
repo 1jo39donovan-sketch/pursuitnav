@@ -14,13 +14,22 @@ function contact(email: string | undefined): string {
     : `open an issue at <a href="${ISSUES_URL}">${ISSUES_URL}</a> (don’t include addresses or anything identifying)`;
 }
 
+// The logo (brand/logo.svg), inline: no extra request, and it's also the tab icon.
+const LOGO =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" rx="180" fill="#0c1220"/>' +
+  '<path d="M300 700V520a120 120 0 0 1 120-120h180" fill="none" stroke="#ffb627" stroke-width="88"/>' +
+  '<circle cx="300" cy="760" r="106" fill="#0c1220"/><circle cx="300" cy="760" r="78" fill="#3d8bff"/>' +
+  '<polygon points="600,290 760,400 600,508" fill="#fff" stroke="#fff" stroke-width="36" stroke-linejoin="round"/></svg>';
+const FAVICON = `data:image/svg+xml,${encodeURIComponent(LOGO)}`;
+
 function page(title: string, body: string): string {
   return `<!doctype html>
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title} · Blue Route</title>
+<title>${title} · BlueRoute</title>
+<link rel="icon" href="${FAVICON}">
 <style>
   :root { color-scheme: dark; }
   body { margin: 0; background: #0c1220; color: #e6ebf5; font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -29,10 +38,14 @@ function page(title: string, body: string): string {
   h2 { font-size: 1.15rem; margin: 28px 0 6px; }
   a { color: #f5b301; }
   .muted { color: #8a96ad; font-size: 0.9rem; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-weight: 700; font-size: 1.1rem; }
+  .brand svg { width: 40px; height: 40px; }
+  .brand b { color: #3d8bff; }
   li { margin: 4px 0; }
 </style>
 </head>
 <body><main>
+<div class="brand">${LOGO}<span>Blue<b>Route</b></span></div>
 <h1>${title}</h1>
 ${body}
 </main></body>
@@ -42,9 +55,9 @@ ${body}
 export function privacyPage(email?: string): string {
   return page(
     "Privacy policy",
-    `<p class="muted">Blue Route · last updated ${UPDATED}</p>
+    `<p class="muted">BlueRoute · last updated ${UPDATED}</p>
 
-<p>Blue Route is a navigation app for police, fire and ambulance crews. It’s an independent app, not a police force or emergency service
+<p>BlueRoute is a navigation app for police, fire and ambulance crews. It’s an independent app, not a police force or emergency service
 system. It has no accounts, no adverts, no third-party analytics and no tracking. It counts how much it's used, in
 the way described under “Usage counts” below.</p>
 
@@ -56,8 +69,8 @@ the way described under “Usage counts” below.</p>
 </ul>
 <p>None of this is sent anywhere. It stays until you clear the log in the app or uninstall it.</p>
 
-<h2>Sent to the Blue Route server, and not kept</h2>
-<p>To answer a request the app sends the Blue Route server only what that request needs:</p>
+<h2>Sent to the BlueRoute server, and not kept</h2>
+<p>To answer a request the app sends the BlueRoute server only what that request needs:</p>
 <ul>
   <li><strong>Routes:</strong> your current position (and direction of travel, when moving) and the destination’s
     position.</li>
@@ -74,7 +87,7 @@ the way described under “Usage counts” below.</p>
 has no database of users. Connections use HTTPS.</p>
 
 <h2>Team sessions (only if you start or join one)</h2>
-<p>In a team, while Blue Route is open, your phone shares your callsign, position and the way you’ve driven in the last
+<p>In a team, while BlueRoute is open, your phone shares your callsign, position and the way you’ve driven in the last
 two hours with the others in the team, every 15 seconds. It’s encrypted on your phone with a key that’s part of the team
 code and is never sent to the server, so the server holds only data it can’t read. It keeps that in memory only (a
 restart forgets it), drops your entry when you leave or a day after you stop sharing, and ends the team after a week.
@@ -89,7 +102,7 @@ totals per road and discards them; a road’s learned speed is used only once at
 Turning it off deletes anything not yet sent.</p>
 
 <h2>Usage counts</h2>
-<p>So we know how many crews use Blue Route, every request to the server carries a random install ID, made on your
+<p>So we know how many crews use BlueRoute, every request to the server carries a random install ID, made on your
 phone the first time the app runs, and the app's version number. You can reset the ID in the Session tab, after which
 the app counts as a new install. The app also reports how many navigation and pursuit sessions were started and how
 many requests got no answer in time, as plain numbers.</p>
@@ -110,7 +123,7 @@ searches, callsigns or IP addresses are kept with these counts, and no third-par
     about you or your journeys is sent to TfL.</li>
   <li><strong>Ordnance Survey</strong> receives address searches from the server, through its OS Names API (and OS
     Places, only if the server is set up with it): not your position or anything about you. House-number search runs
-    on the Blue Route server itself.</li>
+    on the BlueRoute server itself.</li>
   <li><strong>App updates</strong> come from Expo (expo.dev). When the app opens it asks Expo whether there's a newer
     version, sending the app's version, the phone's platform and a random ID made for update checks, and like any
     website it sees the phone's IP address. Nothing about your location, searches or journeys is sent.</li>
@@ -123,7 +136,7 @@ searches, callsigns or IP addresses are kept with these counts, and no third-par
 are. It doesn’t use location in the background.</p>
 
 <h2>Children</h2>
-<p>Blue Route is meant for emergency-service crews and isn’t directed at children.</p>
+<p>BlueRoute is meant for emergency-service crews and isn’t directed at children.</p>
 
 <h2>Questions</h2>
 <p>To ask about this policy, ${contact(email)}. If this policy changes, the date above changes and the new version is
@@ -134,7 +147,7 @@ published here.</p>`,
 export function supportPage(email?: string): string {
   return page(
     "Support",
-    `<p>Blue Route gives officers on patrol in London address and place search filtered to their boroughs, a standard
+    `<p>BlueRoute gives officers on patrol in London address and place search filtered to their boroughs, a standard
 route and (for emergency-service drivers) a faster blue-light route, sized to their vehicle, turn-by-turn navigation with spoken directions, and a pursuit screen.</p>
 
 <h2>Getting help or reporting a problem</h2>
@@ -149,7 +162,7 @@ and what happened, but please don’t send real addresses from jobs.</p>
     drive through London.</li>
   <li><strong>Search can’t find a block or estate?</strong> Save it in the Search tab with the road it’s on.</li>
   <li><strong>Team sessions?</strong> Start a team in the Session tab and share the code. You see each other only while
-    Blue Route is open on both phones, and it needs signal. It doesn’t replace your radio or any force system, and it’s
+    BlueRoute is open on both phones, and it needs signal. It doesn’t replace your radio or any force system, and it’s
     for you to check it fits your force’s policy.</li>
   <li><strong>Road closures?</strong> Routes avoid roads TfL lists as fully closed, updated every 5 minutes. Lane
     closures, and incidents TfL hasn’t listed yet, aren’t included.</li>

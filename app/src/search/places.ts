@@ -47,7 +47,7 @@ const GROUPS = new Set<string>([
 export function parsePlacesFile(text: string): PlacesFile {
   const lines = text.split("\n");
   const header = lines[0]?.match(/^#blueroute-places v1 (\S+)/);
-  if (!header) throw new Error("Not a Blue Route places file");
+  if (!header) throw new Error("Not a BlueRoute places file");
   const places: PointOfInterest[] = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
