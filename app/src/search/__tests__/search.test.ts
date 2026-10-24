@@ -48,6 +48,11 @@ describe("house numbers, flats and postcodes", () => {
     expect(top("54 Caledonian Road")).toMatchObject({ label: "54 Caledonian Road", borough: "Islington" });
   });
 
+  it("takes a number written after the road", () => {
+    expect(top("Caledonian Road 54")).toMatchObject({ label: "54 Caledonian Road", borough: "Islington" });
+    expect(top("Caledonian Rd, 54")?.label).toBe("54 Caledonian Road");
+  });
+
   it("keeps the flat and number", () => {
     expect(top("Flat 3, 54 Caledonian Rd")?.label).toBe("Flat 3, 54 Caledonian Road");
   });
@@ -147,6 +152,15 @@ describe("parseQuery", () => {
   it("handles number ranges and letters", () => {
     expect(parseQuery("54-56 Caledonian Road").number).toBe("54-56");
     expect(parseQuery("54a Caledonian Road").number).toBe("54A");
+  });
+
+  it("finds the number after the road", () => {
+    expect(parseQuery("Caledonian Road 54, N7 8LA")).toEqual({ number: "54", parts: ["Caledonian Road"], postcode: "N7 8LA" });
+    expect(parseQuery("Smith Street, 21a, Islington")).toEqual({ number: "21A", parts: ["Smith Street", "Islington"] });
+    expect(parseQuery("Flat 3, Caledonian Rd 54").number).toBe("54");
+    // A road whose name has a number in it is not a house number.
+    expect(parseQuery("A406").number).toBeUndefined();
+    expect(parseQuery("Caledonian Road").number).toBeUndefined();
   });
 });
 

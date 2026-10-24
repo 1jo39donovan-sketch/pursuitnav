@@ -1,8 +1,11 @@
 // Splits what the control room gave into its parts:
 //   "Flat 3, 54 Caledonian Rd, N7 8LA" → flat 3, number 54, "Caledonian Rd", postcode N7 8LA
+// The number may also come after the street: "Caledonian Rd 54".
 
 const FULL_POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$/;
 const OUTWARD_CODE = /^[A-Z]{1,2}\d[A-Z\d]?$/;
+// The number after the street, as some write it: "Smith Street 21", "Smith Street, 21a, N7".
+const TRAILING_NUMBER = /^([^,]*[a-z][^,]*?)[\s,]+(\d+[a-z]?(?:\s*[-–]\s*\d+[a-z]?)?)(?=\s*(?:,|$))/i;
 
 export interface ParsedQuery {
   /** "Flat 3" etc., tidied. */
@@ -46,6 +49,11 @@ export function parseQuery(raw: string): ParsedQuery {
   if (pc && q.length > pc[0].length) {
     out.postcode = formatPostcode(pc[1]!);
     q = q.slice(0, q.length - pc[0].length);
+  }
+  const after = out.number ? null : TRAILING_NUMBER.exec(q);
+  if (after) {
+    out.number = after[2]!.replace(/\s/g, "").replace("–", "-").toUpperCase();
+    q = after[1]! + q.slice(after[0].length);
   }
   out.parts = q
     .split(",")

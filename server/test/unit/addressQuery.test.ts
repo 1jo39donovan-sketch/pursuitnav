@@ -20,6 +20,16 @@ describe("parseAddressQuery", () => {
     expect(parseAddressQuery("Bedminton Estate")).toEqual({ text: "Bedminton Estate" });
   });
 
+  it("takes a house number written after the street", () => {
+    expect(parseAddressQuery("Caledonian Road 53, N7 8LA")).toEqual({
+      number: "53",
+      text: "Caledonian Road",
+      postcode: "N7 8LA",
+    });
+    expect(parseAddressQuery("Smith Street, 21a")).toEqual({ number: "21a", text: "Smith Street" });
+    expect(parseAddressQuery("Flat 3, Caledonian Rd 54")).toMatchObject({ unit: "Flat 3", number: "54" });
+  });
+
   it("knows a postcode or district on its own", () => {
     expect(parseAddressQuery("n78la")).toEqual({ text: "", postcode: "N7 8LA" });
     expect(parseAddressQuery("N7")).toEqual({ text: "", outward: "N7" });

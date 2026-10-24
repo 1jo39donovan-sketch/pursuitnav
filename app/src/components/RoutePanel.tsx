@@ -35,7 +35,7 @@ interface Props {
   destination: { lat: number; lng: number };
   /** What was picked, e.g. "54 Caledonian Road". */
   title?: string;
-  /** A caution about the destination, e.g. that it's the road, not the door. */
+  /** A caution about the destination, e.g. that it's a postcode, not the door. */
   note?: string;
   onClose: () => void;
   /** Try again after an error, to the same destination. */
@@ -49,16 +49,15 @@ interface Props {
   onOpenExternal?: (app: "google-maps" | "waze") => void;
 }
 
+// Why there's no blue-light route, in one short line under the standard route.
 const NO_POLICE: Record<NoPoliceReason, string> = {
-  "not-faster": "No meaningfully faster route using bus lanes or restricted turns.",
-  "no-restrictions-found": "A faster route exists but its restrictions couldn't be identified, so it isn't offered.",
-  "wrong-way-unavoidable": "The only faster route goes against a one-way street, so it isn't offered.",
-  "vehicle-limit-unavoidable":
-    "The only faster route has a bridge or limit your vehicle can't take, so it isn't offered.",
-  "not-checked": "Blue-light routes are off. Turn them on in Session.",
-  "check-failed": "Couldn’t check for a blue-light route (no signal?). The standard route is ready.",
-  "not-declared":
-    "A faster route using bus lanes or restricted turns exists. Blue-light routes are only shown to emergency-service drivers: turn them on in Session.",
+  "not-faster": "No faster blue-light route.",
+  "no-restrictions-found": "No blue-light route: a faster one's restrictions couldn't be listed.",
+  "wrong-way-unavoidable": "No blue-light route: the faster one goes the wrong way down a one-way street.",
+  "vehicle-limit-unavoidable": "No blue-light route: the faster one has a limit your vehicle can't take.",
+  "not-checked": "Blue-light routes are off (Session).",
+  "check-failed": "Couldn’t check for a blue-light route (no signal?).",
+  "not-declared": "A faster blue-light route exists: turn blue-light routes on in Session.",
 };
 
 /** The two routes side by side, for the operator to choose between. */
@@ -105,15 +104,14 @@ export function RoutePanel({
               {title}
             </Text>
           )}
-          {ageText && <Text style={[styles.label, styles.labelOld]}>{ageText}</Text>}
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Clear destination" onPress={onClose} hitSlop={12}>
           <Text style={styles.close}>Clear</Text>
         </Pressable>
       </View>
-      {note && (
+      {(note || ageText) && (
         <Text style={styles.note} numberOfLines={2}>
-          {note}
+          {[note, ageText && `${ageText}: Go works them out again`].filter(Boolean).join(" · ")}
         </Text>
       )}
       {state.status === "loading" && <Text style={styles.status}>{planningText("routes", waited)}</Text>}
@@ -134,26 +132,30 @@ export function RoutePanel({
       )}
       {slots && state.status === "ready" && (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-          {/* Fixed places, so a row never moves under a finger: blue light on top, standard below. */}
-          <PoliceRow
-            slot={slots[0]}
-            checkingText={planningText("blue-light", waited)}
-            onGo={() => go("police")}
-            expanded={showRestrictions}
-            onToggle={() => setShowRestrictions((v) => !v)}
-          />
+          {/* Blue light on top while it's being worked out or when there is one; otherwise one line under standard. */}
+          {(slots[0].state === "route" || slots[0].state === "checking") && (
+            <PoliceRow
+              slot={slots[0]}
+              checkingText={planningText("blue-light", waited)}
+              onGo={() => go("police")}
+              expanded={showRestrictions}
+              onToggle={() => setShowRestrictions((v) => !v)}
+            />
+          )}
           <StandardRow
             route={slots[1].route}
-            fastest={slots[1].fastest}
+            // "Fastest" only means something beside a blue-light route.
+            fastest={slots[1].fastest && slots[0].state === "route"}
             // Matches the map: grey under a blue-light route, blue on its own.
             swatch={slots[0].state === "route" ? ROUTE_ALT : colors.blue}
             onGo={() => go("standard")}
           />
+          {slots[0].state === "none" && <Text style={styles.closures}>{NO_POLICE[slots[0].reason]}</Text>}
           <ClosuresLine closures={state.plan.closures} />
           {recording && <OtherEtas />}
           {blocks && blocks.length > 0 && (
             <View style={styles.blocks}>
-              <Text style={styles.blocksLabel}>Blocks and estates on this road · tap to go there</Text>
+              <Text style={styles.blocksLabel}>Blocks and estates on this road</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.blockRow}>
                 {blocks.map((b) => (
                   <Pressable
@@ -248,7 +250,7 @@ function StandardRow({
           Standard{fastest ? <Text style={styles.fastest}> · fastest</Text> : null}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {formatDistance(route.distanceM)} · legal
+          {formatDistance(route.distanceM)}
         </Text>
         <TrafficLine route={route} />
       </View>
@@ -400,7 +402,7 @@ function LinkButton({ label, url, onPress }: { label: string; url: string; onPre
   );
 }
 
-/** One honest line on live closures: what was checked, and how fresh it is. */
+/** Live closures: said only when the route may go through one, or they couldn't be checked. */
 function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
   if (!closures) return null;
   if (closures.ignored) {
@@ -411,12 +413,7 @@ function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
     );
   }
   if (!closures.updatedAt) return <Text style={styles.closures}>Live TfL closures unavailable right now.</Text>;
-  const at = new Date(closures.updatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  return (
-    <Text style={styles.closures} numberOfLines={1}>
-      Avoids {closures.active} TfL full {closures.active === 1 ? "closure" : "closures"} (checked {at})
-    </Text>
-  );
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -439,14 +436,6 @@ const styles = StyleSheet.create({
   },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
   headerText: { flex: 1, minWidth: 0 },
-  label: {
-    color: colors.muted,
-    fontFamily: fonts.displaySemiBold,
-    fontSize: 12,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  labelOld: { color: colors.amber },
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 21, lineHeight: 24 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 12, lineHeight: 16 },
   closures: { color: colors.muted, fontFamily: fonts.body, fontSize: 11, lineHeight: 15 },
@@ -563,20 +552,14 @@ const styles = StyleSheet.create({
   },
   blockText: { color: "#93c5fd", fontFamily: fonts.bodySemiBold, fontSize: 15 },
   links: { flexDirection: "row", gap: 8 },
+  // Quiet: a hand-off to another app, not the main choice.
   link: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 8,
+    backgroundColor: colors.panel,
+    borderRadius: 999,
     minHeight: 44,
     justifyContent: "center",
     alignItems: "center",
   },
-  linkText: {
-    color: colors.fg,
-    fontFamily: fonts.displaySemiBold,
-    fontSize: 14,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
+  linkText: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
 });

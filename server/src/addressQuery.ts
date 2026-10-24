@@ -9,6 +9,8 @@ const FULL_POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$/;
 const OUTWARD_CODE = /^[A-Z]{1,2}\d[A-Z\d]?$/;
 const SUB_UNIT = /^\s*((?:flat|unit|apartment|apt|room|suite|studio)\s+[\w-]+)\s*,?\s*/i;
 const NUMBER = /^(\d+[a-z]?(?:\s*[-–]\s*\d+[a-z]?)?)\s*,?\s+/i;
+// The number after the street, as some write it: "Smith Street 21", "Smith Street, 21a, N7".
+const TRAILING_NUMBER = /^([^,]*[a-z][^,]*?)[\s,]+(\d+[a-z]?(?:\s*[-–]\s*\d+[a-z]?)?)(?=\s*(?:,|$))/i;
 const TRAILING_POSTCODE = /,?\s*([a-z]{1,2}\d[a-z\d]?\s*\d[a-z]{2})\s*$/i;
 const TRAILING_OUTWARD = /,\s*([a-z]{1,2}\d[a-z\d]?)\s*$/i;
 
@@ -58,6 +60,11 @@ export function parseAddressQuery(raw: string): AddressQuery {
       out.outward = ow[1]!.toUpperCase();
       q = q.slice(0, q.length - ow[0].length);
     }
+  }
+  const after = out.number ? null : TRAILING_NUMBER.exec(q);
+  if (after) {
+    out.number = after[2]!.replace(/\s/g, "").replace("–", "-").toLowerCase();
+    q = after[1]! + q.slice(after[0].length);
   }
   out.text = q
     .replace(/\s+/g, " ")
