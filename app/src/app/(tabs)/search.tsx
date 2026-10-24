@@ -1,6 +1,6 @@
 import type { LngLat } from "@maplibre/maplibre-react-native";
 import { useNetworkState } from "expo-network";
-import { router, Tabs, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, Tabs, useLocalSearchParams } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -267,8 +267,8 @@ export default function SearchScreen() {
   }, [noSignal, connected]);
 
   // Back from navigation: a plan from where the crew were before is never
-  // offered again. After arriving, or "New destination", start clean and
-  // ready to type; after End, work the routes out again from here.
+  // offered again. After arriving, or "New destination", start clean (the map, no
+  // keyboard); after End, work the routes out again from here.
   const handledEnd = useRef(navigation.ended);
   useEffect(() => {
     const ended = navigation.ended;
@@ -280,7 +280,6 @@ export default function SearchScreen() {
         return;
       }
       clear();
-      input.current?.focus();
     }, 0);
     return () => clearTimeout(t);
     // Only when navigation ends.
@@ -356,14 +355,8 @@ export default function SearchScreen() {
           ? "No boroughs picked: every match shows as outside your area. Pick them on the Session tab."
           : null;
 
-  // Ready to type the moment the screen opens, unless a route is already up.
-  useFocusEffect(
-    useCallback(() => {
-      if (!destination && !query) input.current?.focus();
-      // Only on arriving at the screen, not on every keystroke.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []),
-  );
+  // The keyboard waits for a tap on the search bar: opening Search may be just
+  // to look at the map.
 
   // "Where am I": the officer's exact position, to read out or share.
   const [whereOpen, setWhereOpen] = useState(false);

@@ -9,9 +9,9 @@ export function destinationNote(r: Pick<SearchResult, "label" | "kind" | "precis
   // A house number at the start, or after "Flat 3,": "54 Caledonian Road" (not "Caledonian Road, N7").
   const numbered = /(^|,\s*)\d+[a-z]?\s/i.test(r.label) && r.kind !== "postcode";
   if (r.precision === "road" && numbered) {
-    return "Routes to a point on the road, not the door. On a long road, check which end the number is.";
+    return "The road, not the door: check which end the number is.";
   }
   if (r.precision === "postcode" && r.kind !== "postcode")
-    return "Routes to the postcode, which may cover several doors.";
+    return "The postcode, which may cover several doors.";
   return undefined;
 }
