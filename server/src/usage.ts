@@ -36,6 +36,8 @@ export const APP_EVENTS: Record<string, Metric> = {
   navigation: "navigation_sessions",
   pursuit: "pursuit_sessions",
   timeout: "timeouts",
+  // A route asked for before the tap, then used: the server didn't count it then.
+  plan: "routes_planned",
 };
 
 /** An install ID as the app makes it: 32 hex characters. */

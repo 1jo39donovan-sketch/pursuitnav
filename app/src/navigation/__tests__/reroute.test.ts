@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   NoAnswerRouteError,
+  ServerDownRouteError,
   NoSignalRouteError,
   RouteError,
   type PoliceRoute,
@@ -36,6 +37,8 @@ describe("off-route panel", () => {
 
   it("tells other failures apart, and says it's working while it is", () => {
     expect(offRouteText(rerouteFailure(new RouteError("No route found to there.")), 10).title).toBe("Off route");
+    // The server failing mid-drive: the same as no answer, follow the last route.
+    expect(rerouteFailure(new ServerDownRouteError())).toBe("no-answer");
     expect(offRouteText(null, 10).detail).toMatch(/Finding a new route/);
     expect(offRouteText(null, 10, STILL_PLANNING_MS).detail).toMatch(/Still planning/);
   });

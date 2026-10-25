@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchRoutes, NoAnswerRouteError, NoSignalRouteError, RouteError, ServerDownRouteError } from "../routes";
+import { fetchRoutes, NoAnswerRouteError, NoSignalRouteError, planRequests, RouteError, ServerDownRouteError } from "../routes";
 
 vi.mock("../../config", () => ({ API_URL: "https://server.test", DEMO_MODE: false }));
 
@@ -34,6 +34,25 @@ describe("fetchRoutes", () => {
     const err = await fetchRoutes(from, to, "car").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(NoSignalRouteError);
     expect((err as Error).message).toMatch(/^No signal/);
+  });
+
+  it("marks a plan asked for before the tap, so the server doesn't count it", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+      return new Response(JSON.stringify({ standard: {}, police: null }), { status: 200 });
+    });
+    const signal = new AbortController().signal;
+    const pre = planRequests(from, to, { vehicle: "car", roads: "main", blueLight: true, signal, prefetch: true });
+    await Promise.all([pre.quick, pre.full]);
+    const tap = planRequests(from, to, { vehicle: "car", roads: "main", blueLight: false, signal });
+    await tap.quick;
+    expect(tap.full).toBeNull();
+    expect(bodies.map((b) => [b.standardOnly ?? false, b.prefetch ?? false])).toEqual([
+      [true, true],
+      [false, true],
+      [true, false],
+    ]);
   });
 
   it("tells a server that's down from a reason about the route", async () => {

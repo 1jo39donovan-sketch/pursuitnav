@@ -52,10 +52,13 @@ jobs:
           DOMAIN: ${{ vars.SERVER_DOMAIN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          open=$(gh issue list --state open --search 'in:title "Server down"' --json number --jq '.[0].number // empty')
+          # Found by its label (listed directly, unlike search, which lags), so a
+          # second run can't open a duplicate and no other issue is mistaken for it.
+          gh label create server-down --color B60205 --description "Opened and closed by the uptime check" >/dev/null 2>&1 || true
+          open=$(gh issue list --state open --label server-down --json number --jq '.[0].number // empty')
           now=$(date -u +'%d %b %Y %H:%M UTC')
           if [ "$OUTCOME" = failure ] && [ -z "$open" ]; then
-            gh issue create --title "Server down: $DOMAIN" --body "The uptime check failed at $now (and again a minute later). Officers can't get routes or full addresses from BlueRoute; the app offers Google Maps and Waze instead.
+            gh issue create --label server-down --title "Server down: $DOMAIN" --body "The uptime check failed at $now (and again a minute later). Officers can't get routes or full addresses from BlueRoute; the app offers Google Maps and Waze instead.
 
           What failed: $RUN_URL
 

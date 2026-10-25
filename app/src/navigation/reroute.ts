@@ -1,5 +1,5 @@
 // What the turn panel says while off route, by how the last re-route went.
-import { NoAnswerRouteError, NoSignalRouteError, type RoutePlan } from "../api/routes";
+import { NoAnswerRouteError, NoSignalRouteError, ServerDownRouteError, type RoutePlan } from "../api/routes";
 import { planningText } from "./planning";
 
 /**
@@ -10,7 +10,8 @@ export type RerouteFailure = "no-signal" | "no-answer" | "error" | null;
 
 export function rerouteFailure(err: unknown): RerouteFailure {
   if (err instanceof NoSignalRouteError) return "no-signal";
-  if (err instanceof NoAnswerRouteError) return "no-answer";
+  // The server failing is, for the crew, the same as it not answering: follow the last route.
+  if (err instanceof NoAnswerRouteError || err instanceof ServerDownRouteError) return "no-answer";
   return "error";
 }
 

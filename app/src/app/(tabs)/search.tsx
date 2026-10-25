@@ -6,7 +6,7 @@ import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-na
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  fetchRoutes,
+  planRequests,
   NoAnswerRouteError,
   NoSignalRouteError,
   ServerDownRouteError,
@@ -32,7 +32,7 @@ import { formatDistance } from "../../format";
 import { distanceM } from "../../geo";
 import { routeOrigin, useLocation } from "../../location/LocationProvider";
 import { APP_VERSION, PLATFORM, recorder } from "../../fieldtest/instance";
-import { NO_SIGNAL_ROUTE_START, SERVER_DOWN_ROUTE_START } from "../../navigation/connectivity";
+import { NO_ANSWER_ROUTE_START, NO_SIGNAL_ROUTE_START, SERVER_DOWN_ROUTE_START } from "../../navigation/connectivity";
 import { PREFETCH_PAUSE_MS, prefetchKey, prefetchTarget, usable, type Prefetch } from "../../navigation/prefetch";
 import { rerouteFailure } from "../../navigation/reroute";
 import { useNavigation } from "../../navigation/NavigationProvider";
@@ -48,6 +48,7 @@ import { useSession } from "../../session/SessionProvider";
 import { useTeam } from "../../team/TeamProvider";
 import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
+import { recordEvent } from "../../usage/usage";
 
 interface Destination {
   point: LngLat;
@@ -135,8 +136,11 @@ export default function SearchScreen() {
       const origin = ready?.origin ?? { madeAt: Date.now(), from };
       // The standard route comes back in a second or so; the blue-light one
       // takes longer to check, so show the standard route as soon as it's here.
-      const quick = ready?.quick ?? fetchRoutes(from, to, vehicle, controller.signal, true, roads);
-      const full = ready ? ready.full : policeRoutes ? fetchRoutes(from, to, vehicle, controller.signal, false, roads) : null;
+      const fresh = ready ? null : planRequests(from, to, { vehicle, roads, blueLight: policeRoutes, signal: controller.signal });
+      const quick = ready?.quick ?? fresh!.quick;
+      const full = ready ? ready.full : fresh!.full;
+      // The server didn't count a plan asked for before the tap: count it now it's used.
+      if (ready) recordEvent("plan");
       // Field-test recording (off unless switched on): how long each part of the plan took.
       quick.then((p) => recorder.event({ type: "plan-standard", ms: recorder.sinceStart(), standard: offered(p.standard) }), () => {});
       (full ?? quick).then(
@@ -178,8 +182,10 @@ export default function SearchScreen() {
           setState({ status: "error", message: NO_SIGNAL_ROUTE_START, noSignal: true });
           return;
         }
+        // Either way Google Maps and Waze come first; a slow answer may be weak signal, so it says so.
         if (err instanceof NoAnswerRouteError || err instanceof ServerDownRouteError) {
-          setState({ status: "error", message: SERVER_DOWN_ROUTE_START, serverDown: true });
+          const message = err instanceof NoAnswerRouteError ? NO_ANSWER_ROUTE_START : SERVER_DOWN_ROUTE_START;
+          setState({ status: "error", message, serverDown: true });
           return;
         }
         const message = err instanceof RouteError ? err.message : "Something went wrong working out routes.";
@@ -195,15 +201,25 @@ export default function SearchScreen() {
   const target = showResults && fix && API_URL ? prefetchTarget(results) : null;
   const targetKey = target ? prefetchKey(target, vehicle, roads, policeRoutes) : null;
   useEffect(() => {
-    if (!target || !targetKey || !fix) return;
+    if (!target || !targetKey || !fix) {
+      // No likely match any more (more matches, or the query changed): stop asking.
+      prefetch.current?.controller.abort();
+      prefetch.current = null;
+      return;
+    }
     const t = setTimeout(() => {
       if (usable(prefetch.current, targetKey, fix, Date.now())) return;
       prefetch.current?.controller.abort();
       const controller = new AbortController();
       const from = routeOrigin(fix);
       const to = { lat: target.lat, lng: target.lng };
-      const quick = fetchRoutes(from, to, vehicle, controller.signal, true, roads);
-      const full = policeRoutes ? fetchRoutes(from, to, vehicle, controller.signal, false, roads) : null;
+      const { quick, full } = planRequests(from, to, {
+        vehicle,
+        roads,
+        blueLight: policeRoutes,
+        signal: controller.signal,
+        prefetch: true,
+      });
       const entry: Prefetch = { key: targetKey, origin: { madeAt: Date.now(), from }, quick, full, controller, failed: false };
       const failed = () => {
         entry.failed = true;

@@ -151,6 +151,15 @@ describe("usage API", () => {
     expect(today.installs).toBe(1);
   });
 
+  it("doesn't count a route asked for before the tap, until the app says it was used", async () => {
+    const { usage, app } = setup();
+    const res = await app.inject({ method: "POST", url: "/v1/routes", headers, payload: { ...trip, prefetch: true } });
+    expect(res.statusCode).toBe(200);
+    expect(usage.stats(1).days[0]!.counts.routes_planned).toBe(0);
+    await app.inject({ method: "POST", url: "/v1/usage", headers, payload: { events: { plan: 1 } } });
+    expect(usage.stats(1).days[0]!.counts.routes_planned).toBe(1);
+  });
+
   it("counts failed plans", async () => {
     const { usage, app } = setup();
     await app.inject({ method: "POST", url: "/v1/routes", headers, payload: { ...trip, to: { lat: 10, lng: 10 } } });
@@ -205,6 +214,21 @@ describe("usage API", () => {
     const down = await app2.inject({ method: "POST", url: "/v1/routes", headers, payload: trip });
     expect(down.statusCode).toBe(503);
     expect(usage2.stats(1).days[0]!.counts.server_errors).toBe(1);
+  });
+
+  it("calls the routing engine refusing one request a failed route, not routing being down", async () => {
+    const refusing: Router = {
+      route: async () => {
+        throw new ValhallaError("too far", 400, 154);
+      },
+      traceEdges: async () => [],
+    };
+    const usage3 = new UsageStore(":memory:");
+    const app3 = buildApp(config, refusing, undefined, undefined, undefined, undefined, undefined, usage3);
+    const res = await app3.inject({ method: "POST", url: "/v1/routes", headers, payload: trip });
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toMatchObject({ error: "no-route" });
+    expect(usage3.stats(1).days[0]!.counts).toMatchObject({ route_failures: 1, server_errors: 0 });
   });
 
   it("guards /stats with the bearer token", async () => {

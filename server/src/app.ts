@@ -48,6 +48,8 @@ interface RoutesBody {
   vehicle?: VehicleType;
   /** Only the standard route (quick), for showing while the full plan is worked out. */
   standardOnly?: boolean;
+  /** Asked for before the tap (the app's likely match): not counted as a planned route. */
+  prefetch?: boolean;
   /** Prefer main roads (default) or any roads. */
   roads?: RoadChoice;
 }
@@ -70,6 +72,11 @@ function routeError(err: unknown, req: FastifyRequest, reply: FastifyReply) {
     }
     if (err.code === 171) {
       return reply.code(422).send({ error: "no-road-near", message: "No road found near one of the points." });
+    }
+    // Valhalla refusing this one request (bad location, too far…) is about the route; only its own
+    // failure (5xx) means routing is down, which the app shows as the server not working.
+    if (err.httpStatus < 500) {
+      return reply.code(422).send({ error: "no-route", message: "No route found to there." });
     }
     req.log.error({ status: err.httpStatus, code: err.code }, "routing engine error");
     return reply.code(503).send({ error: "routing-unavailable", message: "Routing is unavailable. Try again." });
@@ -137,8 +144,9 @@ export function buildApp(
       if (path !== "/v1/routes" && path !== "/v1/follow") return;
       if (reply.statusCode === 422) usage.add("route_failures");
       // The app asks for the standard route alone first, then the full plan: count the plan once.
-      const quick = (req.body as { standardOnly?: boolean } | undefined)?.standardOnly === true;
-      if (reply.statusCode === 200 && !quick) usage.add("routes_planned");
+      // A plan asked for before the tap is counted by the app only if it's used ("plan" event).
+      const body = req.body as { standardOnly?: boolean; prefetch?: boolean } | undefined;
+      if (reply.statusCode === 200 && body?.standardOnly !== true && body?.prefetch !== true) usage.add("routes_planned");
     });
   }
 
@@ -194,6 +202,7 @@ export function buildApp(
             to: point,
             vehicle: { type: "string", enum: [...VEHICLE_TYPES] },
             standardOnly: { type: "boolean" },
+            prefetch: { type: "boolean" },
             roads: { type: "string", enum: [...ROAD_CHOICES] },
           },
         },
