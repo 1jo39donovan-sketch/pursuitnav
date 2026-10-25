@@ -279,13 +279,16 @@ export default function SearchScreen() {
   };
 
   // Something to search for, from the BCU screen (a custody suite not mapped as a police station).
+  // It may be outside the boroughs being worked, so matches everywhere show.
   useEffect(() => {
     if (!params.from || !params.q || params.lat || handledParams.current === params.from) return;
-    handledParams.current = params.from;
+    const from = params.from;
     const q = params.q;
     const t = setTimeout(() => {
+      handledParams.current = from;
       clear();
       setQuery(q);
+      setShowOutside(true);
     }, 0);
     return () => clearTimeout(t);
     // clear() is recreated each render; only new params should trigger this.

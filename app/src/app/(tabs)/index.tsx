@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { API_URL, DEMO_MODE } from "../../config";
@@ -61,6 +61,8 @@ export default function SessionScreen() {
   const { savedPlaces, deletePlace, places } = useSearch();
   const logCount = useLog().entries.length;
   const recording = useRecorder();
+  // The BCU being worked, for the custody and stations row (police only).
+  const bcu = useMemo(() => bcuFor(boroughs), [boroughs]);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -145,16 +147,22 @@ export default function SessionScreen() {
 
       <BoroughPicker />
 
-      {service === "police" && (
+      {(service === "police" || service === null) && (
         // Custody, stations and A&Es for the BCU being worked, one tap from a route.
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${bcuFor(boroughs).name} BCU: custody, police stations and A&E`}
-          onPress={() => router.push({ pathname: "/bcu", params: { code: bcuFor(boroughs).code } })}
+          accessibilityLabel={`${bcu ? `${bcu.name} BCU` : "BCUs"}: custody, police stations and A&E`}
+          onPress={() => router.push({ pathname: "/bcu", params: bcu ? { code: bcu.code } : {} })}
           style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
         >
           <Text style={styles.logText}>
-            {bcuFor(boroughs).name} <Text style={styles.logMeta}>{bcuFor(boroughs).code}</Text>
+            {bcu ? (
+              <>
+                {bcu.name} <Text style={styles.logMeta}>{bcu.code}</Text>
+              </>
+            ) : (
+              "BCUs"
+            )}
           </Text>
           <Text style={styles.logMeta}>Custody · stations · A&E ›</Text>
         </Pressable>

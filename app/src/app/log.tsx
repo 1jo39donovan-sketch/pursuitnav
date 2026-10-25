@@ -145,7 +145,7 @@ function Entry({ entry }: { entry: LogEntry }) {
         onPress={() =>
           router.navigate({
             pathname: "/search",
-            params: { lat: String(entry.lat), lng: String(entry.lng), title: entry.chosen, from: String(entry.id) },
+            params: { lat: String(entry.lat), lng: String(entry.lng), title: entry.chosen, q: "", from: String(entry.id) },
           })
         }
         hitSlop={6}

@@ -17,7 +17,7 @@ const station = (name: string, borough: PointOfInterest["borough"], type = "Poli
 });
 
 describe("custody suites", () => {
-  it("are all in real boroughs, and every BCU but one has at least one", () => {
+  it("are all in real boroughs, and every BCU has at least one", () => {
     for (const c of CUSTODY_SUITES) expect(BOROUGHS).toContain(c.borough);
     const empty = BCUS.filter((b) => custodyIn(b.boroughs).length === 0).map((b) => b.code);
     expect(empty).toEqual([]);
@@ -53,7 +53,10 @@ describe("custody suites", () => {
   });
 
   it("picks the BCU most of the chosen boroughs are in", () => {
-    expect(bcuFor(["Camden", "Islington", "Hackney"]).code).toBe("CN");
-    expect(bcuFor(["Lambeth"]).code).toBe("AS");
+    expect(bcuFor(["Camden", "Islington", "Hackney"])?.code).toBe("CN");
+    expect(bcuFor(["Lambeth"])?.code).toBe("AS");
+    // Nothing chosen, or only the City (its own force): no BCU, rather than a wrong one.
+    expect(bcuFor([])).toBeNull();
+    expect(bcuFor(["City of London"])).toBeNull();
   });
 });
