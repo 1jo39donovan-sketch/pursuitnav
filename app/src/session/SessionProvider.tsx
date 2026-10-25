@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { BOROUGHS, type Borough } from "../search/boroughs";
 import { clearQueue, uploadDue } from "../learning/queue";
+import { MAP_LOOKS, type MapLook } from "../components/mapLooks";
 import { store } from "../storage/store";
 import { isService, isVehicle, vehiclesFor, type ServiceType, type VehicleType } from "../vehicles";
 
@@ -28,9 +29,15 @@ interface Session {
   /** Night (dark) or day (light) map. */
   mapTheme: MapTheme;
   setMapTheme: (t: MapTheme) => void;
+  /** Standard, high-contrast, plain or the OS road map. */
+  mapLook: MapLook;
+  setMapLook: (l: MapLook) => void;
   /** How the navigation and pursuit maps turn: north up, direction of travel up, or tilted 3D. */
   mapView: MapView;
   setMapView: (v: MapView) => void;
+  /** Larger text on Search, the route choice and navigation. */
+  largeText: boolean;
+  setLargeText: (on: boolean) => void;
   /** Spoken turn-by-turn directions. */
   voice: boolean;
   setVoice: (on: boolean) => void;
@@ -110,11 +117,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   });
 
   const [mapTheme, setMapTheme] = useSetting<MapTheme>("mapTheme", ["night", "day"], "day");
+  const [mapLook, setMapLook] = useSetting<MapLook>("mapLook", MAP_LOOKS, "standard");
   const [mapView, setMapView] = useSetting<MapView>("mapView", MAP_VIEWS, "3d");
   // "voice" was first stored by the navigation screen as "1"/"0".
   const [voiceSetting, setVoiceSetting] = useSetting<"1" | "0">("voice", ["1", "0"], "1");
   const voice = voiceSetting === "1";
   const [roads, setRoads] = useSetting<RoadChoice>("roads", ["main", "any"], "main");
+  const [largeSetting, setLargeSetting] = useSetting<"1" | "0">("largeText", ["1", "0"], "0");
+  const largeText = largeSetting === "1";
+  const setLargeText = useCallback((on: boolean) => setLargeSetting(on ? "1" : "0"), [setLargeSetting]);
   const setVoice = useCallback((on: boolean) => setVoiceSetting(on ? "1" : "0"), [setVoiceSetting]);
   const [learningSetting, setLearningSetting] = useSetting<"1" | "0">("learning", ["1", "0"], "0");
   const learning = learningSetting === "1";
@@ -185,10 +196,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setVehicle,
       mapTheme,
       setMapTheme,
+      mapLook,
+      setMapLook,
       mapView,
       setMapView,
       voice,
       setVoice,
+      largeText,
+      setLargeText,
       roads,
       setRoads,
       learning,
@@ -216,10 +231,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setVehicle,
       mapTheme,
       setMapTheme,
+      mapLook,
+      setMapLook,
       mapView,
       setMapView,
       voice,
       setVoice,
+      largeText,
+      setLargeText,
       roads,
       setRoads,
     ],

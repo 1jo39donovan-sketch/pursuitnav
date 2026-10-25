@@ -11,6 +11,7 @@ import { BANDS, type LearningStore, type Sample } from "./learning.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
 import type { NearestDoor, WhereIs } from "./nominatim.js";
+import { osMapsRoutes } from "./osMaps.js";
 import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage, termsPage } from "./pages.js";
 import { dataRelease, machineMemory } from "./serverInfo.js";
@@ -173,6 +174,7 @@ export function buildApp(
       places: placesData,
       addresses,
       learning: Boolean(learning),
+      osMaps: Boolean(config.osMapsKey),
       ...(closures ? { closures: closures.summary().active } : {}),
       ...(config.version ? { version: config.version } : {}),
       ...(await dataRelease(config.placesFile).then((data) => (data ? { data } : {}))),
@@ -345,6 +347,7 @@ export function buildApp(
   app.get("/v1/places-data", dataFile(config.placesFile, "places-not-ready", "Place data"));
   app.get("/v1/roads-data", dataFile(config.roadsFile, "roads-not-ready", "The road list"));
   offlineMapRoutes(app, config.offlineMapDir);
+  osMapsRoutes(app, config.osMapsKey, config.bounds, (req) => notSetUp.add(req));
 
   // Follow-in: the way a colleague drove, from here. Their track comes from the
   // phone (decrypted there) and, like every request, isn't logged or kept.

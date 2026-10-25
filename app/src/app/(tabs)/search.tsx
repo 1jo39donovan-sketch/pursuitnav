@@ -49,6 +49,7 @@ import { useTeam } from "../../team/TeamProvider";
 import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
 import { recordEvent } from "../../usage/usage";
+import { useTextStyles } from "../../textSize";
 
 interface Destination {
   point: LngLat;
@@ -63,6 +64,7 @@ interface Destination {
 // Type what the control room gave, pick the match, get both routes from
 // where the phone is now. A long press on the map also sets a destination.
 export default function SearchScreen() {
+  const styles = useTextStyles(baseStyles);
   const { fix, simulated } = useLocation();
   const insets = useSafeAreaInsets();
   // Height of the floating search box (and any notes under it), from the top of the screen.
@@ -657,7 +659,7 @@ function offered(r: Route | PoliceRoute) {
   };
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   // The search box floats over the map, as a rounded bar with a shadow.
   floating: { position: "absolute", left: 10, right: 10, gap: 6 },

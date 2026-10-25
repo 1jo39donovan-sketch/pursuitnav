@@ -6,6 +6,7 @@ import { API_URL, DEMO_MODE } from "../../config";
 
 import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
+import { looksOffered, MAP_LOOK_NAMES, type MapLook } from "../../components/mapLooks";
 import { OfflineMapSection } from "../../components/OfflineMapSection";
 import { TeamSection } from "../../components/TeamSection";
 import { setRecording, useRecorder } from "../../fieldtest/instance";
@@ -21,6 +22,13 @@ import { SERVICES, VEHICLES, vehiclesFor } from "../../vehicles";
 // Once a shift is set up, the app opens on Search: the job is usually to type
 // an address straight away. Only on the first screen shown after launch.
 let openedThisLaunch = false;
+
+const LOOK_HINTS: Record<MapLook, string> = {
+  standard: "The everyday map.",
+  clear: "High contrast: wider, brighter roads and bold names, for reading on the move.",
+  plain: "Just the streets: no shop and business icons.",
+  os: "Ordnance Survey's road map. Needs signal; very close in, it shows larger rather than sharper.",
+};
 
 export default function SessionScreen() {
   const {
@@ -40,6 +48,10 @@ export default function SessionScreen() {
     showPursuit,
     setShowPursuit,
     mapTheme,
+    mapLook,
+    setMapLook,
+    largeText,
+    setLargeText,
     setMapTheme,
     roads,
     setRoads,
@@ -242,6 +254,35 @@ export default function SessionScreen() {
               </Pressable>
             );
           })}
+        </View>
+        <View style={styles.chips} accessibilityLabel="Map style">
+          {looksOffered().map((l) => {
+            const on = mapLook === l;
+            return (
+              <Pressable
+                key={l}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                accessibilityHint={LOOK_HINTS[l]}
+                onPress={() => setMapLook(l)}
+                style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{MAP_LOOK_NAMES[l]}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.placeMeta}>{LOOK_HINTS[mapLook]}</Text>
+        <View style={styles.toggleRow}>
+          <Text style={[styles.placeName, styles.placeText]} nativeID="large-text-label">
+            Larger text
+          </Text>
+          <Switch
+            accessibilityLabelledBy="large-text-label"
+            value={largeText}
+            onValueChange={setLargeText}
+            trackColor={{ false: colors.line, true: colors.amber }}
+          />
         </View>
       </View>
 

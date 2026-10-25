@@ -18,6 +18,7 @@ import {
 import { colors, fonts } from "../theme";
 import { ROUTE_ALT } from "./mapShared";
 import { useElapsed } from "./useElapsed";
+import { useTextStyles } from "../textSize";
 
 export type PlanState =
   | { status: "loading" }
@@ -74,6 +75,7 @@ export function RoutePanel({
   onGo,
   onOpenExternal,
 }: Props) {
+  const styles = useTextStyles(baseStyles);
   const { lat, lng } = destination;
   // A slow answer reads as "still planning", never as a fault.
   const waiting = state.status === "loading" || (state.status === "ready" && !!state.checking);
@@ -187,6 +189,7 @@ export function RoutePanel({
  * typed before Go or later on the Log. Skippable.
  */
 function OtherEtas() {
+  const styles = useTextStyles(baseStyles);
   const [blm, setBlm] = useState("");
   const [google, setGoogle] = useState("");
   const minutes = (v: string) => (/^\d{1,3}$/.test(v.trim()) ? Number(v.trim()) : null);
@@ -223,6 +226,7 @@ function OtherEtas() {
 }
 
 function GoButton({ onPress, color, label }: { onPress: () => void; color: string; label: string }) {
+  const styles = useTextStyles(baseStyles);
   return (
     <Pressable
       accessibilityRole="button"
@@ -246,6 +250,7 @@ function StandardRow({
   swatch: string;
   onGo: () => void;
 }) {
+  const styles = useTextStyles(baseStyles);
   return (
     <View style={[styles.row, fastest && styles.rowFastest]}>
       <View style={[styles.swatch, { backgroundColor: swatch }]} />
@@ -269,6 +274,7 @@ function StandardRow({
  * update), or that it was routed round. Nothing when there are none.
  */
 function TrafficLine({ route }: { route: Route }) {
+  const styles = useTextStyles(baseStyles);
   const on = route.delays ?? [];
   const avoided = route.delaysAvoided ?? [];
   if (on.length) {
@@ -311,6 +317,7 @@ function PoliceRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const styles = useTextStyles(baseStyles);
   if (slot.state !== "route") {
     return (
       <View style={[styles.row, styles.rowMuted]}>
@@ -375,6 +382,7 @@ export function ExternalLinks({
   /** Big, as the main way on: when BlueRoute can't give a route. */
   prominent?: boolean;
 }) {
+  const styles = useTextStyles(baseStyles);
   return (
     <View style={styles.links}>
       <LinkButton
@@ -404,6 +412,7 @@ function LinkButton({
   onPress?: () => void;
   prominent?: boolean;
 }) {
+  const styles = useTextStyles(baseStyles);
   return (
     <Pressable
       accessibilityRole="link"
@@ -423,6 +432,7 @@ function LinkButton({
 
 /** Live closures: said only when the route may go through one, or they couldn't be checked. */
 function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
+  const styles = useTextStyles(baseStyles);
   if (!closures) return null;
   if (closures.ignored) {
     return (
@@ -435,7 +445,7 @@ function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
   return null;
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   // A sheet over the bottom of the map, rounded and lifted, as in Google Maps.
   panel: {
     backgroundColor: colors.bg,

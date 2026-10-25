@@ -4,6 +4,7 @@ import { formatDistance } from "../format";
 import { distanceM } from "../geo";
 import type { SearchResult, SearchResults } from "../search/engine";
 import { colors, fonts } from "../theme";
+import { useTextStyles } from "../textSize";
 
 interface Props {
   results: SearchResults;
@@ -31,6 +32,7 @@ const TAGS: Partial<Record<SearchResult["kind"], { text: string; color: string }
  * station across London is still where they're going.
  */
 export function SearchResultsList({ results, showOutside, onToggleOutside, onPick, footer, emptyText, from }: Props) {
+  const styles = useTextStyles(baseStyles);
   const onlyOutside = results.inArea.length === 0 && results.outside.length > 0;
   const rows =
     showOutside || onlyOutside ? [...results.inArea, ...results.outside.slice(0, 30)] : results.inArea;
@@ -82,6 +84,7 @@ function Row({
   onPick: (r: SearchResult) => void;
   away?: string;
 }) {
+  const styles = useTextStyles(baseStyles);
   const tag = outside
     ? { text: "OUT OF AREA", color: colors.muted }
     : result.placeType
@@ -105,7 +108,7 @@ function Row({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingBottom: 24 },
   row: {
     flexDirection: "row",

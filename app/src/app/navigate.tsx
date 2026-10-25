@@ -56,6 +56,7 @@ import {
   type Progress,
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
+import { useTextStyles } from "../textSize";
 
 const DEMO_GRACE_MS = 5000;
 const ARRIVAL_GRACE_MS = 10_000;
@@ -75,6 +76,7 @@ function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
 
 /** Turn-by-turn guidance, readable at a glance by the operator. */
 export default function NavigateScreen() {
+  const styles = useTextStyles(baseStyles);
   // Screen stays on while navigating. Ending quickly can release the lock
   // before it has taken hold; that's harmless, so it isn't an error.
   useEffect(() => {
@@ -614,6 +616,7 @@ function MarkSheet({
   onClose: () => void;
   bottomInset: number;
 }) {
+  const styles = useTextStyles(baseStyles);
   return (
     <View style={styles.sheetBackdrop}>
       <Pressable style={{ flex: 1 }} accessibilityLabel="Close marks" onPress={onClose} />
@@ -662,6 +665,7 @@ function RouteSheet({
   destination: { lat: number; lng: number };
   bottomInset: number;
 }) {
+  const styles = useTextStyles(baseStyles);
   const action = (label: string, onPress: () => void, style?: object) => (
     <Pressable
       key={label}
@@ -689,7 +693,7 @@ function RouteSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   empty: { alignItems: "center", justifyContent: "center", gap: 16 },
   emptyText: { color: colors.muted, fontFamily: fonts.body, fontSize: 16 },

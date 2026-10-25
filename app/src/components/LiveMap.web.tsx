@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DEMO_MODE, MAP_STYLES, region } from "../config";
+import { useMapStyle } from "./mapLooks";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
@@ -80,7 +81,7 @@ export function LiveMap({
   onMarkerPress,
 }: LiveMapProps) {
   const { fix, facing } = useLocation();
-  const { mapTheme } = useSession();
+  const { mapTheme, mapLook } = useSession();
   // For layers re-added on each style load: the theme now, not when the map was made.
   const theme = useRef(mapTheme);
   useEffect(() => {
@@ -126,7 +127,8 @@ export function LiveMap({
   const [styleVersion, setStyleVersion] = useState(0);
   // Opens where the vehicle is, so a new screen doesn't fly in from the middle of London.
   const startAt = useRef({ fix, zoom });
-  const style = DEMO_MODE ? demoMapStyle : MAP_STYLES[mapTheme];
+  const looked = useMapStyle(MAP_STYLES[mapTheme], mapLook, mapTheme);
+  const style = DEMO_MODE ? demoMapStyle : looked;
   const firstStyle = useRef(style);
 
   useEffect(() => {

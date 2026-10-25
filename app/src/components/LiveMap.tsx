@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MAP_STYLES, region } from "../config";
+import { useMapStyle } from "./mapLooks";
 import { useOfflineMap } from "../offline/OfflineMapProvider";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
@@ -84,9 +85,10 @@ export function LiveMap({
   onMarkerPress,
 }: LiveMapProps) {
   const { fix, facing } = useLocation();
-  const { mapTheme } = useSession();
+  const { mapTheme, mapLook } = useSession();
   // The map kept on the phone, once downloaded: draws with no signal.
   const offlineStyles = useOfflineMap().styles;
+  const mapStyle = useMapStyle(offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme], mapLook, mapTheme);
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
   const [zoomOffset, setZoomOffset] = useState(0);
@@ -151,7 +153,7 @@ export function LiveMap({
     <View style={styles.container} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
       <Map
         style={StyleSheet.absoluteFill}
-        mapStyle={offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme]}
+        mapStyle={mapStyle}
         logo={false}
         compass={!compact}
         attribution

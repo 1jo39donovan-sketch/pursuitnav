@@ -37,6 +37,8 @@ export interface ServerConfig {
   learning?: boolean;
   /** Where learned totals and learned speeds are kept. */
   learnedDir?: string;
+  /** OS Maps API key for the OS road map (OpenData zooms only); defaults to the OS Names key. */
+  osMapsKey?: string;
   /** SQLite file for usage counts (daily totals, hashed install IDs for 30 days). */
   usageDb?: string;
   /** Bearer token for GET /stats; the endpoint is off without one. */
@@ -73,6 +75,8 @@ export function loadConfig(): ServerConfig {
     restrictionCheckBudget: num("RESTRICTION_CHECK_BUDGET", 150),
     osPlacesKey: process.env.OS_PLACES_KEY || undefined,
     osNamesKey: process.env.OS_NAMES_KEY || undefined,
+    // The same OS Data Hub project key works once OS Maps API is added to the project.
+    osMapsKey: process.env.OS_MAPS_KEY || process.env.OS_NAMES_KEY || undefined,
     nominatimUrl: process.env.NOMINATIM_URL || undefined,
     placesFile: process.env.PLACES_FILE ?? "/data/places/places.txt.gz",
     roadsFile: process.env.ROADS_FILE ?? "/data/places/roads.txt.gz",
