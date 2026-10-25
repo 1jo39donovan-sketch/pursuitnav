@@ -119,7 +119,7 @@ def test_54_caledonian_road_without_os_places_is_the_road_in_islington():
 
 def test_54_caledonian_road_estimated_from_the_doors_either_side():
     q = "54 Caledonian Road"
-    est = answer("54 Caledonian Road (estimated between 52 and 58)", "door")
+    est = answer("54 Caledonian Road (estimated between 52 and 58)", "road")
     ok, detail = smoke_london.judge_unmapped([est], q, "Islington", os_places=False)
     assert ok and "estimated" in detail
 

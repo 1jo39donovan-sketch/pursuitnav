@@ -233,17 +233,23 @@ describe("unmapped house numbers", () => {
       const q = (new URL(url).searchParams.get("q") ?? "").replace(/ Rd$/, " Road");
       return new Response(JSON.stringify(doors[q] ? [doors[q]] : [street]), { status: 200 });
     }) as unknown as typeof fetch;
-    const client = new NominatimClient("http://nominatim.test", boroughs, fake);
-    const [top] = await client.search("Flat 3, 54 Caledonian Rd");
+    const estimating = new NominatimClient("http://nominatim.test", boroughs, fake);
+    const [top] = await estimating.search("Flat 3, 54 Caledonian Rd");
     expect(top).toMatchObject({
-      precision: "door",
+      // Placed between the doors, but never called the door itself.
+      precision: "road",
       label: "Flat 3, 54 Caledonian Road (estimated between 52 and 58)",
       postcode: "N1 9DP",
       borough: "Islington",
     });
     expect(top!.lat).toBeCloseTo(51.5442, 4);
+    // OSM's own estimate along an address line stands: no second one, nothing more asked.
+    const { nominatim, calls } = client([interpolation]);
+    const placed = await nominatim.search("53 Caledonian Road");
+    expect(placed.map((a) => a.label)).toEqual(["53 Caledonian Road (estimated point on the road)"]);
+    expect(calls).toHaveLength(1);
     // A mapped door needs no estimate.
-    const mapped = await client.search("52 Caledonian Road");
+    const mapped = await estimating.search("52 Caledonian Road");
     expect(mapped[0]!.label).toBe("52 Caledonian Road");
   });
 });

@@ -206,8 +206,10 @@ export class NominatimClient implements PlacesClient {
   async search(query: string): Promise<Address[]> {
     const asked = parseQuery(query);
     const found = this.toAddresses(await this.results(asked.q), asked);
-    // A numbered address OSM doesn't have: worked out from the doors either side.
-    if (asked.number && asked.street && !found.some((a) => a.precision === "door")) {
+    // A numbered address OSM doesn't have at all: worked out from the doors either side.
+    // Not when OSM already places it along an address line (an estimate of its own).
+    const placed = found.some((a) => a.precision === "door" || /\(estimated point on the road\)$/.test(a.label));
+    if (asked.number && asked.street && !placed) {
       const estimate = await this.estimate(asked).catch(() => null);
       if (estimate) return [estimate, ...found];
     }
@@ -245,7 +247,8 @@ export class NominatimClient implements PlacesClient {
     return {
       id: `osm:est-${normaliseStreet(road).replace(/\s/g, "-")}-${asked.number}`,
       source: "osm",
-      precision: "door",
+      // An estimate is never called the door (like OSM's own interpolated numbers): the label says how it was placed.
+      precision: "road",
       label: `${prefix}${asked.number} ${road} (${how})`,
       postcode: nearest?.r.address?.postcode ?? "",
       borough,

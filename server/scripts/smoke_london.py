@@ -507,7 +507,7 @@ def judge_unmapped(results, query, borough, os_places):
     if not top:
         return False, f"nothing on {street.title()}; got {[a['label'] for a in results[:3]]}"
     # Estimated from the mapped doors either side (labelled so), or else the road.
-    estimated = top.get("precision") == "door" and "(estimated " in top["label"]
+    estimated = top.get("precision") == "road" and "(estimated " in top["label"]
     ok = (estimated or top.get("precision") == "road") and top["borough"] == borough
     note = "" if estimated or not ok else " (door level needs OS Places, an OSM address, or doors either side)"
     return ok, f"top answer '{top['label']}' is {top.get('precision')} in {top['borough']}{note}"
