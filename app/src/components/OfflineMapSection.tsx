@@ -10,8 +10,10 @@ import { useOfflineMap } from "../offline/OfflineMapProvider";
 import { readyText, sizeText, staleText } from "../offline/offlinePack";
 import { colors, fonts } from "../theme";
 import { Button } from "./Button";
+import { useTextStyles } from "../textSize";
 
 export function OfflineMapSection() {
+  const styles = useTextStyles(baseStyles);
   const offline = useOfflineMap();
   const { state, check } = offline;
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -135,7 +137,7 @@ export function OfflineMapSection() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   field: { gap: 10 },
   label: {
     color: colors.muted,

@@ -82,6 +82,89 @@ function clearLayer(l: Layer, theme: MapTheme): Layer {
   return l;
 }
 
+// Night: the detailed day map (buildings, shops, road numbers and all)
+// recoloured dark, rather than a separate dark map that leaves most of it out.
+const NIGHT = {
+  background: "#0f1520",
+  water: "#0b2033",
+  green: "#13241a",
+  building: "#1d2534",
+  buildingTop: "#252e3e",
+  land: "#121925",
+  casing: "#06090f",
+  major: "#8a7440",
+  primary: "#6b6452",
+  secondary: "#4e5769",
+  minor: "#3a4355",
+  rail: "#3e4556",
+  waterway: "#163454",
+  boundary: "#5c667a",
+  halo: "#0b1019",
+};
+const GREEN = /park|grass|wood|forest|garden|pitch|cemetery|meadow|scrub/;
+
+function nightLayer(l: Layer): Layer {
+  const id = l.id;
+  const src = sourceLayer(l) ?? "";
+  switch (l.type) {
+    case "background":
+      return { ...l, paint: { ...l.paint, "background-color": NIGHT.background } };
+    case "fill": {
+      const color =
+        src === "water" || /water/.test(id)
+          ? NIGHT.water
+          : src === "building" || /building/.test(id)
+            ? NIGHT.building
+            : src === "park" || GREEN.test(id)
+              ? NIGHT.green
+              : NIGHT.land;
+      return { ...l, paint: { ...l.paint, "fill-color": color, "fill-outline-color": NIGHT.halo } };
+    }
+    case "fill-extrusion":
+      return { ...l, paint: { ...l.paint, "fill-extrusion-color": NIGHT.buildingTop } };
+    case "line": {
+      let color = NIGHT.minor;
+      if (src === "transportation") {
+        if (/casing|outline/.test(id)) color = NIGHT.casing;
+        else if (/motorway|trunk/.test(id)) color = NIGHT.major;
+        else if (/primary/.test(id)) color = NIGHT.primary;
+        else if (/secondary|tertiary/.test(id)) color = NIGHT.secondary;
+        else if (/rail|transit/.test(id)) color = NIGHT.rail;
+      } else if (src === "waterway" || /water/.test(id)) color = NIGHT.waterway;
+      else if (src === "boundary" || /boundary/.test(id)) color = NIGHT.boundary;
+      return { ...l, paint: { ...l.paint, "line-color": color } };
+    }
+    case "symbol": {
+      // Road number shields keep their own colours: dark text on a light badge.
+      if (/shield/.test(id)) return { ...l, paint: { ...l.paint, "icon-opacity": 0.85 } };
+      const text =
+        src === "place"
+          ? "#e3e9f3"
+          : src === "transportation_name"
+            ? "#c4ccda"
+            : src === "water_name"
+              ? "#6f93bb"
+              : src === "poi"
+                ? "#9fabc0"
+                : "#b5bfd0";
+      return {
+        ...l,
+        paint: { ...l.paint, "text-color": text, "text-halo-color": NIGHT.halo, "text-halo-width": 1.4, "icon-opacity": 0.8 },
+      };
+    }
+    case "raster":
+    case "hillshade":
+      return l.type === "raster" ? { ...l, paint: { ...l.paint, "raster-brightness-max": 0.35 } } : { ...l, layout: { ...l.layout, visibility: "none" } };
+    default:
+      return l;
+  }
+}
+
+/** The day style recoloured for night. */
+export function nightify(style: StyleSpecification): StyleSpecification {
+  return { ...style, layers: style.layers.map(nightLayer) };
+}
+
 function osLayers(theme: MapTheme): { source: StyleSpecification["sources"][string]; layer: Layer } {
   return {
     source: {
@@ -131,21 +214,25 @@ function styleJson(base: string): Promise<StyleSpecification> {
 
 /**
  * The style to draw: `base` (a URL, or a style's JSON text for the offline
- * map) changed to the look. Standard is `base` itself; the others show the
- * standard map until theirs is ready, or if it can't be made.
+ * map) changed to the look. At night it's made from `day` (the detailed day
+ * style) recoloured dark. Standard by day is `base` itself; anything else
+ * shows `base` until it's ready, or if it can't be made.
  */
-export function useMapStyle(base: string, look: MapLook, theme: MapTheme): string | StyleSpecification {
+export function useMapStyle(base: string, look: MapLook, theme: MapTheme, day?: string): string | StyleSpecification {
   const [made, setMade] = useState<{ key: string; style: StyleSpecification } | null>(null);
-  const key = `${look}|${theme}|${base}`;
+  const fromDay = theme === "night" && !!day;
+  const plain = look === "standard" && !fromDay;
+  const source = fromDay ? day! : base;
+  const key = `${look}|${theme}|${source}`;
   useEffect(() => {
-    if (look === "standard") return;
+    if (plain) return;
     let live = true;
-    styleJson(base)
-      .then((s) => live && setMade({ key, style: restyle(s, look, theme) }))
+    styleJson(source)
+      .then((s) => live && setMade({ key, style: restyle(fromDay ? nightify(s) : s, look, theme) }))
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [base, look, theme, key]);
-  return look !== "standard" && made?.key === key ? made.style : base;
+  }, [source, look, theme, key, plain, fromDay]);
+  return !plain && made?.key === key ? made.style : base;
 }

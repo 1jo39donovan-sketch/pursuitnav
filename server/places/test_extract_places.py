@@ -116,3 +116,11 @@ def test_hospitals_that_take_emergencies_are_marked():
     assert classify({"amenity": "hospital", "emergency": "yes"}) == ("Hospital with A&E", "health")
     assert classify({"amenity": "hospital", "emergency": "no"}) == ("Hospital", "health")
     assert classify({"emergency": "emergency_ward_entrance"}) == ("A&E entrance", "health")
+
+
+def test_a_mental_health_unit_is_not_an_ae():
+    from categories import classify
+
+    assert classify({"amenity": "hospital", "emergency": "yes", "name": "Highgate Mental Health Centre"}) != ("Hospital with A&E", "health")
+    assert classify({"amenity": "hospital", "emergency": "yes", "healthcare:speciality": "psychiatry", "name": "X"}) != ("Hospital with A&E", "health")
+    assert classify({"amenity": "hospital", "emergency": "yes", "name": "Whittington Hospital"}) == ("Hospital with A&E", "health")

@@ -134,7 +134,7 @@ export function LiveMap({
   const [styleVersion, setStyleVersion] = useState(0);
   // Opens where the vehicle is, so a new screen doesn't fly in from the middle of London.
   const startAt = useRef({ fix, zoom });
-  const looked = useMapStyle(MAP_STYLES[mapTheme], mapLook, mapTheme);
+  const looked = useMapStyle(MAP_STYLES[mapTheme], mapLook, mapTheme, MAP_STYLES.day);
   const style = DEMO_MODE ? demoMapStyle : looked;
   const firstStyle = useRef(style);
 

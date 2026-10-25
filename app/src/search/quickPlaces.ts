@@ -28,6 +28,16 @@ function nearest(from: { lat: number; lng: number }, list: readonly PointOfInter
   return best;
 }
 
+/**
+ * A hospital to take a casualty to. OSM marks some units emergency=yes that
+ * aren't A&Es (mental health units take psychiatric emergencies); the data
+ * build leaves them out too (server/places/categories.py), this covers files
+ * built before it did.
+ */
+export function isAE(p: PointOfInterest): boolean {
+  return p.type === "Hospital with A&E" && !/mental health|psychiatric|hospice|rehabilitation|maternity/i.test(p.name);
+}
+
 /** Hospitals' A&E entrances are usually away from the main door: within this of it, an entrance mapped as A&E counts. */
 const AE_ENTRANCE_WITHIN_M = 500;
 
@@ -54,7 +64,7 @@ export function quickPlaces(
     const n = nearest(from, list);
     if (n) out.push({ label, ...n });
   };
-  const ae = nearest(from, pois.filter((p) => p.type === "Hospital with A&E"));
+  const ae = nearest(from, pois.filter(isAE));
   if (ae) {
     const place = aeDestination(ae.place, pois);
     out.push({ label: "Nearest A&E", place, metres: distanceM(from, place) });

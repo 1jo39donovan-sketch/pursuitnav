@@ -2,7 +2,7 @@ import type { LngLat } from "@maplibre/maplibre-react-native";
 import { useNetworkState } from "expo-network";
 import { router, Tabs, useLocalSearchParams } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -78,6 +78,9 @@ export default function SearchScreen() {
   const styles = useTextStyles(baseStyles);
   const { fix, simulated } = useLocation();
   const insets = useSafeAreaInsets();
+  // A phone on its side (short and wide): the route card goes down the left, not over the map's bottom half.
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const sideways = screenW > screenH && screenH < 560;
   // Height of the floating search box (and any notes under it), from the top of the screen.
   const [topSpace, setTopSpace] = useState(insets.top + 72);
   const { boroughs, policeRoutes, vehicle, roads, mapView } = useSession();
@@ -689,7 +692,8 @@ export default function SearchScreen() {
       </View>
 
       <View
-        style={[styles.floating, { top: insets.top + 8 }]}
+        // Sideways with routes shown: the search box moves right, so the route card has the left side's full height.
+        style={[styles.floating, { top: insets.top + 8 }, sideways && destination ? { left: "50%" } : null]}
         onLayout={(e) => setTopSpace(insets.top + 8 + e.nativeEvent.layout.height)}
         pointerEvents="box-none"
       >
@@ -748,6 +752,7 @@ export default function SearchScreen() {
       </View>
       {destination && shown && (
         <RoutePanel
+          side={sideways ? { top: insets.top + 8 } : undefined}
           state={shown}
           destination={{ lat: destination.point[1], lng: destination.point[0] }}
           title={destination.title}

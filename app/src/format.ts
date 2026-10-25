@@ -11,6 +11,15 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")} min`;
 }
 
+/**
+ * A journey time to glance at: whole minutes (seconds are noise on a time
+ * that changes as you drive, and don't fit a phone). Over an hour, as above.
+ */
+export function formatMinutes(seconds: number): string {
+  const mins = Math.max(1, Math.round(seconds / 60));
+  return mins < 60 ? `${mins} min` : formatDuration(seconds);
+}
+
 /** UK roads: miles, with yards for short distances. */
 export function formatDistance(metres: number): string {
   const miles = metres / 1609.344;

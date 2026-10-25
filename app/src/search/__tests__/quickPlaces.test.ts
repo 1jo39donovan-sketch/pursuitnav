@@ -39,6 +39,11 @@ describe("quick places", () => {
 });
 
 describe("A&E", () => {
+  it("never offers a mental health unit as the nearest A&E", () => {
+    const unit = poi("Highgate Mental Health Centre", "Hospital with A&E", "Camden", 51.5552, -0.1155);
+    expect(quickPlaces("ambulance", holloway, [unit, ...pois])[0]).toMatchObject({ place: { name: "Whittington Hospital" } });
+  });
+
   it("sends a crew to the A&E entrance when one is mapped near the hospital", () => {
     const hospital = pois[0]!;
     const entrance = poi("Emergency Department", "A&E entrance", "Islington", 51.5662, -0.1379);

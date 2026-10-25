@@ -202,11 +202,23 @@ KEY_ORDER = [
 ]
 
 
+# Hospitals OSM marks emergency=yes that aren't somewhere to take a casualty:
+# mental health units (they take psychiatric emergencies), hospices, rehab.
+NOT_AE_WORDS = ("mental health", "psychiatric", "hospice", "rehabilitation", "maternity")
+NOT_AE_SPECIALITIES = ("psychiatry", "palliative", "rehabilitation", "obstetrics")
+
+
+def not_an_ae(tags) -> bool:
+    name = (tags.get("name") or "").lower()
+    speciality = (tags.get("healthcare:speciality") or "").lower()
+    return any(w in name for w in NOT_AE_WORDS) or any(s in speciality for s in NOT_AE_SPECIALITIES)
+
+
 def classify(tags) -> tuple[str, str] | None:
     """(type label, group) for a feature's tags, or None to leave it out."""
     # Ambulance crews need the hospitals that take emergencies.
     if tags.get("amenity") == "hospital" or tags.get("healthcare") == "hospital":
-        if tags.get("emergency") == "yes":
+        if tags.get("emergency") == "yes" and not not_an_ae(tags):
             return "Hospital with A&E", "health"
     for key in KEY_ORDER:
         value = tags.get(key)

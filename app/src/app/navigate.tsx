@@ -15,7 +15,7 @@ import { useElapsed } from "../components/useElapsed";
 import { LiveMap } from "../components/LiveMap";
 import type { MapRoute } from "../components/mapShared";
 import { ExternalLinks } from "../components/RoutePanel";
-import { formatDistance, formatDuration, roadLabel } from "../format";
+import { formatDistance, formatMinutes, roadLabel } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation, type RouteKind } from "../navigation/NavigationProvider";
 import {
@@ -27,7 +27,7 @@ import {
   type LastReroute,
   type RerouteFailure,
 } from "../navigation/reroute";
-import { arrivalSide, nextCallout } from "../navigation/voice";
+import { arrivalSide, instructionWithPlace, nextCallout } from "../navigation/voice";
 import { recordEvent } from "../usage/usage";
 import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
 import { recorder, useRecorder } from "../fieldtest/instance";
@@ -438,11 +438,11 @@ export default function NavigateScreen() {
             <Text style={styles.distance}>{formatDistance(progress.distanceToNextM)}</Text>
           </View>
           <Text style={styles.instruction} numberOfLines={3}>
-            {progress.next ? upcomingInstruction(progress.next) : "Continue to your destination."}
+            {progress.next ? instructionWithPlace(progress.next, active.destination.title) : "Continue to your destination."}
           </Text>
           {progress.after && (
-            <Text style={styles.then} numberOfLines={1}>
-              Then {maneuverArrow(progress.after.type)} {upcomingInstruction(progress.after)}
+            <Text style={styles.then} numberOfLines={2}>
+              Then {maneuverArrow(progress.after.type)} {instructionWithPlace(progress.after, active.destination.title)}
             </Text>
           )}
         </>
@@ -469,10 +469,10 @@ export default function NavigateScreen() {
             : "—"}
         </Text>
         <View style={styles.eta}>
-          <Text style={styles.etaMeta} numberOfLines={1}>
-            {progress ? `${formatDuration(progress.remainingS)} · ${formatDistance(progress.remainingM)}` : ""}
+          <Text style={styles.etaMeta} numberOfLines={2}>
+            {progress ? `${formatMinutes(progress.remainingS)} · ${formatDistance(progress.remainingM)}` : ""}
           </Text>
-          <Text style={styles.road} numberOfLines={1}>
+          <Text style={styles.road} numberOfLines={2}>
             On {(progress && roadLabel(progress.current.streetNames)) ?? "—"}
           </Text>
           {/* The crew's note on the block, as they get close. */}

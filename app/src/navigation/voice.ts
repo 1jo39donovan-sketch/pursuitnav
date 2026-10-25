@@ -1,6 +1,7 @@
 // What to say aloud during turn-by-turn, so the crew can keep their eyes on
 // the road. Each turn is called once on the approach and once just before
 // it; arrival once. Pure: the screen speaks what this returns.
+import type { Maneuver } from "../api/routes";
 import { upcomingInstruction, type Progress } from "./progress";
 
 /** Approach call between these distances, then the "now" call. */
@@ -47,6 +48,12 @@ export function spokenPlace(title: string | undefined): string | null {
   return title.replace(/,?\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, "").trim() || null;
 }
 
+/** The next manoeuvre as said and shown; the arrival names the address ("Destination ahead on the left: 54 Caledonian Road"). */
+export function instructionWithPlace(m: Maneuver, title?: string): string {
+  const place = spokenPlace(title);
+  return m.type in ARRIVAL_SIDE && place ? `${upcomingInstruction(m)}: ${place}` : upcomingInstruction(m);
+}
+
 export function nextCallout(progress: Progress, said: ReadonlySet<string>, title?: string): Callout | null {
   const place = spokenPlace(title);
   if (progress.arrived) {
@@ -63,8 +70,7 @@ export function nextCallout(progress: Progress, said: ReadonlySet<string>, title
   const id = `turn:${next.beginShapeIndex}`;
   const d = progress.distanceToNextM;
   // The last call before arriving says which side and the address, door number and all.
-  const arriving = next.type in ARRIVAL_SIDE && place;
-  const text = arriving ? `${upcomingInstruction(next)}: ${place}` : upcomingInstruction(next);
+  const text = instructionWithPlace(next, title);
   if (d <= NOW_M) {
     return said.has(`${id}:now`) ? null : { key: `${id}:now`, text: `${text}.`.replace(/\.\.$/, ".") };
   }

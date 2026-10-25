@@ -94,7 +94,12 @@ export function LiveMap({
   const { mapTheme, mapLook } = useSession();
   // The map kept on the phone, once downloaded: draws with no signal.
   const offlineStyles = useOfflineMap().styles;
-  const mapStyle = useMapStyle(offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme], mapLook, mapTheme);
+  const mapStyle = useMapStyle(
+    offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme],
+    mapLook,
+    mapTheme,
+    offlineStyles?.day ?? MAP_STYLES.day,
+  );
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
   const [zoomOffset, setZoomOffset] = useState(0);

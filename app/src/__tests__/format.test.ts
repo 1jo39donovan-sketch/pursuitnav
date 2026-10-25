@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { roadLabel } from "../format";
+import { formatMinutes, roadLabel } from "../format";
 
 describe("roadLabel", () => {
   it("puts the road's name first, then its number, whatever order they come in", () => {
@@ -12,5 +12,13 @@ describe("roadLabel", () => {
     expect(roadLabel(["Upper Street"])).toBe("Upper Street");
     expect(roadLabel(["a406"])).toBe("A406");
     expect(roadLabel([])).toBeNull();
+  });
+});
+
+describe("formatMinutes", () => {
+  it("gives a journey time in whole minutes, never seconds", () => {
+    expect(formatMinutes(234)).toBe("4 min");
+    expect(formatMinutes(20)).toBe("1 min");
+    expect(formatMinutes(3900)).toBe("1 h 05 min");
   });
 });

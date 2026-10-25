@@ -9,7 +9,8 @@ import { colors, fonts } from "../theme";
 const VIEW_LABEL = { heading: "▲", "3d": "3D", north: "N" } as const;
 const VIEW_NAME = { heading: "Direction of travel up", "3d": "Tilted 3D view", north: "North up" } as const;
 // Under the button: which view it's in, in two words.
-const VIEW_CAPTION = { heading: "Ahead up", "3d": "3D view", north: "North up" } as const;
+// One short word each: "Ahead up" didn't fit the 52 px button and was cut to "AHEAD …".
+const VIEW_CAPTION = { heading: "Ahead", "3d": "3D view", north: "North" } as const;
 
 export function MapButtons({
   showView,
@@ -155,5 +156,13 @@ const styles = StyleSheet.create({
   },
   label: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 18, lineHeight: 20 },
   zoom: { fontSize: 28, lineHeight: 30 },
-  caption: { color: colors.muted, fontFamily: fonts.body, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
+  caption: {
+    color: colors.muted,
+    fontFamily: fonts.body,
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    textAlign: "center",
+    alignSelf: "stretch",
+  },
 });
