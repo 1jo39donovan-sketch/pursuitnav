@@ -171,4 +171,24 @@ describe("mergeAddresses", () => {
       ["Cally Pool and Gym", "place"],
     ]);
   });
+
+  it("puts a number estimated from the doors either side above the road, and drops the road row", () => {
+    const merged = mergeAddresses(
+      { inArea: [{ ...road, label: "368 Holloway Road", road: "Holloway Road" }], outside: [] },
+      [
+        {
+          id: "osm:est-holloway-road-368",
+          label: "368 Holloway Road (estimated next to 366)",
+          precision: "road",
+          postcode: "N7 6PA",
+          borough: "Islington",
+          lat: 51.556,
+          lng: -0.117,
+          match: 0.6,
+        } as Address,
+      ],
+      new Set<Borough>(["Islington"]),
+    );
+    expect(merged.inArea.map((r) => r.label)).toEqual(["368 Holloway Road (estimated next to 366)"]);
+  });
 });

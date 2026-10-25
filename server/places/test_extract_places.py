@@ -32,6 +32,7 @@ def write_fixture(path):
     node(LAT, LNG + 3 * D, amenity="bench", name="Memorial bench")  # clutter: left out
     node(52.2, -0.5, amenity="cafe", name="Somewhere Else Cafe")  # outside London
     node(LAT, LNG + 4 * D, shop="tattoo", name="Ink|Well")
+    node(LAT + D, LNG + 5 * D, emergency="emergency_ward_entrance")  # unnamed, but kept: crews need it
     # Two branches of a chain ~1 km apart: both stay.
     node(LAT - 10 * D, LNG, amenity="cafe", name="Costa")
     node(LAT - 32 * D, LNG, amenity="cafe", name="Costa")  # unlisted shop type, pipe in name
@@ -124,3 +125,7 @@ def test_a_mental_health_unit_is_not_an_ae():
     assert classify({"amenity": "hospital", "emergency": "yes", "name": "Highgate Mental Health Centre"}) != ("Hospital with A&E", "health")
     assert classify({"amenity": "hospital", "emergency": "yes", "healthcare:speciality": "psychiatry", "name": "X"}) != ("Hospital with A&E", "health")
     assert classify({"amenity": "hospital", "emergency": "yes", "name": "Whittington Hospital"}) == ("Hospital with A&E", "health")
+
+
+def test_an_unnamed_ae_entrance_is_kept(places):
+    assert places["A&E entrance"][2] == "A&E entrance"
