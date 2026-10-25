@@ -3,7 +3,7 @@
 
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
 // Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
-const UPDATED = "24 October 2026";
+const UPDATED = "25 October 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -81,6 +81,11 @@ under “Usage counts” below.</p>
     in memory for up to 24 hours; they’re never written to disk or logged.</li>
   <li><strong>Pursuit mode:</strong> your last few positions and direction of travel, to find the road and its speed
     limit.</li>
+  <li><strong>Where am I</strong> and <strong>tapping a building on the map:</strong> that point, to find the nearest
+    address and postcode.</li>
+  <li><strong>Building entrances:</strong> the destination’s position, to find the ways into the building there.</li>
+  <li><strong>OS road map</strong> (only if you pick that map style): which part of the map is being shown. The server
+    fetches it from Ordnance Survey itself, so OS doesn’t see your phone.</li>
   <li><strong>Follow in</strong> (team sessions): your position and the colleague’s recent track, to work out the way
     they drove.</li>
 </ul>
@@ -117,6 +122,9 @@ week ends. Nothing more than a week's worth is ever held. No positions, addresse
 searches, callsigns or IP addresses are kept with these counts, and no third-party analytics service is used.</p>
 
 <h2>Waitlist and emails to us</h2>
+<p><strong>Report a problem</strong> in the app opens an email in your own mail app, with the app version and a
+summary of the route (length, time, vehicle and how many restrictions it used; no addresses, positions or road names). You can read and change it before you
+send it, and nothing is sent unless you do.</p>
 <p>If you email us to join the waitlist, we use your email address (and the service or role, if you give it) only to
 tell you when BlueRoute is in the App Store and Google Play. It isn't used for marketing or anything else, isn't
 shared, and is deleted once we've told you, or sooner if you ask. If you email us for support or about using
@@ -125,7 +133,8 @@ BlueRoute in your service, we use your message only to reply.</p>
 <h2>Other services</h2>
 <ul>
   <li><strong>Map tiles</strong> come from OpenFreeMap. Like any website, it sees your phone’s IP address and which part
-    of the map is being shown.</li>
+    of the map is being shown. The offline map, and the places and roads lists used for search with no signal, are
+    downloaded whole from the BlueRoute server, so they say nothing about where you are.</li>
   <li><strong>TfL</strong>: the server reads TfL’s public road closures feed to route around closed roads. Nothing
     about you or your journeys is sent to TfL.</li>
   <li><strong>Ordnance Survey</strong> receives address searches from the server, through its OS Names API (and OS
@@ -164,8 +173,8 @@ and what happened, but please don’t send real addresses from jobs.</p>
 
 <h2>Common questions</h2>
 <ul>
-  <li><strong>No blue-light route showing?</strong> Blue-light routes are off until you turn them on in the Session tab and
-    confirm you drive for the police, fire or ambulance service. Even then, one is only shown when it’s meaningfully faster.</li>
+  <li><strong>No blue-light route showing?</strong> Blue-light routes are on unless you’ve turned them off in the Session tab.
+    One is only shown when it’s meaningfully faster than the standard route.</li>
   <li><strong>Not in London?</strong> Turn on <em>Demo drive</em> in the Session tab to try the app with a simulated
     drive through London.</li>
   <li><strong>Search can’t find a block or estate?</strong> Save it in the Search tab with the road it’s on.</li>
@@ -174,7 +183,7 @@ and what happened, but please don’t send real addresses from jobs.</p>
     for you to check it fits your force’s policy.</li>
   <li><strong>Road closures?</strong> Routes avoid roads TfL lists as fully closed, updated every 5 minutes. Lane
     closures, and incidents TfL hasn’t listed yet, aren’t included.</li>
-  <li><strong>Where is my log?</strong> On your phone only, in the Log tab. It’s never cleared unless you clear it.</li>
+  <li><strong>Where is my log?</strong> On your phone only: open it from the Session tab. It’s never cleared unless you clear it.</li>
 </ul>
 
 <p><a href="/terms">Terms of use</a> · <a href="/privacy">Privacy policy</a></p>`,
