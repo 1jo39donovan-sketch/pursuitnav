@@ -15,7 +15,8 @@ import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { currentInstallId, newInstallId } from "../../usage/usage";
 import { colors, fonts } from "../../theme";
-import { VEHICLES } from "../../vehicles";
+import { bcuFor } from "../../search/boroughGroups";
+import { SERVICES, VEHICLES, vehiclesFor } from "../../vehicles";
 
 // Once a shift is set up, the app opens on Search: the job is usually to type
 // an address straight away. Only on the first screen shown after launch.
@@ -32,8 +33,12 @@ export default function SessionScreen() {
     setPoliceRoutes,
     vehicle,
     setVehicle,
+    service,
+    setService,
     voice,
     setVoice,
+    showPursuit,
+    setShowPursuit,
     mapTheme,
     setMapTheme,
     roads,
@@ -75,9 +80,51 @@ export default function SessionScreen() {
       <View style={styles.intro}>
         <Text style={styles.title}>Start of shift</Text>
         <Text style={styles.hint}>
-          Pick the boroughs you’re working. Address searches show matches in them first, so you get the right Church
-          Street first time. Both are kept for next time.
+          Your service and vehicle, then the area you’re working. Address searches show matches in it first, so you
+          get the right Church Street first time. All are kept for next time.
         </Text>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Service</Text>
+        <View style={styles.chips}>
+          {SERVICES.map((sv) => {
+            const on = service === sv.id;
+            return (
+              <Pressable
+                key={sv.id}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                onPress={() => setService(sv.id)}
+                style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{sv.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Vehicle</Text>
+        <Text style={styles.placeMeta}>Routes avoid low bridges and weight limits it can’t take.</Text>
+        <View style={styles.chips}>
+          {VEHICLES.filter((v) => vehiclesFor(service).includes(v.id)).map((v) => {
+            const on = vehicle === v.id;
+            return (
+              <Pressable
+                key={v.id}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                accessibilityHint={v.detail}
+                onPress={() => setVehicle(v.id)}
+                style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{v.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       <View style={styles.field}>
@@ -98,27 +145,20 @@ export default function SessionScreen() {
 
       <BoroughPicker />
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Vehicle</Text>
-        <Text style={styles.placeMeta}>Routes avoid low bridges and weight limits it can’t take.</Text>
-        <View style={styles.chips}>
-          {VEHICLES.map((v) => {
-            const on = vehicle === v.id;
-            return (
-              <Pressable
-                key={v.id}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: on }}
-                accessibilityHint={v.detail}
-                onPress={() => setVehicle(v.id)}
-                style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
-              >
-                <Text style={[styles.chipText, on && styles.chipTextOn]}>{v.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+      {service === "police" && (
+        // Custody, stations and A&Es for the BCU being worked, one tap from a route.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${bcuFor(boroughs).name} BCU: custody, police stations and A&E`}
+          onPress={() => router.push({ pathname: "/bcu", params: { code: bcuFor(boroughs).code } })}
+          style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.logText}>
+            {bcuFor(boroughs).name} <Text style={styles.logMeta}>{bcuFor(boroughs).code}</Text>
+          </Text>
+          <Text style={styles.logMeta}>Custody · stations · A&E ›</Text>
+        </Pressable>
+      )}
 
       <View style={styles.field}>
         <Text style={styles.label}>Roads</Text>
@@ -151,7 +191,7 @@ export default function SessionScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Map and voice</Text>
+        <Text style={styles.label}>Map, voice and tabs</Text>
         <View style={styles.toggleRow}>
           <Text style={[styles.placeName, styles.placeText]} nativeID="voice-label">
             Spoken directions
@@ -160,6 +200,17 @@ export default function SessionScreen() {
             accessibilityLabelledBy="voice-label"
             value={voice}
             onValueChange={setVoice}
+            trackColor={{ false: colors.line, true: colors.amber }}
+          />
+        </View>
+        <View style={styles.toggleRow}>
+          <Text style={[styles.placeName, styles.placeText]} nativeID="pursuit-label">
+            Pursuit tab
+          </Text>
+          <Switch
+            accessibilityLabelledBy="pursuit-label"
+            value={showPursuit}
+            onValueChange={setShowPursuit}
             trackColor={{ false: colors.line, true: colors.amber }}
           />
         </View>

@@ -2,12 +2,15 @@ import type { BottomTabBarProps } from "expo-router/tabs";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 
 // Text-only tabs with an amber bar over the active one, as in the prototype.
 // Big targets: the operator is tapping this in a moving car.
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  // Pursuit can be hidden in Session (crews who never pursue).
+  const { showPursuit } = useSession();
   return (
     <View
       style={[
@@ -16,6 +19,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       ]}
     >
       {state.routes.map((route, index) => {
+        if (route.name === "pursuit" && !showPursuit) return null;
         const focused = state.index === index;
         const { options } = descriptors[route.key];
         const label = options.title ?? route.name;

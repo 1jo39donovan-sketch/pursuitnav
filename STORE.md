@@ -100,7 +100,7 @@ Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code r
 **Subtitle (Apple, 30 characters):** Blue-light navigation
 **Short description (Google, 80 characters):** Blue-light navigation for emergency services: police, ambulance and fire.
 **Category:** Navigation (Apple) / Maps & Navigation (Google)
-**Price:** Free · no ads · no in-app purchases
+**Price:** Free · no in-app purchases (for now)
 **Age rating:** 4+ / Everyone (no objectionable content). Target audience on Google: 18 and over.
 **Privacy policy:** `https://SERVER_DOMAIN/privacy`
 **Support URL:** `https://SERVER_DOMAIN/support`
@@ -128,7 +128,7 @@ Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code r
 > Every search and route picked is kept on your phone until you clear it.
 >
 > PRIVATE BY DESIGN
-> No accounts, adverts or tracking. Addresses and your log stay on your phone; the server works out routes without keeping anything.
+> No accounts and no third-party analytics. Addresses and your log stay on your phone; the server works out routes without keeping anything.
 >
 > BlueRoute is independent and is not affiliated with or endorsed by any police, ambulance or fire service. Blue-light routes are for emergency-service drivers using the exemptions only. Maps and search start in London, with more areas to come.
 
