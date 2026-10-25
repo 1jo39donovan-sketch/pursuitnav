@@ -358,6 +358,7 @@ export default function SessionScreen() {
         <View style={styles.linkRow}>
           <Button label="Privacy" onPress={() => Linking.openURL(`${API_URL}/privacy`)} />
           <Button label="Help and support" onPress={() => Linking.openURL(`${API_URL}/support`)} />
+          <Button label="Terms" onPress={() => Linking.openURL(`${API_URL}/terms`)} />
         </View>
       )}
 

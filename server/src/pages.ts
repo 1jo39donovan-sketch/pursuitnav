@@ -64,7 +64,7 @@ under “Usage counts” below.</p>
 <h2>Kept on your phone only</h2>
 <ul>
   <li>Your callsign, the boroughs you pick, and your settings.</li>
-  <li>Blocks and estates you save.</li>
+  <li>Blocks and estates you save, and your notes for a BCU or borough.</li>
   <li>The log of your searches and the routes you picked.</li>
 </ul>
 <p>None of this is sent anywhere. It stays until you clear the log in the app or uninstall it.</p>
@@ -146,7 +146,7 @@ are. It doesn’t use location in the background.</p>
 
 <h2>Questions</h2>
 <p>To ask about this policy, ${contact(email)}. If this policy changes, the date above changes and the new version is
-published here.</p>`,
+published here. Using BlueRoute is also subject to its <a href="/terms">terms of use</a>.</p>`,
   );
 }
 
@@ -176,6 +176,103 @@ and what happened, but please don’t send real addresses from jobs.</p>
   <li><strong>Where is my log?</strong> On your phone only, in the Log tab. It’s never cleared unless you clear it.</li>
 </ul>
 
-<p><a href="/privacy">Privacy policy</a></p>`,
+<p><a href="/terms">Terms of use</a> · <a href="/privacy">Privacy policy</a></p>`,
+  );
+}
+
+export function termsPage(email?: string): string {
+  return page(
+    "Terms of use",
+    `<p class="muted">BlueRoute · last updated ${UPDATED}</p>
+
+<p>These terms apply to anyone who uses the BlueRoute app or its website. By using BlueRoute you agree to them. If you
+don’t agree, don’t use it.</p>
+
+<h2>1. What BlueRoute is, and isn’t</h2>
+<ul>
+  <li>BlueRoute is an independent navigation aid. It is not made, endorsed, supplied or approved by any police,
+    ambulance or fire service, and is not an official system of any of them.</li>
+  <li>It is an aid only. It does not replace your training, your judgement, your control room, your radio, your
+    service’s systems or your service’s policies.</li>
+  <li>It is still being field-tested and may change, stop working or be withdrawn at any time, without notice.</li>
+</ul>
+
+<h2>2. You are responsible for how you drive</h2>
+<ul>
+  <li>You, and the driver, are solely responsible for how the vehicle is driven, for obeying road signs, signals,
+    the law and your service’s policies, and for the safety of everyone on and near the road.</li>
+  <li>Follow what you see on the road over anything the app shows. Roads, restrictions, closures, speed limits and
+    other conditions change, and the app’s information can be missing, out of date or wrong.</li>
+  <li>The driver must not operate the app while driving. It is designed for the passenger (operator) to use, or for
+    use when the vehicle is stopped safely.</li>
+</ul>
+
+<h2>3. Blue-light routes</h2>
+<ul>
+  <li>Blue-light routes use bus lanes and bus gates and ignore turn restrictions. They are only for drivers of police,
+    ambulance, fire and other emergency vehicles who are legally entitled to use those exemptions, are trained to,
+    and are using them on an authorised call. Anyone else must turn them off in Session and use the standard route.</li>
+  <li>Whether a blue-light route, or any manoeuvre on it, is lawful, safe and appropriate at that moment is your
+    decision alone. The app lists the restrictions a route relies on so that you can decide; it never makes that
+    decision for you.</li>
+  <li>The app tries never to route the wrong way down a one-way street, or under a bridge or limit your chosen vehicle
+    can’t take, but it relies on map data that can be wrong. Check the road.</li>
+</ul>
+
+<h2>4. Information is provided “as is”</h2>
+<ul>
+  <li>Addresses, search results, routes, journey times, speed limits, road names, closures, places, custody suites,
+    stations and every other piece of information in BlueRoute come from map data and other sources that can be
+    incomplete or wrong. They are provided “as is” and “as available”, without any promise that they are accurate,
+    complete, current or fit for any purpose.</li>
+  <li>Always confirm an address and destination with your control room or by other means before relying on it.</li>
+  <li>Speed limits are shown only where the map data has them, and may still be wrong. The posted limit on the road
+    always applies.</li>
+</ul>
+
+<h2>5. Your notes and your phone</h2>
+<ul>
+  <li>Anything you type into BlueRoute (notes, saved places, callsign) stays on your phone. You are responsible for
+    what you put there and for following your service’s rules on recording and protecting information. Don’t store
+    information there that your service says mustn’t be kept on a personal device.</li>
+  <li>Keep your phone secure. Anyone who can open it can see your search log and notes.</li>
+  <li>Team sessions share your position with anyone who has the team code. Share the code only with colleagues on the
+    job, and only where your service’s policy allows it.</li>
+</ul>
+
+<h2>6. Your service’s rules</h2>
+<p>Using BlueRoute for work may be subject to your service’s approval, its policies on personal devices and apps, and
+its rules on outside business interests. Checking and following those is your responsibility.</p>
+
+<h2>7. Liability</h2>
+<ul>
+  <li>To the fullest extent the law allows, BlueRoute and the people who make it are not liable for any loss, damage,
+    injury, delay, penalty, claim or cost arising from using, or not being able to use, BlueRoute or anything it shows,
+    including a wrong address, route, journey time, speed limit or restriction.</li>
+  <li>Where liability can’t be excluded but can be limited, it is limited to the amount you paid for BlueRoute (nothing,
+    if you paid nothing).</li>
+  <li>Nothing in these terms excludes or limits liability for death or personal injury caused by negligence, for fraud,
+    or for anything else that the law does not allow to be excluded or limited, or affects your statutory rights.</li>
+</ul>
+
+<h2>8. Using BlueRoute properly</h2>
+<p>Don’t misuse BlueRoute: don’t use it to break the law, to impersonate an emergency service, to interfere with the
+service or its server, or to collect other people’s information. We may stop providing BlueRoute to anyone who does.</p>
+
+<h2>9. Other services</h2>
+<p>Map data © OpenStreetMap contributors, and data from Ordnance Survey, TfL and others, each under their own terms.
+“Open in Google Maps” and “Open in Waze” hand over to those apps, whose own terms apply.</p>
+
+<h2>10. Changes and law</h2>
+<ul>
+  <li>These terms may change. The date above changes when they do, and using BlueRoute after a change means you accept
+    the new terms.</li>
+  <li>These terms are governed by the law of England and Wales, and the courts of England and Wales have jurisdiction,
+    except where the law where you live gives you the right to use your local courts.</li>
+  <li>If any part of these terms can’t be enforced, the rest still applies.</li>
+</ul>
+
+<h2>Questions</h2>
+<p>To ask about these terms, ${contact(email)}. How BlueRoute handles data is in the <a href="/privacy">privacy policy</a>.</p>`,
   );
 }

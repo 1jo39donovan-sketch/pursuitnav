@@ -12,7 +12,7 @@ import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "
 import type { LngLat } from "./geo.js";
 import type { NearestDoor, WhereIs } from "./nominatim.js";
 import { offlineMapRoutes } from "./offlineMap.js";
-import { privacyPage, supportPage } from "./pages.js";
+import { privacyPage, supportPage, termsPage } from "./pages.js";
 import { dataRelease, machineMemory } from "./serverInfo.js";
 import { PlacesError, type PlacesClient } from "./places.js";
 import { FollowWrongWayError, planFollow } from "./follow.js";
@@ -182,8 +182,10 @@ export function buildApp(
   // Linked from the app and the store listings.
   const privacy = privacyPage(config.contactEmail);
   const support = supportPage(config.contactEmail);
+  const terms = termsPage(config.contactEmail);
   app.get("/privacy", async (_req, reply) => reply.type("text/html; charset=utf-8").send(privacy));
   app.get("/support", async (_req, reply) => reply.type("text/html; charset=utf-8").send(support));
+  app.get("/terms", async (_req, reply) => reply.type("text/html; charset=utf-8").send(terms));
   app.get("/", async (_req, reply) => reply.redirect("/support"));
 
   app.post<{ Body: RoutesBody }>(

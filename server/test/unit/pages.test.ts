@@ -9,7 +9,7 @@ const app = (contactEmail?: string) =>
 
 describe("privacy and support pages", () => {
   it("serves both as HTML", async () => {
-    for (const url of ["/privacy", "/support"]) {
+    for (const url of ["/privacy", "/support", "/terms"]) {
       const res = await app().inject({ method: "GET", url });
       expect(res.statusCode).toBe(200);
       expect(res.headers["content-type"]).toContain("text/html");
@@ -37,6 +37,15 @@ describe("privacy and support pages", () => {
     const res = await app().inject({ method: "GET", url: "/privacy" });
     expect(res.body).toContain("only to\ntell you when BlueRoute is in the App Store and Google Play");
     expect(res.body).not.toContain("no tracking");
+  });
+
+  it("puts the responsibility for driving and for blue-light routes on the user", async () => {
+    const res = await app().inject({ method: "GET", url: "/terms" });
+    expect(res.body).toContain("solely responsible for how the vehicle is driven");
+    expect(res.body).toContain("is your\n    decision alone");
+    expect(res.body).toContain("“as is”");
+    // What UK law doesn't let anyone exclude stays.
+    expect(res.body).toContain("death or personal injury caused by negligence");
   });
 
   it("points at GitHub issues without one", async () => {

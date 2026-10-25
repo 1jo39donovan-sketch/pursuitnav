@@ -91,7 +91,7 @@ jobs:
               .replace("__STORES__", stores).replace("__SHOTS__", shots);
             fs.writeFileSync("../site-out/index.html", html);
             // /privacy and /support here too: they open the pages on the server, so there is one copy of each.
-            for (const page of ["privacy", "support"]) {
+            for (const page of ["privacy", "support", "terms"]) {
               const url = `https://${e.SERVER_DOMAIN}/${page}`;
               fs.mkdirSync(`../site-out/${page}`);
               fs.writeFileSync(`../site-out/${page}/index.html`,
