@@ -22,6 +22,10 @@ import {
   TEAM_CIRCLE_PAINT,
   TEAM_LABEL_LAYOUT,
   teamLabelPaint,
+  HOUSE_NUMBER_MIN_ZOOM,
+  HOUSE_NUMBER_SOURCE_LAYER,
+  houseNumberLayout,
+  houseNumberPaint,
   ROAD_NAME_SOURCE,
   ROAD_NAME_SOURCE_LAYER,
   roadNameLayout,
@@ -77,6 +81,11 @@ export function LiveMap({
 }: LiveMapProps) {
   const { fix, facing } = useLocation();
   const { mapTheme } = useSession();
+  // For layers re-added on each style load: the theme now, not when the map was made.
+  const theme = useRef(mapTheme);
+  useEffect(() => {
+    theme.current = mapTheme;
+  }, [mapTheme]);
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
   const [zoomOffset, setZoomOffset] = useState(0);
@@ -193,6 +202,18 @@ export function LiveMap({
         layout: { "line-join": "round" },
         paint: { "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] },
       });
+      // House numbers close in, under the road names so a street name always wins the space.
+      if (m.getSource(ROAD_NAME_SOURCE)) {
+        m.addLayer({
+          id: "house-numbers",
+          type: "symbol",
+          source: ROAD_NAME_SOURCE,
+          "source-layer": HOUSE_NUMBER_SOURCE_LAYER,
+          minzoom: HOUSE_NUMBER_MIN_ZOOM,
+          layout: houseNumberLayout,
+          paint: houseNumberPaint(theme.current),
+        });
+      }
       if (roadNames && m.getSource(ROAD_NAME_SOURCE)) {
         m.addLayer({
           id: "road-names-bright",
@@ -201,7 +222,7 @@ export function LiveMap({
           "source-layer": ROAD_NAME_SOURCE_LAYER,
           minzoom: 14,
           layout: roadNameLayout,
-          paint: roadNamePaint(mapTheme),
+          paint: roadNamePaint(theme.current),
         });
       }
       m.addSource("labels", { type: "geojson", data: EMPTY });
@@ -212,7 +233,7 @@ export function LiveMap({
           source: "labels",
           minzoom: 15,
           layout: LABEL_LAYOUT,
-          paint: labelPaint(mapTheme),
+          paint: labelPaint(theme.current),
         });
       }
       m.addSource("team", { type: "geojson", data: EMPTY });
@@ -223,7 +244,7 @@ export function LiveMap({
           type: "symbol",
           source: "team",
           layout: TEAM_LABEL_LAYOUT,
-          paint: teamLabelPaint(mapTheme),
+          paint: teamLabelPaint(theme.current),
         });
       }
       m.addSource("restrictions", { type: "geojson", data: EMPTY });
@@ -326,7 +347,6 @@ export function LiveMap({
     };
     // Day/night, the view and the labels change the map in place (below):
     // making a new one would jump the camera back to the middle of London.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compact, roadNames, vehicleArrow]);
 
   // Day or night: the new style, same camera.

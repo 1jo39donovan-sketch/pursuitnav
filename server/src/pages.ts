@@ -2,6 +2,7 @@
 // served by the API so they live at the same address as the server.
 
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
+// Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
 const UPDATED = "24 October 2026";
 
 function escape(text: string): string {

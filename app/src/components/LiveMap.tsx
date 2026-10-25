@@ -24,6 +24,10 @@ import {
   TEAM_CIRCLE_PAINT,
   TEAM_LABEL_LAYOUT,
   teamLabelPaint,
+  HOUSE_NUMBER_MIN_ZOOM,
+  HOUSE_NUMBER_SOURCE_LAYER,
+  houseNumberLayout,
+  houseNumberPaint,
   ROAD_NAME_SOURCE,
   ROAD_NAME_SOURCE_LAYER,
   roadNameLayout,
@@ -211,6 +215,16 @@ export function LiveMap({
             paint={{ "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] }}
           />
         </GeoJSONSource>
+        {/* Under the road names, so a street name always wins the space. */}
+        <Layer
+          type="symbol"
+          id="house-numbers"
+          source={ROAD_NAME_SOURCE}
+          source-layer={HOUSE_NUMBER_SOURCE_LAYER}
+          minzoom={HOUSE_NUMBER_MIN_ZOOM}
+          layout={houseNumberLayout}
+          paint={houseNumberPaint(mapTheme)}
+        />
         {roadNames && (
           <Layer
             type="symbol"
