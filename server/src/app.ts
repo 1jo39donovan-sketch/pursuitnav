@@ -12,6 +12,7 @@ import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "
 import type { LngLat } from "./geo.js";
 import type { NearestDoor, WhereIs } from "./nominatim.js";
 import { AbandonedError, planContext } from "./planContext.js";
+import { entranceFinder } from "./entrances.js";
 import { osMapsRoutes } from "./osMaps.js";
 import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage, termsPage } from "./pages.js";
@@ -360,6 +361,26 @@ export function buildApp(
     };
   app.get("/v1/places-data", dataFile(config.placesFile, "places-not-ready", "Place data"));
   app.get("/v1/roads-data", dataFile(config.roadsFile, "roads-not-ready", "The road list"));
+
+  // The ways into buildings by a door the crew picked (OpenStreetMap
+  // entrances): the route can end at the right one. Like every request, the
+  // point isn't logged or kept.
+  const entrancesAt = entranceFinder(config.entrancesFile);
+  app.post<{ Body: { lat: number; lng: number } }>(
+    "/v1/entrances",
+    { schema: { body: point } },
+    async (req, reply) => {
+      if (!inBounds(req.body)) {
+        return reply.code(422).send({ error: "outside-area", message: "Outside the area BlueRoute covers." });
+      }
+      const entrances = await entrancesAt(req.body).catch(() => null);
+      if (!entrances) {
+        notSetUp.add(req);
+        return reply.code(503).send({ error: "entrances-not-ready", message: "Entrances haven't been built yet." });
+      }
+      return { entrances };
+    },
+  );
   offlineMapRoutes(app, config.offlineMapDir);
   osMapsRoutes(app, config.osMapsKey, config.bounds, (req) => notSetUp.add(req));
 

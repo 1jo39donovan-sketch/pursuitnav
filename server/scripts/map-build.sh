@@ -54,8 +54,10 @@ bash scripts/valhalla-limits.sh data/valhalla-next >/dev/null </dev/null ||
   say "couldn't raise Valhalla's avoid-area limits; live closures may be skipped"
 
 # Places come from the same extract, so they stay in step with the roads.
-say "extracting places and named roads"
+say "extracting places, named roads and entrances"
 docker compose run --rm places /data/osm/region.osm.pbf /data/places-next/places.txt.gz </dev/null
 docker compose run --rm --entrypoint python places extract_roads.py \
   /data/osm/region.osm.pbf /data/places-next/roads.txt.gz </dev/null
+docker compose run --rm --entrypoint python places extract_entrances.py \
+  /data/osm/region.osm.pbf /data/places-next/entrances.txt.gz </dev/null
 say "map built"

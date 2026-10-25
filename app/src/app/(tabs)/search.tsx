@@ -52,6 +52,9 @@ import { recordEvent } from "../../usage/usage";
 import { useTextStyles } from "../../textSize";
 import { loadFavourites, samePlace, saveFavourites, toggled, type Favourite } from "../../search/favourites";
 import { quickPlaces } from "../../search/quickPlaces";
+import { fetchEntrances } from "../../api/entrances";
+import { bestEntrance, entranceLabel } from "../../search/entrances";
+import { loadNotes, noteNear, saveNotes, withNote, type BlockNote } from "../../search/blockNotes";
 import { BOROUGHS, type Borough } from "../../search/boroughs";
 
 interface Destination {
@@ -62,6 +65,8 @@ interface Destination {
   note?: string;
   /** The log entry for this pick, to add the route chosen. */
   logId?: number;
+  /** A door or block: look for its entrances (OpenStreetMap) and route to the right one. */
+  findEntrance?: boolean;
 }
 
 // Type what the control room gave, pick the match, get both routes from
@@ -119,10 +124,28 @@ export default function SearchScreen() {
         : "Shops, cafés and other places aren't on this phone yet. They download from the BlueRoute server."
       : null;
 
+  const entranceAsk = useRef(0);
   const routeTo = useCallback(
-    async (dest: Destination) => {
+    async (given: Destination) => {
+      let dest = given;
       request.current?.abort();
+      const ask = ++entranceAsk.current;
       setDestination(dest);
+      if (dest.findEntrance) {
+        // The way in, not the middle of the building: asked for first (at most ~1 s).
+        setState({ status: "loading" });
+        const [lng, lat] = dest.point;
+        const entrances = await fetchEntrances(lat, lng);
+        if (ask !== entranceAsk.current) return;
+        const best = bestEntrance(entrances, dest.title ?? "");
+        const way = best ? `To ${entranceLabel(best)}${entrances.length > 1 ? ` (1 of ${entrances.length} ways in)` : ""}` : null;
+        dest = {
+          ...dest,
+          findEntrance: false,
+          ...(best ? { point: [best.lng, best.lat] as LngLat, note: [way, dest.note].filter(Boolean).join(" · ") } : {}),
+        };
+        setDestination(dest);
+      }
       if (!fix) {
         // Routed automatically when the first fix arrives (below).
         setState({ status: "error", message: "Waiting for a GPS position to route from.", waitingForFix: true });
@@ -285,7 +308,13 @@ export default function SearchScreen() {
     setQuery(r.label);
     const note = destinationNote(r);
     choose(
-      { point: [r.lng, r.lat], title: r.label, note, road: r.precision === "road" ? r.road : undefined },
+      {
+        point: [r.lng, r.lat],
+        title: r.label,
+        note,
+        road: r.precision === "road" ? r.road : undefined,
+        findEntrance: r.precision === "door" || r.placeType === "Block of flats",
+      },
       query,
       r.borough,
     );
@@ -460,6 +489,7 @@ export default function SearchScreen() {
     [service, roughLat, roughLng, allPois],
   );
   const [favourites, setFavourites] = useState<Favourite[]>(() => loadFavourites());
+  const [notes, setNotes] = useState<BlockNote[]>(() => loadNotes());
   const toggleFavourite = (f: Favourite) => {
     const next = toggled(favourites, f);
     setFavourites(next);
@@ -691,6 +721,20 @@ export default function SearchScreen() {
             })
           }
           note={destination.note}
+          blockNote={noteNear(notes, { lat: destination.point[1], lng: destination.point[0] })?.note}
+          onSaveNote={
+            destination.road
+              ? undefined
+              : (text) => {
+                  const next = withNote(
+                    notes,
+                    { lat: destination.point[1], lng: destination.point[0], name: destination.title ?? "Saved place" },
+                    text,
+                  );
+                  setNotes(next);
+                  saveNotes(next);
+                }
+          }
           blocks={blocks}
           onPickBlock={(b) => {
             setQuery(b.name);

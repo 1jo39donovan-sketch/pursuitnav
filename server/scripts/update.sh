@@ -77,7 +77,7 @@ after_update() {
   bash scripts/cron.sh || say "couldn't update the schedule"
   # A new kind of search data (e.g. the named-roads list) is built now rather
   # than waiting for the weekly map refresh.
-  if [ ! -s data/places/roads.txt.gz ]; then
+  if [ ! -s data/places/roads.txt.gz ] || [ ! -s data/places/entrances.txt.gz ]; then
     bash scripts/build-places.sh </dev/null || say "search data rebuild failed; the weekly refresh will retry"
   fi
   # A server from before house-number search gets it now rather than at the

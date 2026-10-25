@@ -73,6 +73,7 @@ jobs:
           </osm>""")
           EOF
           docker run --rm -v /tmp:/data --entrypoint python blueroute-places extract_roads.py /data/tiny.osm /data/roads.txt.gz
+          docker run --rm -v /tmp:/data --entrypoint python blueroute-places extract_entrances.py /data/tiny.osm /data/entrances.txt.gz
           docker run --rm -v /tmp:/data --entrypoint python blueroute-places practical_speeds.py /data/tiny.osm /data/out.osm.pbf
       - name: Caddyfile is valid (HTTPS depends on it)
         run: |

@@ -20,4 +20,6 @@ echo "$(date -Is) extracting places from $PBF"
 docker compose run --rm places "/${PBF}" /data/places/places.txt.gz
 echo "$(date -Is) extracting named roads from $PBF"
 docker compose run --rm --entrypoint python places extract_roads.py "/${PBF}" /data/places/roads.txt.gz
+echo "$(date -Is) extracting entrances from $PBF"
+docker compose run --rm --entrypoint python places extract_entrances.py "/${PBF}" /data/places/entrances.txt.gz
 echo "$(date -Is) done"

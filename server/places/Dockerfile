@@ -6,7 +6,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir osmium==4.* shapely==2.*
 WORKDIR /places
-COPY categories.py extract_places.py extract_roads.py practical_speeds.py london-boroughs.geojson ./
+COPY categories.py extract_places.py extract_roads.py extract_entrances.py practical_speeds.py london-boroughs.geojson ./
 # Fail the build here, not 10 minutes into a map build, if osmium can't load.
 RUN python -c "import osmium, shapely"
 ENTRYPOINT ["python", "extract_places.py"]
