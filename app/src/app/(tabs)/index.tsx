@@ -1,11 +1,12 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { API_URL, DEMO_MODE } from "../../config";
 
 import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
+import { looksOffered, MAP_LOOK_NAMES, type MapLook } from "../../components/mapLooks";
 import { OfflineMapSection } from "../../components/OfflineMapSection";
 import { TeamSection } from "../../components/TeamSection";
 import { setRecording, useRecorder } from "../../fieldtest/instance";
@@ -21,6 +22,16 @@ import { SERVICES, VEHICLES, vehiclesFor } from "../../vehicles";
 // Once a shift is set up, the app opens on Search: the job is usually to type
 // an address straight away. Only on the first screen shown after launch.
 let openedThisLaunch = false;
+
+/** The browser version is for testing (the store app is the real one): testing tools first. */
+const TESTING_FIRST = Platform.OS === "web";
+
+const LOOK_HINTS: Record<MapLook, string> = {
+  standard: "The everyday map.",
+  clear: "High contrast: wider, brighter roads and bold names, for reading on the move.",
+  plain: "Just the streets: no shop and business icons.",
+  os: "Ordnance Survey's road map. Needs signal; very close in, it shows larger rather than sharper.",
+};
 
 export default function SessionScreen() {
   const {
@@ -40,6 +51,10 @@ export default function SessionScreen() {
     showPursuit,
     setShowPursuit,
     mapTheme,
+    mapLook,
+    setMapLook,
+    largeText,
+    setLargeText,
     setMapTheme,
     roads,
     setRoads,
@@ -61,8 +76,39 @@ export default function SessionScreen() {
   const { savedPlaces, deletePlace, places } = useSearch();
   const logCount = useLog().entries.length;
   const recording = useRecorder();
-  // The BCU being worked, for the custody and stations row (police only).
+  // The area being worked, for the stations row: a BCU for police (and
+  // installs from before the service choice), else the first borough.
+  const police = service === "police" || service === null;
   const bcu = useMemo(() => bcuFor(boroughs), [boroughs]);
+  const areaCode = police ? bcu?.code : boroughs[0];
+  const areaName = police ? (bcu?.name ?? "BCUs") : (boroughs[0] ?? "Your area");
+  const areaWhat = police
+    ? "Custody · stations · A&E"
+    : service === "ambulance"
+      ? "Ambulance stations · A&E"
+      : service === "fire"
+        ? "Fire stations · A&E"
+        : "Stations · A&E";
+
+  const demoToggle = (
+    <View style={styles.toggleRow}>
+      <View style={styles.placeText}>
+        <Text style={styles.placeName} nativeID="demo-drive-label">
+          Demo drive
+        </Text>
+        <Text style={styles.placeMeta}>
+          Simulates a drive from Holloway Road to Whitechapel, so you can try routes, navigation and pursuit mode
+          away from London. Your real GPS is ignored while it’s on.
+        </Text>
+      </View>
+      <Switch
+        accessibilityLabelledBy="demo-drive-label"
+        value={demoDrive}
+        onValueChange={setDemoDrive}
+        trackColor={{ false: colors.line, true: colors.amber }}
+      />
+    </View>
+  );
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -78,6 +124,14 @@ export default function SessionScreen() {
           {logCount === 0 ? "empty" : `${logCount} entr${logCount === 1 ? "y" : "ies"}`} ›
         </Text>
       </Pressable>
+
+      {/* The browser version is for testing: the demo drive comes first there. */}
+      {!DEMO_MODE && TESTING_FIRST && (
+        <View style={styles.field}>
+          <Text style={styles.label}>Testing</Text>
+          {demoToggle}
+        </View>
+      )}
 
       <View style={styles.intro}>
         <Text style={styles.title}>Start of shift</Text>
@@ -147,26 +201,18 @@ export default function SessionScreen() {
 
       <BoroughPicker />
 
-      {(service === "police" || service === null) && (
-        // Custody, stations and A&Es for the BCU being worked, one tap from a route.
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${bcu ? `${bcu.name} BCU` : "BCUs"}: custody, police stations and A&E`}
-          onPress={() => router.push({ pathname: "/bcu", params: bcu ? { code: bcu.code } : {} })}
-          style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.logText}>
-            {bcu ? (
-              <>
-                {bcu.name} <Text style={styles.logMeta}>{bcu.code}</Text>
-              </>
-            ) : (
-              "BCUs"
-            )}
-          </Text>
-          <Text style={styles.logMeta}>Custody · stations · A&E ›</Text>
-        </Pressable>
-      )}
+      {/* The area being worked: stations, A&Es (and custody, for police), one tap from a route. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${areaName}: ${areaWhat}`}
+        onPress={() => router.push({ pathname: "/area", params: areaCode ? { code: areaCode } : {} })}
+        style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.logText}>
+          {areaName} {police && bcu && <Text style={styles.logMeta}>{bcu.code}</Text>}
+        </Text>
+        <Text style={styles.logMeta}>{areaWhat} ›</Text>
+      </Pressable>
 
       <View style={styles.field}>
         <Text style={styles.label}>Roads</Text>
@@ -239,6 +285,35 @@ export default function SessionScreen() {
               </Pressable>
             );
           })}
+        </View>
+        <View style={styles.chips} accessibilityLabel="Map style">
+          {looksOffered().map((l) => {
+            const on = mapLook === l;
+            return (
+              <Pressable
+                key={l}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                accessibilityHint={LOOK_HINTS[l]}
+                onPress={() => setMapLook(l)}
+                style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{MAP_LOOK_NAMES[l]}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.placeMeta}>{LOOK_HINTS[mapLook]}</Text>
+        <View style={styles.toggleRow}>
+          <Text style={[styles.placeName, styles.placeText]} nativeID="large-text-label">
+            Larger text
+          </Text>
+          <Switch
+            accessibilityLabelledBy="large-text-label"
+            value={largeText}
+            onValueChange={setLargeText}
+            trackColor={{ false: colors.line, true: colors.amber }}
+          />
         </View>
       </View>
 
@@ -329,25 +404,7 @@ export default function SessionScreen() {
         </View>
       )}
 
-      {!DEMO_MODE && (
-        <View style={styles.toggleRow}>
-          <View style={styles.placeText}>
-            <Text style={styles.placeName} nativeID="demo-drive-label">
-              Demo drive
-            </Text>
-            <Text style={styles.placeMeta}>
-              Simulates a drive from Holloway Road to Whitechapel, so you can try routes, navigation and pursuit mode
-              away from London. Your real GPS is ignored while it’s on.
-            </Text>
-          </View>
-          <Switch
-            accessibilityLabelledBy="demo-drive-label"
-            value={demoDrive}
-            onValueChange={setDemoDrive}
-            trackColor={{ false: colors.line, true: colors.amber }}
-          />
-        </View>
-      )}
+      {!DEMO_MODE && !TESTING_FIRST && demoToggle}
 
       <UsageNote />
 
@@ -355,6 +412,7 @@ export default function SessionScreen() {
         <View style={styles.linkRow}>
           <Button label="Privacy" onPress={() => Linking.openURL(`${API_URL}/privacy`)} />
           <Button label="Help and support" onPress={() => Linking.openURL(`${API_URL}/support`)} />
+          <Button label="Terms" onPress={() => Linking.openURL(`${API_URL}/terms`)} />
         </View>
       )}
 
@@ -461,5 +519,5 @@ const styles = StyleSheet.create({
   placeName: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   placeMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
   linkRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  attribution: { color: colors.muted, fontFamily: fonts.body, fontSize: 11, lineHeight: 16, opacity: 0.8 },
+  attribution: { color: colors.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 17 },
 });

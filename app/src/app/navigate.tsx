@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useNetworkState } from "expo-network";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchRoutes, restrictionPoints, type RoutePlan } from "../api/routes";
@@ -15,7 +15,7 @@ import { useElapsed } from "../components/useElapsed";
 import { LiveMap } from "../components/LiveMap";
 import type { MapRoute } from "../components/mapShared";
 import { ExternalLinks } from "../components/RoutePanel";
-import { formatDistance, formatDuration } from "../format";
+import { formatDistance, formatDuration, roadLabel } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation, type RouteKind } from "../navigation/NavigationProvider";
 import {
@@ -56,6 +56,8 @@ import {
   type Progress,
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
+import { reportUrl } from "../feedback";
+import { useTextStyles } from "../textSize";
 
 const DEMO_GRACE_MS = 5000;
 const ARRIVAL_GRACE_MS = 10_000;
@@ -75,6 +77,7 @@ function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
 
 /** Turn-by-turn guidance, readable at a glance by the operator. */
 export default function NavigateScreen() {
+  const styles = useTextStyles(baseStyles);
   // Screen stays on while navigating. Ending quickly can release the lock
   // before it has taken hold; that's harmless, so it isn't an error.
   useEffect(() => {
@@ -92,7 +95,7 @@ export default function NavigateScreen() {
   const [openedAt] = useState(() => Date.now());
   const fix = simulated && lastFix && lastFix.timestamp < openedAt ? null : lastFix;
   const { blockLabels } = useSearch();
-  const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes } = useSession();
+  const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes, mapLook } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -216,7 +219,8 @@ export default function NavigateScreen() {
     handledAsk.current = active.rerouteAsked;
     handledReconnect.current = reconnected.n;
     // A refresh on the line, when signal returns, changes nothing on screen until the new route is in.
-    const quiet = back && !asked && reconnected.quiet && !offRoute;
+    // So does freshening an old plan on Go while still on its line: no "Re-routing" for a clean start.
+    const quiet = (back && !asked && reconnected.quiet && !offRoute) || (asked && active.rerouteReason === "stale-refresh" && !offRoute);
     // Asked for now: what was in flight was for the old choice.
     inFlight.current?.abort();
     const controller = new AbortController();
@@ -360,7 +364,7 @@ export default function NavigateScreen() {
     return (
       <View style={[styles.screen, styles.empty]}>
         <Text style={styles.emptyText}>No route chosen.</Text>
-        <Pressable onPress={() => router.back()} style={styles.endButton}>
+        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.endButton}>
           <Text style={styles.endText}>Back</Text>
         </Pressable>
       </View>
@@ -456,7 +460,7 @@ export default function NavigateScreen() {
             {progress ? `${formatDuration(progress.remainingS)} · ${formatDistance(progress.remainingM)}` : ""}
           </Text>
           <Text style={styles.road} numberOfLines={1}>
-            On {progress?.current.streetNames[0] ?? "—"}
+            On {(progress && roadLabel(progress.current.streetNames)) ?? "—"}
           </Text>
         </View>
         <Text style={[styles.badge, { color: routeColor, borderColor: routeColor }]}>
@@ -497,6 +501,7 @@ export default function NavigateScreen() {
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={confirmEnd ? "Tap again to end navigation" : "End navigation"}
           accessibilityHint="Tap twice to end navigation"
           onPress={() => (confirmEnd || progress?.arrived ? end() : setConfirmEnd(true))}
           style={[styles.endButton, confirmEnd && styles.endConfirm]}
@@ -597,6 +602,21 @@ export default function NavigateScreen() {
             rerouteNow();
           }}
           destination={active.destination}
+          onReport={() => {
+            setSheet(false);
+            const r = active.route;
+            void Linking.openURL(
+              reportUrl({
+                kind: active.kind,
+                vehicle,
+                roads,
+                mapLook,
+                distanceM: r.distanceM,
+                durationS: r.durationS,
+                restrictions: "restrictions" in r ? r.restrictions.length : undefined,
+              }),
+            ).catch(() => {});
+          }}
           bottomInset={insets.bottom}
         />
       )}
@@ -614,6 +634,7 @@ function MarkSheet({
   onClose: () => void;
   bottomInset: number;
 }) {
+  const styles = useTextStyles(baseStyles);
   return (
     <View style={styles.sheetBackdrop}>
       <Pressable style={{ flex: 1 }} accessibilityLabel="Close marks" onPress={onClose} />
@@ -651,6 +672,7 @@ function RouteSheet({
   onSwitch,
   onRerouteNow,
   destination,
+  onReport,
   bottomInset,
 }: {
   kind: RouteKind;
@@ -660,8 +682,10 @@ function RouteSheet({
   onSwitch: (kind: "standard" | "police") => void;
   onRerouteNow: () => void;
   destination: { lat: number; lng: number };
+  onReport: () => void;
   bottomInset: number;
 }) {
+  const styles = useTextStyles(baseStyles);
   const action = (label: string, onPress: () => void, style?: object) => (
     <Pressable
       key={label}
@@ -683,13 +707,15 @@ function RouteSheet({
         {action("Re-route now", onRerouteNow)}
         {/* Handing over to another app leaves this navigation running underneath. */}
         <ExternalLinks lat={destination.lat} lng={destination.lng} onOpen={onClose} />
+        {/* An email in the tester's own mail app, with nothing about the call in it. */}
+        {action("Report a problem with this route", onReport)}
         {action("Cancel", onClose, styles.sheetCancel)}
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   empty: { alignItems: "center", justifyContent: "center", gap: 16 },
   emptyText: { color: colors.muted, fontFamily: fonts.body, fontSize: 16 },

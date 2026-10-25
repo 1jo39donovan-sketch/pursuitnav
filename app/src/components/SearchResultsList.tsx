@@ -4,6 +4,7 @@ import { formatDistance } from "../format";
 import { distanceM } from "../geo";
 import type { SearchResult, SearchResults } from "../search/engine";
 import { colors, fonts } from "../theme";
+import { useTextStyles } from "../textSize";
 
 interface Props {
   results: SearchResults;
@@ -31,6 +32,7 @@ const TAGS: Partial<Record<SearchResult["kind"], { text: string; color: string }
  * station across London is still where they're going.
  */
 export function SearchResultsList({ results, showOutside, onToggleOutside, onPick, footer, emptyText, from }: Props) {
+  const styles = useTextStyles(baseStyles);
   const onlyOutside = results.inArea.length === 0 && results.outside.length > 0;
   const rows =
     showOutside || onlyOutside ? [...results.inArea, ...results.outside.slice(0, 30)] : results.inArea;
@@ -82,6 +84,7 @@ function Row({
   onPick: (r: SearchResult) => void;
   away?: string;
 }) {
+  const styles = useTextStyles(baseStyles);
   const tag = outside
     ? { text: "OUT OF AREA", color: colors.muted }
     : result.placeType
@@ -105,7 +108,7 @@ function Row({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingBottom: 24 },
   row: {
     flexDirection: "row",
@@ -119,8 +122,8 @@ const styles = StyleSheet.create({
   label: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   detail: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, marginTop: 2 },
   side: { alignItems: "flex-end", gap: 4, maxWidth: "45%" },
-  away: { color: colors.muted, fontFamily: fonts.mono, fontSize: 12 },
-  tag: { fontFamily: fonts.mono, fontSize: 10, borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  away: { color: colors.muted, fontFamily: fonts.mono, fontSize: 13 },
+  tag: { fontFamily: fonts.mono, fontSize: 11, borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
   empty: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, paddingVertical: 16 },
   toggle: { paddingVertical: 14 },
   toggleText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 15 },

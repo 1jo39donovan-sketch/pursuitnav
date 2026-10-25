@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, fonts } from "../theme";
 import type { MarkerProperties } from "./mapShared";
+import { useTextStyles } from "../textSize";
 
 interface Props {
   marker: MarkerProperties;
@@ -12,6 +13,7 @@ interface Props {
 
 /** What a tapped place marker is, with a way to route there. */
 export function MarkerCard({ marker, away, onRoute, onClose }: Props) {
+  const styles = useTextStyles(baseStyles);
   return (
     <View style={styles.card}>
       <View style={styles.head}>
@@ -31,7 +33,7 @@ export function MarkerCard({ marker, away, onRoute, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   card: {
     position: "absolute",
     left: 12,

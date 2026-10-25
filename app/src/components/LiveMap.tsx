@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MAP_STYLES, region } from "../config";
+import { useMapStyle } from "./mapLooks";
 import { useOfflineMap } from "../offline/OfflineMapProvider";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
@@ -24,6 +25,10 @@ import {
   TEAM_CIRCLE_PAINT,
   TEAM_LABEL_LAYOUT,
   teamLabelPaint,
+  HOUSE_NUMBER_MIN_ZOOM,
+  HOUSE_NUMBER_SOURCE_LAYER,
+  houseNumberLayout,
+  houseNumberPaint,
   ROAD_NAME_SOURCE,
   ROAD_NAME_SOURCE_LAYER,
   roadNameLayout,
@@ -36,6 +41,7 @@ import {
   ROUTE_CASING_PAINT,
   ROUTE_LINE_PAINT,
   MARKER_CIRCLE_PAINT,
+  MARKER_MIN_ZOOM,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
   pointGeoJSON,
@@ -80,9 +86,10 @@ export function LiveMap({
   onMarkerPress,
 }: LiveMapProps) {
   const { fix, facing } = useLocation();
-  const { mapTheme } = useSession();
+  const { mapTheme, mapLook } = useSession();
   // The map kept on the phone, once downloaded: draws with no signal.
   const offlineStyles = useOfflineMap().styles;
+  const mapStyle = useMapStyle(offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme], mapLook, mapTheme);
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
   const [zoomOffset, setZoomOffset] = useState(0);
@@ -147,7 +154,7 @@ export function LiveMap({
     <View style={styles.container} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
       <Map
         style={StyleSheet.absoluteFill}
-        mapStyle={offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme]}
+        mapStyle={mapStyle}
         logo={false}
         compass={!compact}
         attribution
@@ -179,7 +186,7 @@ export function LiveMap({
             }
           }}
         >
-          <Layer type="circle" id="places-dot" minzoom={11} paint={MARKER_CIRCLE_PAINT} />
+          <Layer type="circle" id="places-dot" minzoom={MARKER_MIN_ZOOM} paint={MARKER_CIRCLE_PAINT} />
           <Layer
             type="symbol"
             id="places-label"
@@ -211,6 +218,16 @@ export function LiveMap({
             paint={{ "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] }}
           />
         </GeoJSONSource>
+        {/* Under the road names, so a street name always wins the space. */}
+        <Layer
+          type="symbol"
+          id="house-numbers"
+          source={ROAD_NAME_SOURCE}
+          source-layer={HOUSE_NUMBER_SOURCE_LAYER}
+          minzoom={HOUSE_NUMBER_MIN_ZOOM}
+          layout={houseNumberLayout}
+          paint={houseNumberPaint(mapTheme)}
+        />
         {roadNames && (
           <Layer
             type="symbol"

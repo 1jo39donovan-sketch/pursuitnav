@@ -141,6 +141,6 @@ The live server runs only `main`. The deploy workflow's `branch` input is for a 
 server/scripts/check-server.sh https://$DOMAIN            # the same checks, by hand
 ```
 
-Settings (environment variables on the `api` service): `VALHALLA_URL`, `OS_NAMES_KEY` (free, address search), `NOMINATIM_URL` (set by `build-geocoder.sh`), `OS_PLACES_KEY` (paid, optional), `PORT`, `REGION_BOUNDS` (`west,south,east,north`, London by default), `MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`, `RESTRICTION_CHECK_BUDGET`, `TFL_APP_KEY` (optional key for the TfL closures feed), `TFL_CLOSURES` (`0` turns live closures off).
+Settings (environment variables on the `api` service): `VALHALLA_URL`, `OS_NAMES_KEY` (free, address search), `OS_MAPS_KEY` (the OS road map, free OpenData zooms only; defaults to `OS_NAMES_KEY`, so add the OS Maps API to the same OS Data Hub project), `NOMINATIM_URL` (set by `build-geocoder.sh`), `OS_PLACES_KEY` (paid, optional), `PORT`, `REGION_BOUNDS` (`west,south,east,north`, London by default), `MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`, `RESTRICTION_CHECK_BUDGET`, `TFL_APP_KEY` (optional key for the TfL closures feed), `TFL_CLOSURES` (`0` turns live closures off).
 
 Map data © OpenStreetMap contributors, under the Open Database License.

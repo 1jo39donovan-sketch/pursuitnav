@@ -1,5 +1,6 @@
 import type { Costing } from "./costing.js";
 import { decodePolyline6, type LngLat } from "./geo.js";
+import { Lanes, planContext, throwIfAbandoned } from "./planContext.js";
 
 export interface Waypoint {
   point: LngLat;
@@ -219,21 +220,37 @@ export const ARRIVE_TYPES = new Set([4, 5, 6]);
 
 /** Talks to a Valhalla server over HTTP. */
 export class ValhallaClient implements Router, Matcher {
+  private readonly lanes: Lanes;
+
   constructor(
     private readonly baseUrl: string,
     private readonly timeoutMs = 15000,
-  ) {}
+    /** Calls sent at once: Valhalla's server_threads (docker-compose.yml). */
+    slots = 2,
+  ) {
+    this.lanes = new Lanes(slots);
+  }
 
   private async post<T>(path: string, body: unknown): Promise<T> {
+    const ctx = planContext.getStore();
+    throwIfAbandoned(ctx?.signal);
+    return this.lanes.run(ctx?.urgent ?? false, () => this.send<T>(path, body, ctx?.signal));
+  }
+
+  private async send<T>(path: string, body: unknown, given: AbortSignal | undefined): Promise<T> {
+    // Given up while waiting its turn: don't send it.
+    throwIfAbandoned(given);
+    const timeout = AbortSignal.timeout(this.timeoutMs);
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: given ? AbortSignal.any([timeout, given]) : timeout,
       });
     } catch (err) {
+      throwIfAbandoned(given);
       throw new ValhallaError(`Routing engine unreachable: ${(err as Error).message}`, 503, undefined);
     }
     const json = (await res.json().catch(() => ({}))) as { error?: string; error_code?: number };

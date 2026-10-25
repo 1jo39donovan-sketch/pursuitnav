@@ -1,7 +1,9 @@
-// A BCU at a glance, for police: its custody suites, police stations and
-// A&Es, each one tap from a route, and the officer's own notes for it (kept
-// on this phone only: radio channels and the like never ship with the app).
-// Opened from Session.
+// An area at a glance, one tap from a route to each place in it, with the
+// crew's own notes for it (kept on this phone only: radio channels and the
+// like never ship with the app). Opened from Session.
+//   Police: a BCU, with its custody suites, police stations and A&Es.
+//   Ambulance and fire: a borough, with its ambulance or fire stations and A&Es.
+//   Other: a borough, with its police, ambulance and fire stations and A&Es.
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -11,29 +13,54 @@ import { custodyIn, custodyStation, type CustodySuite } from "../area/custody";
 import { formatDistance } from "../format";
 import { distanceM } from "../geo";
 import { useLocation } from "../location/LocationProvider";
-import { BCUS, bcuFor } from "../search/boroughGroups";
+import { BCUS, bcuFor, type BoroughGroup } from "../search/boroughGroups";
+import { BOROUGHS, type Borough } from "../search/boroughs";
 import type { PointOfInterest } from "../search/places";
 import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import { colors, fonts } from "../theme";
+import type { ServiceType } from "../vehicles";
+
+/** The stations each service wants listed, by OpenStreetMap place type. */
+const STATIONS: Record<ServiceType, { types: string[]; label: string }> = {
+  police: { types: ["Police station"], label: "Police stations" },
+  ambulance: { types: ["Ambulance station"], label: "Ambulance stations" },
+  fire: { types: ["Fire station"], label: "Fire stations" },
+  other: { types: ["Police station", "Ambulance station", "Fire station"], label: "Emergency service stations" },
+};
+
+/** Ambulance and fire areas are boroughs: the boroughs being worked first. */
+function boroughUnits(chosen: readonly Borough[]): BoroughGroup[] {
+  const order = [...chosen, ...BOROUGHS.filter((b) => !chosen.includes(b))];
+  return order.map((b) => ({ code: b, name: b, boroughs: [b] }));
+}
 
 /** Route to a place: Search works out both routes, as for a search result. */
 function go(title: string, lat: number, lng: number) {
   // Every parameter is given, so none is left over from an earlier visit.
-  router.navigate({ pathname: "/search", params: { lat: String(lat), lng: String(lng), title, q: "", from: `bcu-${Date.now()}` } });
+  router.navigate({ pathname: "/search", params: { lat: String(lat), lng: String(lng), title, q: "", from: `area-${Date.now()}` } });
 }
 
-export default function BcuScreen() {
+export default function AreaScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ code?: string }>();
-  const { boroughs } = useSession();
+  const { boroughs, service } = useSession();
+  // Police (and installs from before the service choice) work by BCU.
+  const police = service === "police" || service === null;
+  const stationKind = STATIONS[service ?? "police"];
+  const units = useMemo(() => (police ? BCUS : boroughUnits(boroughs)), [police, boroughs]);
+  const unitWord = police ? "BCU" : "borough";
+  const notesKey = (c: string) => (police ? `bcuNotes:${c}` : `areaNotes:${c}`);
   const { data, places } = useSearch();
   const { fix } = useLocation();
   const [code, setCode] = useState(
-    () => BCUS.find((g) => g.code === params.code)?.code ?? bcuFor(boroughs)?.code ?? BCUS[0]!.code,
+    () =>
+      units.find((g) => g.code === params.code)?.code ??
+      (police ? bcuFor(boroughs)?.code : boroughs[0]) ??
+      units[0]!.code,
   );
-  const bcu = BCUS.find((g) => g.code === code)!;
+  const bcu = units.find((g) => g.code === code) ?? units[0]!;
 
   const away = (p: { lat: number; lng: number }) => (fix ? distanceM(fix, p) : null);
   const byDistance = <T extends { lat: number; lng: number }>(list: T[]) =>
@@ -41,30 +68,31 @@ export default function BcuScreen() {
 
   const { custody, stations, aes } = useMemo(() => {
     const all = data.status === "ready" ? data.index.pointsOfInterestIn(new Set(bcu.boroughs), new Set(["emergency", "health"])) : [];
-    const custody = custodyIn(bcu.boroughs).map((suite) => ({ suite, place: custodyStation(suite, all) }));
+    const custody = police ? custodyIn(bcu.boroughs).map((suite) => ({ suite, place: custodyStation(suite, all) })) : [];
     const taken = new Set(custody.flatMap((c) => (c.place ? [c.place] : [])));
     return {
       custody,
-      stations: all.filter((p) => p.type === "Police station" && !taken.has(p)),
+      stations: all.filter((p) => stationKind.types.includes(p.type) && !taken.has(p)),
       aes: all.filter((p) => p.type === "Hospital with A&E"),
     };
-  }, [data, bcu, places.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, bcu, places.status, police, stationKind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Notes are saved a moment after typing stops (not on every key), and
   // straight away on switching BCU or leaving the screen.
-  const [notes, setNotesState] = useState(() => store.getSetting(`bcuNotes:${code}`) ?? "");
+  const [notes, setNotesState] = useState(() => store.getSetting(notesKey(code)) ?? "");
   const unsaved = useRef<{ code: string; text: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveNow = () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    if (unsaved.current) store.setSetting(`bcuNotes:${unsaved.current.code}`, unsaved.current.text);
+    if (unsaved.current) store.setSetting(notesKey(unsaved.current.code), unsaved.current.text);
     unsaved.current = null;
   };
-  useEffect(() => saveNow, []);
+  // On leaving: the service (and so where notes go) can't change while this screen is open.
+  useEffect(() => saveNow, []); // eslint-disable-line react-hooks/exhaustive-deps
   const pick = (next: string) => {
     saveNow();
     setCode(next);
-    setNotesState(store.getSetting(`bcuNotes:${next}`) ?? "");
+    setNotesState(store.getSetting(notesKey(next)) ?? "");
   };
   const setNotes = (text: string) => {
     setNotesState(text);
@@ -75,7 +103,7 @@ export default function BcuScreen() {
 
   const placesNote =
     data.status !== "ready" || places.status !== "ready"
-      ? "Police stations and A&Es appear once places have downloaded from the BlueRoute server."
+      ? `${stationKind.label} and A&Es appear once places have downloaded from the BlueRoute server.`
       : null;
 
   const placeRow = (p: PointOfInterest, badge?: string) => {
@@ -107,7 +135,7 @@ export default function BcuScreen() {
         <GoButton
           label={`Search for ${suite.name}`}
           text="Find"
-          onPress={() => router.navigate({ pathname: "/search", params: { q: suite.search, lat: "", lng: "", title: "", from: `bcu-${Date.now()}` } })}
+          onPress={() => router.navigate({ pathname: "/search", params: { q: suite.search, lat: "", lng: "", title: "", from: `area-${Date.now()}` } })}
         />
       </View>
     );
@@ -126,11 +154,11 @@ export default function BcuScreen() {
       </Pressable>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>
-          {bcu.name} <Text style={styles.code}>{bcu.code}</Text>
+          {bcu.name} {police && <Text style={styles.code}>{bcu.code}</Text>}
         </Text>
-        <Text style={styles.hint}>{bcu.boroughs.join(" · ")}</Text>
+        {police && <Text style={styles.hint}>{bcu.boroughs.join(" · ")}</Text>}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {BCUS.map((g) => (
+          {units.map((g) => (
             <Pressable
               key={g.code}
               accessibilityRole="radio"
@@ -144,36 +172,37 @@ export default function BcuScreen() {
           ))}
         </ScrollView>
 
-        <Text style={styles.section}>Custody</Text>
-        {custody.length ? custody.map(custodyRow) : <Text style={styles.empty}>No custody suite in this BCU.</Text>}
+        {police && <Text style={styles.section}>Custody</Text>}
+        {police &&
+          (custody.length ? custody.map(custodyRow) : <Text style={styles.empty}>No custody suite in this BCU.</Text>)}
 
-        <Text style={styles.section}>Police stations</Text>
+        <Text style={styles.section}>{stationKind.label}</Text>
         {placesNote ? (
           <Text style={styles.empty}>{placesNote}</Text>
         ) : stations.length ? (
           byDistance(stations).map((p) => placeRow(p))
         ) : (
-          <Text style={styles.empty}>None mapped in this BCU.</Text>
+          <Text style={styles.empty}>None mapped in this {unitWord}.</Text>
         )}
 
         <Text style={styles.section}>A&E</Text>
         {placesNote ? null : aes.length ? (
           byDistance(aes).map((p) => placeRow(p))
         ) : (
-          <Text style={styles.empty}>No A&E mapped in this BCU.</Text>
+          <Text style={styles.empty}>No A&E mapped in this {unitWord}.</Text>
         )}
 
-        <Text style={styles.section} nativeID="bcu-notes-label">
+        <Text style={styles.section} nativeID="area-notes-label">
           My notes
         </Text>
         <Text style={styles.hint}>Kept on this phone only, never sent anywhere.</Text>
         <TextInput
-          accessibilityLabelledBy="bcu-notes-label"
+          accessibilityLabelledBy="area-notes-label"
           value={notes}
           onChangeText={setNotes}
           onBlur={saveNow}
           multiline
-          placeholder="Anything you want to hand for this BCU"
+          placeholder={`Anything you want to hand for this ${unitWord}`}
           placeholderTextColor={colors.muted}
           style={styles.notes}
         />

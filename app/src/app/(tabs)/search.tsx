@@ -2,7 +2,7 @@ import type { LngLat } from "@maplibre/maplibre-react-native";
 import { useNetworkState } from "expo-network";
 import { router, Tabs, useLocalSearchParams } from "expo-router";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -49,6 +49,10 @@ import { useTeam } from "../../team/TeamProvider";
 import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
 import { recordEvent } from "../../usage/usage";
+import { useTextStyles } from "../../textSize";
+import { loadFavourites, samePlace, saveFavourites, toggled, type Favourite } from "../../search/favourites";
+import { quickPlaces } from "../../search/quickPlaces";
+import { BOROUGHS, type Borough } from "../../search/boroughs";
 
 interface Destination {
   point: LngLat;
@@ -63,6 +67,7 @@ interface Destination {
 // Type what the control room gave, pick the match, get both routes from
 // where the phone is now. A long press on the map also sets a destination.
 export default function SearchScreen() {
+  const styles = useTextStyles(baseStyles);
   const { fix, simulated } = useLocation();
   const insets = useSafeAreaInsets();
   // Height of the floating search box (and any notes under it), from the top of the screen.
@@ -425,9 +430,7 @@ export default function SearchScreen() {
       ? "Loading London roads…"
       : data.status === "error"
         ? `Search data didn't load: ${data.message}`
-        : boroughs.length === 0
-          ? "No boroughs picked: every match shows as outside your area. Pick them on the Session tab."
-          : null;
+        : null;
 
   // The keyboard waits for a tap on the search bar: opening Search may be just
   // to look at the map.
@@ -442,6 +445,26 @@ export default function SearchScreen() {
   useEffect(() => () => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
   }, []);
+  const { service, setDemoDrive } = useSession();
+  const allPois = useMemo(
+    () => (data.status === "ready" ? data.index.pointsOfInterestIn(new Set(BOROUGHS), new Set(["emergency", "health"])) : []),
+    // The place list arrives after the roads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, places.status],
+  );
+  // Nearest from where the phone is, worked out again every ~200 m, not on every fix.
+  const roughLat = fix ? Math.round(fix.lat * 500) / 500 : null;
+  const roughLng = fix ? Math.round(fix.lng * 500) / 500 : null;
+  const quick = useMemo(
+    () => quickPlaces(service, roughLat != null && roughLng != null ? { lat: roughLat, lng: roughLng } : null, allPois),
+    [service, roughLat, roughLng, allPois],
+  );
+  const [favourites, setFavourites] = useState<Favourite[]>(() => loadFavourites());
+  const toggleFavourite = (f: Favourite) => {
+    const next = toggled(favourites, f);
+    setFavourites(next);
+    saveFavourites(next);
+  };
   const entries = log.entries;
   const recent = useMemo(() => {
     const seen = new Set<string>();
@@ -484,7 +507,8 @@ export default function SearchScreen() {
             )
           }
           fitTo={fitTo}
-          markers={showResults ? null : markers}
+          // Not over the routes: the place chooser (the dots' key) is hidden then too.
+          markers={showResults || destination ? null : markers}
           onMarkerPress={(marker, point) => setTapped({ marker, point })}
         />
         {!showResults && !destination && (
@@ -509,9 +533,44 @@ export default function SearchScreen() {
             }}
           />
         )}
-        {typing && !destination && !showResults && !tapped && recent.length > 0 && (
+        {typing && !destination && !showResults && !tapped && (quick.length > 0 || favourites.length > 0 || recent.length > 0) && (
           <View style={[styles.recent, { top: topSpace + 6 }]}>
-            <Text style={styles.recentLabel}>Recent</Text>
+            {quick.map((q) => (
+              <Pressable
+                key={q.label}
+                accessibilityRole="button"
+                accessibilityLabel={`${q.label}: ${q.place.name}, ${formatDistance(q.metres)}`}
+                onPress={() => {
+                  setQuery(q.place.name);
+                  choose({ point: [q.place.lng, q.place.lat], title: q.place.name }, "", q.place.borough);
+                }}
+                style={({ pressed }) => [styles.recentRow, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.recentText} numberOfLines={1}>
+                  ➜ {q.label}: {q.place.name}
+                </Text>
+                <Text style={styles.recentMeta}>{formatDistance(q.metres)}</Text>
+              </Pressable>
+            ))}
+            {favourites.length > 0 && <Text style={styles.recentLabel}>Favourites</Text>}
+            {favourites.slice(0, 5).map((f) => (
+              <Pressable
+                key={`${f.lat},${f.lng}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Route to ${f.name}`}
+                onPress={() => {
+                  setQuery(f.name);
+                  choose({ point: [f.lng, f.lat], title: f.name }, "", (f.borough as Borough | null) ?? null);
+                }}
+                style={({ pressed }) => [styles.recentRow, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.recentText} numberOfLines={1}>
+                  ★ {f.name}
+                </Text>
+                {f.borough && <Text style={styles.recentMeta}>{f.borough}</Text>}
+              </Pressable>
+            ))}
+            {recent.length > 0 && <Text style={styles.recentLabel}>Recent</Text>}
             {recent.map((e) => (
               <Pressable
                 key={e.id}
@@ -600,6 +659,18 @@ export default function SearchScreen() {
           )}
         </View>
         {dataNote && <Text style={styles.dataNote}>{dataNote}</Text>}
+        {data.status === "ready" && boroughs.length === 0 && (
+          // Before anything else: results are sorted by the area being worked.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Pick the boroughs you're working, on Session"
+            onPress={() => router.navigate("/")}
+            style={({ pressed }) => [styles.areaPrompt, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.areaPromptText}>Pick your area first, so matches where you’re working come first.</Text>
+            <Text style={styles.areaPromptButton}>Pick area</Text>
+          </Pressable>
+        )}
         {lookupNote && <Text style={styles.dataNote}>{lookupNote}</Text>}
         {placesNote && <Text style={styles.dataNote}>{placesNote}</Text>}
         <GpsStatus />
@@ -610,6 +681,15 @@ export default function SearchScreen() {
           state={shown}
           destination={{ lat: destination.point[1], lng: destination.point[0] }}
           title={destination.title}
+          favourite={favourites.some((f) => samePlace(f, { lat: destination.point[1], lng: destination.point[0] }))}
+          onToggleFavourite={() =>
+            toggleFavourite({
+              name: destination.title ?? "Saved place",
+              lat: destination.point[1],
+              lng: destination.point[0],
+              borough: boroughAt(destination.point[1], destination.point[0]),
+            })
+          }
           note={destination.note}
           blocks={blocks}
           onPickBlock={(b) => {
@@ -618,12 +698,15 @@ export default function SearchScreen() {
           }}
           onClose={clear}
           onRetry={() => routeTo(destination)}
+          // The browser test version with no location: try it on the demo drive instead.
+          onUseDemo={Platform.OS === "web" && !simulated ? () => setDemoDrive(true) : undefined}
           onOpenExternal={(app) => destination.logId && log.setRoute(destination.logId, app)}
           onGo={(kind) => {
             if (shown.status !== "ready") return;
             if (destination.logId) log.setRoute(destination.logId, kind);
             // An old plan, or one from somewhere else: go now, and re-route from here at once.
-            const stale = !shown.origin || planIsStale(shown.origin, fix, Date.now());
+            // Not on a demo drive: navigating puts the demo car at the route's start anyway.
+            const stale = !simulated && (!shown.origin || planIsStale(shown.origin, fix, Date.now()));
             recorder.event({ type: "go", kind, staleRefresh: stale });
             navigation.start(
               kind,
@@ -657,7 +740,7 @@ function offered(r: Route | PoliceRoute) {
   };
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   // The search box floats over the map, as a rounded bar with a shadow.
   floating: { position: "absolute", left: 10, right: 10, gap: 6 },
@@ -685,6 +768,19 @@ const styles = StyleSheet.create({
   } as object,
   clear: { padding: 12 },
   clearText: { color: colors.muted, fontSize: 20 },
+  areaPrompt: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.panel,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  areaPromptText: { flex: 1, color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 20 },
+  areaPromptButton: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 16 },
   dataNote: {
     color: colors.fg,
     fontFamily: fonts.body,
@@ -726,7 +822,7 @@ const styles = StyleSheet.create({
   recentLabel: {
     color: colors.muted,
     fontFamily: fonts.displaySemiBold,
-    fontSize: 12,
+    fontSize: 13,
     letterSpacing: 1.5,
     textTransform: "uppercase",
   },

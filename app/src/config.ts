@@ -43,3 +43,6 @@ export const DEMO_MODE = process.env.EXPO_PUBLIC_DEMO === "1";
 // The BlueRoute server (see server/README.md). Set EXPO_PUBLIC_API_URL when
 // building, e.g. https://route.example.org. Empty means routing is off.
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
+
+// Where testers' problem reports go (a mailto: link; nothing is sent by the app itself).
+export const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL || "support@bluerouteapp.com";

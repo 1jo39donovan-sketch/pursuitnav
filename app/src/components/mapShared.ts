@@ -76,6 +76,8 @@ export const LABEL_FONT = ["Noto Sans Regular"];
 export const EMPTY_COLLECTION: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 // Shared layer settings for place markers, so phone and browser look alike.
+/** Place dots from street level: further out, a borough's thousands of them hide the map. */
+export const MARKER_MIN_ZOOM = 13;
 export const MARKER_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
   "circle-color": ["get", "color"],
   "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 2.5, 15, 5, 18, 8],
@@ -214,6 +216,25 @@ export function roadNamePaint(theme: "night" | "day"): SymbolLayerSpecification[
   return theme === "night"
     ? { "text-color": "#ffffff", "text-halo-color": "#0c1220", "text-halo-width": 2 }
     : { "text-color": "#111111", "text-halo-color": "#ffffff", "text-halo-width": 2 };
+}
+
+/**
+ * House numbers on the buildings, close in (from the same tiles'
+ * "housenumber" layer), so a crew looking at the map can see which door is
+ * which. Clear on either map; they give way to road names.
+ */
+export const HOUSE_NUMBER_SOURCE_LAYER = "housenumber";
+export const HOUSE_NUMBER_MIN_ZOOM = 16.5;
+export const houseNumberLayout: SymbolLayerSpecification["layout"] = {
+  "text-field": ["get", "housenumber"],
+  "text-font": ["Noto Sans Bold"],
+  "text-size": ["interpolate", ["linear"], ["zoom"], 16.5, 11, 19, 15],
+  "text-padding": 2,
+};
+export function houseNumberPaint(theme: "night" | "day"): SymbolLayerSpecification["paint"] {
+  return theme === "night"
+    ? { "text-color": "#ffd27a", "text-halo-color": "#0c1220", "text-halo-width": 1.5 }
+    : { "text-color": "#5a3b00", "text-halo-color": "#ffffff", "text-halo-width": 1.5 };
 }
 
 /** Block and estate names: blue, like their place colour, readable on either map. */

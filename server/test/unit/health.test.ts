@@ -23,6 +23,7 @@ describe("GET /health", () => {
       places: false,
       addresses: { osNames: false, nominatim: false, osPlaces: false },
       learning: false,
+      osMaps: false,
     });
   });
 
