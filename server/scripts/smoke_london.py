@@ -17,9 +17,9 @@ Checks real London cases against the live API, over HTTPS:
      mapped building, and both routes end within 40 m of it;
    - a full postcode (N7 8LA) found as a postcode, in Islington;
    - 54 Caledonian Road, which isn't in OpenStreetMap: without OS Places, the
-     top Caledonian Road answer is the road, in Islington (the app warns it
-     isn't the door); with OS Places (osPlaces in /health), the door itself,
-     and the route ends there.
+     top Caledonian Road answer is a door estimated from the mapped doors
+     either side (labelled "estimated"), or else the road, in Islington; with
+     OS Places (osPlaces in /health), the door itself, and the route ends there.
 
 Every full route plan must also come back within 8 s, the app's timeout.
 Prints PASS/FAIL per check; exits 1 if anything failed.
@@ -506,8 +506,10 @@ def judge_unmapped(results, query, borough, os_places):
     top = next((a for a in results if street in a["label"].upper()), None)
     if not top:
         return False, f"nothing on {street.title()}; got {[a['label'] for a in results[:3]]}"
-    ok = top.get("precision") == "road" and top["borough"] == borough
-    note = " (door level needs OS Places or an OSM address)" if ok else ""
+    # Estimated from the mapped doors either side (labelled so), or else the road.
+    estimated = top.get("precision") == "door" and "(estimated " in top["label"]
+    ok = (estimated or top.get("precision") == "road") and top["borough"] == borough
+    note = "" if estimated or not ok else " (door level needs OS Places, an OSM address, or doors either side)"
     return ok, f"top answer '{top['label']}' is {top.get('precision')} in {top['borough']}{note}"
 
 

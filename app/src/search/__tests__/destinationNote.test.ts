@@ -16,3 +16,12 @@ describe("destinationNote", () => {
     expect(destinationNote({ label: "N7 8LA", kind: "postcode", precision: "postcode" })).toBeUndefined();
   });
 });
+
+describe("estimated doors", () => {
+  it("asks the crew to check the number when the door was worked out from its neighbours", () => {
+    expect(
+      destinationNote({ label: "54 Caledonian Road (estimated between 52 and 58)", kind: "address", precision: "door" } as never),
+    ).toMatch(/check the number/);
+    expect(destinationNote({ label: "52 Caledonian Road", kind: "address", precision: "door" } as never)).toBeUndefined();
+  });
+});

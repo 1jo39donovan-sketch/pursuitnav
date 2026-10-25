@@ -4,6 +4,7 @@ import { BoroughLookup } from "../../src/boroughArea.js";
 import {
   cachedNearestDoor,
   classify,
+  estimateDoor,
   NominatimClient,
   normaliseStreet,
   parseQuery,
@@ -199,5 +200,50 @@ describe("nearest house number (Pursuit)", () => {
     now = 61_000;
     await find(51.54412, -0.11712);
     expect(asked).toBe(2);
+  });
+});
+
+describe("unmapped house numbers", () => {
+  it("puts a number between the mapped doors either side, same side of the road", () => {
+    const at = estimateDoor(54, [
+      { number: 52, lat: 51.544, lng: -0.117 },
+      { number: 58, lat: 51.5446, lng: -0.117 },
+      // The other side of the road never counts.
+      { number: 55, lat: 51.5443, lng: -0.1175 },
+    ]);
+    expect(at?.between).toEqual([52, 58]);
+    expect(at?.lat).toBeCloseTo(51.5442, 5);
+    expect(at?.lng).toBeCloseTo(-0.117, 5);
+  });
+
+  it("uses next door alone only when that's all there is, and never doors far apart", () => {
+    expect(estimateDoor(54, [{ number: 56, lat: 51.544, lng: -0.117 }])).toMatchObject({ nextTo: 56, between: null });
+    expect(estimateDoor(54, [{ number: 60, lat: 51.544, lng: -0.117 }])).toBeNull();
+    // 50 and 58 half a kilometre apart: a different stretch of road, so no estimate.
+    expect(estimateDoor(54, [{ number: 50, lat: 51.544, lng: -0.117 }, { number: 58, lat: 51.549, lng: -0.117 }])).toBeNull();
+  });
+
+  it("answers a number OSM doesn't have with an estimate, labelled as one", async () => {
+    const doors: Record<string, NominatimResult> = {
+      "52 Caledonian Road": house({ lat: "51.5440", lon: "-0.1170", address: { house_number: "52", road: "Caledonian Road", postcode: "N1 9DP" } }),
+      "58 Caledonian Road": house({ osm_id: 9, lat: "51.5446", lon: "-0.1170", address: { house_number: "58", road: "Caledonian Road", postcode: "N1 9DP" } }),
+    };
+    const fake = (async (url: string) => {
+      // Nominatim reads "Rd" as "Road" too.
+      const q = (new URL(url).searchParams.get("q") ?? "").replace(/ Rd$/, " Road");
+      return new Response(JSON.stringify(doors[q] ? [doors[q]] : [street]), { status: 200 });
+    }) as unknown as typeof fetch;
+    const client = new NominatimClient("http://nominatim.test", boroughs, fake);
+    const [top] = await client.search("Flat 3, 54 Caledonian Rd");
+    expect(top).toMatchObject({
+      precision: "door",
+      label: "Flat 3, 54 Caledonian Road (estimated between 52 and 58)",
+      postcode: "N1 9DP",
+      borough: "Islington",
+    });
+    expect(top!.lat).toBeCloseTo(51.5442, 4);
+    // A mapped door needs no estimate.
+    const mapped = await client.search("52 Caledonian Road");
+    expect(mapped[0]!.label).toBe("52 Caledonian Road");
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Maneuver, Route } from "../../api/routes";
-import { maneuverArrow, offRouteCount, prepare, progressAt } from "../progress";
+import { comingUp, maneuverArrow, offRouteCount, prepare, progressAt } from "../progress";
 
 // An L-shaped route: 500 m east, then right (south) 300 m.
 // ~0.00719° of longitude is 500 m at this latitude; 0.0027° of latitude is 300 m.
@@ -90,5 +90,27 @@ describe("maneuverArrow", () => {
     expect(maneuverArrow(15)).toBe("←");
     expect(maneuverArrow(26)).toBe("⟳");
     expect(maneuverArrow(8)).toBe("↑");
+  });
+});
+
+describe("comingUp", () => {
+  it("lists the turns after the next two, with how far each is from here", () => {
+    const long = prepare({
+      ...route,
+      maneuvers: [
+        m(1, "Drive east.", "A", 0, 1, 250, 25),
+        m(9, "Bear right.", "B", 1, 2, 250, 25),
+        m(10, "Turn right.", "C", 2, 3, 150, 15),
+        m(15, "Turn left.", "D", 3, 4, 150, 15),
+        m(4, "You have arrived.", "", 4, 4, 0, 0),
+      ],
+    });
+    const p = progressAt(long, at(LNG, LAT));
+    const ahead = comingUp(long, p);
+    expect(ahead.map((a) => a.maneuver.instruction)).toEqual(["Turn left.", "You have arrived."]);
+    expect(ahead[0]!.inM).toBeGreaterThan(640);
+    expect(ahead[0]!.inM).toBeLessThan(660);
+    // Near the end there's nothing more to read ahead.
+    expect(comingUp(prepared, progressAt(prepared, at(LNG, LAT)))).toEqual([]);
   });
 });
