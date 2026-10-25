@@ -60,6 +60,10 @@ describe("map looks", () => {
     expect(src.maxzoom).toBe(16);
     expect(src.attribution).toMatch(/Crown copyright/);
     expect(s.layers.at(-1)?.id).toBe("os-road");
+    const os = s.layers.at(-1) as unknown as { maxzoom: number; paint: Record<string, number> };
+    // Gives way to the detailed map close in, and is dark (light and dark swapped) at night.
+    expect(os.maxzoom).toBe(17);
+    expect(os.paint["raster-brightness-min"]).toBeGreaterThan(os.paint["raster-brightness-max"]!);
     expect(s.layers).toHaveLength(6);
   });
 

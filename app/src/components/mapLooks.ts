@@ -29,6 +29,8 @@ export const OS_SOURCE = "os-road";
 // The server refuses closer zooms (OS Premium, charged); the map draws zoom 16 larger.
 const OS_MIN_ZOOM = 7;
 const OS_MAX_ZOOM = 16;
+/** The OS map shows up to here; closer, the detailed map underneath. */
+export const OS_UNTIL_ZOOM = 17;
 export const OS_ATTRIBUTION = `Contains OS data © Crown copyright and database rights ${new Date().getFullYear()}`;
 
 type Layer = StyleSpecification["layers"][number];
@@ -180,8 +182,20 @@ function osLayers(theme: MapTheme): { source: StyleSpecification["sources"][stri
       type: "raster",
       source: OS_SOURCE,
       minzoom: OS_MIN_ZOOM,
-      // Dimmed at night, so it doesn't dazzle in a dark car.
-      paint: theme === "night" ? { "raster-brightness-max": 0.6, "raster-saturation": -0.2 } : {},
+      // Past OS's free zooms its tiles only blur: closer in, the detailed map
+      // (door numbers and all) underneath takes over.
+      maxzoom: OS_UNTIL_ZOOM,
+      // At night, light and dark swapped (white streets turn dark) and the
+      // colours turned back round, rather than a dimmed light map glaring.
+      paint:
+        theme === "night"
+          ? {
+              "raster-brightness-min": 0.92,
+              "raster-brightness-max": 0.08,
+              "raster-hue-rotate": 180,
+              "raster-saturation": -0.3,
+            }
+          : {},
     },
   };
 }

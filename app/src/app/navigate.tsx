@@ -537,20 +537,23 @@ export default function NavigateScreen() {
       {landscape ? (
         <View style={styles.row}>
           <View style={styles.landscapeSide}>
-            {turnPanel}
-            {/* Room to read ahead: the turns after the next two, with how far each is. */}
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.ahead}>
-              {prepared && progress && !progress.arrived && !showOff && !back
-                ? comingUp(prepared, progress).map(({ maneuver, inM }) => (
-                    <View key={maneuver.beginShapeIndex} style={styles.aheadRow}>
-                      <Text style={styles.aheadArrow}>{maneuverArrow(maneuver.type)}</Text>
-                      <Text style={styles.aheadText} numberOfLines={2}>
-                        {upcomingInstruction(maneuver)}
-                      </Text>
-                      <Text style={styles.aheadDistance}>{formatDistance(inM)}</Text>
-                    </View>
-                  ))
-                : null}
+            {/* The next turn and the turns after it scroll if a phone on its side is too short;
+                arrival time, Route and End stay put below. */}
+            <ScrollView style={{ flex: 1 }}>
+              {turnPanel}
+              <View style={styles.ahead}>
+                {prepared && progress && !progress.arrived && !showOff && !back
+                  ? comingUp(prepared, progress).map(({ maneuver, inM }) => (
+                      <View key={maneuver.beginShapeIndex} style={styles.aheadRow}>
+                        <Text style={styles.aheadArrow}>{maneuverArrow(maneuver.type)}</Text>
+                        <Text style={styles.aheadText} numberOfLines={2}>
+                          {upcomingInstruction(maneuver)}
+                        </Text>
+                        <Text style={styles.aheadDistance}>{formatDistance(inM)}</Text>
+                      </View>
+                    ))
+                  : null}
+              </View>
             </ScrollView>
             {etaPanel}
           </View>

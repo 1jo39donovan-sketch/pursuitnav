@@ -20,7 +20,11 @@ const KIND = {
 const roadName = (label: string) => label.split(",")[0]!.trim().toLowerCase();
 
 /** "Flat 3, 53 Caledonian Road" → "caledonian road": the road a door is on. */
-const doorRoad = (label: string) => roadName(label.split(",").at(-1)!.trim().replace(/^\d+[a-z]?\s+/i, ""));
+const doorRoad = (label: string) =>
+  roadName(label.replace(/\s*\(estimated [^)]*\)$/, "").split(",").at(-1)!.trim().replace(/^\d+[a-z]?\s+/i, ""));
+
+/** A number placed from the doors either side or along an address line: still road precision, but nearer the door than the road. */
+const estimated = (r: SearchResult) => /\(estimated [^)]*\)$/.test(r.label);
 
 const compact = (postcode: string) => postcode.replace(/\s/g, "").toUpperCase();
 
@@ -63,14 +67,16 @@ export function mergeAddresses(offline: SearchResults, addresses: Address[], are
     ];
   });
   results.sort((a, b) => b.score - a.score);
-  const exact = (r: SearchResult) => r.precision === "door" || r.precision === "postcode";
+  const exact = (r: SearchResult) => r.precision === "door" || r.precision === "postcode" || estimated(r);
   const mine = (r: SearchResult) => area.has(r.borough) || (area.near?.(r.lat, r.lng) ?? false);
   const inArea = results.filter(mine).slice(0, MAX_ADDRESSES);
   const outside = results.filter((r) => !mine(r));
   // The phone's own rows the server has said better: a postcode it also
   // found, or a road it found the door on.
   const postcodes = new Set(results.filter((r) => r.precision === "postcode").map((r) => compact(r.label)));
-  const doors = new Set(results.filter((r) => r.precision === "door").map((r) => `${doorRoad(r.label)}|${r.borough}`));
+  const doors = new Set(
+    results.filter((r) => r.precision === "door" || estimated(r)).map((r) => `${doorRoad(r.label)}|${r.borough}`),
+  );
   const better = (r: SearchResult) =>
     (r.kind === "postcode" && postcodes.has(compact(r.label))) ||
     (r.precision === "road" && !!r.road && doors.has(`${roadName(r.road)}|${r.borough}`));

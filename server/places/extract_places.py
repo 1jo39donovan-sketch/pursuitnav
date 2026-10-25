@@ -92,11 +92,12 @@ class PlaceCollector(osmium.SimpleHandler):
         self.places = []
 
     def add(self, tags, lng: float, lat: float):
-        name = clean(tags.get("name"))
-        if not name:
-            return
         kind = classify(tags)
         if not kind:
+            return
+        # A&E entrances are rarely named in OSM, but crews need them most.
+        name = clean(tags.get("name")) or (kind[0] if kind[0] == "A&E entrance" else "")
+        if not name:
             return
         borough = self.boroughs.index_of(lng, lat)
         if borough is None:
@@ -106,7 +107,7 @@ class PlaceCollector(osmium.SimpleHandler):
         )
 
     def node(self, n):
-        if "name" in n.tags:
+        if "name" in n.tags or n.tags.get("emergency") == "emergency_ward_entrance":
             self.add(n.tags, n.location.lon, n.location.lat)
 
     def area(self, a):
