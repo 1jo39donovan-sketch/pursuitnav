@@ -3,7 +3,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } fro
 
 import type { NoPoliceReason, Route, RoutePlan } from "../api/routes";
 import type { PointOfInterest } from "../search/places";
-import { formatDistance, formatDuration } from "../format";
+import { formatDistance, formatDuration, formatMinutes } from "../format";
 import { recorder, useRecorder } from "../fieldtest/instance";
 import { RETRYING_WHEN_BACK } from "../navigation/connectivity";
 import { planningText } from "../navigation/planning";
@@ -44,6 +44,8 @@ interface Props {
   blockNote?: string;
   /** Write the note (empty removes it); without it, no notes for this destination (a whole road). */
   onSaveNote?: (text: string) => void;
+  /** A phone on its side: the card is a sheet down the left, so the map keeps its height. */
+  side?: { top: number };
   /** No position yet: offer the demo drive (the browser test version). */
   onUseDemo?: () => void;
   /** Starred (Search shows it first next time). */
@@ -82,6 +84,7 @@ export function RoutePanel({
   favourite,
   onToggleFavourite,
   onUseDemo,
+  side,
   blockNote,
   onSaveNote,
   noteKey,
@@ -118,7 +121,7 @@ export function RoutePanel({
   // No route from BlueRoute: Google Maps and Waze become the main buttons, so a crew is never stuck.
   const handOff = state.status === "error" && (!!state.noSignal || !!state.serverDown);
   return (
-    <View style={styles.panel}>
+    <View style={[styles.panel, side && [styles.sidePanel, { top: side.top }]]}>
       {/* One line: where to, how fresh the plan is, and Clear. */}
       <View style={styles.header}>
         <View style={styles.headerText}>
@@ -337,7 +340,7 @@ function StandardRow({
     <View style={[styles.row, fastest && styles.rowFastest]}>
       <View style={[styles.swatch, { backgroundColor: swatch }]} />
       <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>
+        <Text style={styles.rowTitle} numberOfLines={1}>
           Standard{fastest ? <Text style={styles.fastest}> · fastest</Text> : null}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
@@ -345,7 +348,9 @@ function StandardRow({
         </Text>
         <TrafficLine route={route} />
       </View>
-      <Text style={styles.eta}>{formatDuration(route.durationS)}</Text>
+      <Text style={styles.eta} numberOfLines={1}>
+        {formatMinutes(route.durationS)}
+      </Text>
       <GoButton onPress={onGo} color={colors.blue} label="Go on the standard route" />
     </View>
   );
@@ -405,7 +410,7 @@ function PoliceRow({
       <View style={[styles.row, styles.rowMuted]}>
         <View style={[styles.swatch, styles.swatchMuted]} />
         <View style={styles.rowText}>
-          <Text style={styles.rowTitle}>Blue light</Text>
+          <Text style={styles.rowTitle} numberOfLines={1}>Blue light</Text>
           <Text style={styles.meta} numberOfLines={2}>
             {slot.state === "checking" ? checkingText : NO_POLICE[slot.reason]}
           </Text>
@@ -423,13 +428,15 @@ function PoliceRow({
       <View style={styles.rowInner}>
         <View style={[styles.swatch, { backgroundColor: colors.blue }]} />
         <View style={styles.rowText}>
-          <Text style={styles.rowTitle}>Blue light</Text>
+          <Text style={styles.rowTitle} numberOfLines={1}>Blue light</Text>
           <Text style={[styles.meta, styles.saving]} numberOfLines={1}>
             Saves {formatDuration(route.savingS)}
           </Text>
           <TrafficLine route={route} />
         </View>
-        <Text style={styles.eta}>{formatDuration(route.durationS)}</Text>
+        <Text style={styles.eta} numberOfLines={1}>
+        {formatMinutes(route.durationS)}
+      </Text>
         <GoButton onPress={onGo} color={colors.amber} label="Go on the blue-light route" />
       </View>
       {/* Always says how many it relies on; tap for the list (they're on the map too). */}
@@ -547,6 +554,17 @@ const baseStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: -3 },
     elevation: 8,
   },
+  sidePanel: {
+    position: "absolute",
+    left: 0,
+    bottom: 0,
+    width: "48%",
+    maxWidth: 440,
+    maxHeight: "100%",
+    marginTop: 0,
+    borderTopLeftRadius: 0,
+    borderBottomRightRadius: 18,
+  },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
   headerText: { flex: 1, minWidth: 0 },
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 21, lineHeight: 24 },
@@ -599,7 +617,8 @@ const baseStyles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: "uppercase",
   },
-  scroll: { flexGrow: 0 },
+  // Shrinks to fit the sheet (half the screen, or the side sheet) and scrolls, rather than running off it.
+  scroll: { flexGrow: 0, flexShrink: 1 },
   scrollContent: { gap: 6 },
   // A row: colour swatch, name, time, Go. The same height whatever it says.
   row: {
@@ -628,7 +647,8 @@ const baseStyles = StyleSheet.create({
   rowPolice: { borderColor: colors.amber },
   rowFastest: { borderColor: colors.blue },
   rowMuted: { opacity: 0.85 },
-  rowText: { flex: 1, minWidth: 0 },
+  // Room for "STANDARD" or "BLUE LIGHT" on one line, even with larger text on a narrow phone: the time gives way first.
+  rowText: { flex: 1, minWidth: 136 },
   rowTitle: {
     color: colors.fg,
     fontFamily: fonts.displayBold,
@@ -655,6 +675,7 @@ const baseStyles = StyleSheet.create({
   swatch: { width: 6, alignSelf: "stretch", borderRadius: 3, marginVertical: 4 },
   swatchMuted: { backgroundColor: colors.line },
   eta: {
+    flexShrink: 1,
     color: colors.fg,
     fontFamily: fonts.displayBold,
     fontSize: 28,

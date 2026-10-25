@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { custodyIn, custodyStation, type CustodySuite } from "../area/custody";
 import { formatDistance } from "../format";
-import { aeDestination } from "../search/quickPlaces";
+import { aeDestination, isAE } from "../search/quickPlaces";
 import { distanceM } from "../geo";
 import { useLocation } from "../location/LocationProvider";
 import { BCUS, bcuFor, type BoroughGroup } from "../search/boroughGroups";
@@ -82,7 +82,7 @@ export default function AreaScreen() {
     return {
       custody,
       stations: all.filter((p) => stationKind.types.includes(p.type) && !taken.has(p)),
-      aes: all.filter((p) => p.type === "Hospital with A&E"),
+      aes: all.filter(isAE),
     };
   }, [data, bcu, places.status, police, stationKind]); // eslint-disable-line react-hooks/exhaustive-deps
 

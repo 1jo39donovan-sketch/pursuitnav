@@ -137,8 +137,10 @@ function Banner({
   const color = tone === "ok" ? colors.ok : tone === "warn" ? colors.amber : colors.muted;
   return (
     <View style={styles.banner}>
-      <View style={[styles.dot, { backgroundColor: color }]} />
-      <Text style={styles.text}>{text}</Text>
+      <View style={styles.line}>
+        <View style={[styles.dot, { backgroundColor: color }]} />
+        <Text style={styles.text}>{text}</Text>
+      </View>
       {children}
     </View>
   );
@@ -167,7 +169,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  text: { flexGrow: 1, flexShrink: 1, flexBasis: 220, color: colors.fg, fontFamily: fonts.mono, fontSize: 13, lineHeight: 18 },
+  // The words take the whole line: any buttons go underneath, never squeezing them.
+  line: { flexBasis: "100%", flexDirection: "row", alignItems: "center", gap: 8 },
+  text: { flex: 1, color: colors.fg, fontFamily: fonts.mono, fontSize: 13, lineHeight: 18 },
   dismiss: { paddingHorizontal: 4 },
   dismissText: { color: colors.muted, fontSize: 18 },
   action: {

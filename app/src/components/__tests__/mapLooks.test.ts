@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { restyle, scaleWidth } from "../mapLooks";
+import { nightify, restyle, scaleWidth } from "../mapLooks";
 
 // Hoisted above the imports by vitest.
 vi.mock("../../config", () => ({ API_URL: "https://api.example" }));
@@ -61,5 +61,13 @@ describe("map looks", () => {
     expect(src.attribution).toMatch(/Crown copyright/);
     expect(s.layers.at(-1)?.id).toBe("os-road");
     expect(s.layers).toHaveLength(6);
+  });
+
+  it("makes night from the detailed day map, keeping every layer, recoloured dark", () => {
+    const n = nightify(style);
+    expect(n.layers.map((l) => l.id)).toEqual((style as { layers: { id: string }[] }).layers.map((l) => l.id));
+    expect((n.layers[0] as unknown as Painted).paint["background-color"]).toBe("#0f1520");
+    expect((n.layers[2] as unknown as Painted).paint["line-color"]).toBe("#06090f");
+    expect((n.layers[4] as unknown as Painted).paint["text-color"]).toBe("#c4ccda");
   });
 });

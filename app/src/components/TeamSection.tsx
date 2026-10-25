@@ -15,6 +15,7 @@ import { useSession } from "../session/SessionProvider";
 import { useTeam, type TeamMember } from "../team/TeamProvider";
 import { colors, fonts } from "../theme";
 import { Button } from "./Button";
+import { useTextStyles } from "../textSize";
 
 const STATUS: Record<string, string> = {
   connecting: "Connecting…",
@@ -42,6 +43,7 @@ function ago(ms: number): string {
 }
 
 export function TeamSection() {
+  const styles = useTextStyles(baseStyles);
   const team = useTeam();
   const { fix } = useLocation();
   const { vehicle, roads } = useSession();
@@ -191,7 +193,7 @@ export function TeamSection() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   field: { gap: 10 },
   label: {
     color: colors.muted,
