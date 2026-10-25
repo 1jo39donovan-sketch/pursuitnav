@@ -1,6 +1,6 @@
 // Larger text (Session), for an operator reading on the move: the screens
 // used on the way to a call (Search, the route choice, navigation) take
-// their styles through useTextStyles. Big text grows less, so it still fits.
+// their styles through useTextStyles, and so does Session. Big text grows less, so it still fits.
 import { useSession } from "./session/SessionProvider";
 
 const SMALL_GROWS = 1.25;

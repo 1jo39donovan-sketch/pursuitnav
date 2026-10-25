@@ -5,6 +5,7 @@ import {
   Layer,
   Map,
   type CameraRef,
+  type MapRef,
   type LngLat,
 } from "@maplibre/maplibre-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,7 +26,10 @@ import {
   TEAM_CIRCLE_PAINT,
   TEAM_LABEL_LAYOUT,
   teamLabelPaint,
+  HOUSE_NUMBER_LAYER,
   HOUSE_NUMBER_MIN_ZOOM,
+  HOUSE_NUMBER_TAP_PX,
+  nearestHouseNumber,
   HOUSE_NUMBER_SOURCE_LAYER,
   houseNumberLayout,
   houseNumberPaint,
@@ -108,6 +112,7 @@ export function LiveMap({
   const camera = useRef<CameraRef>(null);
   // When a place marker was last tapped, so the map's own tap under it is let go.
   const markerPressedAt = useRef(0);
+  const mapRef = useRef<MapRef>(null);
 
   // New points to show: stop following so the camera can frame them.
   const [lastFitTo, setLastFitTo] = useState(fitTo);
@@ -156,6 +161,7 @@ export function LiveMap({
   return (
     <View style={styles.container} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
       <Map
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
         mapStyle={mapStyle}
         logo={false}
@@ -170,8 +176,24 @@ export function LiveMap({
           // A tap on a place marker has its own card: wait a moment to see if it was one.
           const at = e.nativeEvent.lngLat;
           const tappedAt = Date.now();
+          const { point } = e.nativeEvent;
+          const r = HOUSE_NUMBER_TAP_PX;
           setTimeout(() => {
-            if (markerPressedAt.current < tappedAt - 50) onPress?.(at);
+            if (markerPressedAt.current >= tappedAt - 50 || !onPress) return;
+            // The house number drawn nearest the tap: the one the crew can see they tapped.
+            void (mapRef.current
+              ?.queryRenderedFeatures(
+                [
+                  [point[0] - r, point[1] - r],
+                  [point[0] + r, point[1] + r],
+                ],
+                {
+                  layers: [HOUSE_NUMBER_LAYER],
+                },
+              )
+              .then((fs) => nearestHouseNumber(fs, at))
+              .catch(() => null) ?? Promise.resolve(null)
+            ).then((n) => onPress(at, n));
           }, 120);
         }}
         onRegionWillChange={(e) => {
@@ -233,7 +255,7 @@ export function LiveMap({
         {/* Under the road names, so a street name always wins the space. */}
         <Layer
           type="symbol"
-          id="house-numbers"
+          id={HOUSE_NUMBER_LAYER}
           source={ROAD_NAME_SOURCE}
           source-layer={HOUSE_NUMBER_SOURCE_LAYER}
           minzoom={HOUSE_NUMBER_MIN_ZOOM}
@@ -305,7 +327,8 @@ export function LiveMap({
       </Map>
 
       {mapFailed && (
-        <View style={styles.failed} pointerEvents="none">
+        // Below whatever floats over the top of the map (Search's box), not hidden under it.
+        <View style={[styles.failed, { top: 16 + overlayTop }]} pointerEvents="none">
           <Text style={styles.failedTitle}>Map couldn’t load</Text>
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>

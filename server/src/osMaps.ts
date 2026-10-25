@@ -48,6 +48,7 @@ export function osMapsRoutes(
 ) {
   // Most recently used last; a Map keeps insertion order.
   const cache = new Map<string, Buffer>();
+  let lastFailure: number | string | null = null;
   const send = (reply: FastifyReply, png: Buffer) =>
     reply.header("content-type", "image/png").header("cache-control", `public, max-age=${7 * DAY_S}`).send(png);
 
@@ -72,10 +73,19 @@ export function osMapsRoutes(
         signal: AbortSignal.timeout(8000),
       }).catch(() => null);
       if (!res?.ok) {
-        // The key's status, not the tile: no URL, so no key, in the log.
-        req.log.warn({ status: res?.status ?? "no answer" }, "OS Maps tile failed");
+        const status = res?.status ?? "no answer";
+        // Said once per change, not per tile: no URL, so no key, in the log.
+        if (status !== lastFailure) req.log.warn({ status }, "OS Maps tile failed");
+        lastFailure = status;
+        // The key refused (OS Maps API not added to its OS Data Hub project):
+        // not set up here, rather than a server error per tile.
+        if (status === 401 || status === 403) {
+          notSetUp(req);
+          return reply.code(503).send({ error: "os-maps-not-configured" });
+        }
         return reply.code(502).send({ error: "os-maps-unavailable" });
       }
+      lastFailure = null;
       const png = Buffer.from(await res.arrayBuffer());
       cache.set(id, png);
       if (cache.size > CACHE_TILES) cache.delete(cache.keys().next().value!);

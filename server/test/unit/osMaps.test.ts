@@ -46,7 +46,13 @@ describe("OS map tiles", () => {
     osMapsRoutes(off, undefined, LONDON);
     expect((await off.inject("/v1/os-maps/Road/16/32744/21793.png")).statusCode).toBe(503);
     const down = Fastify();
-    osMapsRoutes(down, "k", LONDON, undefined, (async () => new Response("", { status: 401 })) as unknown as typeof fetch);
-    expect((await down.inject("/v1/os-maps/Road/16/32744/21793.png")).statusCode).toBe(502);
+    // The key refused: not set up (not a server error for each tile).
+    let notSetUp = 0;
+    osMapsRoutes(down, "k", LONDON, () => notSetUp++, (async () => new Response("", { status: 401 })) as unknown as typeof fetch);
+    expect((await down.inject("/v1/os-maps/Road/16/32744/21793.png")).statusCode).toBe(503);
+    expect(notSetUp).toBe(1);
+    const busy = Fastify();
+    osMapsRoutes(busy, "k", LONDON, undefined, (async () => new Response("", { status: 500 })) as unknown as typeof fetch);
+    expect((await busy.inject("/v1/os-maps/Road/16/32744/21793.png")).statusCode).toBe(502);
   });
 });

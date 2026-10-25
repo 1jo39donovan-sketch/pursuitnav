@@ -23,7 +23,10 @@ import {
   TEAM_CIRCLE_PAINT,
   TEAM_LABEL_LAYOUT,
   teamLabelPaint,
+  HOUSE_NUMBER_LAYER,
   HOUSE_NUMBER_MIN_ZOOM,
+  HOUSE_NUMBER_TAP_PX,
+  nearestHouseNumber,
   HOUSE_NUMBER_SOURCE_LAYER,
   houseNumberLayout,
   houseNumberPaint,
@@ -211,7 +214,7 @@ export function LiveMap({
       // House numbers close in, under the road names so a street name always wins the space.
       if (m.getSource(ROAD_NAME_SOURCE)) {
         m.addLayer({
-          id: "house-numbers",
+          id: HOUSE_NUMBER_LAYER,
           type: "symbol",
           source: ROAD_NAME_SOURCE,
           "source-layer": HOUSE_NUMBER_SOURCE_LAYER,
@@ -343,7 +346,18 @@ export function LiveMap({
     m.on("click", (e) => {
       if (Date.now() - longAt < 800) return;
       if (m.getLayer("places-dot") && m.queryRenderedFeatures(e.point, { layers: ["places-dot"] }).length) return;
-      tap.current?.([e.lngLat.lng, e.lngLat.lat]);
+      const at: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+      const r = HOUSE_NUMBER_TAP_PX;
+      const numbers = m.getLayer(HOUSE_NUMBER_LAYER)
+        ? m.queryRenderedFeatures(
+            [
+              [e.point.x - r, e.point.y - r],
+              [e.point.x + r, e.point.y + r],
+            ],
+            { layers: [HOUSE_NUMBER_LAYER] },
+          )
+        : [];
+      tap.current?.(at, nearestHouseNumber(numbers, at));
     });
     m.on("contextmenu", pressAt);
     let pressTimer: ReturnType<typeof setTimeout> | undefined;
@@ -439,7 +453,8 @@ export function LiveMap({
       {/* flex rather than absoluteFill: maplibre-gl's CSS sets position: relative on this element. */}
       <View ref={container} style={styles.map} />
       {mapFailed && (
-        <View style={styles.failed} pointerEvents="none">
+        // Below whatever floats over the top of the map (Search's box), not hidden under it.
+        <View style={[styles.failed, { top: 16 + overlayTop }]} pointerEvents="none">
           <Text style={styles.failedTitle}>Map couldn’t load</Text>
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>

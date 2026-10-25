@@ -38,6 +38,8 @@ interface Props {
   destination: { lat: number; lng: number };
   /** What was picked, e.g. "54 Caledonian Road". */
   title?: string;
+  /** Changes with the destination, so a note being written never lands on the next one. */
+  noteKey?: string;
   /** The crew's own note on this block (kept on the phone). */
   blockNote?: string;
   /** Write the note (empty removes it); without it, no notes for this destination (a whole road). */
@@ -64,7 +66,7 @@ interface Props {
 // Why there's no blue-light route, in one short line under the standard route.
 const NO_POLICE: Record<NoPoliceReason, string> = {
   "not-faster": "No faster blue-light route.",
-  "no-restrictions-found": "No blue-light route: a faster one's restrictions couldn't be listed.",
+  "no-restrictions-found": "No blue-light route: a quicker one was found, but what it relies on couldn't be checked, so it isn't offered.",
   "wrong-way-unavoidable": "No blue-light route: the faster one goes the wrong way down a one-way street.",
   "vehicle-limit-unavoidable": "No blue-light route: the faster one has a limit your vehicle can't take.",
   "not-checked": "Blue-light routes are off (Session).",
@@ -82,6 +84,7 @@ export function RoutePanel({
   onUseDemo,
   blockNote,
   onSaveNote,
+  noteKey,
   note,
   blocks,
   onPickBlock,
@@ -144,7 +147,7 @@ export function RoutePanel({
           {note}
         </Text>
       )}
-      {onSaveNote && <BlockNoteLine note={blockNote} onSave={onSaveNote} />}
+      {onSaveNote && <BlockNoteLine key={noteKey} note={blockNote} onSave={onSaveNote} />}
       {ageText && <Text style={styles.age}>{`${ageText} · Go updates it from here`}</Text>}
       {state.status === "loading" && <Text style={styles.status}>{planningText("routes", waited)}</Text>}
       {state.status === "error" && (

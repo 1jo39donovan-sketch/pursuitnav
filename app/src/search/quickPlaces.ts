@@ -28,6 +28,20 @@ function nearest(from: { lat: number; lng: number }, list: readonly PointOfInter
   return best;
 }
 
+/** Hospitals' A&E entrances are usually away from the main door: within this of it, an entrance mapped as A&E counts. */
+const AE_ENTRANCE_WITHIN_M = 500;
+
+/**
+ * Where to send a crew for a hospital's A&E: its A&E entrance when
+ * OpenStreetMap has one close by, else the hospital itself.
+ */
+export function aeDestination(hospital: PointOfInterest, pois: readonly PointOfInterest[]): PointOfInterest {
+  const n = nearest(hospital, pois.filter((p) => p.type === "A&E entrance"));
+  return n && n.metres <= AE_ENTRANCE_WITHIN_M
+    ? { ...n.place, name: `${hospital.name} (A&E entrance)`, borough: hospital.borough }
+    : hospital;
+}
+
 /** The quick places for the service, nearest first within each kind; none without a position. */
 export function quickPlaces(
   service: ServiceType | null,
@@ -40,7 +54,11 @@ export function quickPlaces(
     const n = nearest(from, list);
     if (n) out.push({ label, ...n });
   };
-  add("Nearest A&E", pois.filter((p) => p.type === "Hospital with A&E"));
+  const ae = nearest(from, pois.filter((p) => p.type === "Hospital with A&E"));
+  if (ae) {
+    const place = aeDestination(ae.place, pois);
+    out.push({ label: "Nearest A&E", place, metres: distanceM(from, place) });
+  }
   // Police, and installs from before the service choice.
   if (service === "police" || service === null) {
     const suites = CUSTODY_SUITES.filter((c) => c.kind === "24/7").flatMap((c) => {
@@ -50,6 +68,8 @@ export function quickPlaces(
     add("Nearest custody", suites);
   }
   const station = STATION[service ?? "police"];
-  add(station.label, pois.filter((p) => station.types.includes(p.type)));
+  // Not the custody suite again: its police station is already listed.
+  const listed = new Set(out.map((q) => `${q.place.lat},${q.place.lng}`));
+  add(station.label, pois.filter((p) => station.types.includes(p.type) && !listed.has(`${p.lat},${p.lng}`)));
   return out;
 }

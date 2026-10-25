@@ -23,6 +23,21 @@ export function servesFlat(flats: string, flat: number): boolean {
   });
 }
 
+/**
+ * Entrances that can be this building's: never one OSM numbers as another
+ * house, and an unnumbered one only close by. In a terrace the neighbour's
+ * door is a few metres away, so the door's own point beats a guess.
+ */
+export function entrancesFor(entrances: readonly Entrance[], label: string, unnumberedWithinM: number): Entrance[] {
+  const { housenumber, flat } = addressParts(label);
+  return entrances.filter((e) => {
+    const number = e.housenumber.toLowerCase();
+    if (housenumber && number) return number === housenumber;
+    if (flat != null && e.flats && servesFlat(e.flats, flat)) return true;
+    return e.metres <= unnumberedWithinM;
+  });
+}
+
 export function bestEntrance(entrances: readonly Entrance[], label: string): Entrance | null {
   if (!entrances.length) return null;
   const { housenumber, flat } = addressParts(label);
