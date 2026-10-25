@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { custodyIn, custodyStation, type CustodySuite } from "../area/custody";
 import { formatDistance } from "../format";
+import { aeDestination } from "../search/quickPlaces";
 import { distanceM } from "../geo";
 import { useLocation } from "../location/LocationProvider";
 import { BCUS, bcuFor, type BoroughGroup } from "../search/boroughGroups";
@@ -66,6 +67,14 @@ export default function AreaScreen() {
   const byDistance = <T extends { lat: number; lng: number }>(list: T[]) =>
     fix ? [...list].sort((a, b) => distanceM(fix, a) - distanceM(fix, b)) : list;
 
+  // A&E entrances can sit over a borough line from their hospital: looked for everywhere.
+  const entrancesAll = useMemo(
+    () =>
+      data.status === "ready"
+        ? data.index.pointsOfInterestIn(new Set(BOROUGHS), new Set(["health"])).filter((p) => p.type === "A&E entrance")
+        : [],
+    [data, places.status], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const { custody, stations, aes } = useMemo(() => {
     const all = data.status === "ready" ? data.index.pointsOfInterestIn(new Set(bcu.boroughs), new Set(["emergency", "health"])) : [];
     const custody = police ? custodyIn(bcu.boroughs).map((suite) => ({ suite, place: custodyStation(suite, all) })) : [];
@@ -116,7 +125,14 @@ export default function AreaScreen() {
             {[badge, p.address || p.borough, d !== null ? formatDistance(d) : null].filter(Boolean).join(" · ")}
           </Text>
         </View>
-        <GoButton label={`Route to ${p.name}`} onPress={() => go(p.name, p.lat, p.lng)} />
+        <GoButton
+          label={`Route to ${p.name}`}
+          onPress={() => {
+            // A hospital: its A&E entrance when one is mapped.
+            const to = p.type === "Hospital with A&E" ? aeDestination(p, entrancesAll) : p;
+            go(to.name, to.lat, to.lng);
+          }}
+        />
       </View>
     );
   };

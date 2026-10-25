@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { parseFavourites, toggled } from "../favourites";
 import type { PointOfInterest } from "../places";
-import { quickPlaces } from "../quickPlaces";
+import { aeDestination, quickPlaces } from "../quickPlaces";
 
 vi.mock("../../storage/store", () => ({ store: { getSetting: () => null, setSetting: () => {} } }));
 
@@ -24,7 +24,7 @@ describe("quick places", () => {
     expect(q.map((p) => [p.label, p.place.name])).toEqual([
       ["Nearest A&E", "Whittington Hospital"],
       ["Nearest custody", "Islington custody"],
-      ["Nearest police station", "Islington Police Station"],
+      ["Nearest police station", "Holborn Police Station"],
     ]);
   });
 
@@ -35,6 +35,19 @@ describe("quick places", () => {
 
   it("needs a position", () => {
     expect(quickPlaces("police", null, pois)).toEqual([]);
+  });
+});
+
+describe("A&E", () => {
+  it("sends a crew to the A&E entrance when one is mapped near the hospital", () => {
+    const hospital = pois[0]!;
+    const entrance = poi("Emergency Department", "A&E entrance", "Islington", 51.5662, -0.1379);
+    expect(aeDestination(hospital, [...pois, entrance])).toMatchObject({
+      name: "Whittington Hospital (A&E entrance)",
+      lat: 51.5662,
+    });
+    // One by another hospital doesn't count.
+    expect(aeDestination(pois[1]!, [...pois, entrance])).toBe(pois[1]);
   });
 });
 

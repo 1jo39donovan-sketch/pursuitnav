@@ -155,6 +155,8 @@ function Action({ label, onPress }: { label: string; onPress: () => void }) {
 const styles = StyleSheet.create({
   banner: {
     flexDirection: "row",
+    // Long instructions take the line; the buttons go under them on a phone.
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 16,
@@ -165,7 +167,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  text: { flex: 1, color: colors.fg, fontFamily: fonts.mono, fontSize: 13, lineHeight: 18 },
+  text: { flexGrow: 1, flexShrink: 1, flexBasis: 220, color: colors.fg, fontFamily: fonts.mono, fontSize: 13, lineHeight: 18 },
   dismiss: { paddingHorizontal: 4 },
   dismissText: { color: colors.muted, fontSize: 18 },
   action: {

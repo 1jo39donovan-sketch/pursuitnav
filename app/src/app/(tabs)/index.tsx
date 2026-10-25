@@ -18,6 +18,7 @@ import { currentInstallId, newInstallId } from "../../usage/usage";
 import { colors, fonts } from "../../theme";
 import { bcuFor } from "../../search/boroughGroups";
 import { SERVICES, VEHICLES, vehiclesFor } from "../../vehicles";
+import { useTextStyles } from "../../textSize";
 
 // Once a shift is set up, the app opens on Search: the job is usually to type
 // an address straight away. Only on the first screen shown after launch.
@@ -34,6 +35,7 @@ const LOOK_HINTS: Record<MapLook, string> = {
 };
 
 export default function SessionScreen() {
+  const styles = useTextStyles(baseStyles);
   const {
     callsign,
     setCallsign,
@@ -432,6 +434,7 @@ export default function SessionScreen() {
 
 /** Exactly what usage counting sends, and a way to start again as a new install. */
 function UsageNote() {
+  const styles = useTextStyles(baseStyles);
   const [id, setId] = useState(() => currentInstallId());
   return (
     <View style={styles.field}>
@@ -453,7 +456,7 @@ function UsageNote() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, gap: 20 },
   intro: { gap: 6 },

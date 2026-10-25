@@ -54,7 +54,7 @@ import { loadFavourites, samePlace, saveFavourites, toggled, type Favourite } fr
 import { quickPlaces } from "../../search/quickPlaces";
 import { fetchEntrances } from "../../api/entrances";
 import { fetchWhere } from "../../api/where";
-import { bestEntrance, entranceLabel } from "../../search/entrances";
+import { bestEntrance, entranceLabel, entrancesFor } from "../../search/entrances";
 import { loadNotes, noteNear, saveNotes, withNote, type BlockNote } from "../../search/blockNotes";
 import { BOROUGHS, type Borough } from "../../search/boroughs";
 
@@ -139,7 +139,13 @@ export default function SearchScreen() {
         // The way in, not the middle of the building: asked for first (at most ~1 s).
         setState({ status: "loading" });
         const [lng, lat] = dest.point;
-        const entrances = await fetchEntrances(lat, lng);
+        // Only entrances that can be this building's: a door address's own
+        // number, else unnumbered ones close by (further for a whole block).
+        const entrances = entrancesFor(
+          await fetchEntrances(lat, lng),
+          dest.title ?? "",
+          dest.road || !/\d/.test(dest.title ?? "") ? 40 : 20,
+        );
         if (ask !== entranceAsk.current) return;
         const best = bestEntrance(entrances, dest.title ?? "");
         const way = best ? `To ${entranceLabel(best)}${entrances.length > 1 ? ` (1 of ${entrances.length} ways in)` : ""}` : null;
@@ -326,6 +332,8 @@ export default function SearchScreen() {
 
   const clear = () => {
     request.current?.abort();
+    // An entrance still being looked up for the old destination mustn't bring it back.
+    entranceAsk.current++;
     setDestination(null);
     setState(null);
     setQuery("");
@@ -473,7 +481,7 @@ export default function SearchScreen() {
 
   // A tap on the map: what's there (the door number, road and postcode, from
   // the server), with Route here. A long press still routes straight there.
-  const whatsHere = (point: LngLat) => {
+  const whatsHere = (point: LngLat, mapNumber: string | null) => {
     Keyboard.dismiss();
     if (tapped) {
       setTapped(null);
@@ -487,8 +495,11 @@ export default function SearchScreen() {
     });
     setTapped(card(FINDING, ""));
     void fetchWhere(lat, lng).then((w) => {
-      const name = w?.door ?? w?.road ?? `Point on the map (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
-      setTapped((t) => (t && t.point === point ? { ...card(name, w?.door && w.road ? "" : (w?.postcode ?? "")), exact: !!w?.door } : t));
+      // The number drawn where they tapped wins: it's the one they can see. The
+      // server's nearest door can be the next building's, or none at all.
+      const door = mapNumber && w?.road ? `${mapNumber} ${w.road}` : (w?.door ?? null);
+      const name = door ?? w?.road ?? `Point on the map (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+      setTapped((t) => (t && t.point === point ? { ...card(name, w?.postcode ?? ""), exact: !!door } : t));
     });
   };
 
@@ -750,6 +761,7 @@ export default function SearchScreen() {
             })
           }
           note={destination.note}
+          noteKey={`${destination.point[0]},${destination.point[1]}`}
           blockNote={noteNear(notes, { lat: destination.point[1], lng: destination.point[0] })?.note}
           onSaveNote={
             destination.road

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Entrance } from "../../api/entrances";
-import { addressParts, bestEntrance, entranceLabel, servesFlat } from "../entrances";
+import { addressParts, bestEntrance, entranceLabel, entrancesFor, servesFlat } from "../entrances";
 
 const e = (over: Partial<Entrance>): Entrance => ({
   lat: 51.5463,
@@ -43,5 +43,17 @@ describe("entrances", () => {
   it("says which entrance in a few words", () => {
     expect(entranceLabel(e({ kind: "main", ref: "A", flats: "1-24" }))).toBe("Main entrance A · flats 1–24");
     expect(entranceLabel(e({ housenumber: "56" }))).toBe("Entrance · no. 56");
+  });
+
+  it("never sends a crew to the neighbour's door", () => {
+    const neighbour = e({ kind: "main", housenumber: "56", metres: 6 });
+    const unnumberedFar = e({ kind: "main", metres: 35 });
+    const own = e({ housenumber: "54", metres: 12 });
+    expect(entrancesFor([neighbour, unnumberedFar], "54 Caledonian Road", 20)).toEqual([]);
+    expect(entrancesFor([neighbour, own], "54 Caledonian Road", 20)).toEqual([own]);
+    // A whole block, found by name: unnumbered entrances further out count.
+    expect(entrancesFor([unnumberedFar], "Smith House", 40)).toEqual([unnumberedFar]);
+    // The flat's own entrance counts wherever it is.
+    expect(entrancesFor([e({ flats: "25-48", metres: 50 })], "Flat 30, Smith House", 20)).toHaveLength(1);
   });
 });

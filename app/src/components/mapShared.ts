@@ -63,8 +63,8 @@ export interface LiveMapProps {
   lookAhead?: boolean;
   destination?: LngLat | null;
   onLongPress?: (point: LngLat) => void;
-  /** A tap on the map itself, not on a place marker (what's here). */
-  onPress?: (point: LngLat) => void;
+  /** A tap on the map itself, not on a place marker (what's here), with the house number drawn nearest it, if any. */
+  onPress?: (point: LngLat, houseNumber: string | null) => void;
   /** When this changes to a set of points, stop following and show them all. */
   fitTo?: LngLat[] | null;
   /** Place markers (points with MarkerProperties). */
@@ -227,6 +227,30 @@ export function roadNamePaint(theme: "night" | "day"): SymbolLayerSpecification[
  */
 export const HOUSE_NUMBER_SOURCE_LAYER = "housenumber";
 export const HOUSE_NUMBER_MIN_ZOOM = 16.5;
+/** Our house-number layer, and how far from a tap (px) a number on it counts as the one tapped. */
+export const HOUSE_NUMBER_LAYER = "house-numbers";
+export const HOUSE_NUMBER_TAP_PX = 30;
+
+/** The house number drawn nearest a tap, from the map's features there. */
+export function nearestHouseNumber(
+  features: { properties?: Record<string, unknown> | null; geometry?: GeoJSON.Geometry | null }[],
+  at: LngLat,
+): string | null {
+  let best: string | null = null;
+  let bestD = Infinity;
+  for (const f of features) {
+    const n = f.properties?.housenumber;
+    if (typeof n !== "string" && typeof n !== "number") continue;
+    const g = f.geometry;
+    const [lng, lat] = g?.type === "Point" ? g.coordinates : at;
+    const d = (lng! - at[0]) ** 2 + (lat! - at[1]) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = String(n);
+    }
+  }
+  return best;
+}
 export const houseNumberLayout: SymbolLayerSpecification["layout"] = {
   "text-field": ["get", "housenumber"],
   "text-font": ["Noto Sans Bold"],
