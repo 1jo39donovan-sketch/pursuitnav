@@ -63,6 +63,8 @@ export interface LiveMapProps {
   lookAhead?: boolean;
   destination?: LngLat | null;
   onLongPress?: (point: LngLat) => void;
+  /** A tap on the map itself, not on a place marker (what's here). */
+  onPress?: (point: LngLat) => void;
   /** When this changes to a set of points, stop following and show them all. */
   fitTo?: LngLat[] | null;
   /** Place markers (points with MarkerProperties). */

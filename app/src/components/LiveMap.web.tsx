@@ -77,6 +77,7 @@ export function LiveMap({
   onWhereAmI,
   destination,
   onLongPress,
+  onPress,
   fitTo,
   markers,
   onMarkerPress,
@@ -104,11 +105,13 @@ export function LiveMap({
     setFollowing(true);
   }
   const longPress = useRef(onLongPress);
+  const tap = useRef(onPress);
   const markerPress = useRef(onMarkerPress);
   useEffect(() => {
     longPress.current = onLongPress;
+    tap.current = onPress;
     markerPress.current = onMarkerPress;
-  }, [onLongPress, onMarkerPress]);
+  }, [onLongPress, onPress, onMarkerPress]);
 
   // New points to show: stop following so the camera can frame them.
   const [lastFitTo, setLastFitTo] = useState(fitTo);
@@ -331,7 +334,17 @@ export function LiveMap({
     });
     m.on("dragstart", () => setFollowing(false));
     // Right-click stands in for a long press with a mouse.
-    const pressAt = (e: maplibregl.MapMouseEvent) => longPress.current?.([e.lngLat.lng, e.lngLat.lat]);
+    let longAt = 0;
+    const pressAt = (e: maplibregl.MapMouseEvent) => {
+      longAt = Date.now();
+      longPress.current?.([e.lngLat.lng, e.lngLat.lat]);
+    };
+    // A tap on the map, not on a place marker (that has its own card) and not the end of a long press.
+    m.on("click", (e) => {
+      if (Date.now() - longAt < 800) return;
+      if (m.getLayer("places-dot") && m.queryRenderedFeatures(e.point, { layers: ["places-dot"] }).length) return;
+      tap.current?.([e.lngLat.lng, e.lngLat.lat]);
+    });
     m.on("contextmenu", pressAt);
     let pressTimer: ReturnType<typeof setTimeout> | undefined;
     m.on("touchstart", (e) => {

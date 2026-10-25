@@ -27,7 +27,7 @@ import {
   type LastReroute,
   type RerouteFailure,
 } from "../navigation/reroute";
-import { nextCallout } from "../navigation/voice";
+import { arrivalSide, nextCallout } from "../navigation/voice";
 import { recordEvent } from "../usage/usage";
 import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
 import { recorder, useRecorder } from "../fieldtest/instance";
@@ -348,7 +348,7 @@ export default function NavigateScreen() {
     if (!progress || !prepared || offRoute) return;
     // A new route (after a re-route) starts its callouts afresh.
     if (said.current.route !== prepared) said.current = { route: prepared, keys: new Set() };
-    const callout = nextCallout(progress, said.current.keys);
+    const callout = nextCallout(progress, said.current.keys, active?.destination.title);
     if (!callout) return;
     said.current.keys.add(callout.key);
     if (voiceOn) {
@@ -356,7 +356,7 @@ export default function NavigateScreen() {
       Speech.speak(callout.text, { language: "en-GB" });
       recorder.event({ type: "speech", text: callout.text });
     }
-  }, [progress, prepared, offRoute, voiceOn]);
+  }, [progress, prepared, offRoute, voiceOn, active?.destination.title]);
   useEffect(() => () => void Speech.stop(), []);
 
   // Ending takes a second tap, so a bump on the way doesn't drop the route.
@@ -403,6 +403,9 @@ export default function NavigateScreen() {
         <>
           <Text style={styles.distance}>⚑ Arrived</Text>
           <Text style={styles.instruction}>{active.destination.title}</Text>
+          {arrivalSide(active.route.maneuvers) && (
+            <Text style={styles.then}>On the {arrivalSide(active.route.maneuvers)}</Text>
+          )}
           {blockNote && <Text style={styles.blockNote}>✎ {blockNote}</Text>}
         </>
       ) : back ? (

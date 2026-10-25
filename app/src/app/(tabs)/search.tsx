@@ -53,9 +53,12 @@ import { useTextStyles } from "../../textSize";
 import { loadFavourites, samePlace, saveFavourites, toggled, type Favourite } from "../../search/favourites";
 import { quickPlaces } from "../../search/quickPlaces";
 import { fetchEntrances } from "../../api/entrances";
+import { fetchWhere } from "../../api/where";
 import { bestEntrance, entranceLabel } from "../../search/entrances";
 import { loadNotes, noteNear, saveNotes, withNote, type BlockNote } from "../../search/blockNotes";
 import { BOROUGHS, type Borough } from "../../search/boroughs";
+
+const FINDING = "Finding the address…";
 
 interface Destination {
   point: LngLat;
@@ -91,7 +94,8 @@ export default function SearchScreen() {
   // Routes asked for before the tap, for the likely match (navigation/prefetch.ts).
   const prefetch = useRef<Prefetch | null>(null);
   const [markerGroups, setMarkerGroupsState] = useState<PlaceGroup[]>(() => loadMarkerGroups());
-  const [tapped, setTapped] = useState<{ marker: MarkerProperties; point: LngLat } | null>(null);
+  // exact: a door from the map tap, so routing looks for its entrance.
+  const [tapped, setTapped] = useState<{ marker: MarkerProperties; point: LngLat; exact?: boolean } | null>(null);
   const setMarkerGroups = (groups: PlaceGroup[]) => {
     setMarkerGroupsState(groups);
     store.setSetting("markerGroups", JSON.stringify(groups));
@@ -467,6 +471,27 @@ export default function SearchScreen() {
   // "Where am I": the officer's exact position, to read out or share.
   const [whereOpen, setWhereOpen] = useState(false);
 
+  // A tap on the map: what's there (the door number, road and postcode, from
+  // the server), with Route here. A long press still routes straight there.
+  const whatsHere = (point: LngLat) => {
+    Keyboard.dismiss();
+    if (tapped) {
+      setTapped(null);
+      return;
+    }
+    const [lng, lat] = point;
+    const borough = boroughAt(lat, lng) ?? "";
+    const card = (name: string, address: string) => ({
+      point,
+      marker: { name, type: "Here", address, borough, color: colors.blue },
+    });
+    setTapped(card(FINDING, ""));
+    void fetchWhere(lat, lng).then((w) => {
+      const name = w?.door ?? w?.road ?? `Point on the map (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+      setTapped((t) => (t && t.point === point ? { ...card(name, w?.door && w.road ? "" : (w?.postcode ?? "")), exact: !!w?.door } : t));
+    });
+  };
+
   // The last few places routed to, one tap away: shown under the search bar
   // while it's being typed in, so they don't cover the map otherwise.
   const [typing, setTyping] = useState(false);
@@ -540,6 +565,7 @@ export default function SearchScreen() {
           // Not over the routes: the place chooser (the dots' key) is hidden then too.
           markers={showResults || destination ? null : markers}
           onMarkerPress={(marker, point) => setTapped({ marker, point })}
+          onPress={destination || showResults ? undefined : whatsHere}
         />
         {!showResults && !destination && (
           <View style={[styles.belowBar, { top: topSpace - 4 }]} pointerEvents="box-none">
@@ -556,10 +582,13 @@ export default function SearchScreen() {
             away={fix ? formatDistance(distanceM(fix, { lat: tapped.point[1], lng: tapped.point[0] })) : undefined}
             onClose={() => setTapped(null)}
             onRoute={() => {
-              const { marker, point } = tapped;
+              const { marker, point, exact } = tapped;
               setTapped(null);
-              setQuery(marker.name);
-              choose({ point, title: marker.name }, "", marker.borough);
+              // Before the address is back, it's a point on the map.
+              const title =
+                marker.name === FINDING ? `Point on the map (${point[1].toFixed(5)}, ${point[0].toFixed(5)})` : marker.name;
+              setQuery(title);
+              choose({ point, title, findEntrance: exact }, "", marker.borough);
             }}
           />
         )}
@@ -689,7 +718,7 @@ export default function SearchScreen() {
           )}
         </View>
         {dataNote && <Text style={styles.dataNote}>{dataNote}</Text>}
-        {data.status === "ready" && boroughs.length === 0 && (
+        {data.status === "ready" && boroughs.length === 0 && !destination && (
           // Before anything else: results are sorted by the area being worked.
           <Pressable
             accessibilityRole="button"

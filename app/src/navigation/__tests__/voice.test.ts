@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Maneuver } from "../../api/routes";
 import type { Progress } from "../progress";
-import { nextCallout, spokenDistance } from "../voice";
+import { nextCallout, spokenDistance, spokenPlace } from "../voice";
 
 const m = (instruction: string, beginShapeIndex: number): Maneuver => ({
   type: 10,
@@ -70,5 +70,23 @@ describe("spoken directions", () => {
     expect(spokenDistance(800)).toBe("half a mile");
     expect(spokenDistance(1609)).toBe("1 mile");
     expect(spokenDistance(2414)).toBe("1.5 miles");
+  });
+
+  it("names the door and the side on the way in and on arrival", () => {
+    const said = new Set(["start"]);
+    const arrival = { ...m("You have arrived at your destination.", 9), type: 6 };
+    const p = { ...at(300), next: arrival } as unknown as Progress;
+    expect(nextCallout(p, said, "54 Caledonian Road, N7 8LA")?.text).toBe(
+      "In 350 yards, destination ahead on the left: 54 Caledonian Road.",
+    );
+    const there = { ...at(5, true), current: arrival, next: null } as unknown as Progress;
+    expect(nextCallout(there, said, "Flat 3, 54 Caledonian Road")?.text).toBe(
+      "You have arrived at Flat 3, 54 Caledonian Road. It's on the left.",
+    );
+  });
+
+  it("doesn't read out postcodes or map coordinates", () => {
+    expect(spokenPlace("54 Caledonian Road, N7 8LA")).toBe("54 Caledonian Road");
+    expect(spokenPlace("Point on the map (51.54632, -0.11705)")).toBeNull();
   });
 });

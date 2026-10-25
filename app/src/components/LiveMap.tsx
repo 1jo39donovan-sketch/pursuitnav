@@ -81,6 +81,7 @@ export function LiveMap({
   onWhereAmI,
   destination,
   onLongPress,
+  onPress,
   fitTo,
   markers,
   onMarkerPress,
@@ -105,6 +106,8 @@ export function LiveMap({
     setFollowing(true);
   }
   const camera = useRef<CameraRef>(null);
+  // When a place marker was last tapped, so the map's own tap under it is let go.
+  const markerPressedAt = useRef(0);
 
   // New points to show: stop following so the camera can frame them.
   const [lastFitTo, setLastFitTo] = useState(fitTo);
@@ -163,6 +166,14 @@ export function LiveMap({
         onDidFailLoadingMap={() => setMapFailed(true)}
         onDidFinishLoadingStyle={() => setMapFailed(false)}
         onLongPress={(e) => onLongPress?.(e.nativeEvent.lngLat)}
+        onPress={(e) => {
+          // A tap on a place marker has its own card: wait a moment to see if it was one.
+          const at = e.nativeEvent.lngLat;
+          const tappedAt = Date.now();
+          setTimeout(() => {
+            if (markerPressedAt.current < tappedAt - 50) onPress?.(at);
+          }, 120);
+        }}
         onRegionWillChange={(e) => {
           if (e.nativeEvent.userInteraction) setFollowing(false);
         }}
@@ -180,6 +191,7 @@ export function LiveMap({
           data={markers ?? EMPTY_COLLECTION}
           hitbox={{ top: 12, right: 12, bottom: 12, left: 12 }}
           onPress={(e) => {
+            markerPressedAt.current = Date.now();
             const f = e.nativeEvent.features[0];
             if (f?.geometry.type === "Point" && f.properties) {
               onMarkerPress?.(f.properties as MarkerProperties, f.geometry.coordinates as LngLat);
