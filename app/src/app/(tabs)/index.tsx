@@ -61,8 +61,19 @@ export default function SessionScreen() {
   const { savedPlaces, deletePlace, places } = useSearch();
   const logCount = useLog().entries.length;
   const recording = useRecorder();
-  // The BCU being worked, for the custody and stations row (police only).
+  // The area being worked, for the stations row: a BCU for police (and
+  // installs from before the service choice), else the first borough.
+  const police = service === "police" || service === null;
   const bcu = useMemo(() => bcuFor(boroughs), [boroughs]);
+  const areaCode = police ? bcu?.code : boroughs[0];
+  const areaName = police ? (bcu?.name ?? "BCUs") : (boroughs[0] ?? "Your area");
+  const areaWhat = police
+    ? "Custody · stations · A&E"
+    : service === "ambulance"
+      ? "Ambulance stations · A&E"
+      : service === "fire"
+        ? "Fire stations · A&E"
+        : "Stations · A&E";
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -147,26 +158,18 @@ export default function SessionScreen() {
 
       <BoroughPicker />
 
-      {(service === "police" || service === null) && (
-        // Custody, stations and A&Es for the BCU being worked, one tap from a route.
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${bcu ? `${bcu.name} BCU` : "BCUs"}: custody, police stations and A&E`}
-          onPress={() => router.push({ pathname: "/bcu", params: bcu ? { code: bcu.code } : {} })}
-          style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.logText}>
-            {bcu ? (
-              <>
-                {bcu.name} <Text style={styles.logMeta}>{bcu.code}</Text>
-              </>
-            ) : (
-              "BCUs"
-            )}
-          </Text>
-          <Text style={styles.logMeta}>Custody · stations · A&E ›</Text>
-        </Pressable>
-      )}
+      {/* The area being worked: stations, A&Es (and custody, for police), one tap from a route. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${areaName}: ${areaWhat}`}
+        onPress={() => router.push({ pathname: "/area", params: areaCode ? { code: areaCode } : {} })}
+        style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.logText}>
+          {areaName} {police && bcu && <Text style={styles.logMeta}>{bcu.code}</Text>}
+        </Text>
+        <Text style={styles.logMeta}>{areaWhat} ›</Text>
+      </Pressable>
 
       <View style={styles.field}>
         <Text style={styles.label}>Roads</Text>
