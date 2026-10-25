@@ -50,6 +50,9 @@ import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
 import { recordEvent } from "../../usage/usage";
 import { useTextStyles } from "../../textSize";
+import { loadFavourites, samePlace, saveFavourites, toggled, type Favourite } from "../../search/favourites";
+import { quickPlaces } from "../../search/quickPlaces";
+import { BOROUGHS, type Borough } from "../../search/boroughs";
 
 interface Destination {
   point: LngLat;
@@ -444,6 +447,26 @@ export default function SearchScreen() {
   useEffect(() => () => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
   }, []);
+  const { service } = useSession();
+  const allPois = useMemo(
+    () => (data.status === "ready" ? data.index.pointsOfInterestIn(new Set(BOROUGHS), new Set(["emergency", "health"])) : []),
+    // The place list arrives after the roads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, places.status],
+  );
+  // Nearest from where the phone is, worked out again every ~200 m, not on every fix.
+  const roughLat = fix ? Math.round(fix.lat * 500) / 500 : null;
+  const roughLng = fix ? Math.round(fix.lng * 500) / 500 : null;
+  const quick = useMemo(
+    () => quickPlaces(service, roughLat != null && roughLng != null ? { lat: roughLat, lng: roughLng } : null, allPois),
+    [service, roughLat, roughLng, allPois],
+  );
+  const [favourites, setFavourites] = useState<Favourite[]>(() => loadFavourites());
+  const toggleFavourite = (f: Favourite) => {
+    const next = toggled(favourites, f);
+    setFavourites(next);
+    saveFavourites(next);
+  };
   const entries = log.entries;
   const recent = useMemo(() => {
     const seen = new Set<string>();
@@ -511,9 +534,44 @@ export default function SearchScreen() {
             }}
           />
         )}
-        {typing && !destination && !showResults && !tapped && recent.length > 0 && (
+        {typing && !destination && !showResults && !tapped && (quick.length > 0 || favourites.length > 0 || recent.length > 0) && (
           <View style={[styles.recent, { top: topSpace + 6 }]}>
-            <Text style={styles.recentLabel}>Recent</Text>
+            {quick.map((q) => (
+              <Pressable
+                key={q.label}
+                accessibilityRole="button"
+                accessibilityLabel={`${q.label}: ${q.place.name}, ${formatDistance(q.metres)}`}
+                onPress={() => {
+                  setQuery(q.place.name);
+                  choose({ point: [q.place.lng, q.place.lat], title: q.place.name }, "", q.place.borough);
+                }}
+                style={({ pressed }) => [styles.recentRow, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.recentText} numberOfLines={1}>
+                  ➜ {q.label}: {q.place.name}
+                </Text>
+                <Text style={styles.recentMeta}>{formatDistance(q.metres)}</Text>
+              </Pressable>
+            ))}
+            {favourites.length > 0 && <Text style={styles.recentLabel}>Favourites</Text>}
+            {favourites.slice(0, 5).map((f) => (
+              <Pressable
+                key={`${f.lat},${f.lng}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Route to ${f.name}`}
+                onPress={() => {
+                  setQuery(f.name);
+                  choose({ point: [f.lng, f.lat], title: f.name }, "", (f.borough as Borough | null) ?? null);
+                }}
+                style={({ pressed }) => [styles.recentRow, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.recentText} numberOfLines={1}>
+                  ★ {f.name}
+                </Text>
+                {f.borough && <Text style={styles.recentMeta}>{f.borough}</Text>}
+              </Pressable>
+            ))}
+            {recent.length > 0 && <Text style={styles.recentLabel}>Recent</Text>}
             {recent.map((e) => (
               <Pressable
                 key={e.id}
@@ -612,6 +670,15 @@ export default function SearchScreen() {
           state={shown}
           destination={{ lat: destination.point[1], lng: destination.point[0] }}
           title={destination.title}
+          favourite={favourites.some((f) => samePlace(f, { lat: destination.point[1], lng: destination.point[0] }))}
+          onToggleFavourite={() =>
+            toggleFavourite({
+              name: destination.title ?? "Saved place",
+              lat: destination.point[1],
+              lng: destination.point[0],
+              borough: boroughAt(destination.point[1], destination.point[0]),
+            })
+          }
           note={destination.note}
           blocks={blocks}
           onPickBlock={(b) => {

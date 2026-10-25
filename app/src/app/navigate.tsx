@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useNetworkState } from "expo-network";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchRoutes, restrictionPoints, type RoutePlan } from "../api/routes";
@@ -56,6 +56,7 @@ import {
   type Progress,
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
+import { reportUrl } from "../feedback";
 import { useTextStyles } from "../textSize";
 
 const DEMO_GRACE_MS = 5000;
@@ -94,7 +95,7 @@ export default function NavigateScreen() {
   const [openedAt] = useState(() => Date.now());
   const fix = simulated && lastFix && lastFix.timestamp < openedAt ? null : lastFix;
   const { blockLabels } = useSearch();
-  const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes } = useSession();
+  const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes, mapLook } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -599,6 +600,21 @@ export default function NavigateScreen() {
             rerouteNow();
           }}
           destination={active.destination}
+          onReport={() => {
+            setSheet(false);
+            const r = active.route;
+            void Linking.openURL(
+              reportUrl({
+                kind: active.kind,
+                vehicle,
+                roads,
+                mapLook,
+                distanceM: r.distanceM,
+                durationS: r.durationS,
+                restrictions: "restrictions" in r ? r.restrictions.length : undefined,
+              }),
+            ).catch(() => {});
+          }}
           bottomInset={insets.bottom}
         />
       )}
@@ -654,6 +670,7 @@ function RouteSheet({
   onSwitch,
   onRerouteNow,
   destination,
+  onReport,
   bottomInset,
 }: {
   kind: RouteKind;
@@ -663,6 +680,7 @@ function RouteSheet({
   onSwitch: (kind: "standard" | "police") => void;
   onRerouteNow: () => void;
   destination: { lat: number; lng: number };
+  onReport: () => void;
   bottomInset: number;
 }) {
   const styles = useTextStyles(baseStyles);
@@ -687,6 +705,8 @@ function RouteSheet({
         {action("Re-route now", onRerouteNow)}
         {/* Handing over to another app leaves this navigation running underneath. */}
         <ExternalLinks lat={destination.lat} lng={destination.lng} onOpen={onClose} />
+        {/* An email in the tester's own mail app, with nothing about the call in it. */}
+        {action("Report a problem with this route", onReport)}
         {action("Cancel", onClose, styles.sheetCancel)}
       </View>
     </View>

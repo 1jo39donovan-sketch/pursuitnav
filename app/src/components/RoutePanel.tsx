@@ -37,6 +37,9 @@ interface Props {
   destination: { lat: number; lng: number };
   /** What was picked, e.g. "54 Caledonian Road". */
   title?: string;
+  /** Starred (Search shows it first next time). */
+  favourite?: boolean;
+  onToggleFavourite?: () => void;
   /** A caution about the destination, e.g. that it's a postcode, not the door. */
   note?: string;
   onClose: () => void;
@@ -67,6 +70,8 @@ export function RoutePanel({
   state,
   destination,
   title,
+  favourite,
+  onToggleFavourite,
   note,
   blocks,
   onPickBlock,
@@ -110,6 +115,16 @@ export function RoutePanel({
             </Text>
           )}
         </View>
+        {onToggleFavourite && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={favourite ? "Remove from favourites" : "Add to favourites"}
+            onPress={onToggleFavourite}
+            hitSlop={12}
+          >
+            <Text style={[styles.close, favourite && { color: colors.amber }]}>{favourite ? "★" : "☆"}</Text>
+          </Pressable>
+        )}
         <Pressable accessibilityRole="button" accessibilityLabel="Clear destination" onPress={onClose} hitSlop={12}>
           <Text style={styles.close}>Clear</Text>
         </Pressable>
