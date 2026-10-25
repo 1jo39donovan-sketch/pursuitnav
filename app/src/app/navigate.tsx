@@ -15,7 +15,7 @@ import { useElapsed } from "../components/useElapsed";
 import { LiveMap } from "../components/LiveMap";
 import type { MapRoute } from "../components/mapShared";
 import { ExternalLinks } from "../components/RoutePanel";
-import { formatDistance, formatDuration } from "../format";
+import { formatDistance, formatDuration, roadLabel } from "../format";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation, type RouteKind } from "../navigation/NavigationProvider";
 import {
@@ -456,7 +456,7 @@ export default function NavigateScreen() {
             {progress ? `${formatDuration(progress.remainingS)} · ${formatDistance(progress.remainingM)}` : ""}
           </Text>
           <Text style={styles.road} numberOfLines={1}>
-            On {progress?.current.streetNames[0] ?? "—"}
+            On {(progress && roadLabel(progress.current.streetNames)) ?? "—"}
           </Text>
         </View>
         <Text style={[styles.badge, { color: routeColor, borderColor: routeColor }]}>

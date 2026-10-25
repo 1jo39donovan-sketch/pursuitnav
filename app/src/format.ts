@@ -17,3 +17,15 @@ export function formatDistance(metres: number): string {
   if (miles < 0.1) return `${Math.round(metres * 1.0936 / 10) * 10} yd`;
   return `${miles < 10 ? miles.toFixed(1) : Math.round(miles)} mi`;
 }
+
+/** A road number such as A1, A503, B550, M25 or A40(M): OSM gives it alongside the name, in either order. */
+const ROAD_NUMBER = /^[ABM]\d+(\(M\))?$/i;
+
+/** The road as the crew says it: "Holloway Road / A1", or the name or number alone (null when unnamed). */
+export function roadLabel(names: readonly string[]): string | null {
+  const name = names.find((n) => !ROAD_NUMBER.test(n.trim()));
+  const number = names.find((n) => ROAD_NUMBER.test(n.trim()));
+  const ref = number?.toUpperCase();
+  if (name && ref) return `${name} / ${ref}`;
+  return name ?? ref ?? null;
+}

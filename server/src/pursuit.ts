@@ -35,10 +35,27 @@ export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: n
   const names = matched?.names ?? current?.names ?? [];
   const limitKph = matched ? matched.speedLimitKph : current?.speedLimitKph;
   return {
-    road: names[0] ?? null,
+    road: roadLabel(names),
     speedLimitMph: limitKph ? kphToMph(limitKph) : null,
     nextJunction: current ? await findJunction(matcher, current, names) : null,
   };
+}
+
+/** A road number such as A1, A503, B550, M25 or A40(M): OSM gives it alongside the name, in either order. */
+const ROAD_NUMBER = /^[ABM]\d+(\(M\))?$/i;
+
+/** The road's name rather than its number, when it has one: "Holloway Road", not "A1". */
+export function streetName(names: readonly string[]): string | null {
+  return names.find((n) => !ROAD_NUMBER.test(n.trim())) ?? names[0] ?? null;
+}
+
+/** The road as the crew says it: "Holloway Road / A1", or the name or number alone. */
+export function roadLabel(names: readonly string[]): string | null {
+  const name = names.find((n) => !ROAD_NUMBER.test(n.trim()));
+  const number = names.find((n) => ROAD_NUMBER.test(n.trim()));
+  const ref = number?.toUpperCase();
+  if (name && ref) return `${name} / ${ref}`;
+  return name ?? ref ?? null;
 }
 
 /** The edge the car is on: running its way, preferably on the matched road. */
@@ -72,7 +89,7 @@ async function findJunction(
       ...new Set(
         atNode
           .filter((e) => e.car && JUNCTION_USES.has(e.use) && e.names.length && !sameRoad(e.names, roadNames))
-          .map((e) => e.names[0]!),
+          .map((e) => streetName(e.names)!),
       ),
     ];
     if (others.length) return { name: others.slice(0, 2).join(" / "), distanceM: Math.round(distance) };
