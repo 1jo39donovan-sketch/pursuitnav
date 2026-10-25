@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useNetworkState } from "expo-network";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchRoutes, restrictionPoints, type RoutePlan } from "../api/routes";
@@ -47,6 +47,7 @@ import { useSession } from "../session/SessionProvider";
 import { useTeam } from "../team/TeamProvider";
 import {
   maneuverArrow,
+  comingUp,
   upcomingInstruction,
   OFF_ROUTE_FIXES,
   offRouteCount,
@@ -537,7 +538,20 @@ export default function NavigateScreen() {
         <View style={styles.row}>
           <View style={styles.landscapeSide}>
             {turnPanel}
-            <View style={{ flex: 1 }} />
+            {/* Room to read ahead: the turns after the next two, with how far each is. */}
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.ahead}>
+              {prepared && progress && !progress.arrived && !showOff && !back
+                ? comingUp(prepared, progress).map(({ maneuver, inM }) => (
+                    <View key={maneuver.beginShapeIndex} style={styles.aheadRow}>
+                      <Text style={styles.aheadArrow}>{maneuverArrow(maneuver.type)}</Text>
+                      <Text style={styles.aheadText} numberOfLines={2}>
+                        {upcomingInstruction(maneuver)}
+                      </Text>
+                      <Text style={styles.aheadDistance}>{formatDistance(inM)}</Text>
+                    </View>
+                  ))
+                : null}
+            </ScrollView>
             {etaPanel}
           </View>
           <View style={styles.map}>
@@ -737,6 +751,11 @@ function RouteSheet({
 const NOTE_WITHIN_M = 500;
 
 const baseStyles = StyleSheet.create({
+  ahead: { paddingHorizontal: 16, paddingVertical: 8, gap: 10 },
+  aheadRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  aheadArrow: { width: 28, color: colors.muted, fontSize: 22, fontWeight: "700", textAlign: "center" },
+  aheadText: { flex: 1, color: colors.fg, fontFamily: fonts.body, fontSize: 16, lineHeight: 21 },
+  aheadDistance: { color: colors.muted, fontFamily: fonts.bodyMedium, fontSize: 15 },
   blockNote: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 16, lineHeight: 21 },
   screen: { flex: 1, backgroundColor: colors.bg },
   empty: { alignItems: "center", justifyContent: "center", gap: 16 },

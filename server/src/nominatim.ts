@@ -162,6 +162,39 @@ export function cachedNearestDoor(find: NearestDoor, now: () => number = Date.no
   };
 }
 
+/** A mapped door near the one asked for: its number (the digits) and where it is. */
+export interface Neighbour {
+  number: number;
+  lat: number;
+  lng: number;
+}
+
+/** Neighbours this far apart are on different stretches of the road (or across a junction). */
+const NEIGHBOURS_WITHIN_M = 250;
+/** Numbers asked for either side of an unmapped one: 2, 4 and 6 away, same side of the road. */
+export const NEIGHBOUR_STEPS = [2, 4, 6];
+
+/**
+ * Where an unmapped house number is, from mapped doors on the same side of
+ * the same road: between the nearest lower and higher numbers (by number),
+ * or at the next-door house if only that one is mapped. Null when they're
+ * too far apart to trust. Never a guess from the other side of the road.
+ */
+export function estimateDoor(
+  wanted: number,
+  neighbours: readonly Neighbour[],
+): { lat: number; lng: number; between: [number, number] | null; nextTo: number | null } | null {
+  const same = neighbours.filter((n) => n.number % 2 === wanted % 2 && n.number !== wanted);
+  const lo = same.filter((n) => n.number < wanted).sort((a, b) => b.number - a.number)[0];
+  const hi = same.filter((n) => n.number > wanted).sort((a, b) => a.number - b.number)[0];
+  if (lo && hi && metresBetween(lo.lat, lo.lng, hi.lat, hi.lng) <= NEIGHBOURS_WITHIN_M) {
+    const t = (wanted - lo.number) / (hi.number - lo.number);
+    return { lat: lo.lat + (hi.lat - lo.lat) * t, lng: lo.lng + (hi.lng - lo.lng) * t, between: [lo.number, hi.number], nextTo: null };
+  }
+  const next = same.find((n) => Math.abs(n.number - wanted) === 2);
+  return next ? { lat: next.lat, lng: next.lng, between: null, nextTo: next.number } : null;
+}
+
 export class NominatimClient implements PlacesClient {
   constructor(
     private readonly baseUrl: string,
@@ -172,8 +205,63 @@ export class NominatimClient implements PlacesClient {
 
   async search(query: string): Promise<Address[]> {
     const asked = parseQuery(query);
+    const found = this.toAddresses(await this.results(asked.q), asked);
+    // A numbered address OSM doesn't have at all: worked out from the doors either side.
+    // Not when OSM already places it along an address line (an estimate of its own).
+    const placed = found.some((a) => a.precision === "door" || /\(estimated point on the road\)$/.test(a.label));
+    if (asked.number && asked.street && !placed) {
+      const estimate = await this.estimate(asked).catch(() => null);
+      if (estimate) return [estimate, ...found];
+    }
+    return found;
+  }
+
+  /** The doors 2, 4 and 6 numbers either side, mapped in OSM, and the estimate from them. */
+  private async estimate(asked: ParsedQuery): Promise<Address | null> {
+    const wanted = parseInt(asked.number!, 10);
+    if (!Number.isFinite(wanted)) return null;
+    const numbers = NEIGHBOUR_STEPS.flatMap((d) => [wanted - d, wanted + d]).filter((n) => n > 0);
+    const found = await Promise.all(
+      numbers.map(async (n) => {
+        const near: ParsedQuery = { q: `${n} ${asked.street}`, number: String(n), street: asked.street };
+        const r = (await this.results(near.q).catch(() => [])).find(
+          (x) => !interpolated(x) && classify(x, near)?.precision === "door",
+        );
+        return r ? { n, r } : null;
+      }),
+    );
+    const doors = found.filter((f): f is { n: number; r: NominatimResult } => f !== null);
+    // All on one road: the first one found decides which (the same name can be elsewhere in London).
+    const road = doors[0]?.r.address?.road;
+    const onRoad = doors.filter((d) => d.r.address?.road === road);
+    const at = estimateDoor(
+      wanted,
+      onRoad.map((d) => ({ number: d.n, lat: Number(d.r.lat), lng: Number(d.r.lon) })),
+    );
+    if (!at || !road) return null;
+    const borough = this.boroughs.at(at.lat, at.lng);
+    if (!borough) return null;
+    const prefix = asked.unit ? `${asked.unit}, ` : "";
+    const how = at.between ? `estimated between ${at.between[0]} and ${at.between[1]}` : `estimated next to ${at.nextTo}`;
+    const nearest = onRoad.find((d) => d.n === (at.between?.[0] ?? at.nextTo));
+    return {
+      id: `osm:est-${normaliseStreet(road).replace(/\s/g, "-")}-${asked.number}`,
+      source: "osm",
+      // An estimate is never called the door (like OSM's own interpolated numbers): the label says how it was placed.
+      precision: "road",
+      label: `${prefix}${asked.number} ${road} (${how})`,
+      postcode: nearest?.r.address?.postcode ?? "",
+      borough,
+      lat: at.lat,
+      lng: at.lng,
+      match: 0.6,
+    };
+  }
+
+  /** Nominatim's answers for a query. */
+  private async results(q: string): Promise<NominatimResult[]> {
     const params = new URLSearchParams({
-      q: asked.q,
+      q,
       format: "jsonv2",
       addressdetails: "1",
       countrycodes: "gb",
@@ -198,8 +286,10 @@ export class NominatimClient implements PlacesClient {
     } catch {
       throw new PlacesError("Nominatim sent an unreadable answer", 503);
     }
-    if (!Array.isArray(results)) return [];
+    return Array.isArray(results) ? results : [];
+  }
 
+  private toAddresses(results: NominatimResult[], asked: ParsedQuery): Address[] {
     return results.flatMap((r) => {
       const lat = Number(r.lat);
       const lng = Number(r.lon);

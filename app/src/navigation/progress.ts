@@ -186,3 +186,19 @@ const ARRIVAL: Record<number, string> = {
 export function upcomingInstruction(m: Maneuver): string {
   return ARRIVAL[m.type] ?? m.instruction;
 }
+
+/**
+ * The turns after the next two (those are on screen already), with how far
+ * each is from here: for reading ahead where there's room (landscape).
+ */
+export function comingUp(prepared: PreparedRoute, progress: Progress, count = 5): { maneuver: Maneuver; inM: number }[] {
+  const ms = prepared.route.maneuvers;
+  const from = progress.after ?? progress.next;
+  if (!from) return [];
+  const start = ms.indexOf(from) + 1;
+  if (start <= 0) return [];
+  return ms.slice(start, start + count).map((m) => ({
+    maneuver: m,
+    inM: Math.max(0, (prepared.cumulative[m.beginShapeIndex] ?? 0) - progress.along),
+  }));
+}
