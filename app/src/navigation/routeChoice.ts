@@ -76,9 +76,39 @@ export function planIsStale(
   return !!fix && distanceM(fix, plan.from) > STALE_BEYOND_M;
 }
 
-/** "Routes from 40 s ago" once a plan is old enough to say so, else null. */
+/**
+ * Go quietly plans again from here once a plan is 20 s old; the card only
+ * mentions the plan's age once it's a couple of minutes old, calmly.
+ */
+export const AGE_SHOWN_AFTER_MS = 120_000;
+
+/** "Planned 3 min ago" once a plan is old enough to say so, else null. */
 export function planAgeText(madeAt: number, now: number): string | null {
-  const ageS = Math.floor((now - madeAt) / 1000);
-  if (ageS * 1000 <= STALE_AFTER_MS) return null;
-  return ageS < 60 ? `Routes from ${ageS} s ago` : `Routes from ${Math.floor(ageS / 60)} min ago`;
+  const ageMs = now - madeAt;
+  if (ageMs < AGE_SHOWN_AFTER_MS) return null;
+  return `Planned ${Math.floor(ageMs / 60_000)} min ago`;
+}
+
+const KIND_WORDS: Record<string, [string, string]> = {
+  turn: ["banned turn", "banned turns"],
+  "bus-only": ["bus-only section", "bus-only sections"],
+  manoeuvre: ["restricted manoeuvre", "restricted manoeuvres"],
+  "wrong-way": ["one-way section", "one-way sections"],
+};
+
+/**
+ * What a blue-light route relies on, in words a crew can weigh at a glance:
+ * "1 banned turn", "2 bus-only sections and 1 banned turn". "at least" when
+ * the server couldn't check every stretch.
+ */
+export function restrictionSummary(kinds: readonly string[], complete: boolean): string {
+  if (!kinds.length) return "no restrictions";
+  const counts = new Map<string, number>();
+  for (const k of kinds) counts.set(k, (counts.get(k) ?? 0) + 1);
+  const parts = [...counts].map(([k, n]) => {
+    const [one, many] = KIND_WORDS[k] ?? ["restriction", "restrictions"];
+    return `${n} ${n === 1 ? one : many}`;
+  });
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]!;
+  return complete ? list : `at least ${list}`;
 }

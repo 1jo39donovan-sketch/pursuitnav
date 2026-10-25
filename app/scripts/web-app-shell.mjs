@@ -4,7 +4,7 @@
 // of a phone screen. Run on a web export (web.yml does).
 //
 // Usage: node scripts/web-app-shell.mjs <export-dir> <base path, e.g. /pursuitnav>
-import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,7 +37,21 @@ writeFileSync(
   ),
 );
 
+// The app's fonts, found in the export, fetched with the page rather than
+// after the script starts, so text doesn't flash in a stand-in font.
+const fonts = [];
+const walk = (d) => {
+  for (const e of readdirSync(d, { withFileTypes: true })) {
+    if (e.isDirectory()) walk(join(d, e.name));
+    else if (/^Inter_(400Regular|500Medium|600SemiBold|700Bold)\..*ttf$/.test(e.name)) fonts.push(join(d, e.name).slice(dir.length).replace(/\\/g, "/"));
+  }
+};
+walk(dir);
+
 const tags = [
+  // Dark from the first moment, not a white page while the script loads.
+  `<style>html,body{background:${BG}}</style>`,
+  ...fonts.map((f) => `<link rel="preload" href="${prefix}${f.startsWith("/") ? f : `/${f}`}" as="font" type="font/ttf" crossorigin />`),
   // The page runs edge to edge, under the iPhone's status bar; the app's own
   // safe-area padding keeps text clear of it.
   `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />`,
@@ -61,4 +75,14 @@ for (const page of ["index.html", "404.html"]) {
   html = html.replace("</head>", `${tags}\n</head>`);
   writeFileSync(join(dir, page), html);
 }
-console.log(`Web app shell added (start ${prefix}/)`);
+
+// A link straight to a screen (…/app/search), or a reload on one, gets the
+// app with a 200 rather than GitHub Pages' 404 page: each screen has its
+// own copy of the page. Anything else still opens through 404.html.
+const SCREENS = ["search", "pursuit", "log", "area", "navigate", "trips"];
+const index = readFileSync(join(dir, "index.html"), "utf8");
+for (const screen of SCREENS) {
+  mkdirSync(join(dir, screen), { recursive: true });
+  writeFileSync(join(dir, screen, "index.html"), index);
+}
+console.log(`Web app shell added (start ${prefix}/, ${fonts.length} fonts preloaded, ${SCREENS.length} screens)`);

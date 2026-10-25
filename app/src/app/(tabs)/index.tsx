@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { API_URL, DEMO_MODE } from "../../config";
 
@@ -22,6 +22,9 @@ import { SERVICES, VEHICLES, vehiclesFor } from "../../vehicles";
 // Once a shift is set up, the app opens on Search: the job is usually to type
 // an address straight away. Only on the first screen shown after launch.
 let openedThisLaunch = false;
+
+/** The browser version is for testing (the store app is the real one): testing tools first. */
+const TESTING_FIRST = Platform.OS === "web";
 
 const LOOK_HINTS: Record<MapLook, string> = {
   standard: "The everyday map.",
@@ -87,6 +90,26 @@ export default function SessionScreen() {
         ? "Fire stations · A&E"
         : "Stations · A&E";
 
+  const demoToggle = (
+    <View style={styles.toggleRow}>
+      <View style={styles.placeText}>
+        <Text style={styles.placeName} nativeID="demo-drive-label">
+          Demo drive
+        </Text>
+        <Text style={styles.placeMeta}>
+          Simulates a drive from Holloway Road to Whitechapel, so you can try routes, navigation and pursuit mode
+          away from London. Your real GPS is ignored while it’s on.
+        </Text>
+      </View>
+      <Switch
+        accessibilityLabelledBy="demo-drive-label"
+        value={demoDrive}
+        onValueChange={setDemoDrive}
+        trackColor={{ false: colors.line, true: colors.amber }}
+      />
+    </View>
+  );
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {/* The search log lives here, one tap away, rather than taking a tab. */}
@@ -101,6 +124,14 @@ export default function SessionScreen() {
           {logCount === 0 ? "empty" : `${logCount} entr${logCount === 1 ? "y" : "ies"}`} ›
         </Text>
       </Pressable>
+
+      {/* The browser version is for testing: the demo drive comes first there. */}
+      {!DEMO_MODE && TESTING_FIRST && (
+        <View style={styles.field}>
+          <Text style={styles.label}>Testing</Text>
+          {demoToggle}
+        </View>
+      )}
 
       <View style={styles.intro}>
         <Text style={styles.title}>Start of shift</Text>
@@ -373,25 +404,7 @@ export default function SessionScreen() {
         </View>
       )}
 
-      {!DEMO_MODE && (
-        <View style={styles.toggleRow}>
-          <View style={styles.placeText}>
-            <Text style={styles.placeName} nativeID="demo-drive-label">
-              Demo drive
-            </Text>
-            <Text style={styles.placeMeta}>
-              Simulates a drive from Holloway Road to Whitechapel, so you can try routes, navigation and pursuit mode
-              away from London. Your real GPS is ignored while it’s on.
-            </Text>
-          </View>
-          <Switch
-            accessibilityLabelledBy="demo-drive-label"
-            value={demoDrive}
-            onValueChange={setDemoDrive}
-            trackColor={{ false: colors.line, true: colors.amber }}
-          />
-        </View>
-      )}
+      {!DEMO_MODE && !TESTING_FIRST && demoToggle}
 
       <UsageNote />
 
@@ -506,5 +519,5 @@ const styles = StyleSheet.create({
   placeName: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   placeMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
   linkRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  attribution: { color: colors.muted, fontFamily: fonts.body, fontSize: 11, lineHeight: 16, opacity: 0.8 },
+  attribution: { color: colors.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 17 },
 });

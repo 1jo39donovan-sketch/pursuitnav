@@ -37,6 +37,7 @@ import {
   FIT_PADDING,
   LOOK_AHEAD,
   MARKER_CIRCLE_PAINT,
+  MARKER_MIN_ZOOM,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
   pointGeoJSON,
@@ -159,7 +160,7 @@ export function LiveMap({
     // keeps the camera where it is but drops what was added to the map.
     m.on("style.load", () => {
       m.addSource("places", { type: "geojson", data: EMPTY });
-      m.addLayer({ id: "places-dot", type: "circle", source: "places", minzoom: 11, paint: MARKER_CIRCLE_PAINT });
+      m.addLayer({ id: "places-dot", type: "circle", source: "places", minzoom: MARKER_MIN_ZOOM, paint: MARKER_CIRCLE_PAINT });
       // The offline demo style has no glyphs to draw labels with.
       if (!DEMO_MODE) {
         m.addLayer({

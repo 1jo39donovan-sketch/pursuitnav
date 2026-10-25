@@ -5,6 +5,7 @@ import {
   cardSlots,
   createTapGuard,
   planAgeText,
+  restrictionSummary,
   planIsStale,
   slotKey,
   STALE_AFTER_MS,
@@ -90,9 +91,17 @@ describe("planIsStale", () => {
 });
 
 describe("planAgeText", () => {
-  it("says how old the routes are once older than 20 s", () => {
-    expect(planAgeText(0, 20_000)).toBeNull();
-    expect(planAgeText(0, 40_000)).toBe("Routes from 40 s ago");
-    expect(planAgeText(0, 130_000)).toBe("Routes from 2 min ago");
+  it("says how old the routes are only once they're a couple of minutes old", () => {
+    expect(planAgeText(0, 40_000)).toBeNull();
+    expect(planAgeText(0, 119_000)).toBeNull();
+    expect(planAgeText(0, 130_000)).toBe("Planned 2 min ago");
+  });
+});
+
+describe("restrictionSummary", () => {
+  it("says what a blue-light route relies on in plain words", () => {
+    expect(restrictionSummary(["turn"], true)).toBe("1 banned turn");
+    expect(restrictionSummary(["bus-only", "turn", "bus-only"], true)).toBe("2 bus-only sections and 1 banned turn");
+    expect(restrictionSummary(["manoeuvre"], false)).toBe("at least 1 restricted manoeuvre");
   });
 });

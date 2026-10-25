@@ -100,7 +100,10 @@ jobs:
                 `<p><a style="color:#ffb627" href="${url}">Open the BlueRoute ${page} page</a></p>`);
             }
             // The test app: unlisted, so search engines leave it out.
-            for (const f of ["../site-out/app/index.html", "../site-out/app/404.html"]) {
+            const screens = fs.readdirSync("../site-out/app", { withFileTypes: true })
+              .filter((d) => d.isDirectory() && fs.existsSync(`../site-out/app/${d.name}/index.html`))
+              .map((d) => `../site-out/app/${d.name}/index.html`);
+            for (const f of ["../site-out/app/index.html", "../site-out/app/404.html", ...screens]) {
               fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace("<head>", "<head><meta name=\"robots\" content=\"noindex\">"));
             }
           '

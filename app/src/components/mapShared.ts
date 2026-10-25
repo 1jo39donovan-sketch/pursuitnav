@@ -76,6 +76,8 @@ export const LABEL_FONT = ["Noto Sans Regular"];
 export const EMPTY_COLLECTION: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 // Shared layer settings for place markers, so phone and browser look alike.
+/** Place dots from street level: further out, a borough's thousands of them hide the map. */
+export const MARKER_MIN_ZOOM = 13;
 export const MARKER_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
   "circle-color": ["get", "color"],
   "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 2.5, 15, 5, 18, 8],

@@ -60,7 +60,7 @@ export function PlacesControl({ groups, onChange, shownCount }: Props) {
             <Pressable onPress={() => onChange([])} style={styles.link}>
               <Text style={styles.linkText}>Hide all</Text>
             </Pressable>
-            <Pressable onPress={() => setOpen(false)} style={styles.link}>
+            <Pressable accessibilityRole="button" onPress={() => setOpen(false)} style={styles.link}>
               <Text style={styles.linkText}>Done</Text>
             </Pressable>
           </View>
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     gap: 10,
     alignSelf: "stretch",
   },
-  note: { color: colors.muted, fontFamily: fonts.mono, fontSize: 12 },
+  note: { color: colors.muted, fontFamily: fonts.mono, fontSize: 13 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   chip: {
     flexDirection: "row",

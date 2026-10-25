@@ -155,5 +155,5 @@ const styles = StyleSheet.create({
   },
   label: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 18, lineHeight: 20 },
   zoom: { fontSize: 28, lineHeight: 30 },
-  caption: { color: colors.muted, fontFamily: fonts.body, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5 },
+  caption: { color: colors.muted, fontFamily: fonts.body, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
 });

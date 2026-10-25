@@ -13,6 +13,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { showPursuit } = useSession();
   return (
     <View
+      accessibilityRole="tablist"
       style={[
         styles.bar,
         { paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right },
@@ -27,6 +28,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           <Pressable
             key={route.key}
             accessibilityRole="tab"
+            accessibilityLabel={label}
             accessibilityState={{ selected: focused }}
             onPress={() => {
               const event = navigation.emit({

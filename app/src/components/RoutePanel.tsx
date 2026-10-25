@@ -11,6 +11,7 @@ import {
   cardSlots,
   createTapGuard,
   planAgeText,
+  restrictionSummary,
   slotKey,
   type PlanOrigin,
   type PoliceSlot,
@@ -37,6 +38,8 @@ interface Props {
   destination: { lat: number; lng: number };
   /** What was picked, e.g. "54 Caledonian Road". */
   title?: string;
+  /** No position yet: offer the demo drive (the browser test version). */
+  onUseDemo?: () => void;
   /** Starred (Search shows it first next time). */
   favourite?: boolean;
   onToggleFavourite?: () => void;
@@ -72,6 +75,7 @@ export function RoutePanel({
   title,
   favourite,
   onToggleFavourite,
+  onUseDemo,
   note,
   blocks,
   onPickBlock,
@@ -129,16 +133,28 @@ export function RoutePanel({
           <Text style={styles.close}>Clear</Text>
         </Pressable>
       </View>
-      {(note || ageText) && (
+      {note && (
         <Text style={styles.note} numberOfLines={2}>
-          {[note, ageText && `${ageText}: Go works them out again`].filter(Boolean).join(" · ")}
+          {note}
         </Text>
       )}
+      {ageText && <Text style={styles.age}>{`${ageText} · Go updates it from here`}</Text>}
       {state.status === "loading" && <Text style={styles.status}>{planningText("routes", waited)}</Text>}
       {state.status === "error" && (
         <View style={styles.errorBox}>
           <Text style={[styles.status, styles.error]}>{state.message}</Text>
           {state.noSignal && <Text style={styles.status}>{RETRYING_WHEN_BACK}</Text>}
+          {state.waitingForFix && onUseDemo && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Use the demo drive instead of GPS"
+              onPress={onUseDemo}
+              style={({ pressed }) => [styles.demoButton, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.demoText}>Try it with the demo drive</Text>
+              <Text style={styles.demoMeta}>A pretend drive in London instead of your location. Off again in Session.</Text>
+            </Pressable>
+          )}
           {handOff && <ExternalLinks lat={lat} lng={lng} onOpen={onOpenExternal} prominent />}
           {onRetry && !state.waitingForFix && (
             <Pressable
@@ -347,8 +363,10 @@ function PoliceRow({
     );
   }
   const route = slot.route;
-  const count = route.restrictions.length;
-  const countText = `${route.restrictionsComplete ? "" : "at least "}${count} restriction${count === 1 ? "" : "s"}`;
+  const countText = restrictionSummary(
+    route.restrictions.map((r) => r.kind),
+    route.restrictionsComplete,
+  );
   return (
     <View style={[styles.rowWrap, styles.rowPolice]}>
       <View style={styles.rowInner}>
@@ -371,7 +389,7 @@ function PoliceRow({
         hitSlop={6}
       >
         <Text style={styles.relies}>
-          {formatDistance(route.distanceM)} · relies on {countText} {expanded ? "▴" : "▾"}
+          {formatDistance(route.distanceM)} · uses {countText} · {expanded ? "hide ▴" : "where ▾"}
         </Text>
       </Pressable>
       {expanded &&
@@ -481,8 +499,12 @@ const baseStyles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
   headerText: { flex: 1, minWidth: 0 },
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 21, lineHeight: 24 },
-  note: { color: colors.amber, fontFamily: fonts.body, fontSize: 12, lineHeight: 16 },
-  closures: { color: colors.muted, fontFamily: fonts.body, fontSize: 11, lineHeight: 15 },
+  note: { color: colors.amber, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
+  demoButton: { borderColor: colors.amber, borderWidth: 1, borderRadius: 12, padding: 12, gap: 2 },
+  demoText: { color: colors.amber, fontFamily: fonts.displaySemiBold, fontSize: 17 },
+  demoMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
+  age: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
+  closures: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
   closuresWarn: { color: colors.amber, fontFamily: fonts.bodySemiBold },
   close: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 16, paddingVertical: 4 },
   status: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, paddingVertical: 10 },
@@ -573,8 +595,8 @@ const baseStyles = StyleSheet.create({
   },
   meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
   saving: { color: colors.amber, fontFamily: fonts.bodySemiBold },
-  traffic: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 12, lineHeight: 16, marginTop: 2 },
-  trafficAvoided: { color: colors.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 16, marginTop: 2 },
+  traffic: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 13, lineHeight: 17, marginTop: 2 },
+  trafficAvoided: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 17, marginTop: 2 },
   relies: { color: colors.amber, fontFamily: fonts.body, fontSize: 13, lineHeight: 18, paddingVertical: 4 },
   restriction: { color: colors.fg, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   go: {
@@ -593,7 +615,7 @@ const baseStyles = StyleSheet.create({
   },
   fastest: { color: colors.ok, fontFamily: fonts.displayBold, fontSize: 13, letterSpacing: 1 },
   blocks: { gap: 6 },
-  blocksLabel: { color: colors.muted, fontFamily: fonts.body, fontSize: 12 },
+  blocksLabel: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
   blockRow: { gap: 8 },
   block: {
     borderColor: "#60a5fa",

@@ -219,7 +219,8 @@ export default function NavigateScreen() {
     handledAsk.current = active.rerouteAsked;
     handledReconnect.current = reconnected.n;
     // A refresh on the line, when signal returns, changes nothing on screen until the new route is in.
-    const quiet = back && !asked && reconnected.quiet && !offRoute;
+    // So does freshening an old plan on Go while still on its line: no "Re-routing" for a clean start.
+    const quiet = (back && !asked && reconnected.quiet && !offRoute) || (asked && active.rerouteReason === "stale-refresh" && !offRoute);
     // Asked for now: what was in flight was for the old choice.
     inFlight.current?.abort();
     const controller = new AbortController();
@@ -363,7 +364,7 @@ export default function NavigateScreen() {
     return (
       <View style={[styles.screen, styles.empty]}>
         <Text style={styles.emptyText}>No route chosen.</Text>
-        <Pressable onPress={() => router.back()} style={styles.endButton}>
+        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.endButton}>
           <Text style={styles.endText}>Back</Text>
         </Pressable>
       </View>
@@ -500,6 +501,7 @@ export default function NavigateScreen() {
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={confirmEnd ? "Tap again to end navigation" : "End navigation"}
           accessibilityHint="Tap twice to end navigation"
           onPress={() => (confirmEnd || progress?.arrived ? end() : setConfirmEnd(true))}
           style={[styles.endButton, confirmEnd && styles.endConfirm]}

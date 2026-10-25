@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   groupName: { flex: 1, color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 18 },
-  count: { color: colors.muted, fontFamily: fonts.mono, fontSize: 12 },
+  count: { color: colors.muted, fontFamily: fonts.mono, fontSize: 13 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 34 },
   chip: { borderColor: colors.line, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },

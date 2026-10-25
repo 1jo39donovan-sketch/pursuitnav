@@ -73,7 +73,7 @@ export function AddPlaceForm({ initialName, onSaved }: { initialName: string; on
         accessibilityLabel="Road it's on"
       />
       {matches.map((r) => (
-        <Pressable key={`${r.name}|${r.borough}`} onPress={() => setRoad(r)} style={styles.match}>
+        <Pressable key={`${r.name}|${r.borough}`} accessibilityRole="button" onPress={() => setRoad(r)} style={styles.match}>
           <Text style={styles.matchText}>
             {r.name} <Text style={styles.matchBorough}>— {r.borough}</Text>
           </Text>

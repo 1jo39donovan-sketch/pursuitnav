@@ -7,16 +7,37 @@ import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 
 const WEB = Platform.OS === "web";
-// In a browser there's no Settings screen to open: say where to go instead.
-const WEB_DENIED =
-  "Location is blocked for this site. On iPhone: Settings → Privacy & Security → Location Services → " +
-  "Safari Websites → While Using the App (Precise Location on). Then reload.";
+// In a browser there's no Settings screen to open: say where to go instead,
+// for the device it's on.
+export type WebDevice = "iphone" | "android" | "desktop";
+export function webDevice(userAgent: string): WebDevice {
+  if (/iPhone|iPad|iPod/i.test(userAgent)) return "iphone";
+  if (/Android/i.test(userAgent)) return "android";
+  return "desktop";
+}
+export function webDeniedText(device: WebDevice): string {
+  switch (device) {
+    case "iphone":
+      return (
+        "Location is blocked for this site. On iPhone: Settings → Privacy & Security → Location Services → " +
+        "Safari Websites → While Using the App (Precise Location on). Then reload."
+      );
+    case "android":
+      return "Location is blocked for this site. Tap the icon left of the address → Permissions → Location → Allow. Then reload.";
+    case "desktop":
+      return "Location is blocked for this site. Click the icon left of the address → Site settings → Location → Allow. Then reload.";
+  }
+}
+const device = (): WebDevice => webDevice(typeof navigator === "undefined" ? "" : navigator.userAgent);
 const reload = () => window.location.reload();
 
 /** A line when the GPS position can't be trusted, with a fix if there is one. Nothing when it's good. */
 export function GpsStatus() {
   const { status, fix, requestPermission, simulated } = useLocation();
   const { setDemoDrive } = useSession();
+  // In the browser (the test version) the blocked-location line can be put
+  // away for this visit; it says so once more after a reload.
+  const [dismissed, setDismissed] = useState(false);
 
   // After a while with no position, say what usually helps.
   const waiting = !simulated && status === "granted" && !fix;
@@ -38,9 +59,21 @@ export function GpsStatus() {
     );
   }
   if (status === "denied") {
+    if (WEB && dismissed) return null;
     return WEB ? (
-      <Banner tone="warn" text={WEB_DENIED}>
+      <Banner tone="warn" text={webDeniedText(device())}>
         <Action label="Reload" onPress={reload} />
+        {/* The test version: try BlueRoute without location, on a pretend drive in London. */}
+        <Action label="Demo drive" onPress={() => setDemoDrive(true)} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+          onPress={() => setDismissed(true)}
+          hitSlop={10}
+          style={styles.dismiss}
+        >
+          <Text style={styles.dismissText}>✕</Text>
+        </Pressable>
       </Banner>
     ) : (
       <Banner tone="warn" text="Location permission was refused. Turn it on in Settings.">
@@ -73,9 +106,11 @@ export function GpsStatus() {
       <Banner
         tone="warn"
         text={
-          WEB
-            ? "Still no GPS. Check Location Services is on and Safari Websites is set to While Using the App, with Precise Location on."
-            : "Still no GPS. Check Location Services is on; a position comes quicker outdoors."
+          !WEB
+            ? "Still no GPS. Check Location Services is on; a position comes quicker outdoors."
+            : device() === "iphone"
+              ? "Still no GPS. Check Location Services is on and Safari Websites is set to While Using the App, with Precise Location on."
+              : "Still no GPS. Check this browser is allowed your location (the icon left of the address)."
         }
       >
         {WEB && <Action label="Reload" onPress={reload} />}
@@ -111,7 +146,7 @@ function Banner({
 
 function Action({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.action}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.action}>
       <Text style={styles.actionText}>{label}</Text>
     </Pressable>
   );
@@ -130,7 +165,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  text: { flex: 1, color: colors.muted, fontFamily: fonts.mono, fontSize: 12 },
+  text: { flex: 1, color: colors.fg, fontFamily: fonts.mono, fontSize: 13, lineHeight: 18 },
+  dismiss: { paddingHorizontal: 4 },
+  dismissText: { color: colors.muted, fontSize: 18 },
   action: {
     borderWidth: 1,
     borderColor: colors.amber,

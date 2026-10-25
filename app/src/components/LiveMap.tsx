@@ -41,6 +41,7 @@ import {
   ROUTE_CASING_PAINT,
   ROUTE_LINE_PAINT,
   MARKER_CIRCLE_PAINT,
+  MARKER_MIN_ZOOM,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
   pointGeoJSON,
@@ -185,7 +186,7 @@ export function LiveMap({
             }
           }}
         >
-          <Layer type="circle" id="places-dot" minzoom={11} paint={MARKER_CIRCLE_PAINT} />
+          <Layer type="circle" id="places-dot" minzoom={MARKER_MIN_ZOOM} paint={MARKER_CIRCLE_PAINT} />
           <Layer
             type="symbol"
             id="places-label"

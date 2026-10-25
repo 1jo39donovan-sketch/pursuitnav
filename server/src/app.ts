@@ -11,6 +11,7 @@ import { BANDS, type LearningStore, type Sample } from "./learning.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
 import type { NearestDoor, WhereIs } from "./nominatim.js";
+import { AbandonedError, planContext } from "./planContext.js";
 import { osMapsRoutes } from "./osMaps.js";
 import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage, termsPage } from "./pages.js";
@@ -64,6 +65,8 @@ export function bearerMatches(header: string | undefined, token: string): boolea
 }
 
 function routeError(err: unknown, req: FastifyRequest, reply: FastifyReply) {
+  // The phone has gone; nobody reads this, and it isn't a server error.
+  if (err instanceof AbandonedError) return reply.code(499).send({ error: "abandoned" });
   if (err instanceof NoSafeRouteError) {
     return reply.code(422).send({ error: "no-safe-route", message: err.message });
   }
@@ -218,8 +221,19 @@ export function buildApp(
         return reply.code(422).send({ error: "outside-area", message: "Both points must be in the covered area." });
       }
       const toLngLat = (p: { lat: number; lng: number }): LngLat => [p.lng, p.lat];
+      // Given up by the phone (the connection closes before the answer): stop working it out.
+      const gone = new AbortController();
+      reply.raw.on("close", () => {
+        if (!reply.raw.writableFinished) gone.abort();
+      });
+      const started = performance.now();
       try {
-        const plan = await planRoutes(router, toLngLat(from), toLngLat(to), { ...config, standardOnly, roads }, from.heading, vehicle);
+        // The standard route alone is what a crew waits on before they can go: it goes first.
+        const plan = await planContext.run({ urgent: standardOnly === true, signal: gone.signal }, () =>
+          planRoutes(router, toLngLat(from), toLngLat(to), { ...config, standardOnly, roads }, from.heading, vehicle),
+        );
+        // How long it took, for the browser's network panel (no addresses or positions in it).
+        reply.header("server-timing", `plan;dur=${Math.round(performance.now() - started)}`);
         if (!closures) return plan;
         const ignored = [plan.standard, plan.police].some((r) => (r as ClosureAwareRoute | null)?.closuresIgnored);
         return { ...plan, closures: { ...closures.summary(), ignored } };
