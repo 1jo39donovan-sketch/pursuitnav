@@ -30,14 +30,41 @@ export function spokenDistance(metres: number): string {
 /** Lower-case the first letter so it reads on after "In 300 yards, ". */
 const continuing = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
-export function nextCallout(progress: Progress, said: ReadonlySet<string>): Callout | null {
-  if (progress.arrived) return said.has("arrived") ? null : { key: "arrived", text: "You have arrived." };
+/** Valhalla's arrival manoeuvre types, by the side the destination is on. */
+const ARRIVAL_SIDE: Record<number, "right" | "left" | null> = { 4: null, 5: "right", 6: "left" };
+
+/** Which side of the road the destination is on, from the route's last manoeuvre. */
+export function arrivalSide(maneuvers: readonly { type: number }[]): "right" | "left" | null {
+  return ARRIVAL_SIDE[maneuvers.at(-1)?.type ?? -1] ?? null;
+}
+
+/**
+ * The destination as it's said: the address without its postcode or
+ * "Point on the map" coordinates, which nobody wants read out.
+ */
+export function spokenPlace(title: string | undefined): string | null {
+  if (!title || /^Point on the map/.test(title)) return null;
+  return title.replace(/,?\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, "").trim() || null;
+}
+
+export function nextCallout(progress: Progress, said: ReadonlySet<string>, title?: string): Callout | null {
+  const place = spokenPlace(title);
+  if (progress.arrived) {
+    if (said.has("arrived")) return null;
+    const side = ARRIVAL_SIDE[progress.current.type] ?? ARRIVAL_SIDE[progress.next?.type ?? -1] ?? null;
+    return {
+      key: "arrived",
+      text: `You have arrived${place ? ` at ${place}` : ""}${side ? `. It's on the ${side}` : ""}.`,
+    };
+  }
   if (!said.has("start")) return { key: "start", text: progress.current.instruction };
   const next = progress.next;
   if (!next) return null;
   const id = `turn:${next.beginShapeIndex}`;
   const d = progress.distanceToNextM;
-  const text = upcomingInstruction(next);
+  // The last call before arriving says which side and the address, door number and all.
+  const arriving = next.type in ARRIVAL_SIDE && place;
+  const text = arriving ? `${upcomingInstruction(next)}: ${place}` : upcomingInstruction(next);
   if (d <= NOW_M) {
     return said.has(`${id}:now`) ? null : { key: `${id}:now`, text: `${text}.`.replace(/\.\.$/, ".") };
   }

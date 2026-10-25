@@ -38,6 +38,10 @@ interface Props {
   destination: { lat: number; lng: number };
   /** What was picked, e.g. "54 Caledonian Road". */
   title?: string;
+  /** The crew's own note on this block (kept on the phone). */
+  blockNote?: string;
+  /** Write the note (empty removes it); without it, no notes for this destination (a whole road). */
+  onSaveNote?: (text: string) => void;
   /** No position yet: offer the demo drive (the browser test version). */
   onUseDemo?: () => void;
   /** Starred (Search shows it first next time). */
@@ -76,6 +80,8 @@ export function RoutePanel({
   favourite,
   onToggleFavourite,
   onUseDemo,
+  blockNote,
+  onSaveNote,
   note,
   blocks,
   onPickBlock,
@@ -138,6 +144,7 @@ export function RoutePanel({
           {note}
         </Text>
       )}
+      {onSaveNote && <BlockNoteLine note={blockNote} onSave={onSaveNote} />}
       {ageText && <Text style={styles.age}>{`${ageText} · Go updates it from here`}</Text>}
       {state.status === "loading" && <Text style={styles.status}>{planningText("routes", waited)}</Text>}
       {state.status === "error" && (
@@ -253,6 +260,47 @@ function OtherEtas() {
         })}
       </View>
     </View>
+  );
+}
+
+/** The crew's note on the block: shown when there is one, written or changed with a tap. */
+function BlockNoteLine({ note, onSave }: { note?: string; onSave: (text: string) => void }) {
+  const styles = useTextStyles(baseStyles);
+  const [editing, setEditing] = useState<string | null>(null);
+  if (editing !== null) {
+    const save = () => {
+      onSave(editing);
+      setEditing(null);
+    };
+    return (
+      <View style={styles.noteEdit}>
+        <TextInput
+          value={editing}
+          onChangeText={setEditing}
+          autoFocus
+          multiline
+          placeholder="e.g. Entrance round the back, lift to 4th floor, flats 1–24"
+          placeholderTextColor={colors.muted}
+          accessibilityLabel="Note for this block, kept on this phone"
+          style={styles.noteInput}
+        />
+        <Pressable accessibilityRole="button" accessibilityLabel="Save note" onPress={save} hitSlop={8}>
+          <Text style={styles.noteSave}>Save</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={note ? `Your note: ${note}. Tap to change` : "Add a note for this block"}
+      onPress={() => setEditing(note ?? "")}
+      hitSlop={6}
+    >
+      <Text style={note ? styles.blockNote : styles.addNote} numberOfLines={3}>
+        {note ? `✎ ${note}` : "+ Note for this block (floor, entrance, flats)"}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -500,6 +548,22 @@ const baseStyles = StyleSheet.create({
   headerText: { flex: 1, minWidth: 0 },
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 21, lineHeight: 24 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
+  blockNote: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 20 },
+  addNote: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 14 },
+  noteEdit: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
+  noteInput: {
+    flex: 1,
+    color: colors.fg,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minHeight: 44,
+  },
+  noteSave: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 16, paddingBottom: 10 },
   demoButton: { borderColor: colors.amber, borderWidth: 1, borderRadius: 12, padding: 12, gap: 2 },
   demoText: { color: colors.amber, fontFamily: fonts.displaySemiBold, fontSize: 17 },
   demoMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },

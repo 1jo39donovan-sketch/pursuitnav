@@ -27,7 +27,7 @@ import {
   type LastReroute,
   type RerouteFailure,
 } from "../navigation/reroute";
-import { nextCallout } from "../navigation/voice";
+import { arrivalSide, nextCallout } from "../navigation/voice";
 import { recordEvent } from "../usage/usage";
 import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
 import { recorder, useRecorder } from "../fieldtest/instance";
@@ -57,6 +57,7 @@ import {
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
 import { reportUrl } from "../feedback";
+import { loadNotes, noteNear } from "../search/blockNotes";
 import { useTextStyles } from "../textSize";
 
 const DEMO_GRACE_MS = 5000;
@@ -102,6 +103,13 @@ export default function NavigateScreen() {
   const landscape = width > height;
 
   const prepared = useMemo(() => (active ? prepare(active.route) : null), [active]);
+  // The crew's own note on the block they're going to, if they wrote one (Search).
+  const destLat = active?.destination.lat;
+  const destLng = active?.destination.lng;
+  const blockNote = useMemo(
+    () => (destLat != null && destLng != null ? noteNear(loadNotes(), { lat: destLat, lng: destLng })?.note : undefined),
+    [destLat, destLng],
+  );
 
   // The demo drive follows the route being navigated, from its first point,
   // and goes back on patrol afterwards.
@@ -340,7 +348,7 @@ export default function NavigateScreen() {
     if (!progress || !prepared || offRoute) return;
     // A new route (after a re-route) starts its callouts afresh.
     if (said.current.route !== prepared) said.current = { route: prepared, keys: new Set() };
-    const callout = nextCallout(progress, said.current.keys);
+    const callout = nextCallout(progress, said.current.keys, active?.destination.title);
     if (!callout) return;
     said.current.keys.add(callout.key);
     if (voiceOn) {
@@ -348,7 +356,7 @@ export default function NavigateScreen() {
       Speech.speak(callout.text, { language: "en-GB" });
       recorder.event({ type: "speech", text: callout.text });
     }
-  }, [progress, prepared, offRoute, voiceOn]);
+  }, [progress, prepared, offRoute, voiceOn, active?.destination.title]);
   useEffect(() => () => void Speech.stop(), []);
 
   // Ending takes a second tap, so a bump on the way doesn't drop the route.
@@ -395,6 +403,10 @@ export default function NavigateScreen() {
         <>
           <Text style={styles.distance}>⚑ Arrived</Text>
           <Text style={styles.instruction}>{active.destination.title}</Text>
+          {arrivalSide(active.route.maneuvers) && (
+            <Text style={styles.then}>On the {arrivalSide(active.route.maneuvers)}</Text>
+          )}
+          {blockNote && <Text style={styles.blockNote}>✎ {blockNote}</Text>}
         </>
       ) : back ? (
         <View accessibilityRole="alert">
@@ -462,6 +474,12 @@ export default function NavigateScreen() {
           <Text style={styles.road} numberOfLines={1}>
             On {(progress && roadLabel(progress.current.streetNames)) ?? "—"}
           </Text>
+          {/* The crew's note on the block, as they get close. */}
+          {blockNote && progress && !progress.arrived && progress.remainingM < NOTE_WITHIN_M && (
+            <Text style={styles.blockNote} numberOfLines={2}>
+              ✎ {blockNote}
+            </Text>
+          )}
         </View>
         <Text style={[styles.badge, { color: routeColor, borderColor: routeColor }]}>
           {isPolice
@@ -715,7 +733,11 @@ function RouteSheet({
   );
 }
 
+/** The block note shows from this close to the destination. */
+const NOTE_WITHIN_M = 500;
+
 const baseStyles = StyleSheet.create({
+  blockNote: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 16, lineHeight: 21 },
   screen: { flex: 1, backgroundColor: colors.bg },
   empty: { alignItems: "center", justifyContent: "center", gap: 16 },
   emptyText: { color: colors.muted, fontFamily: fonts.body, fontSize: 16 },
