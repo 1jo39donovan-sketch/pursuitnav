@@ -48,7 +48,8 @@ if [ -z "${DOMAIN:-}" ]; then
 fi
 [ -n "$DOMAIN" ] || fail "A domain name is needed for HTTPS."
 # Other names the server also answers on (e.g. an old address while apps move over).
-if [ -z "${ALSO_SERVE:-}" ] && [ -f "$DIR/server/.env" ]; then
+# Given but empty (as the deploy passes it) clears them; not given keeps the old ones.
+if [ -z "${ALSO_SERVE+set}" ] && [ -f "$DIR/server/.env" ]; then
   ALSO_SERVE=$(grep -E '^ALSO_SERVE=' "$DIR/server/.env" | cut -d= -f2- || true)
 fi
 ALSO_SERVE=${ALSO_SERVE:-}

@@ -64,6 +64,9 @@ export function linkBanner(link: Link): string | null {
 export const NO_SIGNAL_ROUTE_START = "No signal: can't plan a route. Open in Google Maps / Waze, or try again.";
 /** Picking a destination while the server is down or not answering: the hand-off comes first. */
 export const SERVER_DOWN_ROUTE_START = "BlueRoute's server isn't answering. Use Google Maps or Waze for now, or try again.";
+/** No answer in time: weak signal or a busy server, so it doesn't say the server is down. */
+export const NO_ANSWER_ROUTE_START =
+  "No answer from the BlueRoute server in time (weak signal, or the server is busy). Use Google Maps or Waze for now, or try again.";
 export const RETRYING_WHEN_BACK = "Trying again by itself when signal is back.";
 
 /** "Re-routing" is only said when a re-route can actually happen. */

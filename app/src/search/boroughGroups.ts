@@ -29,10 +29,11 @@ export const BOROUGH_GROUPS: BoroughGroup[] = [
 /** The Met's 12 BCUs (without the City, which has its own force). */
 export const BCUS: BoroughGroup[] = BOROUGH_GROUPS.filter((g) => g.code !== "");
 
-/** The BCU most of the chosen boroughs are in, or the first. */
-export function bcuFor(boroughs: readonly Borough[]): BoroughGroup {
+/** The BCU most of the chosen boroughs are in, or null if none is in one (none chosen, or only the City). */
+export function bcuFor(boroughs: readonly Borough[]): BoroughGroup | null {
   const score = (g: BoroughGroup) => g.boroughs.filter((b) => boroughs.includes(b)).length;
-  return [...BCUS].sort((a, b) => score(b) - score(a))[0]!;
+  const best = [...BCUS].sort((a, b) => score(b) - score(a))[0]!;
+  return score(best) > 0 ? best : null;
 }
 
 /**

@@ -100,6 +100,23 @@ export class ServerDownRouteError extends RouteError {
   }
 }
 
+/**
+ * The requests for one plan: the standard route alone (back in a second or
+ * so, shown first) and, with blue-light routes on, the full plan (slower).
+ * Used for a plan asked for on the tap and one asked for before it alike.
+ */
+export function planRequests(
+  from: { lat: number; lng: number; heading?: number },
+  to: { lat: number; lng: number },
+  opts: { vehicle: VehicleType; roads: RoadChoice; blueLight: boolean; signal: AbortSignal; prefetch?: boolean },
+): { quick: Promise<RoutePlan>; full: Promise<RoutePlan> | null } {
+  const { vehicle, roads, blueLight, signal, prefetch = false } = opts;
+  return {
+    quick: fetchRoutes(from, to, vehicle, signal, true, roads, prefetch),
+    full: blueLight ? fetchRoutes(from, to, vehicle, signal, false, roads, prefetch) : null,
+  };
+}
+
 /** A failed request to the server as the route error to show. */
 export function routeFailure(err: unknown): unknown {
   if (isNoSignal(err)) return new NoSignalRouteError();
@@ -125,6 +142,8 @@ export async function fetchRoutes(
   /** Just the standard route: quick, for showing while the blue-light one is worked out. */
   standardOnly = false,
   roads: RoadChoice = "main",
+  /** Asked for before the tap (the likely match): the server doesn't count it as a planned route. */
+  prefetch = false,
 ): Promise<RoutePlan> {
   if (!API_URL) {
     throw new RouteError(
@@ -140,7 +159,14 @@ export async function fetchRoutes(
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ from, to, vehicle, roads, ...(standardOnly ? { standardOnly } : {}) }),
+        body: JSON.stringify({
+          from,
+          to,
+          vehicle,
+          roads,
+          ...(standardOnly ? { standardOnly } : {}),
+          ...(prefetch ? { prefetch } : {}),
+        }),
         signal,
       },
       { timeoutMs: ROUTE_TIMEOUT_MS },

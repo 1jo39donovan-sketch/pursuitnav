@@ -157,13 +157,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const setService = useCallback(
     (s: ServiceType) => {
+      // The same service tapped again changes nothing (keeps the crew's own Pursuit choice).
+      if (s === service) return;
       setServiceState(s);
       store.setSetting("service", s);
       const offered = vehiclesFor(s);
       if (!offered.includes(vehicle)) setVehicle(offered[0]!);
       setShowPursuit(s === "police");
     },
-    [vehicle, setVehicle, setShowPursuit],
+    [service, vehicle, setVehicle, setShowPursuit],
   );
 
   const value = useMemo(

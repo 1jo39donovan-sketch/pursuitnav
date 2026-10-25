@@ -7,7 +7,8 @@
 //
 // Plain logic over a small settings store, so it can be tested off the phone.
 
-export type UsageEvent = "navigation" | "pursuit" | "timeout";
+// plan: a route asked for before the tap and then used (the server didn't count it when asked).
+export type UsageEvent = "navigation" | "pursuit" | "timeout" | "plan";
 export type Pending = Partial<Record<UsageEvent, number>>;
 
 export interface SettingsStore {

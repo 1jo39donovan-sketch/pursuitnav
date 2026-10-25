@@ -3,7 +3,7 @@
 // on this phone only: radio channels and the like never ship with the app).
 // Opened from Session.
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -20,7 +20,8 @@ import { colors, fonts } from "../theme";
 
 /** Route to a place: Search works out both routes, as for a search result. */
 function go(title: string, lat: number, lng: number) {
-  router.navigate({ pathname: "/search", params: { lat: String(lat), lng: String(lng), title, from: `bcu-${Date.now()}` } });
+  // Every parameter is given, so none is left over from an earlier visit.
+  router.navigate({ pathname: "/search", params: { lat: String(lat), lng: String(lng), title, q: "", from: `bcu-${Date.now()}` } });
 }
 
 export default function BcuScreen() {
@@ -29,7 +30,9 @@ export default function BcuScreen() {
   const { boroughs } = useSession();
   const { data, places } = useSearch();
   const { fix } = useLocation();
-  const [code, setCode] = useState(() => BCUS.find((g) => g.code === params.code)?.code ?? bcuFor(boroughs).code);
+  const [code, setCode] = useState(
+    () => BCUS.find((g) => g.code === params.code)?.code ?? bcuFor(boroughs)?.code ?? BCUS[0]!.code,
+  );
   const bcu = BCUS.find((g) => g.code === code)!;
 
   const away = (p: { lat: number; lng: number }) => (fix ? distanceM(fix, p) : null);
@@ -47,14 +50,27 @@ export default function BcuScreen() {
     };
   }, [data, bcu, places.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Notes are saved a moment after typing stops (not on every key), and
+  // straight away on switching BCU or leaving the screen.
   const [notes, setNotesState] = useState(() => store.getSetting(`bcuNotes:${code}`) ?? "");
+  const unsaved = useRef<{ code: string; text: string } | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveNow = () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (unsaved.current) store.setSetting(`bcuNotes:${unsaved.current.code}`, unsaved.current.text);
+    unsaved.current = null;
+  };
+  useEffect(() => saveNow, []);
   const pick = (next: string) => {
+    saveNow();
     setCode(next);
     setNotesState(store.getSetting(`bcuNotes:${next}`) ?? "");
   };
   const setNotes = (text: string) => {
     setNotesState(text);
-    store.setSetting(`bcuNotes:${code}`, text);
+    unsaved.current = { code, text };
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(saveNow, 600);
   };
 
   const placesNote =
@@ -91,7 +107,7 @@ export default function BcuScreen() {
         <GoButton
           label={`Search for ${suite.name}`}
           text="Find"
-          onPress={() => router.navigate({ pathname: "/search", params: { q: suite.search, from: `bcu-${Date.now()}` } })}
+          onPress={() => router.navigate({ pathname: "/search", params: { q: suite.search, lat: "", lng: "", title: "", from: `bcu-${Date.now()}` } })}
         />
       </View>
     );
@@ -155,6 +171,7 @@ export default function BcuScreen() {
           accessibilityLabelledBy="bcu-notes-label"
           value={notes}
           onChangeText={setNotes}
+          onBlur={saveNow}
           multiline
           placeholder="Anything you want to hand for this BCU"
           placeholderTextColor={colors.muted}

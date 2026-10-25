@@ -194,14 +194,24 @@ jobs:
             [ -n "$zone" ] || { echo "::error::CLOUDFLARE_API_TOKEN can't see a Cloudflare zone for $name."; return 1; }
             for type in A AAAA; do
               ip=$IP; [ "$type" = AAAA ] && ip=$IP6
-              [ -n "$ip" ] || continue
-              rec=$(cf "https://api.cloudflare.com/client/v4/zones/$zone/dns_records?type=$type&name=$name" | jq -r '.result[0].id // empty')
-              body=$(jq -nc --arg t "$type" --arg n "$name" --arg c "$ip" '{type:$t,name:$n,content:$c,ttl:1,proxied:false}')
-              if [ -n "$rec" ]; then
-                cf -X PATCH "https://api.cloudflare.com/client/v4/zones/$zone/dns_records/$rec" --data "$body" >/dev/null
-              else
-                cf -X POST "https://api.cloudflare.com/client/v4/zones/$zone/dns_records" --data "$body" >/dev/null
-              fi || { echo "::error::Cloudflare refused the $type record for $name."; return 1; }
+              # One record of each type, pointing here: extras (and an AAAA when this
+              # server has no IPv6) would send some phones to an old server.
+              mapfile -t recs < <(cf "https://api.cloudflare.com/client/v4/zones/$zone/dns_records?type=$type&name=$name" | jq -r '.result[].id')
+              keep=""
+              if [ -n "$ip" ]; then
+                body=$(jq -nc --arg t "$type" --arg n "$name" --arg c "$ip" '{type:$t,name:$n,content:$c,ttl:1,proxied:false}')
+                if [ -n "${recs[0]:-}" ]; then
+                  keep=${recs[0]}
+                  cf -X PATCH "https://api.cloudflare.com/client/v4/zones/$zone/dns_records/$keep" --data "$body" >/dev/null
+                else
+                  cf -X POST "https://api.cloudflare.com/client/v4/zones/$zone/dns_records" --data "$body" >/dev/null
+                fi || { echo "::error::Cloudflare refused the $type record for $name."; return 1; }
+              fi
+              for rec in "${recs[@]}"; do
+                [ "$rec" = "$keep" ] && continue
+                cf -X DELETE "https://api.cloudflare.com/client/v4/zones/$zone/dns_records/$rec" >/dev/null ||
+                  { echo "::error::Couldn't remove an old $type record for $name."; return 1; }
+              done
             done
             echo "$name now points at $IP${IP6:+ and $IP6} (Cloudflare, DNS only)"
           }
