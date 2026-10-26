@@ -1,18 +1,14 @@
 // Team on Session: start or join a team, share the code, see who's where, and
 // follow a colleague's way in.
-import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { fetchFollow } from "../api/teams";
 import { boroughAt } from "../area/area";
 import { formatDistance } from "../format";
 import { distanceM } from "../geo";
-import { routeOrigin, useLocation } from "../location/LocationProvider";
-import { useLog } from "../log/LogProvider";
-import { useNavigation } from "../navigation/NavigationProvider";
-import { useSession } from "../session/SessionProvider";
-import { useTeam, type TeamMember } from "../team/TeamProvider";
+import { useLocation } from "../location/LocationProvider";
+import { accuracyText, roughFix, useTeam } from "../team/TeamProvider";
+import { useFollowIn } from "../team/useFollowIn";
 import { colors, fonts } from "../theme";
 import { Button } from "./Button";
 import { useTextStyles } from "../textSize";
@@ -25,8 +21,22 @@ const STATUS: Record<string, string> = {
   ended: "This team has ended. Leave it and start a new one.",
 };
 
+/** The message sent with the code. Pasting all of it into Join works too. */
+export const shareMessage = (code: string) =>
+  `Join my BlueRoute team: in BlueRoute, go to Session → Team → Join with a code, and paste this message.\n\nCode: ${code}`;
+
+/** Copies to the clipboard in a browser (the phone app copies from the share sheet). */
+async function copy(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Ticks every 15 s, for "2 min ago". */
-function useNow() {
+export function useNow() {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 15_000);
@@ -35,7 +45,7 @@ function useNow() {
   return now;
 }
 
-function ago(ms: number): string {
+export function ago(ms: number): string {
   const mins = Math.round(ms / 60_000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins} min ago`;
@@ -46,50 +56,22 @@ export function TeamSection() {
   const styles = useTextStyles(baseStyles);
   const team = useTeam();
   const { fix } = useLocation();
-  const { vehicle, roads } = useSession();
-  const navigation = useNavigation();
-  const log = useLog();
+  const { follow, following, error } = useFollowIn();
   const now = useNow();
   const [joining, setJoining] = useState(false);
   const [typed, setTyped] = useState("");
   const [badCode, setBadCode] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [following, setFollowing] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const follow = async (m: TeamMember) => {
-    if (!fix) return setError("Waiting for your GPS position.");
-    setError(null);
-    setFollowing(m.memberId);
-    try {
-      const plan = await fetchFollow(routeOrigin(fix), m.track, vehicle, roads);
-      const borough = boroughAt(m.lat, m.lng);
-      const id = log.record({
-        query: `Follow ${m.callsign}`,
-        chosen: `${m.callsign}'s way in`,
-        borough,
-        lat: m.lat,
-        lng: m.lng,
-      });
-      log.setRoute(id, "follow");
-      navigation.start(
-        "follow",
-        { standard: plan.route, police: plan.route },
-        { lat: m.lat, lng: m.lng, title: `${m.callsign}'s way in` },
-        { callsign: m.callsign, track: m.track },
-      );
-      router.push("/navigate");
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setFollowing(null);
-    }
-  };
+  const [copied, setCopied] = useState<"copied" | "failed" | null>(null);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(null), 3000);
+    return () => clearTimeout(t);
+  }, [copied]);
 
   if (!team.code) {
     return (
       <View style={styles.field}>
-        <Text style={styles.label}>Team</Text>
         <Text style={styles.meta}>
           On a job with others? See each other on the map, and follow a colleague’s way in to somewhere hard to find.
         </Text>
@@ -101,7 +83,7 @@ export function TeamSection() {
                 setTyped(t);
                 setBadCode(false);
               }}
-              placeholder="Team code"
+              placeholder="Paste the code or the whole message"
               placeholderTextColor={colors.muted}
               autoCapitalize="characters"
               autoCorrect={false}
@@ -109,6 +91,7 @@ export function TeamSection() {
               style={styles.input}
             />
             <Button label="Join" variant="primary" onPress={() => setBadCode(!team.join(typed))} />
+            <Button label="Cancel" onPress={() => setJoining(false)} />
           </View>
         ) : (
           <View style={styles.row}>
@@ -116,7 +99,9 @@ export function TeamSection() {
             <Button label="Join with a code" onPress={() => setJoining(true)} />
           </View>
         )}
-        {badCode && <Text style={styles.error}>That isn’t a team code: it’s 24 letters and numbers.</Text>}
+        {badCode && (
+          <Text style={styles.error}>No team code found: it’s 24 letters and numbers, in groups of four.</Text>
+        )}
         <Text style={styles.small}>
           Shares only while BlueRoute is open. Positions are encrypted on your phone; the server can’t read them. Not a
           force system: follow your force’s policy, and use your radio.
@@ -126,12 +111,32 @@ export function TeamSection() {
   }
 
   const others = team.members.filter((m) => !m.me);
+  // Three groups of four a line, so the whole code shows on a narrow phone.
+  const groups = team.code.split("-");
+  const lines = [groups.slice(0, 3).join(" "), groups.slice(3).join(" ")];
+  const share = async () => {
+    const message = shareMessage(team.code!);
+    if (Platform.OS !== "web") return void Share.share({ message });
+    const nav = navigator as Navigator & { share?: (d: { text: string }) => Promise<void> };
+    if (nav.share) {
+      try {
+        return await nav.share({ text: message });
+      } catch (e) {
+        // Closing the share sheet isn't a failure.
+        if ((e as Error).name === "AbortError") return;
+      }
+    }
+    setCopied((await copy(message)) ? "copied" : "failed");
+  };
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>Team</Text>
-      <Text style={styles.code} selectable numberOfLines={1} adjustsFontSizeToFit>
-        {team.code}
-      </Text>
+      <View style={styles.codeBox} accessible accessibilityLabel={`Team code ${team.code}`}>
+        {lines.map((l) => (
+          <Text key={l} style={styles.code} selectable>
+            {l}
+          </Text>
+        ))}
+      </View>
       <Text style={[styles.meta, (team.status === "ended" || team.status === "notfound") && styles.error]}>
         {STATUS[team.status] ?? ""}
         {team.expiresAt && team.status === "live"
@@ -139,15 +144,13 @@ export function TeamSection() {
           : ""}
       </Text>
       <View style={styles.row}>
-        <Button
-          label="Share code"
-          variant="primary"
-          onPress={() =>
-            void Share.share({
-              message: `Join my BlueRoute team. Code: ${team.code}`,
-            })
-          }
-        />
+        <Button label="Share code" variant="primary" onPress={() => void share()} />
+        {Platform.OS === "web" && (
+          <Button
+            label={copied === "copied" ? "Copied ✓" : "Copy code"}
+            onPress={() => void copy(team.code!).then((ok) => setCopied(ok ? "copied" : "failed"))}
+          />
+        )}
         {confirmLeave ? (
           <>
             <Button label="Yes, leave" variant="danger" onPress={team.leave} />
@@ -158,6 +161,8 @@ export function TeamSection() {
         )}
       </View>
 
+      {copied === "copied" && <Text style={styles.meta}>Copied. Paste it in a message to your colleagues.</Text>}
+      {copied === "failed" && <Text style={styles.error}>Couldn’t copy: press and hold the code to select it.</Text>}
       {others.length === 0 ? (
         <Text style={styles.meta}>Nobody else yet. Share the code with your colleagues.</Text>
       ) : (
@@ -172,6 +177,12 @@ export function TeamSection() {
                     .filter(Boolean)
                     .join(" · ")}
                 </Text>
+                {m.accuracy != null && (
+                  <Text style={roughFix(m.accuracy) ? styles.error : styles.meta}>
+                    GPS {accuracyText(m.accuracy)}
+                    {roughFix(m.accuracy) ? ": their position may be well off" : ""}
+                  </Text>
+                )}
               </View>
               {following === m.memberId ? (
                 <ActivityIndicator color={colors.amber} />
@@ -225,11 +236,20 @@ const baseStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
+  codeBox: {
+    backgroundColor: colors.panel,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 2,
+  },
   code: {
     color: colors.fg,
     fontFamily: fonts.mono,
-    fontSize: 20,
-    letterSpacing: 1,
+    fontSize: 22,
+    letterSpacing: 2,
   },
   member: {
     flexDirection: "row",

@@ -12,7 +12,7 @@ import { deleteMember, getMembers, NoTeamError, putMember } from "../api/teams";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
-import { formatCode, newTeamCode, normaliseCode, open, randomHex, seal, teamKeys } from "./crypto";
+import { codeIn, formatCode, newTeamCode, normaliseCode, open, randomHex, seal, teamKeys } from "./crypto";
 import { addFix, decodeTrack, encodeTrack, type TrackPoint } from "./track";
 
 export interface TeamMember {
@@ -23,6 +23,8 @@ export interface TeamMember {
   heading: number | null;
   /** When their phone took this position, ms since 1970. */
   at: number;
+  /** How far off their position may be, in metres; null if their app doesn't say. */
+  accuracy: number | null;
   /** Where they've driven lately, oldest first, ending where they are. */
   track: { lat: number; lng: number }[];
   me: boolean;
@@ -58,6 +60,8 @@ interface Shared {
   h: number | null;
   t: number;
   tr: number[];
+  /** Accuracy in metres (newer apps). */
+  a?: number;
 }
 
 const TeamContext = createContext<TeamValue | null>(null);
@@ -119,7 +123,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const create = useCallback(() => enter(normaliseCode(newTeamCode(random))!, true), [enter]);
   const join = useCallback(
     (typed: string) => {
-      const normalised = normaliseCode(typed);
+      const normalised = codeIn(typed);
       if (!normalised) return false;
       if (normalised !== code) enter(normalised, false);
       return true;
@@ -153,6 +157,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
             h: f.course,
             t: f.timestamp,
             tr: encodeTrack(track.current),
+            ...(f.accuracy != null ? { a: Math.round(f.accuracy) } : {}),
           };
           await putMember(teamId, me.current.memberId, me.current.token, seal(key, shared, random), starter.current);
         }
@@ -213,6 +218,7 @@ function toMember(memberId: string, raw: unknown, me: boolean): TeamMember | nul
     lng,
     heading: typeof s.h === "number" ? s.h : null,
     at: s.t,
+    accuracy: typeof s.a === "number" ? s.a : null,
     track: decodeTrack(s.tr),
     me,
   };
@@ -237,7 +243,17 @@ function teamPoints(members: TeamMember[], now: number): GeoJSON.FeatureCollecti
       .map((m) => ({
         type: "Feature",
         geometry: { type: "Point", coordinates: [m.lng, m.lat] },
-        properties: { name: m.callsign },
+        // A rough position says so on the map, and is drawn faint.
+        properties: { id: m.memberId, name: roughFix(m.accuracy) ? `${m.callsign} ${accuracyText(m.accuracy!)}` : m.callsign, rough: roughFix(m.accuracy) },
       })),
   };
+}
+
+/** Further off than this, a colleague's position is shown as rough. */
+const ROUGH_M = 250;
+export const roughFix = (accuracy: number | null) => accuracy != null && accuracy > ROUGH_M;
+
+/** "±40 m", "±13 km". */
+export function accuracyText(m: number): string {
+  return m < 1000 ? `±${Math.round(m)} m` : `±${Math.round(m / 1000)} km`;
 }
