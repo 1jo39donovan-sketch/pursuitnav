@@ -102,6 +102,10 @@ export default function NavigateScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
+  // A small phone held upright: a tighter turn card, so the map keeps half the screen.
+  const compact = !landscape && height < 760;
+  // Too narrow for the route badge beside the arrival time: it goes under the road.
+  const narrow = width < 400;
 
   const prepared = useMemo(() => (active ? prepare(active.route) : null), [active]);
   // The crew's own note on the block they're going to, if they wrote one (Search).
@@ -318,7 +322,9 @@ export default function NavigateScreen() {
     const reason = progress?.arrived ? "arrived" : "end";
     recorder.end(reason);
     stop(reason);
-    router.back();
+    // Opened straight from its address (web), there's nothing to go back to.
+    if (router.canGoBack()) router.back();
+    else router.replace("/search");
   };
 
   // Quick actions: one tap each, no second End tap needed.
@@ -373,7 +379,11 @@ export default function NavigateScreen() {
     return (
       <View style={[styles.screen, styles.empty]}>
         <Text style={styles.emptyText}>No route chosen.</Text>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.endButton}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/search"))}
+          style={styles.endButton}
+        >
           <Text style={styles.endText}>Back</Text>
         </Pressable>
       </View>
@@ -434,14 +444,16 @@ export default function NavigateScreen() {
       ) : (
         <>
           <View style={styles.turnRow}>
-            <Text style={styles.arrow}>{maneuverArrow(progress.next?.type ?? 4)}</Text>
-            <Text style={styles.distance}>{formatDistance(progress.distanceToNextM)}</Text>
+            <Text style={[styles.arrow, compact && styles.arrowCompact]}>{maneuverArrow(progress.next?.type ?? 4)}</Text>
+            <Text style={[styles.distance, compact && styles.distanceCompact]}>
+              {formatDistance(progress.distanceToNextM)}
+            </Text>
           </View>
-          <Text style={styles.instruction} numberOfLines={3}>
+          <Text style={[styles.instruction, compact && styles.instructionCompact]} numberOfLines={compact ? 2 : 3}>
             {progress.next ? instructionWithPlace(progress.next, active.destination.title) : "Continue to your destination."}
           </Text>
           {progress.after && (
-            <Text style={styles.then} numberOfLines={2}>
+            <Text style={styles.then} numberOfLines={compact ? 1 : 2}>
               Then {maneuverArrow(progress.after.type)} {instructionWithPlace(progress.after, active.destination.title)}
             </Text>
           )}
@@ -456,6 +468,13 @@ export default function NavigateScreen() {
     </View>
   );
 
+  const routeBadge = (
+    <Text style={[styles.badge, narrow && styles.badgeUnder, { color: routeColor, borderColor: routeColor }]}>
+      {isPolice
+        ? `BLUE LIGHT · ${"restrictions" in active.route ? active.route.restrictions.length : 0}`
+        : "STANDARD"}
+    </Text>
+  );
   // Two rows, so nothing has to squeeze: arrival time and road, then the buttons.
   const etaPanel = (
     <View style={[styles.bottom, { paddingBottom: insets.bottom + 10 }]}>
@@ -469,12 +488,13 @@ export default function NavigateScreen() {
             : "—"}
         </Text>
         <View style={styles.eta}>
-          <Text style={styles.etaMeta} numberOfLines={2}>
+          <Text style={styles.etaMeta} numberOfLines={1}>
             {progress ? `${formatMinutes(progress.remainingS)} · ${formatDistance(progress.remainingM)}` : ""}
           </Text>
-          <Text style={styles.road} numberOfLines={2}>
+          <Text style={styles.road} numberOfLines={narrow ? 1 : 2}>
             On {(progress && roadLabel(progress.current.streetNames)) ?? "—"}
           </Text>
+          {narrow && routeBadge}
           {/* The crew's note on the block, as they get close. */}
           {blockNote && progress && !progress.arrived && progress.remainingM < NOTE_WITHIN_M && (
             <Text style={styles.blockNote} numberOfLines={2}>
@@ -482,11 +502,7 @@ export default function NavigateScreen() {
             </Text>
           )}
         </View>
-        <Text style={[styles.badge, { color: routeColor, borderColor: routeColor }]}>
-          {isPolice
-            ? `BLUE LIGHT · ${"restrictions" in active.route ? active.route.restrictions.length : 0}`
-            : "STANDARD"}
-        </Text>
+        {!narrow && routeBadge}
       </View>
       <View style={styles.buttons}>
         <Pressable
@@ -782,6 +798,7 @@ const baseStyles = StyleSheet.create({
   turnOff: { backgroundColor: "#2a1d0a" },
   turnRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   arrow: { color: colors.amber, fontSize: 56, lineHeight: 64, fontWeight: "700" },
+  arrowCompact: { fontSize: 42, lineHeight: 48 },
   distance: {
     color: colors.fg,
     fontFamily: fonts.displayBold,
@@ -789,6 +806,7 @@ const baseStyles = StyleSheet.create({
     lineHeight: 58,
     fontVariant: ["tabular-nums"],
   },
+  distanceCompact: { fontSize: 42, lineHeight: 48 },
   noSignal: { color: colors.amber },
   smallArrow: { color: colors.amber, fontSize: 26, fontWeight: "700" },
   linkBanner: {
@@ -803,6 +821,7 @@ const baseStyles = StyleSheet.create({
     overflow: "hidden",
   },
   instruction: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26, lineHeight: 30 },
+  instructionCompact: { fontSize: 22, lineHeight: 26 },
   then: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
   bottom: {
@@ -833,6 +852,7 @@ const baseStyles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
+  badgeUnder: { alignSelf: "flex-start", marginTop: 4 },
   buttons: { flexDirection: "row", gap: 8, alignItems: "stretch" },
   voiceButton: {
     width: 56,

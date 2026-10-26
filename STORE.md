@@ -28,7 +28,7 @@ Charging officers nothing is fine on both stores: list it as a free app.
 - **Don't use Met or police branding.** Don't use the Met name, crest or logos, and don't say "official". The listing below says it's independent and lists the police route as needing the user's declaration. Apple and Google both reject apps that look as if they're from an organisation they aren't.
 - **The name.** "BlueRoute" may already be taken on one of the stores. If it is, use "BlueRoute Patrol" (only the name on the store changes).
 - **The server is up** at `api.bluerouteapp.com`, and the privacy, support and terms pages the stores ask for are at `https://bluerouteapp.com/privacy`, `/support` and `/terms`.
-- **Contact address.** Google emails the listing's contact address, so `support@bluerouteapp.com` must receive mail (it's the app's "Report a problem" address too). To show it on the privacy and support pages, add the GitHub variable `CONTACT_EMAIL` and run **Deploy server** with **recreate** ticked. Without it, the pages point to GitHub issues.
+- **Contact address.** Google emails the listing's contact address. `support@bluerouteapp.com` receives mail (checked 26 October: it forwards to the hello@ inbox at Purelymail), and it's the app's "Report a problem" address too. To show it on the privacy and support pages, add the GitHub variable `CONTACT_EMAIL` and run **Deploy server** with **recreate** ticked. Without it, the pages point to GitHub issues.
 
 ## One-off setup
 
@@ -109,7 +109,7 @@ Checked 25 October 2026 against the app as it is now. The privacy policy, suppor
 | **Support URL** | `https://bluerouteapp.com/support` | Website: `https://bluerouteapp.com` |
 | **Marketing URL** (optional) | `https://bluerouteapp.com` | |
 | **Contact email** | | `support@bluerouteapp.com` (it must receive mail: Google emails it) |
-| **Copyright** | © 2026 your full name | |
+| **Copyright** | © 2026 *your legal name* (fill in) | |
 | **Bundle ID / package** | `com.blueroute.patrol` | `com.blueroute.patrol` |
 
 The name under the icon on the phone stays **BlueRoute**. If the name is taken in either store, use "BlueRoute Patrol – Sat Nav" (26 characters).
@@ -139,7 +139,7 @@ blue light,emergency,police,ambulance,fire,satnav,bus lane,pursuit,postcode,999,
 > TWO ROUTES, YOUR CHOICE
 > Every search gives journey times from where you are now, sized to your vehicle (car to fire appliance) so it never sends you under a low bridge or down a road too narrow. A blue-light route that uses bus lanes and bus gates and ignores turn restrictions is offered beside the standard route when it's meaningfully faster. It never goes the wrong way down a one-way street, and it lists every restriction it relies on. You choose; it never routes through a restriction without telling you. Roads TfL lists as closed are avoided automatically.
 >
-> TO THE DOOR
+> TO THE DOOR *(paste only once building entrances are live, after the weekly map build around 31 October; otherwise leave this paragraph out)*
 > Where the map knows the way into a block, the route ends at the entrance, not the middle of the building. Keep your own notes on blocks and estates.
 >
 > TURN-BY-TURN
@@ -191,7 +191,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 
 ### Screenshots
 
-The PM's six (`site/screenshots/`, 440 × 956) are the right *pictures*, in the right order, but not the right *sizes*: they're taken at 1× and are slightly taller than 2:1, which Google refuses. They need taking again at these sizes (the PM prompt has the steps). Use **Demo drive** so no real job addresses appear.
+The PM took both sets at these sizes on 26 October (round 5). Retake the Android route-choice and navigation shots after the 26 October layout fixes, which stop the times being cut off at that size. Use **Demo drive** so no real job addresses appear, and take Session from the top of the page.
 
 | Store | Slot | Size (pixels) | How many |
 |---|---|---|---|

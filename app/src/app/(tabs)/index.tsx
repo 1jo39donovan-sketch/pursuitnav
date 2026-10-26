@@ -210,10 +210,16 @@ export default function SessionScreen() {
         onPress={() => router.push({ pathname: "/area", params: areaCode ? { code: areaCode } : {} })}
         style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
       >
-        <Text style={styles.logText}>
-          {areaName} {police && bcu && <Text style={styles.logMeta}>{bcu.code}</Text>}
-        </Text>
-        <Text style={styles.logMeta}>{areaWhat} ›</Text>
+        {/* Name above what's in it, so a long BCU name doesn't squeeze either on a narrow phone. */}
+        <View style={styles.areaText}>
+          <Text style={styles.logText} numberOfLines={1}>
+            {areaName} {police && bcu && <Text style={styles.logMeta}>{bcu.code}</Text>}
+          </Text>
+          <Text style={styles.logMeta} numberOfLines={1}>
+            {areaWhat}
+          </Text>
+        </View>
+        <Text style={styles.chevron}>›</Text>
       </Pressable>
 
       <View style={styles.field}>
@@ -474,6 +480,8 @@ const baseStyles = StyleSheet.create({
   },
   logText: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 20 },
   logMeta: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
+  areaText: { flex: 1, minWidth: 0, paddingVertical: 8 },
+  chevron: { color: colors.muted, fontFamily: fonts.body, fontSize: 24, paddingLeft: 8 },
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26 },
   hint: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
   field: { gap: 10 },
