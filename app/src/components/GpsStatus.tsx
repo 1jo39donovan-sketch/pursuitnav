@@ -28,6 +28,23 @@ export function webDeniedText(device: WebDevice): string {
       return "Location is blocked for this site. Click the icon left of the address → Site settings → Location → Allow. Then reload.";
   }
 }
+/** Further off than this, the phone is guessing from Wi-Fi or masts: usually Precise Location is off. */
+export const ROUGH_GPS_M = 1000;
+/** What to say about a rough position, and how to fix it, for where BlueRoute is running. */
+export function roughGpsText(accuracy: number, where: WebDevice | "app"): string {
+  const off = accuracy < 10_000 ? `±${(accuracy / 1000).toFixed(1)} km` : `±${Math.round(accuracy / 1000)} km`;
+  const start = `GPS ${off}: your position is only a rough guess.`;
+  switch (where) {
+    case "iphone":
+      return `${start} Settings → Privacy & Security → Location Services → Safari Websites → turn on Precise Location. Then reload.`;
+    case "android":
+      return `${start} Tap the icon left of the address → Permissions → Location → Use precise location. Then reload.`;
+    case "desktop":
+      return `${start} Computers without GPS place themselves by Wi-Fi. Use a phone for real routes.`;
+    case "app":
+      return `${start} Turn on Precise Location for BlueRoute in Settings.`;
+  }
+}
 const device = (): WebDevice => webDevice(typeof navigator === "undefined" ? "" : navigator.userAgent);
 const reload = () => window.location.reload();
 
@@ -121,6 +138,17 @@ export function GpsStatus() {
   }
   // A good position needs no line on screen: the map's space is worth more.
   if (fix.accuracy != null && fix.accuracy <= 50) return null;
+  if (fix.accuracy != null && fix.accuracy > ROUGH_GPS_M) {
+    return WEB ? (
+      <Banner tone="warn" text={roughGpsText(fix.accuracy, device())}>
+        {device() !== "desktop" && <Action label="Reload" onPress={reload} />}
+      </Banner>
+    ) : (
+      <Banner tone="warn" text={roughGpsText(fix.accuracy, "app")}>
+        <Action label="Settings" onPress={() => Linking.openSettings()} />
+      </Banner>
+    );
+  }
   const accuracy = fix.accuracy != null ? `±${Math.round(fix.accuracy)} m` : "accuracy unknown";
   return <Banner tone="warn" text={`GPS ${accuracy}: position may be off`} />;
 }

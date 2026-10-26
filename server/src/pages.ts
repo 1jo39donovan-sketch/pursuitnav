@@ -3,7 +3,7 @@
 
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
 // Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
-const UPDATED = "25 October 2026";
+const UPDATED = "26 October 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -93,8 +93,8 @@ under “Usage counts” below.</p>
 has no database of users. Connections use HTTPS.</p>
 
 <h2>Team sessions (only if you start or join one)</h2>
-<p>In a team, while BlueRoute is open, your phone shares your callsign, position and the way you’ve driven in the last
-two hours with the others in the team, every 15 seconds. It’s encrypted on your phone with a key that’s part of the team
+<p>In a team, while BlueRoute is open, your phone shares your callsign, position (and how accurate it is) and the way you’ve
+driven in the last two hours with the others in the team, every 15 seconds. It’s encrypted on your phone with a key that’s part of the team
 code and is never sent to the server, so the server holds only data it can’t read. It keeps that in memory only (a
 restart forgets it), drops your entry when you leave or a day after you stop sharing, and ends the team after a week.
 Anyone you give the team code to can see your position, so share it only with colleagues on the job.</p>

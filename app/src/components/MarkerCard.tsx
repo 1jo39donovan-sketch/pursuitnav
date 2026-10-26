@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, fonts } from "../theme";
 import type { MarkerProperties } from "./mapShared";
@@ -9,10 +9,14 @@ interface Props {
   away?: string;
   onRoute: () => void;
   onClose: () => void;
+  /** More about it, a line each; a warning line in amber. */
+  lines?: { text: string; warn?: boolean }[];
+  /** A second way there, beside Route here (Follow in, for a colleague). */
+  other?: { label: string; onPress: () => void; busy?: boolean };
 }
 
 /** What a tapped place marker is, with a way to route there. */
-export function MarkerCard({ marker, away, onRoute, onClose }: Props) {
+export function MarkerCard({ marker, away, onRoute, onClose, lines, other }: Props) {
   const styles = useTextStyles(baseStyles);
   return (
     <View style={styles.card}>
@@ -26,9 +30,34 @@ export function MarkerCard({ marker, away, onRoute, onClose }: Props) {
       </View>
       <Text style={styles.name}>{marker.name}</Text>
       <Text style={styles.detail}>{[marker.address, marker.borough].filter(Boolean).join(" · ")}</Text>
-      <Pressable accessibilityRole="button" onPress={onRoute} style={({ pressed }) => [styles.route, pressed && { opacity: 0.85 }]}>
-        <Text style={styles.routeText}>Route here</Text>
-      </Pressable>
+      {lines?.map((l) => (
+        <Text key={l.text} style={[styles.detail, l.warn && styles.warn]}>
+          {l.text}
+        </Text>
+      ))}
+      <View style={styles.buttons}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onRoute}
+          style={({ pressed }) => [styles.route, pressed && { opacity: 0.85 }]}
+        >
+          <Text style={styles.routeText}>Route here</Text>
+        </Pressable>
+        {other && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={other.onPress}
+            disabled={other.busy}
+            style={({ pressed }) => [styles.route, styles.otherButton, pressed && { opacity: 0.85 }]}
+          >
+            {other.busy ? (
+              <ActivityIndicator color={colors.fg} />
+            ) : (
+              <Text style={[styles.routeText, styles.otherText]}>{other.label}</Text>
+            )}
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
@@ -54,6 +83,10 @@ const baseStyles = StyleSheet.create({
   closeText: { color: colors.muted, fontSize: 16 },
   name: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 22 },
   detail: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
-  route: { backgroundColor: colors.amber, borderRadius: 8, paddingVertical: 10, alignItems: "center", marginTop: 6 },
+  warn: { color: colors.amber, fontFamily: fonts.bodyMedium },
+  buttons: { flexDirection: "row", gap: 8, marginTop: 6 },
+  route: { flex: 1, backgroundColor: colors.amber, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
+  otherButton: { backgroundColor: colors.panel, borderColor: colors.line, borderWidth: 1 },
+  otherText: { color: colors.fg },
   routeText: { color: "#1a1200", fontFamily: fonts.displayBold, fontSize: 16, letterSpacing: 1, textTransform: "uppercase" },
 });

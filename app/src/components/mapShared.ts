@@ -70,6 +70,8 @@ export interface LiveMapProps {
   /** Place markers (points with MarkerProperties). */
   markers?: GeoJSON.FeatureCollection | null;
   onMarkerPress?: (marker: MarkerProperties, point: LngLat) => void;
+  /** A tap on a colleague's dot: their member ID. */
+  onTeamPress?: (memberId: string) => void;
 }
 
 /** Glyph font for marker labels; OpenFreeMap's styles serve Noto Sans. */
@@ -281,9 +283,12 @@ export function labelPaint(theme: "night" | "day"): SymbolLayerSpecification["pa
 export const TEAM_COLOR = "#22c55e";
 export const TEAM_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
   "circle-color": TEAM_COLOR,
-  "circle-radius": 7,
+  "circle-radius": 9,
   "circle-stroke-color": "#ffffff",
   "circle-stroke-width": 2,
+  // A rough position (a phone without a good fix) is drawn faint.
+  "circle-opacity": ["case", ["boolean", ["get", "rough"], false], 0.45, 1],
+  "circle-stroke-opacity": ["case", ["boolean", ["get", "rough"], false], 0.45, 1],
 };
 export const TEAM_LABEL_LAYOUT: SymbolLayerSpecification["layout"] = {
   "text-field": ["get", "name"],

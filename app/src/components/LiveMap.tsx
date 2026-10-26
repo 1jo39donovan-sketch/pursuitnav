@@ -89,6 +89,7 @@ export function LiveMap({
   fitTo,
   markers,
   onMarkerPress,
+  onTeamPress,
 }: LiveMapProps) {
   const { fix, facing } = useLocation();
   const { mapTheme, mapLook } = useSession();
@@ -281,7 +282,17 @@ export function LiveMap({
         <GeoJSONSource id="labels" data={labels ?? EMPTY_COLLECTION}>
           <Layer type="symbol" id="block-labels" minzoom={15} layout={LABEL_LAYOUT} paint={labelPaint(mapTheme)} />
         </GeoJSONSource>
-        <GeoJSONSource id="team" data={team ?? EMPTY_COLLECTION}>
+        <GeoJSONSource
+          id="team"
+          data={team ?? EMPTY_COLLECTION}
+          hitbox={{ top: 16, right: 16, bottom: 16, left: 16 }}
+          onPress={(e) => {
+            const id = e.nativeEvent.features[0]?.properties?.id;
+            if (typeof id !== "string" || !onTeamPress) return;
+            markerPressedAt.current = Date.now();
+            onTeamPress(id);
+          }}
+        >
           <Layer type="circle" id="team-dot" paint={TEAM_CIRCLE_PAINT} />
           <Layer type="symbol" id="team-label" layout={TEAM_LABEL_LAYOUT} paint={teamLabelPaint(mapTheme)} />
         </GeoJSONSource>

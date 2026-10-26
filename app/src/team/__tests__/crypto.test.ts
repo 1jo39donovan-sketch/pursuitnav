@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-import { formatCode, newTeamCode, normaliseCode, open, seal, teamKeys } from "../crypto";
+import { codeIn, formatCode, newTeamCode, normaliseCode, open, seal, teamKeys } from "../crypto";
 
 const random = (n: number) => new Uint8Array(randomBytes(n));
 
@@ -15,6 +15,9 @@ describe("team codes", () => {
     const typed = formatCode(code).toLowerCase().replace(/-/g, " ").replace(/0/g, "o");
     expect(normaliseCode(typed)).toBe(code);
     expect(normaliseCode("ABCD")).toBeNull();
+    // A whole shared message pasted in still joins.
+    expect(codeIn(`Join my BlueRoute team.\nCode: ${formatCode(code)}`)).toBe(code);
+    expect(codeIn("Join my BlueRoute team, no code here")).toBeNull();
   });
 
   it("give the same team ID and key to everyone, and a different team to another code", () => {

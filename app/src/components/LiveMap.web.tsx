@@ -84,6 +84,7 @@ export function LiveMap({
   fitTo,
   markers,
   onMarkerPress,
+  onTeamPress,
 }: LiveMapProps) {
   const { fix, facing } = useLocation();
   const { mapTheme, mapLook } = useSession();
@@ -110,11 +111,13 @@ export function LiveMap({
   const longPress = useRef(onLongPress);
   const tap = useRef(onPress);
   const markerPress = useRef(onMarkerPress);
+  const teamPress = useRef(onTeamPress);
   useEffect(() => {
     longPress.current = onLongPress;
     tap.current = onPress;
     markerPress.current = onMarkerPress;
-  }, [onLongPress, onPress, onMarkerPress]);
+    teamPress.current = onTeamPress;
+  }, [onLongPress, onPress, onMarkerPress, onTeamPress]);
 
   // New points to show: stop following so the camera can frame them.
   const [lastFitTo, setLastFitTo] = useState(fitTo);
@@ -346,6 +349,16 @@ export function LiveMap({
     m.on("click", (e) => {
       if (Date.now() - longAt < 800) return;
       if (m.getLayer("places-dot") && m.queryRenderedFeatures(e.point, { layers: ["places-dot"] }).length) return;
+      // A colleague's dot (a finger's width around it) opens their card instead.
+      const near: [[number, number], [number, number]] = [
+        [e.point.x - 14, e.point.y - 14],
+        [e.point.x + 14, e.point.y + 14],
+      ];
+      const mate = m.getLayer("team-dot") ? m.queryRenderedFeatures(near, { layers: ["team-dot"] })[0] : undefined;
+      if (mate && typeof mate.properties?.id === "string" && teamPress.current) {
+        teamPress.current(mate.properties.id);
+        return;
+      }
       const at: [number, number] = [e.lngLat.lng, e.lngLat.lat];
       const r = HOUSE_NUMBER_TAP_PX;
       const numbers = m.getLayer(HOUSE_NUMBER_LAYER)

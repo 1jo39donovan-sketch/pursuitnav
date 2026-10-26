@@ -45,7 +45,10 @@ import type { PlaceGroup } from "../../search/places";
 import { useSearch } from "../../search/SearchProvider";
 import { useAddressLookup } from "../../search/useAddressLookup";
 import { useSession } from "../../session/SessionProvider";
-import { useTeam } from "../../team/TeamProvider";
+import { accuracyText, roughFix, useTeam } from "../../team/TeamProvider";
+import { useFollowIn } from "../../team/useFollowIn";
+import { ago, useNow } from "../../components/TeamSection";
+import { TEAM_COLOR } from "../../components/mapShared";
 import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
 import { recordEvent } from "../../usage/usage";
@@ -84,7 +87,7 @@ export default function SearchScreen() {
   // Height of the floating search box (and any notes under it), from the top of the screen.
   const [topSpace, setTopSpace] = useState(insets.top + 72);
   const { boroughs, policeRoutes, vehicle, roads, mapView } = useSession();
-  const { mapPoints: teamMap } = useTeam();
+  const { mapPoints: teamMap, members: teamMembers } = useTeam();
   const { data, search, places, blockLabels, area: searchArea } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
@@ -548,6 +551,12 @@ export default function SearchScreen() {
     return out;
   }, [entries]);
 
+  // A colleague tapped on the map: their card, with when and how well they were last placed.
+  const [mateId, setMateId] = useState<string | null>(null);
+  const mate = mateId ? (teamMembers.find((m) => m.memberId === mateId) ?? null) : null;
+  const followIn = useFollowIn();
+  const now = useNow();
+
   return (
     <View style={styles.screen}>
       {/* No app header: the map fills the screen and the search box floats on it. */}
@@ -579,7 +588,12 @@ export default function SearchScreen() {
           // Not over the routes: the place chooser (the dots' key) is hidden then too.
           markers={showResults || destination ? null : markers}
           onMarkerPress={(marker, point) => setTapped({ marker, point })}
-          onPress={destination || showResults ? undefined : whatsHere}
+          onTeamPress={(id) => {
+            setTapped(null);
+            setMateId(id);
+          }}
+          // A tap elsewhere puts a colleague's card away first.
+          onPress={destination || showResults ? undefined : (p, n) => (mateId ? setMateId(null) : whatsHere(p, n))}
         />
         {!showResults && !destination && (
           <View style={[styles.belowBar, { top: topSpace - 4 }]} pointerEvents="box-none">
@@ -604,6 +618,43 @@ export default function SearchScreen() {
               setQuery(title);
               choose({ point, title, findEntrance: exact }, "", marker.borough);
             }}
+          />
+        )}
+        {mate && !destination && !showResults && (
+          <MarkerCard
+            marker={{
+              name: mate.callsign,
+              type: "Team",
+              address: "",
+              borough: boroughAt(mate.lat, mate.lng) ?? "",
+              color: TEAM_COLOR,
+            }}
+            away={fix ? formatDistance(distanceM(fix, mate)) : undefined}
+            lines={[
+              {
+                text: `Updated ${ago(now - mate.at)} (${new Date(mate.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })})`,
+                warn: now - mate.at > 5 * 60_000,
+              },
+              mate.accuracy != null
+                ? {
+                    text: `GPS ${accuracyText(mate.accuracy)}${roughFix(mate.accuracy) ? ": their position may be well off" : ""}`,
+                    warn: roughFix(mate.accuracy),
+                  }
+                : { text: "GPS accuracy not shared (older app)" },
+              ...(followIn.error ? [{ text: followIn.error, warn: true }] : []),
+            ]}
+            onClose={() => setMateId(null)}
+            onRoute={() => {
+              setMateId(null);
+              const title = `${mate.callsign} (last seen ${new Date(mate.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })})`;
+              setQuery(title);
+              choose({ point: [mate.lng, mate.lat], title }, "", boroughAt(mate.lat, mate.lng));
+            }}
+            other={
+              mate.track.length >= 2
+                ? { label: "Follow in", onPress: () => void followIn.follow(mate), busy: followIn.following === mate.memberId }
+                : undefined
+            }
           />
         )}
         {typing && !destination && !showResults && !tapped && (quick.length > 0 || favourites.length > 0 || recent.length > 0) && (
