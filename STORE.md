@@ -1,6 +1,6 @@
 # Getting BlueRoute onto the App Store and Google Play
 
-Plan written 10 October 2026, for officers installing it from the stores by **Friday 23 October**.
+Plan written 10 October 2026; listing, privacy answers and launch plan updated 25 October 2026.
 
 ## What's realistic in 14 days
 
@@ -27,8 +27,8 @@ Charging officers nothing is fine on both stores: list it as a free app.
 - **Use a personal developer account.** Your name will show as the seller. An organisation account needs a D-U-N-S number, which can take weeks.
 - **Don't use Met or police branding.** Don't use the Met name, crest or logos, and don't say "official". The listing below says it's independent and lists the police route as needing the user's declaration. Apple and Google both reject apps that look as if they're from an organisation they aren't.
 - **The name.** "BlueRoute" may already be taken on one of the stores. If it is, use "BlueRoute Patrol" (only the name on the store changes).
-- **The server must be up first** (DEPLOY.md). The stores need the privacy policy at `https://SERVER_DOMAIN/privacy`.
-- **Optionally set a contact address.** In GitHub, add the variable `CONTACT_EMAIL` (for example a new Gmail address just for BlueRoute) so it appears on the privacy and support pages, then run **Deploy server** with **recreate** ticked. Without it, the pages point to GitHub issues.
+- **The server is up** at `api.bluerouteapp.com`, and the privacy, support and terms pages the stores ask for are at `https://bluerouteapp.com/privacy`, `/support` and `/terms`.
+- **Contact address.** Google emails the listing's contact address, so `support@bluerouteapp.com` must receive mail (it's the app's "Report a problem" address too). To show it on the privacy and support pages, add the GitHub variable `CONTACT_EMAIL` and run **Deploy server** with **recreate** ticked. Without it, the pages point to GitHub issues.
 
 ## One-off setup
 
@@ -45,9 +45,9 @@ Charging officers nothing is fine on both stores: list it as a free app.
    1. On the repository page on GitHub, click **Code → Codespaces → Create codespace** (free).
    2. In the terminal that opens, run:
       ```
-      bash app/scripts/setup-ios.sh blueroute-yourname.duckdns.org
+      bash app/scripts/setup-ios.sh api.bluerouteapp.com
       ```
-      (your SERVER_DOMAIN).
+      (the server's address).
    3. Sign in to Expo, then to Apple, and say yes when it offers to create the certificate, provisioning profile and app.
    4. The build takes about 20–30 minutes, then goes to TestFlight.
 3. In [App Store Connect](https://appstoreconnect.apple.com), open the new app. The number in the address after `/apps/` is its **App ID**.
@@ -94,131 +94,195 @@ Version numbers count up automatically.
 
 Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code reach store installs over the air too (DEPLOY.md, "App updates"), within the stores' rules for updates that fix and improve the app without changing what it is. A new store build is needed only when the App update summary says the change is native, or to change the listing.
 
-## Store listing
+## Store listing (ready to paste)
 
-**Name (both stores, 30 characters):** BlueRoute – Response Sat Nav. The name under the icon on the phone stays **BlueRoute**. The store name can be changed later: Google Play at any time, Apple with the next version sent for review.
-**Subtitle (Apple, 30 characters):** Blue-light navigation
-**Short description (Google, 80 characters):** Blue-light navigation for emergency services: police, ambulance and fire.
-**Category:** Navigation (Apple) / Maps & Navigation (Google)
-**Price:** Free · no in-app purchases (for now)
-**Age rating:** 4+ / Everyone (no objectionable content). Target audience on Google: 18 and over.
-**Privacy policy:** `https://SERVER_DOMAIN/privacy`
-**Support URL:** `https://SERVER_DOMAIN/support`
+Checked 25 October 2026 against the app as it is now. The privacy policy, support page and terms are live at `https://bluerouteapp.com/privacy`, `/support` and `/terms` (the same pages are on `https://api.bluerouteapp.com`).
 
-**Description:**
+| Field | Apple (App Store Connect) | Google (Play Console) |
+|---|---|---|
+| **Name** (30 max) | BlueRoute – Response Sat Nav | BlueRoute – Response Sat Nav |
+| **Subtitle** (Apple, 30 max) | Blue-light navigation | |
+| **Short description** (Google, 80 max) | | Blue-light navigation for emergency services: police, ambulance and fire. |
+| **Category** | Navigation (secondary: Utilities) | Maps & Navigation |
+| **Price** | Free, no in-app purchases | Free, no in-app purchases, no ads |
+| **Privacy policy URL** | `https://bluerouteapp.com/privacy` | `https://bluerouteapp.com/privacy` |
+| **Support URL** | `https://bluerouteapp.com/support` | Website: `https://bluerouteapp.com` |
+| **Marketing URL** (optional) | `https://bluerouteapp.com` | |
+| **Contact email** | | `support@bluerouteapp.com` (it must receive mail: Google emails it) |
+| **Copyright** | © 2026 your full name | |
+| **Bundle ID / package** | `com.blueroute.patrol` | `com.blueroute.patrol` |
 
-> BlueRoute is blue-light navigation built for emergency services (police, ambulance and fire), around crews' needs rather than a general sat-nav.
+The name under the icon on the phone stays **BlueRoute**. If the name is taken in either store, use "BlueRoute Patrol – Sat Nav" (26 characters).
+
+**Keywords** (Apple, 100 max, commas, no spaces):
+
+```
+blue light,emergency,police,ambulance,fire,satnav,bus lane,pursuit,postcode,999,response,officer
+```
+
+**What's new** (first release): `First release.`
+
+**Promotional text** (Apple, 170 max, can change any time without review):
+
+> Built with crews on London's roads: search the way control gives it, two routes side by side, big turn-by-turn and a pursuit screen. No account, no tracking.
+
+**Description** (both stores, 4,000 max; this is about 2,600):
+
+> BlueRoute is blue-light navigation built for emergency services (police, ambulance and fire), around crews' needs rather than a general sat nav. It's made for the operator in the passenger seat: big text, few taps, spoken directions.
 >
 > SEARCH THE WAY CONTROL GIVES IT
-> Type what the control room says: a road, "54 Caledonian Rd", "Flat 3, 54 Caledonian Road", a postcode, an outward code like N7, or an estate or block by name. Misspellings are forgiven. Pick the boroughs you're working at the start of a shift and their results come first, so you get the right Church Street first time. Road search works with no signal.
+> Type what the control room says: a road, "54 Caledonian Rd", "Flat 3, 54 Caledonian Road", a postcode, an outward code like N7, or an estate or block by name. Misspellings and nicknames are forgiven ("Cally Road"). Pick the boroughs you're working at the start of a shift and their results come first, so you get the right Church Street first time. Recent and favourite places sit at the top, and road search works with no signal.
 >
-> PLACES
-> Find shops, cafés, takeaways, pubs, schools, parks, stations, health services and more by name, or list every one of a kind in your boroughs. Shown on the map, and searchable offline.
+> PLACES AND THE NEAREST A&E
+> Find shops, cafés, takeaways, pubs, schools, parks, stations, hospitals and more by name, or list every one of a kind in your boroughs. One tap for the nearest A&E. Tap any building on the map for its address and a route there.
 >
 > TWO ROUTES, YOUR CHOICE
-> Every search gives journey times from where you are now. Police drivers can turn on a second route that uses bus lanes and bus gates and ignores turn restrictions, never the wrong way down a one-way street, shown only when it's meaningfully faster and always listing each restriction it relies on. You choose; it never routes through a restriction without telling you.
+> Every search gives journey times from where you are now, sized to your vehicle (car to fire appliance) so it never sends you under a low bridge or down a road too narrow. A blue-light route that uses bus lanes and bus gates and ignores turn restrictions is offered beside the standard route when it's meaningfully faster. It never goes the wrong way down a one-way street, and it lists every restriction it relies on. You choose; it never routes through a restriction without telling you. Roads TfL lists as closed are avoided automatically.
+>
+> TO THE DOOR
+> Where the map knows the way into a block, the route ends at the entrance, not the middle of the building. Keep your own notes on blocks and estates.
 >
 > TURN-BY-TURN
-> Large, glanceable directions for the operator, with automatic re-routing. Or hand over to Google Maps or Waze.
+> Large, glanceable directions with spoken turns, which side the destination is on, automatic re-routing, and a map that carries on with no signal (download the offline map on Wi-Fi). Day and night maps, heading-up or 3D, a larger text setting, and an Ordnance Survey map style. Or hand over to Google Maps or Waze.
 >
 > PURSUIT SCREEN
-> Speed, the road's speed limit (or "—" when it isn't known, never a guess), road name, heading, borough, next junction and the area you're heading towards, with a heading-up map. Updates every second, keeps the screen awake.
+> Speed, the road's speed limit (or "—" when it isn't known, never a guess), road name, heading, borough, next junction and the area you're heading towards, with a heading-up map. Updates every second and keeps the screen awake.
+>
+> WHERE AM I
+> Your nearest address, postcode, OS grid reference and how accurate the fix is, ready to read out or share.
+>
+> TEAM SESSIONS
+> Opt in, share a code, and see colleagues on the map while the app is open. Follow in along a colleague's track. End-to-end encrypted: the server can't read it.
 >
 > LOG
 > Every search and route picked is kept on your phone until you clear it.
 >
 > PRIVATE BY DESIGN
-> No accounts and no third-party analytics. Addresses and your log stay on your phone; the server works out routes without keeping anything.
+> No accounts, no ads and no third-party analytics. Addresses and your log stay on your phone; the server works out routes without logging them.
 >
-> BlueRoute is independent and is not affiliated with or endorsed by any police, ambulance or fire service. Blue-light routes are for emergency-service drivers using the exemptions only. Maps and search start in London, with more areas to come.
+> BlueRoute is independent and is not affiliated with or endorsed by any police, ambulance or fire service. Blue-light routes are for emergency-service drivers using the exemptions only, and can be turned off. Maps and search cover London for now, with more areas to come.
 
-**Keywords (Apple, 100 characters):** `blue light,emergency,police,ambulance,fire,satnav,route,bus lane,pursuit,address,postcode,navigation`
+### Notes for the reviewers (Apple "App Review Information"; Google "App access")
 
-**What's new (first release):** First release.
-
-### Notes for the reviewers (App Review Information / App access)
+Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes**. Google: choose **All functionality is available without any access restrictions**, then paste the same text into **Instructions** anyway so the reviewer knows about Demo drive.
 
 > BlueRoute is blue-light navigation for emergency services (police, ambulance and fire). Maps and search cover London for now. No account or login is needed.
 >
-> To try it outside London: on the Session tab, turn on "Demo drive". It simulates driving through north London, so search, routes, turn-by-turn and the Pursuit tab all work. For example, search "Caledonian Road" or "N7", pick a result, and compare the routes.
+> To try it outside London: on the Session tab, turn on "Demo drive". It simulates driving through north London, so search, routes, turn-by-turn and the Pursuit tab all work. For example, search "Caledonian Road" or "N7", pick a result, and compare the two routes.
 >
-> The second "Blue light" route (bus lanes, bus gates, ignoring turn restrictions, never against one-way streets) is on by default, by design: the app is for emergency-service drivers using the emergency exemptions. It can be turned off on the Session tab, and then the app gives standard, fully legal routes only. The standard route is always offered beside it; when a blue-light route is shown, every restriction it uses is listed and the user chooses.
+> The "Blue light" route (bus lanes, bus gates, ignoring turn restrictions, never against one-way streets) is on by default, by design: the app is for emergency-service drivers using the legal exemptions, and the first launch asks the user to accept terms that say so. It can be turned off on the Session tab, and then the app gives standard, fully legal routes only. The standard route is always offered beside it; when a blue-light route is shown, every restriction it uses is listed and the user chooses.
 >
 > The app is independent and not affiliated with any police, ambulance or fire service. Location is used only while the app is open.
 
-Google's **App access** question: choose "All or some functionality is restricted" and paste the same text, so the reviewer knows how to see police routes.
+### Other questions in the forms
+
+**Apple**
+
+- **Age rating** (questionnaire): answer **None / No** to every question, including unrestricted web access, user-generated content and messaging (team sessions only share a position and callsign with people who have the code; there's no chat). Result: 4+.
+- **Encryption** (export compliance): already answered in the app (`ITSAppUsesNonExemptEncryption: false`), so App Store Connect won't ask. The app uses HTTPS and, for team sessions, standard published ciphers to protect users' own data; nothing proprietary. If Apple does ask, say it uses only standard encryption and no proprietary algorithms.
+- **Content rights**: "Does your app contain, show, or access third-party content?" **Yes**, and confirm you have the rights: OpenStreetMap (ODbL), Ordnance Survey OpenData (Open Government Licence) and TfL open data (credited in the app).
+- **Advertising identifier (IDFA)**: **No**.
+
+**Google**
+
+- **Ads**: No. **Target audience**: 18 and over only. **News app**: No. **Government app**: No (it's independent). **Financial features**: None. **Health**: None. **COVID-19**: not a contact tracing or status app.
+- **Content rating** (IARC questionnaire): category **All Other App Types**. Answer **No** to every question except one: "Does the app share the user's current physical location with other users?" is **Yes**, because team sessions do when the user opts in. That adds a "Shares location" note but doesn't change the age. Result: Everyone / PEGI 3.
+- **Permissions**: the app uses location only while open (no background location), so no permission declaration form is needed. If Play asks about foreground service or exact alarms, the answer is that the app doesn't use them.
 
 ### Screenshots
 
-In `store/`:
+The PM's six (`site/screenshots/`, 440 × 956) are the right *pictures*, in the right order, but not the right *sizes*: they're taken at 1× and are slightly taller than 2:1, which Google refuses. They need taking again at these sizes (the PM prompt has the steps). Use **Demo drive** so no real job addresses appear.
 
-- `iphone-1-session.png` (1290 × 2796, the 6.7" iPhone slot) and `android-1-session.png` (1080 × 1920): the Session tab.
-- `feature-graphic.png` (1024 × 500) and `play-icon.png` (512 × 512) for Play.
+| Store | Slot | Size (pixels) | How many |
+|---|---|---|---|
+| Apple | iPhone 6.9" | **1320 × 2868** (1290 × 2796 also accepted) | 3 to 10; Apple scales them down for smaller iPhones |
+| Apple | iPad | not needed: the app is iPhone only | |
+| Google | Phone | **1080 × 2160** (2:1 exactly; no side may be more than twice the other) | 2 to 8 |
+| Google | Feature graphic | 1024 × 500 (`store/feature-graphic.png`) | 1 |
+| Google | App icon | 512 × 512 (`store/play-icon.png`) | 1 |
 
-Apple needs at least 3 screenshots and Play at least 2. Take the rest on your phone once the server is up, using **Demo drive** so no real job addresses or locations appear:
+Order, both stores:
 
-1. Search results for "stroud green rd".
-2. The two route cards for an address (turn on police routes first).
-3. Turn-by-turn navigation.
-4. The Pursuit tab.
-5. The Log.
+1. Search ("stroud green rd" or "Bemerton", results in Islington)
+2. Route choice (Standard beside Blue light, with the restrictions listed)
+3. Turn-by-turn navigation (day)
+4. Turn-by-turn navigation (night)
+5. Pursuit screen
+6. Start of shift (Session: callsign, boroughs, vehicle)
 
-On iPhone, use a 6.7" or 6.9" model if you can (otherwise Apple asks for that size). Any modern Android phone is fine.
+## Privacy answers (ready to paste)
 
-## Privacy answers
+What leaves the phone, checked against the code on 25 October 2026:
+
+| Data | Where to | Kept? | Counts as |
+|---|---|---|---|
+| Position and destination for routes, pursuit, Where am I, entrances | BlueRoute server | No: answered in memory, not logged | Not collected (real-time processing) |
+| Search text (what was typed) | BlueRoute server, then OS Names | **Up to 24 hours in memory**, as a speed-up cache, with no ID, IP or position | **Collected** (Search history), not linked |
+| Random install ID, app version, counts of routes, sessions, timeouts | BlueRoute server | Daily totals; salted hashes deleted when the day or week ends | **Collected** (Device ID, Product interaction, Diagnostics), not linked |
+| Expo's update check: runtime version, platform, random update ID | Expo (works for us) | Expo's own terms | **Collected** (Device ID), not linked |
+| Team sessions: callsign, position, track | Other team members, through the server | Sealed, in memory, up to a week | Not collected: end-to-end encrypted, the server can't read it |
+| Learning: per-road timings | BlueRoute server | Totals per road | **Not yet**: switched off on the server (`LEARNING` not set). See below |
+| Report a problem | The user's own mail app | | Not collected by the app: the user sends the email |
+| Log, callsign, boroughs, notes, favourites, field-test trips | Phone only | | Not collected |
 
 ### Apple: App Privacy
 
-Positions and searched addresses don't count as collected: the app sends them to the BlueRoute server only to answer each request in real time, and nothing is kept. Apple doesn't count real-time processing that isn't retained as collection.
+**Data collection**: "Yes, we collect data from this app". Then tick these four, and for each answer **Linked to the user's identity: No** and **Used for tracking: No**:
 
-Usage counts (README, "Usage data") do count. Answer:
-- **Identifiers → Device ID:** collected (the app's own random install ID, kept by the server only as salted hashes with a new salt each day and each week, deleted when the day or week ends; and the random ID Expo's update check sends, which Expo uses to deliver and count app updates).
-  - Linked to the user: **No**.
-  - Used for tracking: **No**.
-  - Purpose: **Analytics** and **App Functionality**.
-- **Usage Data → Product Interaction:** collected (counts of routes planned, navigation and pursuit sessions).
-  - Linked to the user: **No**.
-  - Used for tracking: **No**.
-  - Purpose: **Analytics**.
-- **Diagnostics → Other Diagnostic Data:** collected (counts of timeouts and failed requests).
-  - Linked to the user: **No**.
-  - Used for tracking: **No**.
-  - Purpose: **Analytics**.
+| Data type | Purposes |
+|---|---|
+| **Identifiers → Device ID** | Analytics, App Functionality |
+| **Usage Data → Product Interaction** | Analytics |
+| **Diagnostics → Other Diagnostic Data** | Analytics |
+| **Search History** | App Functionality |
 
-There's no tracking.
+Don't tick Location. Positions are only processed in real time to answer each request and aren't kept, which Apple doesn't count as collection, and team-session positions are end-to-end encrypted so neither you nor the server can read them.
+
+The label will then say **"Data Not Linked to You"** with those four, and nothing under "Data Used to Track You".
 
 ### Google: Data safety
 
-- **Does your app collect or share any of the required user data types?** Yes.
-- **Location → Approximate location and Precise location:** Collected, not shared.
-  - Processed ephemerally: **Yes**.
-  - Required: **Yes**.
-  - Purpose: **App functionality**.
-- **Device or other IDs:** Collected, not shared. Purpose: **Analytics**. (The app's own random install ID, resettable in the app, kept only as salted hashes with a new salt each day and each week, deleted when the day or week ends. Expo, which delivers app updates on our behalf, also sees a random ID the update check makes; a service provider acting for the developer doesn't count as sharing.)
-- **App activity → Other actions:** Collected, not shared. Purpose: **Analytics**. (Counts of routes planned, navigation and pursuit sessions.)
-- **App info and performance → Diagnostics:** Collected, not shared. Purpose: **Analytics**. (Counts of timeouts and failed requests.)
-- No other data types.
-- **Is all of the user data encrypted in transit?** Yes.
-- **Do you provide a way for users to request that their data is deleted?** The server keeps only daily usage totals, plus today's and this week's salted hashes of install IDs, which are deleted when the day or week ends. Resetting the install ID in the app stops it being linked to the old one. Data on the phone is deleted by clearing the log or uninstalling.
+**Data collection and security**
 
-Other Play questions: **Ads:** No. **Government app:** No. **News app:** No. **Financial features:** None. **Health:** No.
+- Does your app collect or share any of the required user data types? **Yes**
+- Is all of the user data collected by your app encrypted in transit? **Yes**
+- Which of the following methods of account creation does your app support? **My app does not allow users to create an account**
+- Do you provide a way for users to request that their data is deleted? **No** (there are no accounts; the server deletes the hashes when the day or week ends, and the search cache within 24 hours, by itself)
 
-## Day by day
+**Data types**: tick these and nothing else:
 
-Day 1 is Saturday 10 October.
+| Data type | Collected / shared | Processed ephemerally? | Required or optional? | Purposes |
+|---|---|---|---|---|
+| **Location → Precise location** | Collected, not shared | **Yes** | Required | App functionality |
+| **Location → Approximate location** | Collected, not shared | **Yes** | Required | App functionality |
+| **App activity → In-app search history** | Collected, not shared | **No** (24-hour cache) | Required | App functionality |
+| **App activity → Other actions** | Collected, not shared | No | Required | Analytics |
+| **App info and performance → Diagnostics** | Collected, not shared | No | Required | Analytics |
+| **Device or other IDs** | Collected, not shared | No | Required | Analytics |
+
+"Not shared" is right for all of them: Ordnance Survey and Expo act for us as service providers, which Google doesn't count as sharing. Team-session data is end-to-end encrypted, which Google doesn't count as collected.
+
+### If the answers need to change
+
+- **Turning learning on** (`LEARNING=1` on the server): add Apple **Location → Coarse Location** (App Functionality, not linked) and Google **Location → Approximate location** with processed ephemerally **No** and **Optional**. Update both before turning it on.
+- **Dropping the search cache** would take Search history off both labels, at the cost of repeat searches taking a few hundred milliseconds longer. Your call; the answers above assume the cache stays.
+- **Adding a subscription**: see "Later: a subscription" below.
+
+## Launch plan
+
+The first plan (10 to 23 October) waited on the accounts, which aren't set up yet. Counting from the day you pay for them:
 
 | Day | You | Claude / GitHub |
 |---|---|---|
-| **1 (Sat 10)** | Merge the pull request. Pay for Apple and Google and start verification. Create the Expo account and add `EXPO_TOKEN`. Run **Deploy server** (DEPLOY.md). | Code, store pipeline and this pack are ready. |
-| **2 (Sun 11)** | Check the server answers at `/health` and `/privacy`. Try the Android test APK on your phone. Line up 15+ officers for the Android closed test (their Gmail addresses). | Fix anything you find. |
-| **3 (Mon 12)** | Once Apple has approved you, do the Codespaces iOS step. Add the Apple variables and secret. | First iOS build goes to TestFlight. |
-| **4 (Tue 13)** | Once Google has verified you, create the app in Play Console and fill in the listing, content rating and data safety. Set up the service account. Do the first manual `.aab` upload to closed testing and send it for review. | |
-| **5 (Wed 14)** | TestFlight: add an external group, turn on the **public link**, and submit for Beta App Review (usually about a day). Install it yourself and test in a car. | Fix anything from your test. |
-| **6–7 (Thu 15–Fri 16)** | When the closed test is approved, send officers the Play join link. When TestFlight is approved, send iPhone users the TestFlight link. **Get 12+ Android officers to join, install and keep it installed: the 14-day clock starts here.** | Run **Store builds** for any fixes. |
-| **8 (Sat 17)** | Fill in the App Store listing (text and screenshots above) and **Submit for Review** for the App Store. | |
-| **9–11** | Answer any questions from Apple's review. If it's rejected, tell Claude what Apple said. | Fix and resubmit the same day. |
-| **12–14 (Wed 21–Fri 23)** | **App Store live**: send iPhone users the App Store link. Android officers are on the Play closed test. | |
-| **~20–25** | After 14 days with 12+ testers, apply for production access in Play Console. Once Google approves it, release to production; it then appears in Play search. | Run **Store builds** with track *production*. |
+| **1** | Pay for Apple (£79) and Google ($25) and start identity checks. Create the Expo account and add `EXPO_TOKEN`. | |
+| **2–3** | Once Apple has approved you, do the Codespaces iOS step and add the Apple variables and secret. | First iOS build goes to TestFlight. |
+| **3–4** | Once Google has verified you, create the app in Play Console, paste the listing, content rating and data safety above, set up the service account, and do the first manual `.aab` upload to closed testing. | |
+| **4–5** | TestFlight: add an external group, turn on the public link, submit for Beta App Review (about a day). | |
+| **5–7** | Send officers the TestFlight and Play join links. **Get 12+ Android officers to join and keep it installed: Google's 14-day clock starts here.** | Fix anything they find. |
+| **6** | Paste the App Store listing and screenshots and **Submit for Review**. | |
+| **7–10** | Answer Apple's questions. If it's rejected, send Claude what Apple said. | Fix and resubmit the same day. |
+| **~10** | App Store live. | |
+| **~20–28** | After 14 days with 12+ testers, apply for production access in Play Console. | Run **Store builds** with track *production* once approved. |
 
 ## Later: a subscription (£3–5 a month)
 
