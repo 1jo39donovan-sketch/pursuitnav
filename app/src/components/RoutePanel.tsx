@@ -348,11 +348,22 @@ function StandardRow({
         </Text>
         <TrafficLine route={route} />
       </View>
-      <Text style={styles.eta} numberOfLines={1}>
-        {formatMinutes(route.durationS)}
-      </Text>
+      <Eta seconds={route.durationS} />
       <GoButton onPress={onGo} color={colors.blue} label="Go on the standard route" />
     </View>
+  );
+}
+
+/** The journey time, the number big and "min" smaller, so "12 min" fits beside Go on a narrow phone. */
+function Eta({ seconds }: { seconds: number }) {
+  const styles = useTextStyles(baseStyles);
+  const text = formatMinutes(seconds);
+  const unit = text.endsWith(" min") ? " min" : "";
+  return (
+    <Text style={styles.eta} numberOfLines={1}>
+      {text.slice(0, text.length - unit.length)}
+      {unit ? <Text style={styles.etaUnit}>{unit}</Text> : null}
+    </Text>
   );
 }
 
@@ -434,9 +445,7 @@ function PoliceRow({
           </Text>
           <TrafficLine route={route} />
         </View>
-        <Text style={styles.eta} numberOfLines={1}>
-        {formatMinutes(route.durationS)}
-      </Text>
+        <Eta seconds={route.durationS} />
         <GoButton onPress={onGo} color={colors.amber} label="Go on the blue-light route" />
       </View>
       {/* Always says how many it relies on; tap for the list (they're on the map too). */}
@@ -681,6 +690,7 @@ const baseStyles = StyleSheet.create({
     fontSize: 28,
     fontVariant: ["tabular-nums"],
   },
+  etaUnit: { fontFamily: fonts.displaySemiBold, fontSize: 17 },
   meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
   saving: { color: colors.amber, fontFamily: fonts.bodySemiBold },
   traffic: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 13, lineHeight: 17, marginTop: 2 },
