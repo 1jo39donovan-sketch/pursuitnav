@@ -101,7 +101,7 @@ export class Recorder {
     this.live = {
       record: {
         header: { ...header, id, format: TRIP_FORMAT, startedAt },
-        others: { blueLightMaps: null, googleApple: null },
+        others: { googleApple: null },
         notes: {},
         summary: summarise([]),
       },

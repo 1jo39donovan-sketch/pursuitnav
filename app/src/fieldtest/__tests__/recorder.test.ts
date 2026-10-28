@@ -136,7 +136,7 @@ describe("field-test recorder", () => {
 describe("export files", () => {
   const record: TripRecord = {
     header: { ...HEADER, id: "t1", format: 1, startedAt: Date.UTC(2026, 9, 23, 12) },
-    others: { blueLightMaps: 9, googleApple: 12 },
+    others: { googleApple: 12 },
     notes: { "1792756860000": 'Said "left", meant right' },
     summary: {
       kind: "police",
@@ -179,7 +179,7 @@ describe("export files", () => {
     expect(lines[0]).toMatch(/^trip_id,demo,started,/);
     expect(lines[1]).toContain('"54 Caledonian Road, Islington"');
     expect(lines[1]).toContain('"No right turn: Upper Street, Islington Green"');
-    expect(lines[1]!.endsWith(",9,12")).toBe(true);
+    expect(lines[1]!.endsWith(",12")).toBe(true);
     const ev = eventsCsv([{ record, events }]);
     expect(ev.split("\r\n")[0]).toBe("trip_id,time,type,lat,lng,details");
     expect(ev).toContain('note=Said ""left"", meant right');

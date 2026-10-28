@@ -53,7 +53,7 @@ import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
 import { recordEvent } from "../../usage/usage";
 import { useTextStyles } from "../../textSize";
-import { loadFavourites, samePlace, saveFavourites, toggled, type Favourite } from "../../search/favourites";
+import { samePlace, setFavourites, toggled, useFavourites, type Favourite } from "../../search/favourites";
 import { quickPlaces } from "../../search/quickPlaces";
 import { fetchEntrances } from "../../api/entrances";
 import { fetchWhere } from "../../api/where";
@@ -530,12 +530,23 @@ export default function SearchScreen() {
     () => quickPlaces(service, roughLat != null && roughLng != null ? { lat: roughLat, lng: roughLng } : null, allPois),
     [service, roughLat, roughLng, allPois],
   );
-  const [favourites, setFavourites] = useState<Favourite[]>(() => loadFavourites());
+  const favourites = useFavourites();
+  // Starring says where the place has gone, so it doesn't look like nothing happened.
+  const [favNote, setFavNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!favNote) return;
+    const t = setTimeout(() => setFavNote(null), 3500);
+    return () => clearTimeout(t);
+  }, [favNote]);
   const [notes, setNotes] = useState<BlockNote[]>(() => loadNotes());
   const toggleFavourite = (f: Favourite) => {
     const next = toggled(favourites, f);
     setFavourites(next);
-    saveFavourites(next);
+    setFavNote(
+      next.length > favourites.length
+        ? `★ ${f.name} saved. Tap the search box, or Session → Favourites, to go there.`
+        : `Removed ${f.name} from favourites.`,
+    );
   };
   const entries = log.entries;
   const recent = useMemo(() => {
@@ -576,7 +587,8 @@ export default function SearchScreen() {
           routes={routes}
           restrictions={restrictionPoints(plan?.police)}
           labels={blockLabels}
-          destination={destination?.point}
+          // A tapped point or place gets its pin straight away, before Route here.
+          destination={destination?.point ?? tapped?.point}
           onLongPress={(point) =>
             choose(
               { point, title: `Point on the map (${point[1].toFixed(5)}, ${point[0].toFixed(5)})` },
@@ -607,6 +619,18 @@ export default function SearchScreen() {
         {tapped && !destination && !showResults && (
           <MarkerCard
             marker={tapped.marker}
+            favourite={favourites.some((f) => samePlace(f, { lat: tapped.point[1], lng: tapped.point[0] }))}
+            onToggleFavourite={
+              tapped.marker.name === FINDING
+                ? undefined
+                : () =>
+                    toggleFavourite({
+                      name: tapped.marker.name,
+                      lat: tapped.point[1],
+                      lng: tapped.point[0],
+                      borough: tapped.marker.borough || null,
+                    })
+            }
             away={fix ? formatDistance(distanceM(fix, { lat: tapped.point[1], lng: tapped.point[0] })) : undefined}
             onClose={() => setTapped(null)}
             onRoute={() => {
@@ -656,6 +680,11 @@ export default function SearchScreen() {
                 : undefined
             }
           />
+        )}
+        {favNote && (
+          <View style={[styles.recent, styles.favNote, { top: topSpace + 6 }]} accessibilityRole="alert">
+            <Text style={styles.favNoteText}>{favNote}</Text>
+          </View>
         )}
         {typing && !destination && !showResults && !tapped && (quick.length > 0 || favourites.length > 0 || recent.length > 0) && (
           <View style={[styles.recent, { top: topSpace + 6 }]}>
@@ -949,6 +978,8 @@ const baseStyles = StyleSheet.create({
     padding: 10,
   },
   hintText: { color: colors.muted, fontFamily: fonts.body, fontSize: 14, textAlign: "center" },
+  favNote: { zIndex: 5, borderColor: colors.amber },
+  favNoteText: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
   recent: {
     position: "absolute",
     left: 12,

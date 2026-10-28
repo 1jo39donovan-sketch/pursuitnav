@@ -1,5 +1,7 @@
 // Places the crew star (a station, a custody suite, a hospital they go to
 // often), kept on the phone and shown first in Search, one tap from a route.
+import { useSyncExternalStore } from "react";
+
 import { store } from "../storage/store";
 
 export interface Favourite {
@@ -39,3 +41,38 @@ export function toggled(list: Favourite[], place: Favourite): Favourite[] {
 
 export const loadFavourites = () => parseFavourites(store.getSetting(KEY));
 export const saveFavourites = (list: Favourite[]) => store.setSetting(KEY, JSON.stringify(list));
+
+/** Renamed: the crew's own name for it ("Brixton nick"), never empty. */
+export function renamed(list: Favourite[], index: number, name: string): Favourite[] {
+  const clean = name.trim().slice(0, 60);
+  return clean ? list.map((f, i) => (i === index ? { ...f, name: clean } : f)) : list;
+}
+
+/** Moved one place up (-1) or down (+1) the list. */
+export function moved(list: Favourite[], index: number, by: -1 | 1): Favourite[] {
+  const to = index + by;
+  if (to < 0 || to >= list.length) return list;
+  const next = [...list];
+  [next[index], next[to]] = [next[to]!, next[index]!];
+  return next;
+}
+
+// One list for every screen (Search and Session), kept on the phone.
+let current: Favourite[] | null = null;
+const listeners = new Set<() => void>();
+const snapshot = () => (current ??= loadFavourites());
+const subscribe = (l: () => void) => {
+  listeners.add(l);
+  return () => listeners.delete(l);
+};
+
+/** Saves the list and shows it on every screen. */
+export function setFavourites(list: Favourite[]) {
+  current = list;
+  saveFavourites(list);
+  listeners.forEach((l) => l());
+}
+
+export function useFavourites(): Favourite[] {
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
+}

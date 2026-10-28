@@ -3,7 +3,7 @@
 
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
 // Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
-const UPDATED = "26 October 2026";
+const UPDATED = "28 October 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -98,6 +98,11 @@ driven in the last two hours with the others in the team, every 15 seconds. It�
 code and is never sent to the server, so the server holds only data it can’t read. It keeps that in memory only (a
 restart forgets it), drops your entry when you leave or a day after you stop sharing, and ends the team after a week.
 Anyone you give the team code to can see your position, so share it only with colleagues on the job.</p>
+<p>You choose when it shares (Session → Team): always while BlueRoute is open, only while navigating, or only once
+you’re within 150 m of where you navigated to. Battery saver shares only while navigating, and less often when you’re
+standing still. At a police station (public locations from OpenStreetMap) you’re hidden from the team and your drive
+there isn’t kept, unless you turn on sharing there. When you’re not sharing, your position isn’t sent and you drop off
+the others’ maps and team list. Nothing is shared while BlueRoute isn’t open on screen.</p>
 
 <h2>Helping improve journey times (only if you turn it on)</h2>
 <p>Off unless you turn it on in the Session tab. While you navigate, the phone times each road it drives along and

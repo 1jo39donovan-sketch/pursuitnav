@@ -234,36 +234,28 @@ export function RoutePanel({
  */
 function OtherEtas() {
   const styles = useTextStyles(baseStyles);
-  const [blm, setBlm] = useState("");
-  const [google, setGoogle] = useState("");
+  const [other, setOther] = useState("");
   const minutes = (v: string) => (/^\d{1,3}$/.test(v.trim()) ? Number(v.trim()) : null);
-  const field = (label: string, value: string, onChange: (v: string) => void) => (
-    <View style={styles.otherField}>
-      <Text style={styles.otherLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        keyboardType="number-pad"
-        maxLength={3}
-        placeholder="min"
-        placeholderTextColor={colors.muted}
-        style={styles.otherInput}
-        accessibilityLabel={`${label} ETA in minutes`}
-      />
-    </View>
-  );
   return (
     <View style={styles.others}>
-      <Text style={styles.otherTitle}>Other apps’ ETA (optional)</Text>
+      <Text style={styles.otherTitle}>Another app’s ETA (optional)</Text>
       <View style={styles.otherRow}>
-        {field("Blue Light Maps", blm, (v) => {
-          setBlm(v);
-          recorder.setOthers({ blueLightMaps: minutes(v), googleApple: minutes(google) });
-        })}
-        {field("Google/Apple", google, (v) => {
-          setGoogle(v);
-          recorder.setOthers({ blueLightMaps: minutes(blm), googleApple: minutes(v) });
-        })}
+        <View style={styles.otherField}>
+          <Text style={styles.otherLabel}>Google/Apple/Waze</Text>
+          <TextInput
+            value={other}
+            onChangeText={(v) => {
+              setOther(v);
+              recorder.setOthers({ googleApple: minutes(v) });
+            }}
+            keyboardType="number-pad"
+            maxLength={3}
+            placeholder="min"
+            placeholderTextColor={colors.muted}
+            style={styles.otherInput}
+            accessibilityLabel="Another app's ETA in minutes"
+          />
+        </View>
       </View>
     </View>
   );
