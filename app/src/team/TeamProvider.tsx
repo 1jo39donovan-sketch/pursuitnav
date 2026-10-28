@@ -10,9 +10,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { deleteMember, getMembers, NoTeamError, putMember } from "../api/teams";
 import { useLocation } from "../location/LocationProvider";
+import { useNavigation } from "../navigation/NavigationProvider";
+import { BOROUGHS } from "../search/boroughs";
+import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import { codeIn, formatCode, newTeamCode, normaliseCode, open, randomHex, seal, teamKeys } from "./crypto";
+import { atPoliceStation, shareDecision, type SharePolicy } from "./sharePolicy";
 import { addFix, decodeTrack, encodeTrack, type TrackPoint } from "./track";
 
 export interface TeamMember {
@@ -44,6 +48,17 @@ interface TeamValue {
   expiresAt: number | null;
   /** Colleagues seen in the last half hour, for a map's team prop. */
   mapPoints: GeoJSON.FeatureCollection;
+  /** Whether this phone is sharing its position now, and why (or why not), for the crew to see. */
+  sharing: { share: boolean; why: string };
+  /** When to share (Session). */
+  policy: SharePolicy;
+  setPolicy: (p: SharePolicy) => void;
+  /** Shares only while navigating, and less often. */
+  batterySaver: boolean;
+  setBatterySaver: (on: boolean) => void;
+  /** Shares even at a police station (off by default). */
+  shareAtPolice: boolean;
+  setShareAtPolice: (on: boolean) => void;
   create: () => void;
   /** Joins with a code as typed. False if it isn't a team code. */
   join: (typed: string) => boolean;
@@ -64,11 +79,75 @@ interface Shared {
   a?: number;
 }
 
+/** Not sharing: no position (so any app, old or new, leaves this member off the map). */
+interface Hidden {
+  v: 1;
+  cs: string;
+  t: number;
+  hidden: true;
+}
+
+/** Standing still, a share is sent at most this often (moving: every 15 s). */
+const STILL_SHARE_MS = 60_000;
+/** Moved less than this since the last share: standing still. */
+const STILL_M = 25;
+
 const TeamContext = createContext<TeamValue | null>(null);
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { callsign } = useSession();
   const { fix } = useLocation();
+  const { active, lastDestination } = useNavigation();
+  const { data, places } = useSearch();
+
+  // When to share, kept on the phone.
+  const [policy, setPolicyState] = useState<SharePolicy>(() => {
+    const p = store.getSetting("teamShare");
+    return p === "navigating" || p === "arrived" ? p : "always";
+  });
+  const [batterySaver, setBatterySaverState] = useState(() => store.getSetting("batterySaver") === "1");
+  const [shareAtPolice, setShareAtPoliceState] = useState(() => store.getSetting("teamShareAtPolice") === "1");
+  const setPolicy = useCallback((p: SharePolicy) => {
+    setPolicyState(p);
+    store.setSetting("teamShare", p);
+  }, []);
+  const setBatterySaver = useCallback((on: boolean) => {
+    setBatterySaverState(on);
+    store.setSetting("batterySaver", on ? "1" : "");
+  }, []);
+  const setShareAtPolice = useCallback((on: boolean) => {
+    setShareAtPoliceState(on);
+    store.setSetting("teamShareAtPolice", on ? "1" : "");
+  }, []);
+
+  // Police stations from OpenStreetMap (public: amenity=police, in the weekly
+  // places list). Inside one, by default, this phone isn't shown to the team.
+  const stations = useMemo(
+    () =>
+      data.status === "ready" && places.status === "ready"
+        ? data.index
+            .pointsOfInterestIn(new Set(BOROUGHS), new Set(["emergency"]))
+            .filter((p) => p.type === "Police station")
+        : [],
+    // The places list arrives after the roads.
+    [data, places.status],
+  );
+  const [atPolice, setAtPolice] = useState(false);
+  const [atPoliceFixAt, setAtPoliceFixAt] = useState(0);
+  if (fix && fix.timestamp !== atPoliceFixAt) {
+    setAtPoliceFixAt(fix.timestamp);
+    const now = atPoliceStation(atPolice, fix, stations);
+    if (now !== atPolice) setAtPolice(now);
+  }
+  const sharing = shareDecision({
+    policy,
+    batterySaver,
+    shareAtPolice,
+    atPolice,
+    navigating: active != null,
+    destination: active?.destination ?? lastDestination,
+    fix,
+  });
   const [code, setCode] = useState(() => normaliseCode(store.getSetting("teamCode") ?? ""));
   const [status, setStatus] = useState<TeamStatus>(code ? "connecting" : "off");
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -86,20 +165,26 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   // Whether this team has been seen, so a 404 after that means it ended.
   const seen = useRef(false);
   const track = useRef<TrackPoint[]>([]);
-  const latest = useRef({ fix, callsign });
+  const latest = useRef({ fix, callsign, share: sharing.share, slow: batterySaver });
   useEffect(() => {
-    latest.current = { fix, callsign };
-  }, [fix, callsign]);
+    latest.current = { fix, callsign, share: sharing.share, slow: batterySaver };
+  }, [fix, callsign, sharing.share, batterySaver]);
 
-  // Record the drive while in a team, so colleagues can follow you in.
+  // Arriving at a police station: the drive there is forgotten, so following
+  // it in can't lead a colleague to whoever is inside.
   useEffect(() => {
-    if (code && fix)
+    if (atPolice && !shareAtPolice) track.current = [];
+  }, [atPolice, shareAtPolice]);
+
+  // Record the drive while in a team and sharing, so colleagues can follow you in.
+  useEffect(() => {
+    if (code && fix && sharing.share)
       track.current = addFix(track.current, {
         lat: fix.lat,
         lng: fix.lng,
         at: fix.timestamp,
       });
-  }, [code, fix]);
+  }, [code, fix, sharing.share]);
 
   const enter = useCallback((normalised: string, started: boolean) => {
     starter.current = started;
@@ -146,20 +231,38 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     if (!code) return;
     const { teamId, key } = teamKeys(code);
     let stopped = false;
+    // The last share sent, to send less often standing still (battery).
+    let last: { at: number; lat: number; lng: number; hidden: boolean } | null = null;
     const tick = async () => {
-      const { fix: f, callsign: cs } = latest.current;
+      const { fix: f, callsign: cs, share, slow } = latest.current;
+      const now = Date.now();
       try {
-        if (f) {
-          const shared: Shared = {
-            v: 1,
-            cs: cs || "No callsign",
-            p: [f.lat, f.lng],
-            h: f.course,
-            t: f.timestamp,
-            tr: encodeTrack(track.current),
-            ...(f.accuracy != null ? { a: Math.round(f.accuracy) } : {}),
-          };
-          await putMember(teamId, me.current.memberId, me.current.token, seal(key, shared, random), starter.current);
+        if (f && !share) {
+          // Not sharing: say so once (taking this phone off colleagues' maps), then now and then to stay in the team.
+          if (!last?.hidden || now - last.at >= STILL_SHARE_MS) {
+            const hidden: Hidden = { v: 1, cs: cs || "No callsign", t: now, hidden: true };
+            await putMember(teamId, me.current.memberId, me.current.token, seal(key, hidden, random), starter.current);
+            last = { at: now, lat: f.lat, lng: f.lng, hidden: true };
+          }
+        } else if (f) {
+          const still =
+            last && !last.hidden && Math.hypot((f.lat - last.lat) * 111_320, (f.lng - last.lng) * 69_000) < STILL_M;
+          const every = slow || still ? STILL_SHARE_MS : SHARE_EVERY_MS;
+          if (last && !last.hidden && now - last.at < every - 1000) {
+            // Nothing new worth sending yet.
+          } else {
+            last = { at: now, lat: f.lat, lng: f.lng, hidden: false };
+            const shared: Shared = {
+              v: 1,
+              cs: cs || "No callsign",
+              p: [f.lat, f.lng],
+              h: f.course,
+              t: f.timestamp,
+              tr: encodeTrack(track.current),
+              ...(f.accuracy != null ? { a: Math.round(f.accuracy) } : {}),
+            };
+            await putMember(teamId, me.current.memberId, me.current.token, seal(key, shared, random), starter.current);
+          }
         }
         const team = await getMembers(teamId);
         if (stopped) return;
@@ -193,6 +296,13 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       code: code ? formatCode(code) : null,
+      sharing: { share: sharing.share, why: sharing.why },
+      policy,
+      setPolicy,
+      batterySaver,
+      setBatterySaver,
+      shareAtPolice,
+      setShareAtPolice,
       status,
       members,
       expiresAt,
@@ -201,7 +311,24 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       join,
       leave,
     }),
-    [code, status, members, expiresAt, mapPoints, create, join, leave],
+    [
+      code,
+      status,
+      members,
+      expiresAt,
+      mapPoints,
+      create,
+      join,
+      leave,
+      sharing.share,
+      sharing.why,
+      policy,
+      setPolicy,
+      batterySaver,
+      setBatterySaver,
+      shareAtPolice,
+      setShareAtPolice,
+    ],
   );
   return <TeamContext.Provider value={value}>{children}</TeamContext.Provider>;
 }
@@ -244,7 +371,11 @@ function teamPoints(members: TeamMember[], now: number): GeoJSON.FeatureCollecti
         type: "Feature",
         geometry: { type: "Point", coordinates: [m.lng, m.lat] },
         // A rough position says so on the map, and is drawn faint.
-        properties: { id: m.memberId, name: roughFix(m.accuracy) ? `${m.callsign} ${accuracyText(m.accuracy!)}` : m.callsign, rough: roughFix(m.accuracy) },
+        properties: {
+          id: m.memberId,
+          name: roughFix(m.accuracy) ? `${m.callsign} ${accuracyText(m.accuracy!)}` : m.callsign,
+          rough: roughFix(m.accuracy),
+        },
       })),
   };
 }

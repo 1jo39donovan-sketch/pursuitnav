@@ -103,8 +103,8 @@ export default function TripScreen() {
         {line("No signal", s.noSignalS ? `${Math.round(s.noSignalS)} s` : null)}
         {line(
           "Other apps",
-          others.blueLightMaps !== null || others.googleApple !== null
-            ? `Blue Light Maps ${others.blueLightMaps ?? "—"} min · Google/Apple ${others.googleApple ?? "—"} min`
+          others.googleApple != null
+            ? `Google/Apple/Waze ${others.googleApple} min`
             : null,
         )}
         {line("Ended", s.ended)}

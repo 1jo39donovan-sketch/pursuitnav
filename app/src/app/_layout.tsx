@@ -44,8 +44,8 @@ export default function RootLayout() {
           <SearchProvider>
             <OfflineMapProvider>
               <LocationProvider>
-                <TeamProvider>
-                  <NavigationProvider>
+                <NavigationProvider>
+                  <TeamProvider>
                     <StatusBar style="light" />
                     <Stack
                       screenOptions={{
@@ -68,8 +68,8 @@ export default function RootLayout() {
                     <RecIndicator />
                     {/* Over everything until the terms are agreed to. */}
                     <TermsGate />
-                  </NavigationProvider>
-                </TeamProvider>
+                  </TeamProvider>
+                </NavigationProvider>
               </LocationProvider>
             </OfflineMapProvider>
           </SearchProvider>

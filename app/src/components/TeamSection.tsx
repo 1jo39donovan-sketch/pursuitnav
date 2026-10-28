@@ -1,13 +1,14 @@
 // Team on Session: start or join a team, share the code, see who's where, and
 // follow a colleague's way in.
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Platform, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { boroughAt } from "../area/area";
 import { formatDistance } from "../format";
 import { distanceM } from "../geo";
 import { useLocation } from "../location/LocationProvider";
 import { accuracyText, roughFix, useTeam } from "../team/TeamProvider";
+import { SHARE_POLICIES } from "../team/sharePolicy";
 import { useFollowIn } from "../team/useFollowIn";
 import { colors, fonts } from "../theme";
 import { Button } from "./Button";
@@ -161,6 +162,7 @@ export function TeamSection() {
         )}
       </View>
 
+      <ShareSettings />
       {copied === "copied" && <Text style={styles.meta}>Copied. Paste it in a message to your colleagues.</Text>}
       {copied === "failed" && <Text style={styles.error}>Couldn’t copy: press and hold the code to select it.</Text>}
       {others.length === 0 ? (
@@ -200,6 +202,73 @@ export function TeamSection() {
         Follow in drives you to the nearest point of the way they came, then along it. It may use bus lanes or ignore
         turn bans as they did; each one is listed. It won’t follow them the wrong way down a one-way street.
       </Text>
+    </View>
+  );
+}
+
+/** What this phone shares, said plainly, and the crew's choices about it. */
+function ShareSettings() {
+  const styles = useTextStyles(baseStyles);
+  const team = useTeam();
+  const hint = SHARE_POLICIES.find((p) => p.id === team.policy)?.hint;
+  return (
+    <View style={styles.settings}>
+      <View style={[styles.sharing, !team.sharing.share && styles.notSharing]} accessibilityRole="text">
+        <Text style={styles.sharingText}>
+          {team.sharing.share ? "● " : "○ "}
+          {team.sharing.why}
+        </Text>
+      </View>
+      <Text style={styles.label}>Share my position</Text>
+      <View style={styles.row}>
+        {SHARE_POLICIES.map((p) => {
+          const on = team.policy === p.id;
+          return (
+            <Pressable
+              key={p.id}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: on }}
+              accessibilityHint={p.hint}
+              onPress={() => team.setPolicy(p.id)}
+              style={[styles.chip, on && styles.chipOn]}
+            >
+              <Text style={[styles.chipText, on && styles.chipTextOn]}>{p.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {hint && <Text style={styles.meta}>{hint} Only while BlueRoute is open: a locked phone shares nothing.</Text>}
+      <View style={styles.toggle}>
+        <View style={styles.memberText}>
+          <Text style={styles.toggleName} nativeID="battery-label">
+            Battery saver
+          </Text>
+          <Text style={styles.meta}>Shares only while navigating, and once a minute when you’re standing still.</Text>
+        </View>
+        <Switch
+          accessibilityLabelledBy="battery-label"
+          value={team.batterySaver}
+          onValueChange={team.setBatterySaver}
+          trackColor={{ false: colors.line, true: colors.amber }}
+        />
+      </View>
+      <View style={styles.toggle}>
+        <View style={styles.memberText}>
+          <Text style={styles.toggleName} nativeID="police-share-label">
+            Share at police stations
+          </Text>
+          <Text style={styles.meta}>
+            Off: at a police station (public OpenStreetMap locations) you’re hidden from the team, and your drive there
+            isn’t kept.
+          </Text>
+        </View>
+        <Switch
+          accessibilityLabelledBy="police-share-label"
+          value={team.shareAtPolice}
+          onValueChange={team.setShareAtPolice}
+          trackColor={{ false: colors.line, true: colors.amber }}
+        />
+      </View>
     </View>
   );
 }
@@ -260,6 +329,23 @@ const baseStyles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   memberText: { flex: 1, minWidth: 0 },
+  settings: { gap: 10 },
+  sharing: { borderRadius: 8, borderWidth: 1, borderColor: colors.ok, paddingHorizontal: 12, paddingVertical: 8 },
+  notSharing: { borderColor: colors.line },
+  sharingText: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
+  chip: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.line,
+    justifyContent: "center",
+  },
+  chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  chipText: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 16 },
+  chipTextOn: { color: "#ffffff" },
+  toggle: { flexDirection: "row", alignItems: "center", gap: 12 },
+  toggleName: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   callsign: {
     color: colors.fg,
     fontFamily: fonts.displaySemiBold,

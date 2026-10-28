@@ -74,7 +74,6 @@ export type TripEvent = { t: number } & (
 
 /** Typed in by the operator: what the other apps said, in minutes. */
 export interface OtherEtas {
-  blueLightMaps: number | null;
   googleApple: number | null;
 }
 

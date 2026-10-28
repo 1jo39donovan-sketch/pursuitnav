@@ -8,7 +8,9 @@ import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
 import { looksOffered, MAP_LOOK_NAMES, type MapLook } from "../../components/mapLooks";
 import { OfflineMapSection } from "../../components/OfflineMapSection";
+import { FavouritesSection } from "../../components/FavouritesSection";
 import { TeamSection } from "../../components/TeamSection";
+import { useFavourites } from "../../search/favourites";
 import { store } from "../../storage/store";
 import { useTeam } from "../../team/TeamProvider";
 import { setRecording, useRecorder } from "../../fieldtest/instance";
@@ -29,7 +31,7 @@ let openedThisLaunch = false;
 /** The browser version is for testing (the store app is the real one): testing tools start open. */
 const TESTING_FIRST = Platform.OS === "web";
 
-type SectionId = "shift" | "team" | "map" | "offline" | "saved" | "testing" | "privacy";
+type SectionId = "shift" | "favourites" | "team" | "map" | "offline" | "saved" | "testing" | "privacy";
 
 /** A heading with a one-line summary that opens to show its settings, so Session isn't one long page. */
 function Section({
@@ -121,6 +123,7 @@ export default function SessionScreen() {
   }, []);
   const { savedPlaces, deletePlace, places } = useSearch();
   const team = useTeam();
+  const favourites = useFavourites();
   // Which sections are open, kept for next time. At first: start of shift until it's
   // filled in, the team while in one, and testing in the browser version.
   const [open, setOpen] = useState<Set<SectionId>>(() => {
@@ -176,7 +179,7 @@ export default function SessionScreen() {
   const teamSummary = !team.code
     ? "Off · see colleagues on the map"
     : team.status === "live"
-      ? `Live · ${others === 0 ? "nobody else yet" : `${others} other${others === 1 ? "" : "s"}`}`
+      ? `Live · ${others === 0 ? "nobody else yet" : `${others} other${others === 1 ? "" : "s"}`}${team.sharing.share ? "" : " · you're hidden"}`
       : team.status === "offline"
         ? "In a team · no signal"
         : team.status === "ended" || team.status === "notfound"
@@ -377,6 +380,16 @@ export default function SessionScreen() {
         >
           <Text style={styles.buttonText}>Go to search</Text>
         </Pressable>
+      </Section>
+
+      <Section
+        id="favourites"
+        title="Favourites"
+        summary={favourites.length ? `${favourites.length} saved: tap one to route there` : "None yet: star a place in Search"}
+        open={open}
+        toggle={toggle}
+      >
+        <FavouritesSection />
       </Section>
 
       <Section id="team" title="Team" summary={teamSummary} open={open} toggle={toggle}>

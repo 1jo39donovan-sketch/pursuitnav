@@ -28,6 +28,8 @@ interface NavigationContextValue {
   active: ActiveNavigation | null;
   /** The last time navigation ended, and why. */
   ended: { at: number; reason: EndReason } | null;
+  /** Where the crew last navigated to (kept after navigation ends): "on scene" for team sharing. */
+  lastDestination: ActiveNavigation["destination"] | null;
   start: (
     kind: RouteKind,
     plan: RoutePlan,
@@ -73,6 +75,7 @@ export function chooseRoute(
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveNavigation | null>(null);
   const [ended, setEnded] = useState<{ at: number; reason: EndReason } | null>(null);
+  const [lastDestination, setLastDestination] = useState<ActiveNavigation["destination"] | null>(null);
 
   const start = useCallback(
     (
@@ -88,6 +91,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       const note = follow
         ? `Following ${follow.callsign}’s way in. ${n ? `Uses ${n} restriction${n === 1 ? "" : "s"} (R on the map).` : "No restrictions found on it."}`
         : chosen.note;
+      setLastDestination(destination);
       setActive({
         kind,
         destination,
@@ -130,8 +134,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ active, ended, start, replan, rerouteNow, stop }),
-    [active, ended, start, replan, rerouteNow, stop],
+    () => ({ active, ended, lastDestination, start, replan, rerouteNow, stop }),
+    [active, ended, lastDestination, start, replan, rerouteNow, stop],
   );
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
 }

@@ -11,7 +11,7 @@ import { store } from "../storage/store";
 import { colors, fonts } from "../theme";
 
 /** The terms' date (server/src/pages.ts, UPDATED): a new date asks again. */
-export const TERMS_VERSION = "26 October 2026";
+export const TERMS_VERSION = "28 October 2026";
 const KEY = "termsAccepted";
 
 const POINTS = [

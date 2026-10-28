@@ -11,12 +11,15 @@ interface Props {
   onClose: () => void;
   /** More about it, a line each; a warning line in amber. */
   lines?: { text: string; warn?: boolean }[];
+  /** Starred in favourites; with onToggleFavourite, a star to tap. */
+  favourite?: boolean;
+  onToggleFavourite?: () => void;
   /** A second way there, beside Route here (Follow in, for a colleague). */
   other?: { label: string; onPress: () => void; busy?: boolean };
 }
 
 /** What a tapped place marker is, with a way to route there. */
-export function MarkerCard({ marker, away, onRoute, onClose, lines, other }: Props) {
+export function MarkerCard({ marker, away, onRoute, onClose, lines, other, favourite, onToggleFavourite }: Props) {
   const styles = useTextStyles(baseStyles);
   return (
     <View style={styles.card}>
@@ -24,6 +27,17 @@ export function MarkerCard({ marker, away, onRoute, onClose, lines, other }: Pro
         <View style={[styles.dot, { backgroundColor: marker.color }]} />
         <Text style={styles.type}>{marker.type.toUpperCase()}</Text>
         {away && <Text style={styles.away}>{away}</Text>}
+        {onToggleFavourite && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={favourite ? "Remove from favourites" : "Add to favourites"}
+            onPress={onToggleFavourite}
+            hitSlop={12}
+            style={styles.close}
+          >
+            <Text style={[styles.star, favourite && styles.starOn]}>{favourite ? "★" : "☆"}</Text>
+          </Pressable>
+        )}
         <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={12} style={styles.close}>
           <Text style={styles.closeText}>✕</Text>
         </Pressable>
@@ -81,6 +95,8 @@ const baseStyles = StyleSheet.create({
   away: { color: colors.muted, fontFamily: fonts.mono, fontSize: 12 },
   close: { paddingLeft: 8 },
   closeText: { color: colors.muted, fontSize: 16 },
+  star: { color: colors.muted, fontSize: 22 },
+  starOn: { color: colors.amber },
   name: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 22 },
   detail: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
   warn: { color: colors.amber, fontFamily: fonts.bodyMedium },
