@@ -89,6 +89,8 @@ export interface NamedArea {
   name: string;
   lat: number;
   lng: number;
+  /** A neighbourhood rather than a well-known area: named only when no area is ahead. */
+  minor?: boolean;
 }
 
 // Look 0.5–2 km ahead: far enough to be useful to relay, close enough to be soon.
@@ -119,8 +121,8 @@ export function generallyTowards(
     if (d < 400 || d > 3000) continue;
     const off = Math.abs(((bearing(origin, a) - heading + 540) % 360) - 180);
     if (off > AREA_CONE_DEG) continue;
-    // Prefer areas nearer the line of travel, then nearer 1.5 km.
-    const score = off * 40 + Math.abs(d - 1500);
+    // Prefer areas nearer the line of travel, then nearer 1.5 km; a well-known area over a neighbourhood.
+    const score = off * 40 + Math.abs(d - 1500) + (a.minor ? 1500 : 0);
     if (!best || score < best.score) best = { name: a.name, score };
   }
   return best?.name ?? null;

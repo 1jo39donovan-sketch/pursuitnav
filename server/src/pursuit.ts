@@ -8,6 +8,12 @@ export interface PursuitInfo {
   /** From OSM maxspeed only. Null when the road has no limit tagged: never guessed. */
   speedLimitMph: number | null;
   nextJunction: { name: string; distanceM: number } | null;
+  /**
+   * The stretch of road the car is on, in the way it's going ([lng, lat]
+   * points, 5 decimals): the app draws the car on it, so the arrow sits on the
+   * road rather than wherever GPS drift puts it. Null when the road isn't known.
+   */
+  roadShape: LngLat[] | null;
 }
 
 // Look this far ahead for a junction with another named road.
@@ -38,6 +44,11 @@ export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: n
     road: roadLabel(names),
     speedLimitMph: limitKph ? kphToMph(limitKph) : null,
     nextJunction: current ? await findJunction(matcher, current, names) : null,
+    // Only an edge on the matched road: a side road's shape would pull the arrow off.
+    roadShape:
+      current && (!matched || sameRoad(current.names, matched.names))
+        ? current.shape.map(([lng, lat]) => [Math.round(lng * 1e5) / 1e5, Math.round(lat * 1e5) / 1e5] as LngLat)
+        : null,
   };
 }
 

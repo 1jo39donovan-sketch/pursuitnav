@@ -9,6 +9,8 @@ export interface PursuitInfo {
   nextJunction: { name: string; distanceM: number } | null;
   /** The mapped house number by the car ("123 Maida Vale"); null when none is close. Older servers leave it out. */
   near?: string | null;
+  /** The stretch of road the car is on, [lng, lat] in its direction: the arrow is drawn on it. Older servers leave it out. */
+  roadShape?: [number, number][] | null;
 }
 
 export type PursuitLookup =

@@ -59,6 +59,7 @@ import {
   VEHICLE_IMAGE,
   vehicleFeature,
 } from "./mapShared";
+import { useGlide } from "./glide";
 import { MapButtons } from "./MapButtons";
 
 /**
@@ -90,6 +91,7 @@ export function LiveMap({
   markers,
   onMarkerPress,
   onTeamPress,
+  snapTo,
 }: LiveMapProps) {
   const { fix, facing } = useLocation();
   const { mapTheme, mapLook } = useSession();
@@ -137,11 +139,14 @@ export function LiveMap({
   }, [fitTo, overlayTop, overlayBottom]);
   const [mapFailed, setMapFailed] = useState(false);
 
-  const position: LngLat | null = fix ? [fix.lng, fix.lat] : null;
+  // Where the vehicle is drawn: on the route while navigating (snapTo), else the
+  // GPS fix; gliding from one to the next rather than jumping once a second.
+  const pose = useGlide(snapTo ?? (fix ? { lng: fix.lng, lat: fix.lat, course: facing } : null));
+  const position: LngLat | null = pose ? [pose.lng, pose.lat] : null;
 
-  const lng = fix?.lng;
-  const lat = fix?.lat;
-  const course = facing;
+  const lng = pose?.lng;
+  const lat = pose?.lat;
+  const course = pose?.course ?? null;
   const puck = useMemo<GeoJSON.Feature | null>(
     () => (lng != null && lat != null ? vehicleFeature(lng, lat, course) : null),
     [lng, lat, course],
@@ -156,11 +161,12 @@ export function LiveMap({
       ? {
           center: position,
           zoom: followAt,
-          ...cameraFor(view, facing),
+          ...cameraFor(view, course),
           // Navigating with the map turned: the vehicle sits low, showing the road ahead.
           padding: { top: ahead + overlayTop / 2, bottom: overlayBottom / 2, left: 0, right: 0 },
-          duration: 800,
-          easing: "ease" as const,
+          // Short, even steps that follow the gliding vehicle frame by frame.
+          duration: 120,
+          easing: "linear" as const,
         }
       : {};
 

@@ -116,6 +116,28 @@ export async function planRoutes(
   heading?: number,
   vehicle: VehicleType = "car",
 ): Promise<Plan> {
+  try {
+    return await planFrom(router, from, to, opts, heading, vehicle);
+  } catch (err) {
+    // Starting the way the car is facing can leave no way at all (GPS a few
+    // metres onto a one-way side street, or on a junction): the crew saw "No
+    // route found", then a route on Retry. Try again from the same point in any
+    // direction before saying there's no route.
+    if (heading !== undefined && err instanceof ValhallaError && err.httpStatus < 500) {
+      return planFrom(router, from, to, opts, undefined, vehicle);
+    }
+    throw err;
+  }
+}
+
+async function planFrom(
+  router: Router,
+  from: LngLat,
+  to: LngLat,
+  opts: PlanOptions,
+  heading: number | undefined,
+  vehicle: VehicleType,
+): Promise<Plan> {
   const STANDARD = standardFor(vehicle, opts.roads);
   const POLICE = policeFor(vehicle, opts.roads);
   const start = { point: from, heading };

@@ -262,8 +262,15 @@ export class SearchIndex {
   }
 
   /** Named neighbourhoods and areas (Brixton, Angel…), for "generally towards". */
-  namedAreas(): { name: string; lat: number; lng: number }[] {
-    return this.pois.filter((p) => p.item.group === "area").map(({ item }) => ({ name: item.name, lat: item.lat, lng: item.lng }));
+  /**
+   * Areas to say the car is heading towards: suburbs and quarters (Brixton,
+   * Stockwell), then neighbourhoods as "minor". Localities and squares are left
+   * out: OSM calls a cricket ground's gates and a block's courtyard localities.
+   */
+  namedAreas(): { name: string; lat: number; lng: number; minor: boolean }[] {
+    return this.pois
+      .filter((p) => p.item.group === "area" && (p.item.type === "Area" || p.item.type === "Neighbourhood"))
+      .map(({ item }) => ({ name: item.name, lat: item.lat, lng: item.lng, minor: item.type !== "Area" }));
   }
 
   get pointOfInterestCount(): number {

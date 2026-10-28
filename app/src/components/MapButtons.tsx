@@ -104,10 +104,12 @@ export function MapButtons({
 }
 
 const styles = StyleSheet.create({
-  column: { position: "absolute", right: 12, gap: 8 },
+  column: { position: "absolute", right: 12, gap: 10 },
   button: {
     width: 52,
-    height: 52,
+    // At least 52: grows with its caption (on an iPhone the caption ran under the compass).
+    minHeight: 52,
+    paddingVertical: 4,
     borderRadius: 10,
     backgroundColor: colors.panel,
     borderColor: colors.line,

@@ -13,6 +13,7 @@ import { useLocation, type Fix } from "../../location/LocationProvider";
 import { EMPTY_FEED, feedNote, nextFeed, shownInfo } from "../../navigation/serverFeed";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
+import { snapToLine } from "../../navigation/snapLine";
 import { useTeam } from "../../team/TeamProvider";
 import { recordEvent } from "../../usage/usage";
 import { colors, fonts } from "../../theme";
@@ -30,6 +31,9 @@ const mph = (ms: number) => ms * 2.236936;
  * borough, next junction and where the car is generally heading. Updates
  * with every GPS fix (about once a second) and keeps the screen on.
  */
+/** How often the nearest door number may change on screen. */
+const DOOR_EVERY_MS = 5_000;
+
 export default function PursuitScreen() {
   // Tabs stay mounted once visited: only poll and hold the screen on while this one is showing.
   const focused = useIsFocused();
@@ -99,8 +103,20 @@ export default function PursuitScreen() {
   );
 
 
-  const speed = fix?.speed != null ? Math.round(mph(fix.speed)) : null;
+  // A fix now and then comes without a speed: show the last one for a moment rather than "—".
+  const withSpeed = fix ? [...trace.fixes].reverse().find((f) => f.speed != null && fix.timestamp - f.timestamp <= 3000) : undefined;
+  const speed = withSpeed?.speed != null ? Math.round(mph(withSpeed.speed)) : null;
   const pursuit = shownInfo(feed, now);
+  // The nearest door changes every second on the move: shown at most every 5 s
+  // (or at once on a new road), so it can be read rather than flicker.
+  const [door, setDoor] = useState<{ near: string | null; road: string | null; at: number }>({ near: null, road: null, at: 0 });
+  const nearNow = pursuit?.near ?? null;
+  const roadNow = pursuit?.road ?? null;
+  if (nearNow !== door.near && (roadNow !== door.road || !door.near || now - door.at >= DOOR_EVERY_MS)) {
+    setDoor({ near: nearNow, road: roadNow, at: now });
+  }
+  // The car drawn on the road it's matched to, when GPS puts it a few metres off.
+  const snapTo = fix ? snapToLine(fix, pursuit?.roadShape) : null;
   const limit = pursuit?.speedLimitMph ?? null;
   const over = speed != null && limit != null && speed > limit;
   const borough = fix ? boroughAt(fix.lat, fix.lng) : null;
@@ -133,9 +149,9 @@ export default function PursuitScreen() {
         {pursuit?.road ?? "—"}
       </Text>
       {/* The nearest numbered door: for a foot chase, or where something was thrown. */}
-      {pursuit?.near && (
+      {pursuit && door.near && (
         <Text style={styles.dist} numberOfLines={1}>
-          by {pursuit.near}
+          by {door.near}
         </Text>
       )}
     </View>
@@ -148,6 +164,7 @@ export default function PursuitScreen() {
           {heading != null && (
             <View style={[styles.needleWrap, { transform: [{ rotate: `${heading}deg` }] }]}>
               <View style={styles.needle} />
+              <View style={styles.needleTail} />
             </View>
           )}
         </View>
@@ -217,6 +234,7 @@ export default function PursuitScreen() {
   const map = (
     <View style={styles.map}>
       <LiveMap
+        snapTo={snapTo}
         lookAhead
         team={teamMap}
         view={mapView}
@@ -294,19 +312,23 @@ const styles = StyleSheet.create({
   dist: { color: colors.muted, fontFamily: fonts.mono, fontSize: 13 },
   compassRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
   dial: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: colors.line, alignItems: "center", justifyContent: "center" },
-  needleWrap: { width: 32, height: 32, alignItems: "center" },
-  // An amber arrowhead pointing up the dial, rotated to the heading.
+  // Fills the dial exactly, so it turns about the dial's centre (it was larger than the dial, so turned off-centre).
+  needleWrap: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center" },
+  // An amber arrow pointing up the dial, rotated to the heading. Long and
+  // narrow, with a tail, so which end is the point is never in doubt (a
+  // squat triangle read as pointing the wrong way).
   needle: {
-    marginTop: 3,
+    marginTop: 2,
     width: 0,
     height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderBottomWidth: 13,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 14,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderBottomColor: colors.amber,
   },
+  needleTail: { width: 3, height: 8, backgroundColor: colors.amber, opacity: 0.6 },
   note: { color: colors.muted, fontFamily: fonts.mono, fontSize: 11 },
   noSignal: {
     flexDirection: "row",
