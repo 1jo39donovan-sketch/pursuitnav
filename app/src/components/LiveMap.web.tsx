@@ -14,6 +14,7 @@ import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { glider, type Pose } from "./glide";
 import {
   ARROW_LAYOUT,
   boundsOf,
@@ -85,6 +86,7 @@ export function LiveMap({
   markers,
   onMarkerPress,
   onTeamPress,
+  snapTo,
 }: LiveMapProps) {
   const { fix, facing } = useLocation();
   const { mapTheme, mapLook } = useSession();
@@ -443,23 +445,64 @@ export function LiveMap({
     return () => clearTimeout(timer);
   }, [fitTo, loaded, overlayTop, overlayBottom]);
 
+  // Where the vehicle is drawn: on the route while navigating (snapTo), else the GPS fix.
+  const target: Pose | null = snapTo ?? (fix ? { lng: fix.lng, lat: fix.lat, course: facing } : null);
+  // The camera settings now, for the glide's frames.
+  const cam = useRef({ following, zoom, view, lookAhead, rotates, overlayTop, overlayBottom });
+  useEffect(() => {
+    cam.current = { following, zoom, view, lookAhead, rotates, overlayTop, overlayBottom };
+  });
+  const paddingFor = (m: maplibregl.Map, c: typeof cam.current) => {
+    // Navigating with the map turned: the vehicle sits low on the screen,
+    // so most of what shows is the road ahead.
+    const ahead = c.lookAhead && c.rotates ? Math.round(m.getContainer().clientHeight * LOOK_AHEAD) : 0;
+    return { top: ahead + c.overlayTop / 2, bottom: c.overlayBottom / 2, left: 0, right: 0 };
+  };
+  // The vehicle glides from fix to fix, the map moving with it every frame, so
+  // the arrow stays still on screen and the streets slide past (not a jump a second).
+  const shown = useRef<Pose | null>(null);
+  const glide = useRef<ReturnType<typeof glider> | null>(null);
   useEffect(() => {
     const m = map.current;
-    if (!m || !loaded || !fix) return;
-    (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(fix.lng, fix.lat, facing));
-    if (following) {
-      // Navigating with the map turned: the vehicle sits low on the screen,
-      // so most of what shows is the road ahead.
-      const ahead = lookAhead && rotates ? Math.round(m.getContainer().clientHeight * LOOK_AHEAD) : 0;
-      m.easeTo({
-        center: [fix.lng, fix.lat],
-        zoom,
-        ...cameraFor(view, facing),
-        padding: { top: ahead + overlayTop / 2, bottom: overlayBottom / 2, left: 0, right: 0 },
-        duration: 800,
+    if (!m || !loaded) return;
+    const g = glider((p) => {
+      shown.current = p;
+      (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(p.lng, p.lat, p.course));
+      const c = cam.current;
+      if (!c.following) return;
+      // Zoom eases towards the speed's zoom a little each frame, rather than stepping.
+      const z = m.getZoom();
+      m.jumpTo({
+        center: [p.lng, p.lat],
+        zoom: Math.abs(c.zoom - z) < 0.01 ? c.zoom : z + (c.zoom - z) * 0.08,
+        ...cameraFor(c.view, p.course),
+        padding: paddingFor(m, c),
       });
-    }
-  }, [fix, facing, loaded, following, zoom, view, lookAhead, rotates, overlayTop, overlayBottom, styleVersion]);
+    });
+    glide.current = g;
+    if (shown.current) g.to(shown.current);
+    return () => g.stop();
+  }, [loaded, styleVersion]);
+  const tLng = target?.lng;
+  const tLat = target?.lat;
+  const tCourse = target?.course ?? null;
+  useEffect(() => {
+    if (tLng == null || tLat == null) return;
+    glide.current?.to({ lng: tLng, lat: tLat, course: tCourse });
+  }, [tLng, tLat, tCourse, loaded, styleVersion]);
+  // A change of view, zoom or following with no new fix (the car stopped): move the camera there.
+  useEffect(() => {
+    const m = map.current;
+    const p = shown.current;
+    if (!m || !loaded || !p || !following) return;
+    m.easeTo({
+      center: [p.lng, p.lat],
+      zoom,
+      ...cameraFor(view, p.course),
+      padding: paddingFor(m, cam.current),
+      duration: 600,
+    });
+  }, [following, zoom, view, lookAhead, rotates, overlayTop, overlayBottom, loaded]);
 
   return (
     <View style={styles.container}>

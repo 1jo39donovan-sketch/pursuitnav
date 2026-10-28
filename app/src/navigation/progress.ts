@@ -202,3 +202,26 @@ export function comingUp(prepared: PreparedRoute, progress: Progress, count = 5)
     inM: Math.max(0, (prepared.cumulative[m.beginShapeIndex] ?? 0) - progress.along),
   }));
 }
+
+/**
+ * The point `along` metres down the route, and which way the road runs there:
+ * where the vehicle is drawn while it's on the route, so the arrow sits on the
+ * road rather than wherever GPS drift puts it.
+ */
+export function pointAlong(prepared: PreparedRoute, along: number): { lng: number; lat: number; course: number } | null {
+  const { shape } = prepared.route;
+  const { cumulative } = prepared;
+  if (shape.length < 2) return null;
+  let i = 0;
+  while (i < shape.length - 2 && cumulative[i + 1]! < along) i++;
+  // Skip zero-length segments (repeated points), which have no direction.
+  let j = i;
+  while (j < shape.length - 2 && cumulative[j + 1]! - cumulative[j]! < 0.5) j++;
+  const [ax, ay] = shape[j] as LngLat;
+  const [bx, by] = shape[j + 1] as LngLat;
+  const len = cumulative[j + 1]! - cumulative[j]!;
+  const t = len > 0 ? Math.max(0, Math.min(1, (along - cumulative[j]!) / len)) : 0;
+  const cosLat = Math.cos((ay * Math.PI) / 180);
+  const course = ((Math.atan2((bx - ax) * cosLat, by - ay) * 180) / Math.PI + 360) % 360;
+  return { lng: ax + (bx - ax) * t, lat: ay + (by - ay) * t, course };
+}

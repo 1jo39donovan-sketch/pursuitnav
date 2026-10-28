@@ -31,6 +31,15 @@ describe("POST /v1/pursuit", () => {
     expect(info.speedLimitMph).toBeNull();
   });
 
+  it("sends the stretch of road the car is on, running the way it's going", async () => {
+    const info = await lookup({ points: eastboundTo(points.unsigned_near_split!), heading: 90 });
+    expect(info.roadShape!.length).toBeGreaterThanOrEqual(2);
+    const first = info.roadShape![0]!;
+    const last = info.roadShape![info.roadShape!.length - 1]!;
+    expect(last[0]).toBeGreaterThan(first[0]); // eastbound
+    expect(Math.abs(last[1] - points.unsigned_near_split!.lat)).toBeLessThan(0.0005);
+  });
+
   it("finds the next junction, passing through a split in the same road", async () => {
     // ~35 m before the split at column 1, then 208 m on to Cross Street.
     const info = await lookup({ points: eastboundTo(points.unsigned_near_split!), heading: 90 });

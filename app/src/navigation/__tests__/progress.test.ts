@@ -114,3 +114,27 @@ describe("comingUp", () => {
     expect(comingUp(prepared, progressAt(prepared, at(LNG, LAT)))).toEqual([]);
   });
 });
+
+describe("drawing the vehicle on the route", () => {
+  it("puts it on the line, facing along the road", async () => {
+    const { pointAlong, prepare } = await import("../progress");
+    const route = {
+      shape: [
+        [0, 51.5],
+        [0, 51.501],
+        [0.0016, 51.501],
+      ],
+      maneuvers: [],
+      durationS: 60,
+      distanceM: 220,
+    } as never;
+    const prepared = prepare(route);
+    const north = pointAlong(prepared, 50)!;
+    expect(north.lng).toBeCloseTo(0);
+    expect(north.lat).toBeCloseTo(51.50045, 5);
+    expect(north.course).toBeCloseTo(0);
+    const east = pointAlong(prepared, 150)!;
+    expect(east.lat).toBeCloseTo(51.501);
+    expect(east.course).toBeCloseTo(90);
+  });
+});

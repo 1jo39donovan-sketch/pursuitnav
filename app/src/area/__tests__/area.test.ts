@@ -44,6 +44,18 @@ describe("generallyTowards", () => {
     ).toBe("Ahead");
   });
 
+  it("names a well-known area over a closer, better-lined-up neighbourhood", () => {
+    const at = { lat: 51.372, lng: -0.1 };
+    const gate = projectAhead(at.lat, at.lng, 0, 1500);
+    const area = projectAhead(at.lat, at.lng, 15, 2000);
+    expect(
+      generallyTowards(at.lat, at.lng, 0, [
+        { name: "Some Gate", ...gate, minor: true },
+        { name: "Brixton", ...area },
+      ]),
+    ).toBe("Brixton");
+  });
+
   it("says so when there's nothing to name", () => {
     expect(generallyTowards(51.372, -0.1, 0, [])).toBeNull();
   });

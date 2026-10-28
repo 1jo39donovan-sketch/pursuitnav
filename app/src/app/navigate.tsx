@@ -52,6 +52,7 @@ import {
   OFF_ROUTE_FIXES,
   offRouteCount,
   prepare,
+  pointAlong,
   progressAt,
   type PreparedRoute,
   type Progress,
@@ -78,6 +79,9 @@ function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
 }
 
 /** Turn-by-turn guidance, readable at a glance by the operator. */
+/** Drawn on the route line when GPS puts the vehicle within this of it, metres. */
+const SNAP_DRAW_M = 30;
+
 export default function NavigateScreen() {
   const styles = useTextStyles(baseStyles);
   // Screen stays on while navigating. Ending quickly can release the lock
@@ -400,6 +404,13 @@ export default function NavigateScreen() {
   const offRouteMsg = offRouteText(failed, RETRY_AFTER_FAILURE_MS / 1000, reroutingFor);
   // The off-route panel also shows while a re-route asked for on the line is worked out.
   const showOff = offRoute || rerouting;
+  // On the route, the arrow is drawn on the route line (GPS a few metres to the
+  // side put it on the pavement or the buildings); off it, where GPS says. Within
+  // less than the off-route distance, so a missed turn shows within a few seconds.
+  const snapTo =
+    progress && !showOff && !progress.arrived && progress.offRouteBy <= SNAP_DRAW_M
+      ? pointAlong(prepared, progress.along)
+      : null;
   const banner = linkBanner(linkState.link);
   // Off the line with no signal: no new route is coming, so show the way back.
   const back =
@@ -446,7 +457,8 @@ export default function NavigateScreen() {
           <View style={styles.turnRow}>
             <Text style={[styles.arrow, compact && styles.arrowCompact]}>{maneuverArrow(progress.next?.type ?? 4)}</Text>
             <Text style={[styles.distance, compact && styles.distanceCompact]}>
-              {formatDistance(progress.distanceToNextM)}
+              {/* At the junction "0 yd" read like a fault: say it's now. */}
+              {progress.distanceToNextM < 15 ? "Now" : formatDistance(progress.distanceToNextM)}
             </Text>
           </View>
           <Text style={[styles.instruction, compact && styles.instructionCompact]} numberOfLines={compact ? 2 : 3}>
@@ -575,6 +587,7 @@ export default function NavigateScreen() {
           </View>
           <View style={styles.map}>
             <LiveMap
+              snapTo={snapTo}
               lookAhead
               team={teamMap}
               view={mapView}
@@ -597,6 +610,7 @@ export default function NavigateScreen() {
           {/* The map fills the screen; the next turn floats over its top. */}
           <View style={styles.map}>
             <LiveMap
+              snapTo={snapTo}
               lookAhead
               overlayTop={turnHeight}
               overlayBottom={18}

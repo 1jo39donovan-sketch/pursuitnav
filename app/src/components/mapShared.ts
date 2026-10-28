@@ -70,6 +70,11 @@ export interface LiveMapProps {
   /** Place markers (points with MarkerProperties). */
   markers?: GeoJSON.FeatureCollection | null;
   onMarkerPress?: (marker: MarkerProperties, point: LngLat) => void;
+  /**
+   * Where to draw the vehicle instead of the raw GPS fix: its point on the route
+   * while navigating, so the arrow sits on the road. Null: the GPS fix.
+   */
+  snapTo?: { lng: number; lat: number; course: number } | null;
   /** A tap on a colleague's dot: their member ID. */
   onTeamPress?: (memberId: string) => void;
 }
@@ -194,11 +199,10 @@ export function pointsGeoJSON(points: LngLat[] | undefined): GeoJSON.FeatureColl
  */
 export function speedZoom(speedMs: number | null): number {
   if (speedMs == null) return 0;
+  // A smooth slope rather than steps: in stop-start traffic the speed hovers
+  // round a step, and the map zoomed in and out every few seconds.
   const mph = speedMs * 2.23694;
-  if (mph < 10) return 1;
-  if (mph < 25) return 0.5;
-  if (mph < 45) return 0;
-  return -1;
+  return Math.max(-1, Math.min(1, 1 - ((mph - 10) / 35) * 2));
 }
 
 /**
