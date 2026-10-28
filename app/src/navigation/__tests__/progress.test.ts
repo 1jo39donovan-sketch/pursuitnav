@@ -81,6 +81,12 @@ describe("offRouteCount", () => {
   it("allows for poor GPS accuracy", () => {
     expect(offRouteCount(0, 60, 50)).toBe(0); // 60 m off with ±50 m accuracy isn't conclusive
     expect(offRouteCount(0, 90, 50)).toBe(1);
+    // Gone past a turn: a little off the line and driving across the route counts double.
+    expect(offRouteCount(0, 25, 8, 90)).toBe(2);
+    expect(offRouteCount(2, 30, 8, 85)).toBe(4);
+    // Along the route's direction, or close to the line: as before.
+    expect(offRouteCount(0, 25, 8, 10)).toBe(0);
+    expect(offRouteCount(0, 12, 8, 90)).toBe(0);
   });
 });
 
@@ -136,5 +142,16 @@ describe("drawing the vehicle on the route", () => {
     const east = pointAlong(prepared, 150)!;
     expect(east.lat).toBeCloseTo(51.501);
     expect(east.course).toBeCloseTo(90);
+  });
+});
+
+describe("briefInstruction", () => {
+  it("drops the trailing 'Continue on …' so the turn itself fits", async () => {
+    const { briefInstruction } = await import("../progress");
+    expect(briefInstruction("Turn left onto A501/Penton Rise. Continue on A501.")).toBe("Turn left onto A501/Penton Rise.");
+    expect(briefInstruction("Turn right onto Bedford Road/B221. Continue for 200 metres.")).toBe(
+      "Turn right onto Bedford Road/B221.",
+    );
+    expect(briefInstruction("Continue on A3.")).toBe("Continue on A3.");
   });
 });

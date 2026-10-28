@@ -31,6 +31,9 @@ const mph = (ms: number) => ms * 2.236936;
  * borough, next junction and where the car is generally heading. Updates
  * with every GPS fix (about once a second) and keeps the screen on.
  */
+/** How often the nearest door number may change on screen. */
+const DOOR_EVERY_MS = 5_000;
+
 export default function PursuitScreen() {
   // Tabs stay mounted once visited: only poll and hold the screen on while this one is showing.
   const focused = useIsFocused();
@@ -104,6 +107,14 @@ export default function PursuitScreen() {
   const withSpeed = fix ? [...trace.fixes].reverse().find((f) => f.speed != null && fix.timestamp - f.timestamp <= 3000) : undefined;
   const speed = withSpeed?.speed != null ? Math.round(mph(withSpeed.speed)) : null;
   const pursuit = shownInfo(feed, now);
+  // The nearest door changes every second on the move: shown at most every 5 s
+  // (or at once on a new road), so it can be read rather than flicker.
+  const [door, setDoor] = useState<{ near: string | null; road: string | null; at: number }>({ near: null, road: null, at: 0 });
+  const nearNow = pursuit?.near ?? null;
+  const roadNow = pursuit?.road ?? null;
+  if (nearNow !== door.near && (roadNow !== door.road || !door.near || now - door.at >= DOOR_EVERY_MS)) {
+    setDoor({ near: nearNow, road: roadNow, at: now });
+  }
   // The car drawn on the road it's matched to, when GPS puts it a few metres off.
   const snapTo = fix ? snapToLine(fix, pursuit?.roadShape) : null;
   const limit = pursuit?.speedLimitMph ?? null;
@@ -138,9 +149,9 @@ export default function PursuitScreen() {
         {pursuit?.road ?? "—"}
       </Text>
       {/* The nearest numbered door: for a foot chase, or where something was thrown. */}
-      {pursuit?.near && (
+      {pursuit && door.near && (
         <Text style={styles.dist} numberOfLines={1}>
-          by {pursuit.near}
+          by {door.near}
         </Text>
       )}
     </View>

@@ -127,9 +127,33 @@ export function progressAt(
  * Counts consecutive off-route fixes. GPS can be poor between tall
  * buildings, so the threshold widens with the fix's own stated accuracy.
  */
-export function offRouteCount(previous: number, offRouteBy: number, accuracy: number | null): number {
+/** Off the line by this much and driving across the route's direction: a missed turn, counted double. */
+export const WRONG_WAY_M = 20;
+/** Degrees between the car's course and the route's direction that count as across it. */
+export const WRONG_WAY_DEG = 60;
+
+/**
+ * Off-route fixes so far. A car well off the line counts one a fix (4 to
+ * re-route, about 4 s). One that has gone past a turn shows it sooner: a
+ * little off the line and driving across the route's direction counts two a
+ * fix, so a missed turn re-routes in about 2 s. `headingOff` is degrees between
+ * the car's course and the route's direction there (null when not moving).
+ */
+export function offRouteCount(
+  previous: number,
+  offRouteBy: number,
+  accuracy: number | null,
+  headingOff: number | null = null,
+): number {
   const limit = Math.max(OFF_ROUTE_M, (accuracy ?? 0) * 1.5);
+  const wrongWay = headingOff != null && headingOff > WRONG_WAY_DEG && offRouteBy > Math.max(WRONG_WAY_M, accuracy ?? 0);
+  if (wrongWay) return previous + 2;
   return offRouteBy > limit ? previous + 1 : 0;
+}
+
+/** Degrees between two courses, 0 to 180. */
+export function courseDiff(a: number, b: number): number {
+  return Math.abs(((a - b + 540) % 360) - 180);
 }
 
 /** Arrow for a Valhalla maneuver type, for the big next-turn display. */
@@ -185,6 +209,16 @@ const ARRIVAL: Record<number, string> = {
  */
 export function upcomingInstruction(m: Maneuver): string {
   return ARRIVAL[m.type] ?? m.instruction;
+}
+
+/**
+ * An instruction for reading at a glance: without the routing engine's
+ * trailing "Continue on A501." (or "Continue for 200 metres."), which pushed
+ * the turn itself out of the "Then" line.
+ */
+export function briefInstruction(text: string): string {
+  const brief = text.replace(/\s+Continue (on|for|along)\b[^.]*\.?\s*$/i, "").trim();
+  return brief || text;
 }
 
 /**

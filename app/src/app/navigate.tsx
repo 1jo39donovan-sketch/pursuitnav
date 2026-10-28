@@ -50,6 +50,8 @@ import {
   comingUp,
   upcomingInstruction,
   OFF_ROUTE_FIXES,
+  briefInstruction,
+  courseDiff,
   offRouteCount,
   prepare,
   pointAlong,
@@ -79,6 +81,13 @@ function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
 }
 
 /** Turn-by-turn guidance, readable at a glance by the operator. */
+/** Degrees between the car's course and the route's direction where it is; null when not moving. */
+function headingOff(prepared: PreparedRoute, progress: Progress, fix: { course: number | null; speed: number | null }) {
+  if (fix.course == null || fix.speed == null || fix.speed < 3) return null;
+  const here = pointAlong(prepared, progress.along);
+  return here ? courseDiff(fix.course, here.course) : null;
+}
+
 /** Drawn on the route line when GPS puts the vehicle within this of it, metres. */
 const SNAP_DRAW_M = 30;
 
@@ -149,7 +158,7 @@ export default function NavigateScreen() {
       offCount:
         fresh || (simulated && fix.timestamp - demoDriveStartedAt() < DEMO_GRACE_MS)
           ? 0
-          : offRouteCount(track.offCount, progress.offRouteBy, fix.accuracy),
+          : offRouteCount(track.offCount, progress.offRouteBy, fix.accuracy, headingOff(prepared, progress, fix)),
     });
   }
   const progress = track.prepared === prepared ? track.progress : null;
@@ -462,11 +471,14 @@ export default function NavigateScreen() {
             </Text>
           </View>
           <Text style={[styles.instruction, compact && styles.instructionCompact]} numberOfLines={compact ? 2 : 3}>
-            {progress.next ? instructionWithPlace(progress.next, active.destination.title) : "Continue to your destination."}
+            {progress.next
+              ? briefInstruction(instructionWithPlace(progress.next, active.destination.title))
+              : "Continue to your destination."}
           </Text>
           {progress.after && (
             <Text style={styles.then} numberOfLines={compact ? 1 : 2}>
-              Then {maneuverArrow(progress.after.type)} {instructionWithPlace(progress.after, active.destination.title)}
+              Then {maneuverArrow(progress.after.type)}{" "}
+              {briefInstruction(instructionWithPlace(progress.after, active.destination.title))}
             </Text>
           )}
         </>
