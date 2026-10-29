@@ -22,6 +22,7 @@ import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import { colors, fonts } from "../theme";
 import type { ServiceType } from "../vehicles";
+import { useThemed, useColors } from "../textSize";
 
 /** The stations each service wants listed, by OpenStreetMap place type. */
 const STATIONS: Record<ServiceType, { types: string[]; label: string }> = {
@@ -44,6 +45,8 @@ function go(title: string, lat: number, lng: number) {
 }
 
 export default function AreaScreen() {
+  const palette = useColors();
+  const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ code?: string }>();
   const { boroughs, service } = useSession();
@@ -219,7 +222,7 @@ export default function AreaScreen() {
           onBlur={saveNow}
           multiline
           placeholder={`Anything you want to hand for this ${unitWord}`}
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={palette.muted}
           style={styles.notes}
         />
       </ScrollView>
@@ -228,6 +231,7 @@ export default function AreaScreen() {
 }
 
 function GoButton({ label, onPress, text = "Go" }: { label: string; onPress: () => void; text?: string }) {
+  const styles = useThemed(baseStyles);
   return (
     <Pressable
       accessibilityRole="button"
@@ -240,7 +244,7 @@ function GoButton({ label, onPress, text = "Go" }: { label: string; onPress: () 
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   back: { paddingHorizontal: 16, paddingVertical: 12, alignSelf: "flex-start" },
   backText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 17 },

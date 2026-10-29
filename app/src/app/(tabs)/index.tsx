@@ -10,6 +10,7 @@ import { looksOffered, MAP_LOOK_NAMES, type MapLook } from "../../components/map
 import { OfflineMapSection } from "../../components/OfflineMapSection";
 import { FavouritesSection } from "../../components/FavouritesSection";
 import { TeamSection } from "../../components/TeamSection";
+import { VoiceSettings } from "../../components/VoiceSettings";
 import { useFavourites } from "../../search/favourites";
 import { store } from "../../storage/store";
 import { useTeam } from "../../team/TeamProvider";
@@ -19,10 +20,10 @@ import { useLog } from "../../log/LogProvider";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { currentInstallId, newInstallId } from "../../usage/usage";
-import { colors, fonts } from "../../theme";
+import { APPEARANCES, colors, fonts, type Appearance } from "../../theme";
 import { bcuFor } from "../../search/boroughGroups";
 import { SERVICES, VEHICLES, vehiclesFor } from "../../vehicles";
-import { useTextStyles } from "../../textSize";
+import { useTextStyles, useColors } from "../../textSize";
 
 // Once a shift is set up, the app opens on Search: the job is usually to type
 // an address straight away. Only on the first screen shown after launch.
@@ -73,6 +74,13 @@ function Section({
   );
 }
 
+/** Dark or light screens (the map has its own Day and Night). */
+const APPEARANCE_NAMES: Record<Appearance, string> = {
+  system: "◐ Match phone",
+  dark: "Dark screens",
+  light: "Light screens",
+};
+
 const LOOK_HINTS: Record<MapLook, string> = {
   standard: "The everyday map.",
   clear: "High contrast: wider, brighter roads and bold names, for reading on the move.",
@@ -81,6 +89,7 @@ const LOOK_HINTS: Record<MapLook, string> = {
 };
 
 export default function SessionScreen() {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const {
     callsign,
@@ -104,6 +113,8 @@ export default function SessionScreen() {
     largeText,
     setLargeText,
     setMapTheme,
+    appearance,
+    setAppearance,
     roads,
     setRoads,
     learning,
@@ -188,6 +199,7 @@ export default function SessionScreen() {
   const mapSummary = [
     mapTheme === "night" ? "Night map" : "Day map",
     MAP_LOOK_NAMES[mapLook],
+    appearance === "system" ? null : appearance === "dark" ? "dark screens" : "light screens",
     voice ? "voice on" : "voice off",
     largeText ? "larger text" : null,
   ]
@@ -215,7 +227,7 @@ export default function SessionScreen() {
         accessibilityLabelledBy="demo-drive-label"
         value={demoDrive}
         onValueChange={setDemoDrive}
-        trackColor={{ false: colors.line, true: colors.amber }}
+        trackColor={{ false: palette.line, true: palette.amber }}
       />
     </View>
   );
@@ -293,7 +305,7 @@ export default function SessionScreen() {
             value={callsign}
             onChangeText={setCallsign}
             placeholder="e.g. NI-31"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={palette.muted}
             autoCapitalize="characters"
             autoCorrect={false}
             style={styles.input}
@@ -364,7 +376,7 @@ export default function SessionScreen() {
               accessibilityLabelledBy="bluelight-label"
               value={policeRoutes}
               onValueChange={setPoliceRoutes}
-              trackColor={{ false: colors.line, true: colors.amber }}
+              trackColor={{ false: palette.line, true: palette.amber }}
             />
           </View>
           <Text style={styles.placeMeta}>
@@ -407,9 +419,10 @@ export default function SessionScreen() {
               accessibilityLabelledBy="voice-label"
               value={voice}
               onValueChange={setVoice}
-              trackColor={{ false: colors.line, true: colors.amber }}
+              trackColor={{ false: palette.line, true: palette.amber }}
             />
           </View>
+          {voice && <VoiceSettings />}
           <View style={styles.toggleRow}>
             <Text style={[styles.placeName, styles.placeText]} nativeID="pursuit-label">
               Pursuit tab
@@ -418,8 +431,24 @@ export default function SessionScreen() {
               accessibilityLabelledBy="pursuit-label"
               value={showPursuit}
               onValueChange={setShowPursuit}
-              trackColor={{ false: colors.line, true: colors.amber }}
+              trackColor={{ false: palette.line, true: palette.amber }}
             />
+          </View>
+          <View style={styles.chips} accessibilityLabel="Screens">
+            {APPEARANCES.map((a) => {
+              const on = appearance === a;
+              return (
+                <Pressable
+                  key={a}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: on }}
+                  onPress={() => setAppearance(a)}
+                  style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
+                >
+                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{APPEARANCE_NAMES[a]}</Text>
+                </Pressable>
+              );
+            })}
           </View>
           <View style={styles.chips}>
             {(["night", "day"] as const).map((t) => {
@@ -465,7 +494,7 @@ export default function SessionScreen() {
               accessibilityLabelledBy="large-text-label"
               value={largeText}
               onValueChange={setLargeText}
-              trackColor={{ false: colors.line, true: colors.amber }}
+              trackColor={{ false: palette.line, true: palette.amber }}
             />
           </View>
         </View>
@@ -516,7 +545,7 @@ export default function SessionScreen() {
               accessibilityLabelledBy="fieldtest-label"
               value={recording.enabled}
               onValueChange={setRecording}
-              trackColor={{ false: colors.line, true: colors.amber }}
+              trackColor={{ false: palette.line, true: palette.amber }}
             />
           </View>
           <Text style={styles.placeMeta}>
@@ -542,7 +571,7 @@ export default function SessionScreen() {
                 accessibilityLabelledBy="learning-label"
                 value={learning}
                 onValueChange={setLearning}
-                trackColor={{ false: colors.line, true: colors.amber }}
+                trackColor={{ false: palette.line, true: palette.amber }}
               />
             </View>
             <Text style={styles.placeMeta}>

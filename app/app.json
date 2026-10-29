@@ -14,7 +14,7 @@
     },
     "orientation": "default",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#0c1220",
     "ios": {
       "bundleIdentifier": "com.blueroute.patrol",

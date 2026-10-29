@@ -5,6 +5,7 @@ import { DEMO_MODE } from "../config";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { useThemed, useColors } from "../textSize";
 
 const WEB = Platform.OS === "web";
 // In a browser there's no Settings screen to open: say where to go instead,
@@ -50,6 +51,7 @@ const reload = () => window.location.reload();
 
 /** A line when the GPS position can't be trusted, with a fix if there is one. Nothing when it's good. */
 export function GpsStatus() {
+  const styles = useThemed(baseStyles);
   const { status, fix, requestPermission, simulated } = useLocation();
   const { setDemoDrive } = useSession();
   // In the browser (the test version) the blocked-location line can be put
@@ -162,7 +164,9 @@ function Banner({
   text: string;
   children?: React.ReactNode;
 }) {
-  const color = tone === "ok" ? colors.ok : tone === "warn" ? colors.amber : colors.muted;
+  const palette = useColors();
+  const styles = useThemed(baseStyles);
+  const color = tone === "ok" ? palette.ok : tone === "warn" ? palette.amber : palette.muted;
   return (
     <View style={styles.banner}>
       <View style={styles.line}>
@@ -175,6 +179,7 @@ function Banner({
 }
 
 function Action({ label, onPress }: { label: string; onPress: () => void }) {
+  const styles = useThemed(baseStyles);
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.action}>
       <Text style={styles.actionText}>{label}</Text>
@@ -182,7 +187,7 @@ function Action({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   banner: {
     flexDirection: "row",
     // Long instructions take the line; the buttons go under them on a phone.

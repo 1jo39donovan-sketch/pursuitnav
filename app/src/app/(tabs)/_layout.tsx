@@ -2,15 +2,16 @@ import { Tabs } from "expo-router";
 
 import { Header } from "../../components/Header";
 import { TabBar } from "../../components/TabBar";
-import { colors } from "../../theme";
+import { useColors } from "../../textSize";
 
 export default function TabLayout() {
+  const palette = useColors();
   return (
     <Tabs
       tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         header: () => <Header />,
-        sceneStyle: { backgroundColor: colors.bg },
+        sceneStyle: { backgroundColor: palette.bg },
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Session" }} />

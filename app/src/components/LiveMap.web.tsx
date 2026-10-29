@@ -58,6 +58,7 @@ import {
   vehicleFeature,
 } from "./mapShared";
 import { MapButtons } from "./MapButtons";
+import { useThemed } from "../textSize";
 
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -88,6 +89,7 @@ export function LiveMap({
   onTeamPress,
   snapTo,
 }: LiveMapProps) {
+  const styles = useThemed(baseStyles);
   const { fix, facing } = useLocation();
   const { mapTheme, mapLook } = useSession();
   // For layers re-added on each style load: the theme now, not when the map was made.
@@ -538,7 +540,7 @@ export function LiveMap({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, overflow: "hidden" },
   map: { flex: 1 },
   recentre: {

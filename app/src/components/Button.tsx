@@ -3,6 +3,7 @@
 import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from "react-native";
 
 import { colors, fonts } from "../theme";
+import { useThemed } from "../textSize";
 
 type Variant = "primary" | "secondary" | "danger";
 
@@ -19,6 +20,7 @@ export function Button({
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const styles = useThemed(baseStyles);
   return (
     <Pressable
       accessibilityRole="button"
@@ -33,7 +35,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   base: {
     minHeight: 48,
     paddingHorizontal: 16,

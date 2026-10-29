@@ -12,7 +12,7 @@ import { SHARE_POLICIES } from "../team/sharePolicy";
 import { useFollowIn } from "../team/useFollowIn";
 import { colors, fonts } from "../theme";
 import { Button } from "./Button";
-import { useTextStyles } from "../textSize";
+import { useTextStyles, useColors } from "../textSize";
 
 const STATUS: Record<string, string> = {
   connecting: "Connecting…",
@@ -54,6 +54,7 @@ export function ago(ms: number): string {
 }
 
 export function TeamSection() {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const team = useTeam();
   const { fix } = useLocation();
@@ -85,7 +86,7 @@ export function TeamSection() {
                 setBadCode(false);
               }}
               placeholder="Paste the code or the whole message"
-              placeholderTextColor={colors.muted}
+              placeholderTextColor={palette.muted}
               autoCapitalize="characters"
               autoCorrect={false}
               autoFocus
@@ -187,7 +188,7 @@ export function TeamSection() {
                 )}
               </View>
               {following === m.memberId ? (
-                <ActivityIndicator color={colors.amber} />
+                <ActivityIndicator color={palette.amber} />
               ) : m.track.length >= 2 ? (
                 <Button label="Follow in" variant="primary" onPress={() => void follow(m)} />
               ) : (
@@ -208,6 +209,7 @@ export function TeamSection() {
 
 /** What this phone shares, said plainly, and the crew's choices about it. */
 function ShareSettings() {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const team = useTeam();
   const hint = SHARE_POLICIES.find((p) => p.id === team.policy)?.hint;
@@ -249,7 +251,7 @@ function ShareSettings() {
           accessibilityLabelledBy="battery-label"
           value={team.batterySaver}
           onValueChange={team.setBatterySaver}
-          trackColor={{ false: colors.line, true: colors.amber }}
+          trackColor={{ false: palette.line, true: palette.amber }}
         />
       </View>
       <View style={styles.toggle}>
@@ -266,7 +268,7 @@ function ShareSettings() {
           accessibilityLabelledBy="police-share-label"
           value={team.shareAtPolice}
           onValueChange={team.setShareAtPolice}
-          trackColor={{ false: colors.line, true: colors.amber }}
+          trackColor={{ false: palette.line, true: palette.amber }}
         />
       </View>
     </View>

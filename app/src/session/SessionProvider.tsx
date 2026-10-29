@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useColorScheme } from "react-native";
 
 import { BOROUGHS, type Borough } from "../search/boroughs";
 import { clearQueue, uploadDue } from "../learning/queue";
 import { MAP_LOOKS, type MapLook } from "../components/mapLooks";
 import { store } from "../storage/store";
+import { APPEARANCES, type Appearance } from "../theme";
 import { isService, isVehicle, vehiclesFor, type ServiceType, type VehicleType } from "../vehicles";
 
 interface Session {
@@ -35,6 +37,11 @@ interface Session {
   /** How the navigation and pursuit maps turn: north up, direction of travel up, or tilted 3D. */
   mapView: MapView;
   setMapView: (v: MapView) => void;
+  /** Dark or light screens: following the phone, or chosen. */
+  appearance: Appearance;
+  setAppearance: (a: Appearance) => void;
+  /** The screens are dark now. */
+  dark: boolean;
   /** Larger text on Search, the route choice and navigation. */
   largeText: boolean;
   setLargeText: (on: boolean) => void;
@@ -123,6 +130,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [voiceSetting, setVoiceSetting] = useSetting<"1" | "0">("voice", ["1", "0"], "1");
   const voice = voiceSetting === "1";
   const [roads, setRoads] = useSetting<RoadChoice>("roads", ["main", "any"], "main");
+  const [appearance, setAppearance] = useSetting<Appearance>("appearance", APPEARANCES, "system");
+  // Before a build that follows the phone, it always says dark.
+  const scheme = useColorScheme();
+  const dark = appearance === "dark" || (appearance === "system" && scheme !== "light");
   const [largeSetting, setLargeSetting] = useSetting<"1" | "0">("largeText", ["1", "0"], "0");
   const largeText = largeSetting === "1";
   const setLargeText = useCallback((on: boolean) => setLargeSetting(on ? "1" : "0"), [setLargeSetting]);
@@ -202,6 +213,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapView,
       voice,
       setVoice,
+      appearance,
+      setAppearance,
+      dark,
       largeText,
       setLargeText,
       roads,
@@ -237,6 +251,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapView,
       voice,
       setVoice,
+      appearance,
+      setAppearance,
+      dark,
       largeText,
       setLargeText,
       roads,

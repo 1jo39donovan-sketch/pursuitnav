@@ -61,6 +61,7 @@ import {
 } from "./mapShared";
 import { useGlide } from "./glide";
 import { MapButtons } from "./MapButtons";
+import { useThemed } from "../textSize";
 
 /**
  * Map (night or day style) that follows the phone's GPS position. Panning the map stops
@@ -93,6 +94,7 @@ export function LiveMap({
   onTeamPress,
   snapTo,
 }: LiveMapProps) {
+  const styles = useThemed(baseStyles);
   const { fix, facing } = useLocation();
   const { mapTheme, mapLook } = useSession();
   // The map kept on the phone, once downloaded: draws with no signal.
@@ -376,7 +378,7 @@ export function LiveMap({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, overflow: "hidden" },
   recentre: {
     position: "absolute",

@@ -12,8 +12,11 @@ import { storageState, storageText, type TripRecord } from "../fieldtest/trip";
 import { formatDuration } from "../format";
 import { store } from "../storage/store";
 import { colors, fonts } from "../theme";
+import { useThemed, useColors } from "../textSize";
 
 export default function TripsScreen() {
+  const palette = useColors();
+  const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();
   // Re-read when a trip starts or ends.
   useRecorder();
@@ -77,7 +80,7 @@ export default function TripsScreen() {
                   accessibilityLabelledBy="demo-label"
                   value={includeDemo}
                   onValueChange={setIncludeDemo}
-                  trackColor={{ false: colors.line, true: colors.amber }}
+                  trackColor={{ false: palette.line, true: palette.amber }}
                 />
               </View>
               <View style={styles.buttons}>
@@ -138,6 +141,7 @@ export default function TripsScreen() {
 const KIND: Record<string, string> = { police: "BLUE LIGHT", standard: "STANDARD", follow: "FOLLOW-IN" };
 
 function TripRow({ trip }: { trip: TripRecord }) {
+  const styles = useThemed(baseStyles);
   const { header: h, summary: s } = trip;
   const when = new Date(h.startedAt).toLocaleString("en-GB", {
     day: "numeric",
@@ -167,7 +171,7 @@ function TripRow({ trip }: { trip: TripRecord }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   back: { paddingHorizontal: 16, paddingVertical: 12, alignSelf: "flex-start" },
   backText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 17 },
