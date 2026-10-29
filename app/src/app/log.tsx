@@ -8,6 +8,7 @@ import { useLog } from "../log/LogProvider";
 import { store } from "../storage/store";
 import type { LogEntry, LoggedRoute } from "../storage/types";
 import { colors, fonts } from "../theme";
+import { useColors, useThemed, useTint } from "../textSize";
 
 const ROUTE_LABEL: Record<LoggedRoute, { text: string; color: string }> = {
   standard: { text: "STANDARD ROUTE", color: colors.blue },
@@ -31,6 +32,7 @@ function dayLabel(iso: string): string {
  * Opened from the Session tab.
  */
 export default function LogScreen() {
+  const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();
   const { entries, clear } = useLog();
   const [confirming, setConfirming] = useState(false);
@@ -126,6 +128,9 @@ export default function LogScreen() {
 }
 
 function Entry({ entry }: { entry: LogEntry }) {
+  const palette = useColors();
+  const tint = useTint();
+  const styles = useThemed(baseStyles);
   const time = new Date(entry.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   const route = entry.route ? ROUTE_LABEL[entry.route] : null;
   return (
@@ -136,7 +141,12 @@ function Entry({ entry }: { entry: LogEntry }) {
       <Text style={styles.chosen}>{entry.chosen}</Text>
       <View style={styles.row}>
         <Text style={styles.borough}>{entry.borough ?? "Outside London"}</Text>
-        <Text style={[styles.route, { color: route?.color ?? colors.muted, borderColor: route?.color ?? colors.line }]}>
+        <Text
+          style={[
+            styles.route,
+            { color: route ? tint(route.color) : palette.muted, borderColor: route ? tint(route.color) : palette.line },
+          ]}
+        >
           {route?.text ?? "NO ROUTE PICKED"}
         </Text>
       </View>
@@ -156,7 +166,7 @@ function Entry({ entry }: { entry: LogEntry }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   back: { paddingHorizontal: 16, paddingVertical: 12, alignSelf: "flex-start" },
   backText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 17 },

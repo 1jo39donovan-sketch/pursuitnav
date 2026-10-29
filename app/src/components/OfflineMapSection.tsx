@@ -10,9 +10,10 @@ import { useOfflineMap } from "../offline/OfflineMapProvider";
 import { readyText, sizeText, staleText } from "../offline/offlinePack";
 import { colors, fonts } from "../theme";
 import { Button } from "./Button";
-import { useTextStyles } from "../textSize";
+import { useTextStyles, useColors } from "../textSize";
 
 export function OfflineMapSection() {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const offline = useOfflineMap();
   const { state, check } = offline;
@@ -44,7 +45,7 @@ export function OfflineMapSection() {
         accessibilityLabelledBy="offline-mobile-label"
         value={offline.allowMobile}
         onValueChange={offline.setAllowMobile}
-        trackColor={{ false: colors.line, true: colors.amber }}
+        trackColor={{ false: palette.line, true: palette.amber }}
       />
     </View>
   );

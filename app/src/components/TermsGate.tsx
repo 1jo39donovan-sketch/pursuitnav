@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { API_URL } from "../config";
 import { store } from "../storage/store";
 import { colors, fonts } from "../theme";
+import { useThemed } from "../textSize";
 
 /** The terms' date (server/src/pages.ts, UPDATED): a new date asks again. */
 export const TERMS_VERSION = "28 October 2026";
@@ -22,6 +23,7 @@ const POINTS = [
 ];
 
 export function TermsGate() {
+  const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();
   const [accepted, setAccepted] = useState(() => store.getSetting(KEY) === TERMS_VERSION);
   if (accepted) return null;
@@ -66,7 +68,7 @@ export function TermsGate() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { ...StyleSheet.absoluteFill, backgroundColor: colors.bg, paddingHorizontal: 20, zIndex: 100 },
   content: { gap: 12, paddingBottom: 16 },
   title: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 28 },

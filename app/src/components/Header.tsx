@@ -4,8 +4,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BOROUGHS } from "../search/boroughs";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { useThemed } from "../textSize";
 
 export function Header() {
+  const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();
   const { callsign, boroughs } = useSession();
   const area =
@@ -36,7 +38,7 @@ export function Header() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   bar: {
     flexDirection: "row",
     justifyContent: "space-between",

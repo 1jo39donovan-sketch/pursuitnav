@@ -17,6 +17,7 @@ import { snapToLine } from "../../navigation/snapLine";
 import { useTeam } from "../../team/TeamProvider";
 import { recordEvent } from "../../usage/usage";
 import { colors, fonts } from "../../theme";
+import { useThemed } from "../../textSize";
 
 const POLL_MS = 1000;
 const TRACE_POINTS = 8;
@@ -33,8 +34,11 @@ const mph = (ms: number) => ms * 2.236936;
  */
 /** How often the nearest door number may change on screen. */
 const DOOR_EVERY_MS = 5_000;
+/** Above this the door number is gone before it's read (29 Oct trial): shown only on foot or crawling. */
+const DOOR_MAX_MPH = 10;
 
 export default function PursuitScreen() {
+  const styles = useThemed(baseStyles);
   // Tabs stay mounted once visited: only poll and hold the screen on while this one is showing.
   const focused = useIsFocused();
   useEffect(() => {
@@ -107,8 +111,8 @@ export default function PursuitScreen() {
   const withSpeed = fix ? [...trace.fixes].reverse().find((f) => f.speed != null && fix.timestamp - f.timestamp <= 3000) : undefined;
   const speed = withSpeed?.speed != null ? Math.round(mph(withSpeed.speed)) : null;
   const pursuit = shownInfo(feed, now);
-  // The nearest door changes every second on the move: shown at most every 5 s
-  // (or at once on a new road), so it can be read rather than flicker.
+  // The nearest door changes every second on the move: shown only when slow,
+  // and at most every 5 s (or at once on a new road), so it can be read.
   const [door, setDoor] = useState<{ near: string | null; road: string | null; at: number }>({ near: null, road: null, at: 0 });
   const nearNow = pursuit?.near ?? null;
   const roadNow = pursuit?.road ?? null;
@@ -149,7 +153,7 @@ export default function PursuitScreen() {
         {pursuit?.road ?? "—"}
       </Text>
       {/* The nearest numbered door: for a foot chase, or where something was thrown. */}
-      {pursuit && door.near && (
+      {pursuit && door.near && (speed == null || speed <= DOOR_MAX_MPH) && (
         <Text style={styles.dist} numberOfLines={1}>
           by {door.near}
         </Text>
@@ -272,7 +276,7 @@ export default function PursuitScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   row: { flex: 1, flexDirection: "row" },
   side: { flex: 0.9 },

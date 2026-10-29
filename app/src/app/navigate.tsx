@@ -1,7 +1,6 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
 import { useNetworkState } from "expo-network";
-import * as Speech from "expo-speech";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +26,7 @@ import {
   type LastReroute,
   type RerouteFailure,
 } from "../navigation/reroute";
+import { hush, say } from "../navigation/speaker";
 import { arrivalSide, instructionWithPlace, nextCallout } from "../navigation/voice";
 import { recordEvent } from "../usage/usage";
 import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
@@ -121,6 +121,8 @@ export default function NavigateScreen() {
   const narrow = width < 400;
 
   const prepared = useMemo(() => (active ? prepare(active.route) : null), [active]);
+  // Whether the last new route came from a quiet refresh (no "Re-routing", no "New route").
+  const replanQuiet = useRef(false);
   // The crew's own note on the block they're going to, if they wrote one (Search).
   const destLat = active?.destination.lat;
   const destLng = active?.destination.lng;
@@ -255,10 +257,12 @@ export default function NavigateScreen() {
     // tries, every 10 s, in case the phone's network state is behind).
     const canReroute = mayAnnounceReroute(linkRef.current.link);
     if (!quiet && canReroute) setRerouting(true);
+    // A quiet refresh keeps going without a word; a real re-route says "New route…" with its first turn.
+    replanQuiet.current = quiet;
     if (voiceOn && !quiet && canReroute) {
-      Speech.stop();
-      Speech.speak("Re-routing", { language: "en-GB" });
-      recorder.event({ type: "speech", text: "Re-routing" });
+      // Short, and the new route's first prompt waits for it to finish.
+      say("Re-routing.");
+      recorder.event({ type: "speech", text: "Re-routing." });
     }
     const current = () => inFlight.current === controller && !controller.signal.aborted;
     // Field-test recording: why, how long, how it went, and the route before and after.
@@ -361,23 +365,37 @@ export default function NavigateScreen() {
   // Remembered between routes (and set on Session), so a muted app stays muted.
   const toggleVoice = () => {
     setVoice(!voiceOn);
-    if (voiceOn) Speech.stop();
+    if (voiceOn) hush();
   };
-  const said = useRef<{ route: unknown; keys: Set<string> }>({ route: null, keys: new Set() });
+  const said = useRef<{ route: unknown; keys: Set<string>; routes: number }>({
+    route: null,
+    keys: new Set(),
+    routes: 0,
+  });
   useEffect(() => {
     if (!progress || !prepared || offRoute) return;
     // A new route (after a re-route) starts its callouts afresh.
-    if (said.current.route !== prepared) said.current = { route: prepared, keys: new Set() };
-    const callout = nextCallout(progress, said.current.keys, active?.destination.title);
+    if (said.current.route !== prepared) {
+      const first = said.current.routes === 0;
+      // A quiet refresh mid-drive doesn't start again with "Head along…".
+      said.current = {
+        route: prepared,
+        keys: new Set(!first && replanQuiet.current ? ["start"] : []),
+        routes: said.current.routes + 1,
+      };
+    }
+    const callout = nextCallout(progress, said.current.keys, active?.destination.title, {
+      rerouted: said.current.routes > 1,
+    });
     if (!callout) return;
     said.current.keys.add(callout.key);
+    callout.covers?.forEach((k) => said.current.keys.add(k));
     if (voiceOn) {
-      Speech.stop();
-      Speech.speak(callout.text, { language: "en-GB" });
+      say(callout.text, callout.priority);
       recorder.event({ type: "speech", text: callout.text });
     }
   }, [progress, prepared, offRoute, voiceOn, active?.destination.title]);
-  useEffect(() => () => void Speech.stop(), []);
+  useEffect(() => () => hush(), []);
 
   // Ending takes a second tap, so a bump on the way doesn't drop the route.
   const [confirmEnd, setConfirmEnd] = useState(false);

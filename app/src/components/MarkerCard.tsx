@@ -2,7 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 
 import { colors, fonts } from "../theme";
 import type { MarkerProperties } from "./mapShared";
-import { useTextStyles } from "../textSize";
+import { useTextStyles, useColors } from "../textSize";
 
 interface Props {
   marker: MarkerProperties;
@@ -20,6 +20,7 @@ interface Props {
 
 /** What a tapped place marker is, with a way to route there. */
 export function MarkerCard({ marker, away, onRoute, onClose, lines, other, favourite, onToggleFavourite }: Props) {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   return (
     <View style={styles.card}>
@@ -65,7 +66,7 @@ export function MarkerCard({ marker, away, onRoute, onClose, lines, other, favou
             style={({ pressed }) => [styles.route, styles.otherButton, pressed && { opacity: 0.85 }]}
           >
             {other.busy ? (
-              <ActivityIndicator color={colors.fg} />
+              <ActivityIndicator color={palette.fg} />
             ) : (
               <Text style={[styles.routeText, styles.otherText]}>{other.label}</Text>
             )}

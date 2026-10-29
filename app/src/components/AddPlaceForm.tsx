@@ -6,9 +6,12 @@ import { useSearch } from "../search/SearchProvider";
 import { normalise } from "../search/text";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { useThemed, useColors } from "../textSize";
 
 /** Lets an officer add a block or estate and the road it's on. Kept on the phone. */
 export function AddPlaceForm({ initialName, onSaved }: { initialName: string; onSaved: (name: string) => void }) {
+  const palette = useColors();
+  const styles = useThemed(baseStyles);
   const { data, addPlace } = useSearch();
   const { boroughs } = useSession();
   const [open, setOpen] = useState(false);
@@ -57,7 +60,7 @@ export function AddPlaceForm({ initialName, onSaved }: { initialName: string; on
         value={name}
         onChangeText={setName}
         placeholder="Name, e.g. Harvist Estate"
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={palette.muted}
         style={styles.input}
         accessibilityLabel="Block or estate name"
       />
@@ -68,7 +71,7 @@ export function AddPlaceForm({ initialName, onSaved }: { initialName: string; on
           setRoadQuery(t);
         }}
         placeholder="Main road it's on"
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={palette.muted}
         style={styles.input}
         accessibilityLabel="Road it's on"
       />
@@ -98,7 +101,7 @@ export function AddPlaceForm({ initialName, onSaved }: { initialName: string; on
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   openButton: { paddingVertical: 14 },
   openText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 15 },
   form: { borderColor: colors.line, borderWidth: 1, borderRadius: 10, padding: 14, gap: 10, marginTop: 8 },

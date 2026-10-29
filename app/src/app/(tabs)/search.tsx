@@ -52,7 +52,7 @@ import { TEAM_COLOR } from "../../components/mapShared";
 import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
 import { recordEvent } from "../../usage/usage";
-import { useTextStyles } from "../../textSize";
+import { useTextStyles, useColors } from "../../textSize";
 import { samePlace, setFavourites, toggled, useFavourites, type Favourite } from "../../search/favourites";
 import { quickPlaces } from "../../search/quickPlaces";
 import { fetchEntrances } from "../../api/entrances";
@@ -78,6 +78,7 @@ interface Destination {
 // Type what the control room gave, pick the match, get both routes from
 // where the phone is now. A long press on the map also sets a destination.
 export default function SearchScreen() {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const { fix, simulated } = useLocation();
   const insets = useSafeAreaInsets();
@@ -791,7 +792,7 @@ export default function SearchScreen() {
               }
             }}
             placeholder="Address, postcode, or a place like Costa"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={palette.muted}
             autoCorrect={false}
             autoCapitalize="words"
             returnKeyType="search"

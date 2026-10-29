@@ -2,6 +2,7 @@
 // used on the way to a call (Search, the route choice, navigation) take
 // their styles through useTextStyles, and so does Session. Big text grows less, so it still fits.
 import { useSession } from "./session/SessionProvider";
+import { colors, lighten, lightColors, lightOf, type Palette } from "./theme";
 
 const SMALL_GROWS = 1.25;
 const BIG_GROWS = 1.1;
@@ -32,7 +33,25 @@ export function enlarge<T extends Styles>(styles: T): T {
   return out as T;
 }
 
-/** A screen's styles, larger when Session's "Larger text" is on. */
+/** A screen's styles, larger when Session's "Larger text" is on, in the dark or light colours. */
 export function useTextStyles<T extends Styles>(styles: T): T {
-  return useSession().largeText ? enlarge(styles) : styles;
+  const { largeText, dark } = useSession();
+  const sized = largeText ? enlarge(styles) : styles;
+  return dark ? sized : lighten(sized);
 }
+
+/** Styles in the dark or light colours (text size unchanged). */
+export function useThemed<T extends Styles>(styles: T): T {
+  return useSession().dark ? styles : lighten(styles);
+}
+
+/** The colours for things drawn outside a stylesheet (icons, switches, placeholders). */
+export function useColors(): Palette {
+  return useSession().dark ? colors : lightColors;
+}
+
+/** For a colour kept outside a component (a tag's colour): itself, or its daylight version. */
+export function useTint(): (colour: string) => string {
+  return useSession().dark ? same : lightOf;
+}
+const same = (colour: string) => colour;

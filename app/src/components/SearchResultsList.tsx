@@ -4,7 +4,7 @@ import { formatDistance } from "../format";
 import { distanceM } from "../geo";
 import type { SearchResult, SearchResults } from "../search/engine";
 import { colors, fonts } from "../theme";
-import { useTextStyles } from "../textSize";
+import { useColors, useTextStyles, useTint } from "../textSize";
 
 interface Props {
   results: SearchResults;
@@ -84,24 +84,26 @@ function Row({
   onPick: (r: SearchResult) => void;
   away?: string;
 }) {
+  const palette = useColors();
+  const tint = useTint();
   const styles = useTextStyles(baseStyles);
   const tag = outside
-    ? { text: "OUT OF AREA", color: colors.muted }
+    ? { text: "OUT OF AREA", color: palette.muted }
     : result.placeType
-      ? { text: result.placeType.toUpperCase(), color: colors.blue }
+      ? { text: result.placeType.toUpperCase(), color: palette.blue }
       : TAGS[result.kind];
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => onPick(result)}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.panel }]}
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: palette.panel }]}
     >
       <View style={styles.rowText}>
-        <Text style={[styles.label, outside && { color: colors.muted }]}>{result.label}</Text>
+        <Text style={[styles.label, outside && { color: palette.muted }]}>{result.label}</Text>
         <Text style={styles.detail}>{result.detail}</Text>
       </View>
       <View style={styles.side}>
-        {tag && <Text style={[styles.tag, { color: tag.color, borderColor: tag.color }]}>{tag.text}</Text>}
+        {tag && <Text style={[styles.tag, { color: tint(tag.color), borderColor: tint(tag.color) }]}>{tag.text}</Text>}
         {away && <Text style={styles.away}>{away}</Text>}
       </View>
     </Pressable>

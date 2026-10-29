@@ -13,8 +13,10 @@ import { MARKS, type TripEvent } from "../../fieldtest/trip";
 import { formatDistance, formatDuration } from "../../format";
 import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
+import { useThemed, useColors } from "../../textSize";
 
 export default function TripScreen() {
+  const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [record, setRecord] = useState(() => store.listTrips().find((t) => t.header.id === id) ?? null);
@@ -141,6 +143,8 @@ export default function TripScreen() {
 
 /** A note on a mark, saved when the field is left. */
 function NoteField({ initial, onSave }: { initial: string; onSave: (note: string) => void }) {
+  const palette = useColors();
+  const styles = useThemed(baseStyles);
   const [text, setText] = useState(initial);
   return (
     <TextInput
@@ -148,13 +152,13 @@ function NoteField({ initial, onSave }: { initial: string; onSave: (note: string
       onChangeText={setText}
       onBlur={() => text.trim() !== initial && onSave(text.trim())}
       placeholder="Add a note"
-      placeholderTextColor={colors.muted}
+      placeholderTextColor={palette.muted}
       style={styles.note}
     />
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   back: { paddingHorizontal: 16, paddingVertical: 12, alignSelf: "flex-start" },
   backText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 17 },

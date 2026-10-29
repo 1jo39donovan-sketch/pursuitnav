@@ -19,7 +19,7 @@ import {
 import { colors, fonts } from "../theme";
 import { ROUTE_ALT } from "./mapShared";
 import { useElapsed } from "./useElapsed";
-import { useTextStyles } from "../textSize";
+import { useTextStyles, useColors } from "../textSize";
 
 export type PlanState =
   | { status: "loading" }
@@ -96,6 +96,7 @@ export function RoutePanel({
   onGo,
   onOpenExternal,
 }: Props) {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const { lat, lng } = destination;
   // A slow answer reads as "still planning", never as a fault.
@@ -138,7 +139,7 @@ export function RoutePanel({
             onPress={onToggleFavourite}
             hitSlop={12}
           >
-            <Text style={[styles.close, favourite && { color: colors.amber }]}>{favourite ? "★" : "☆"}</Text>
+            <Text style={[styles.close, favourite && { color: palette.amber }]}>{favourite ? "★" : "☆"}</Text>
           </Pressable>
         )}
         <Pressable accessibilityRole="button" accessibilityLabel="Clear destination" onPress={onClose} hitSlop={12}>
@@ -233,6 +234,7 @@ export function RoutePanel({
  * typed before Go or later on the Log. Skippable.
  */
 function OtherEtas() {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const [other, setOther] = useState("");
   const minutes = (v: string) => (/^\d{1,3}$/.test(v.trim()) ? Number(v.trim()) : null);
@@ -251,7 +253,7 @@ function OtherEtas() {
             keyboardType="number-pad"
             maxLength={3}
             placeholder="min"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={palette.muted}
             style={styles.otherInput}
             accessibilityLabel="Another app's ETA in minutes"
           />
@@ -263,6 +265,7 @@ function OtherEtas() {
 
 /** The crew's note on the block: shown when there is one, written or changed with a tap. */
 function BlockNoteLine({ note, onSave }: { note?: string; onSave: (text: string) => void }) {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const [editing, setEditing] = useState<string | null>(null);
   if (editing !== null) {
@@ -278,7 +281,7 @@ function BlockNoteLine({ note, onSave }: { note?: string; onSave: (text: string)
           autoFocus
           multiline
           placeholder="e.g. Entrance round the back, lift to 4th floor, flats 1–24"
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={palette.muted}
           accessibilityLabel="Note for this block, kept on this phone"
           style={styles.noteInput}
         />
@@ -327,6 +330,7 @@ function StandardRow({
   swatch: string;
   onGo: () => void;
 }) {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   return (
     <View style={[styles.row, fastest && styles.rowFastest]}>
@@ -341,7 +345,7 @@ function StandardRow({
         <TrafficLine route={route} />
       </View>
       <Eta seconds={route.durationS} />
-      <GoButton onPress={onGo} color={colors.blue} label="Go on the standard route" />
+      <GoButton onPress={onGo} color={palette.blue} label="Go on the standard route" />
     </View>
   );
 }
@@ -407,6 +411,7 @@ function PoliceRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   if (slot.state !== "route") {
     return (
@@ -429,7 +434,7 @@ function PoliceRow({
   return (
     <View style={[styles.rowWrap, styles.rowPolice]}>
       <View style={styles.rowInner}>
-        <View style={[styles.swatch, { backgroundColor: colors.blue }]} />
+        <View style={[styles.swatch, { backgroundColor: palette.blue }]} />
         <View style={styles.rowText}>
           <Text style={styles.rowTitle} numberOfLines={1}>Blue light</Text>
           <Text style={[styles.meta, styles.saving]} numberOfLines={1}>
@@ -438,7 +443,7 @@ function PoliceRow({
           <TrafficLine route={route} />
         </View>
         <Eta seconds={route.durationS} />
-        <GoButton onPress={onGo} color={colors.amber} label="Go on the blue-light route" />
+        <GoButton onPress={onGo} color={palette.amber} label="Go on the blue-light route" />
       </View>
       {/* Always says how many it relies on; tap for the list (they're on the map too). */}
       <Pressable

@@ -12,10 +12,10 @@ import { TermsGate } from "../components/TermsGate";
 import { NavigationProvider } from "../navigation/NavigationProvider";
 import { OfflineMapProvider } from "../offline/OfflineMapProvider";
 import { SearchProvider } from "../search/SearchProvider";
-import { SessionProvider } from "../session/SessionProvider";
+import { SessionProvider, useSession } from "../session/SessionProvider";
 import { TeamProvider } from "../team/TeamProvider";
-import { colors } from "../theme";
 import { startUsage } from "../usage/usage";
+import { useColors } from "../textSize";
 
 SplashScreen.preventAutoHideAsync();
 // Every request to the server carries the install ID and app version (usage counts).
@@ -46,25 +46,7 @@ export default function RootLayout() {
               <LocationProvider>
                 <NavigationProvider>
                   <TeamProvider>
-                    <StatusBar style="light" />
-                    <Stack
-                      screenOptions={{
-                        headerShown: false,
-                        contentStyle: { backgroundColor: colors.bg },
-                      }}
-                    >
-                      <Stack.Screen name="(tabs)" />
-                      {/* The search log, opened from Session. */}
-                      <Stack.Screen name="log" />
-                      <Stack.Screen name="area" />
-                      <Stack.Screen
-                        name="navigate"
-                        options={{
-                          gestureEnabled: false,
-                          animation: "slide_from_bottom",
-                        }}
-                      />
-                    </Stack>
+                    <AppStack />
                     <RecIndicator />
                     {/* Over everything until the terms are agreed to. */}
                     <TermsGate />
@@ -76,5 +58,34 @@ export default function RootLayout() {
         </LogProvider>
       </SessionProvider>
     </SafeAreaProvider>
+  );
+}
+
+/** The screens, in the dark or light colours. */
+function AppStack() {
+  const palette = useColors();
+  const { dark } = useSession();
+  return (
+    <>
+      <StatusBar style={dark ? "light" : "dark"} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: palette.bg },
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        {/* The search log, opened from Session. */}
+        <Stack.Screen name="log" />
+        <Stack.Screen name="area" />
+        <Stack.Screen
+          name="navigate"
+          options={{
+            gestureEnabled: false,
+            animation: "slide_from_bottom",
+          }}
+        />
+      </Stack>
+    </>
   );
 }

@@ -12,6 +12,7 @@ import { BOROUGHS, type Borough } from "../search/boroughs";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 import { Button } from "./Button";
+import { useThemed } from "../textSize";
 
 /** "All London", "North London", or the boroughs by name. */
 function summary(chosen: readonly Borough[]): string {
@@ -23,6 +24,7 @@ function summary(chosen: readonly Borough[]): string {
 }
 
 export function BoroughPicker() {
+  const styles = useThemed(baseStyles);
   const { boroughs, toggleBorough, setBoroughs, service } = useSession();
   // BCUs are the Met's; other services see plain boroughs.
   const byBcu = service === "police" || service === null;
@@ -129,7 +131,7 @@ export function BoroughPicker() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   field: { gap: 8 },
   headRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   label: {

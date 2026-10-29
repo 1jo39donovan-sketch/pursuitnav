@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { useThemed } from "../textSize";
 
 const VIEW_LABEL = { heading: "▲", "3d": "3D", north: "N" } as const;
 const VIEW_NAME = { heading: "Direction of travel up", "3d": "Tilted 3D view", north: "North up" } as const;
@@ -31,6 +32,7 @@ export function MapButtons({
   /** With this, + and − buttons: +1 zooms in, −1 out. */
   onZoom?: (step: 1 | -1) => void;
 }) {
+  const styles = useThemed(baseStyles);
   const { mapTheme, setMapTheme, mapView, setMapView } = useSession();
   const next = mapView === "3d" ? "heading" : "3d";
   return (
@@ -103,7 +105,7 @@ export function MapButtons({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   column: { position: "absolute", right: 12, gap: 10 },
   button: {
     width: 52,

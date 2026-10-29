@@ -90,3 +90,31 @@ describe("spoken directions", () => {
     expect(spokenPlace("Point on the map (51.54632, -0.11705)")).toBeNull();
   });
 });
+
+describe("prompts that don't cut each other off", () => {
+  it("after a re-route says one complete line with the turn, and doesn't repeat it", () => {
+    const said = new Set<string>();
+    const first = nextCallout(at(140), said, undefined, { rerouted: true })!;
+    expect(first.text).toBe("New route. In 150 yards, turn right onto Seven Sisters Road.");
+    said.add(first.key);
+    first.covers?.forEach((k) => said.add(k));
+    expect(nextCallout(at(130), said)).toBeNull();
+    // The turn itself is still called, and may cut in.
+    expect(nextCallout(at(50), said)).toMatchObject({
+      text: "Turn right onto Seven Sisters Road.",
+      priority: "urgent",
+    });
+  });
+
+  it("starts with the road's name, never a slash", () => {
+    const p = {
+      ...at(900),
+      current: { ...m("Drive northeast on A3.", 0), streetNames: ["A3", "Clapham Road"] },
+      next: m("Turn left onto A3/Union Road.", 5),
+    } as unknown as Progress;
+    expect(nextCallout(p, new Set())?.text).toBe("Head along Clapham Road.");
+    expect(nextCallout({ ...p, distanceToNextM: 300 } as Progress, new Set(["start"]))?.text).toBe(
+      "In 350 yards, turn left onto Union Road.",
+    );
+  });
+});

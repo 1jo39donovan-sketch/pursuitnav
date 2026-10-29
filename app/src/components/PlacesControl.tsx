@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { PlaceGroup } from "../search/places";
 import { MARKER_GROUPS } from "../search/placeGroups";
 import { colors, fonts } from "../theme";
+import { useThemed, useColors } from "../textSize";
 
 interface Props {
   groups: PlaceGroup[];
@@ -14,6 +15,8 @@ interface Props {
 
 /** "Places" button on the map, opening a chooser of which kinds to mark. */
 export function PlacesControl({ groups, onChange, shownCount }: Props) {
+  const palette = useColors();
+  const styles = useThemed(baseStyles);
   const [open, setOpen] = useState(false);
   const on = new Set(groups);
   const toggle = (g: PlaceGroup) => onChange(on.has(g) ? groups.filter((x) => x !== g) : [...groups, g]);
@@ -51,7 +54,7 @@ export function PlacesControl({ groups, onChange, shownCount }: Props) {
                   style={[styles.chip, selected && { borderColor: g.color }]}
                 >
                   <View style={[styles.dot, { backgroundColor: g.color, opacity: selected ? 1 : 0.35 }]} />
-                  <Text style={[styles.chipText, !selected && { color: colors.muted }]}>{g.label}</Text>
+                  <Text style={[styles.chipText, !selected && { color: palette.muted }]}>{g.label}</Text>
                 </Pressable>
               );
             })}
@@ -70,7 +73,7 @@ export function PlacesControl({ groups, onChange, shownCount }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   wrap: { position: "absolute", top: 12, left: 12, right: 64, alignItems: "flex-start", gap: 8 },
   button: {
     backgroundColor: colors.panel,

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { enlarge } from "../textSize";
 
-vi.mock("../session/SessionProvider", () => ({ useSession: () => ({ largeText: true }) }));
+vi.mock("../session/SessionProvider", () => ({ useSession: () => ({ largeText: true, dark: true }) }));
 
 describe("larger text", () => {
   it("grows small text by a quarter and big text a little, with its line height", () => {
