@@ -131,7 +131,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const voice = voiceSetting === "1";
   const [roads, setRoads] = useSetting<RoadChoice>("roads", ["main", "any"], "main");
   const [appearance, setAppearance] = useSetting<Appearance>("appearance", APPEARANCES, "system");
-  // Before a build that follows the phone, it always says dark.
+  // app.json still says "dark" (changing it needs a new native build), so until then
+  // the phone always reports dark here and "Match phone" means dark.
   const scheme = useColorScheme();
   const dark = appearance === "dark" || (appearance === "system" && scheme !== "light");
   const [largeSetting, setLargeSetting] = useSetting<"1" | "0">("largeText", ["1", "0"], "0");
