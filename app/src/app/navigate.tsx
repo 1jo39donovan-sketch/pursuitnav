@@ -647,6 +647,7 @@ export default function NavigateScreen() {
               zoomControl
               autoZoom
               roadNames
+              houseNumbers={false}
               vehicleArrow
               followZoom={16.5}
               routes={routes}
@@ -672,6 +673,7 @@ export default function NavigateScreen() {
               zoomControl
               autoZoom
               roadNames
+              houseNumbers={false}
               vehicleArrow
               followZoom={16.5}
               routes={routes}

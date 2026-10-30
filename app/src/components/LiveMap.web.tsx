@@ -70,6 +70,7 @@ export function LiveMap({
   autoZoom = false,
   zoomControl = false,
   roadNames = false,
+  houseNumbers = true,
   labels,
   team,
   vehicleArrow = false,
@@ -141,7 +142,7 @@ export function LiveMap({
   const [styleVersion, setStyleVersion] = useState(0);
   // Opens where the vehicle is, so a new screen doesn't fly in from the middle of London.
   const startAt = useRef({ fix, zoom });
-  const looked = useMapStyle(MAP_STYLES[mapTheme], mapLook, mapTheme, MAP_STYLES.day);
+  const looked = useMapStyle(MAP_STYLES[mapTheme], mapLook, mapTheme, MAP_STYLES.day, houseNumbers);
   const style = DEMO_MODE ? demoMapStyle : looked;
   const firstStyle = useRef(style);
 
@@ -219,7 +220,7 @@ export function LiveMap({
         paint: { "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] },
       });
       // House numbers close in, under the road names so a street name always wins the space.
-      if (m.getSource(ROAD_NAME_SOURCE)) {
+      if (houseNumbers && m.getSource(ROAD_NAME_SOURCE)) {
         m.addLayer({
           id: HOUSE_NUMBER_LAYER,
           type: "symbol",
@@ -394,7 +395,7 @@ export function LiveMap({
     };
     // Day/night, the view and the labels change the map in place (below):
     // making a new one would jump the camera back to the middle of London.
-  }, [compact, roadNames, vehicleArrow]);
+  }, [compact, roadNames, houseNumbers, vehicleArrow]);
 
   // Day or night: the new style, same camera.
   useEffect(() => {
@@ -511,8 +512,8 @@ export function LiveMap({
       {/* flex rather than absoluteFill: maplibre-gl's CSS sets position: relative on this element. */}
       <View ref={container} style={styles.map} />
       {mapFailed && (
-        // Below whatever floats over the top of the map (Search's box), not hidden under it.
-        <View style={[styles.failed, { top: 16 + overlayTop }]} pointerEvents="none">
+        // Low on the map, above what floats at the bottom: at the top it covered PLACES (30 Oct).
+        <View style={[styles.failed, { bottom: 16 + overlayBottom }]} pointerEvents="none">
           <Text style={styles.failedTitle}>Map couldn’t load</Text>
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>
@@ -556,8 +557,7 @@ const baseStyles = StyleSheet.create({
   failed: {
     position: "absolute",
     left: 16,
-    right: 16,
-    top: 16,
+    right: 72,
     backgroundColor: colors.panel,
     borderColor: colors.amber,
     borderWidth: 1,

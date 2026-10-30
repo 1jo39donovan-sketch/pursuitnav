@@ -75,6 +75,7 @@ export function LiveMap({
   autoZoom = false,
   zoomControl = false,
   roadNames = false,
+  houseNumbers = true,
   labels,
   team,
   vehicleArrow = false,
@@ -104,6 +105,7 @@ export function LiveMap({
     mapLook,
     mapTheme,
     offlineStyles?.day ?? MAP_STYLES.day,
+    houseNumbers,
   );
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
@@ -267,15 +269,17 @@ export function LiveMap({
           />
         </GeoJSONSource>
         {/* Under the road names, so a street name always wins the space. */}
-        <Layer
-          type="symbol"
-          id={HOUSE_NUMBER_LAYER}
-          source={ROAD_NAME_SOURCE}
-          source-layer={HOUSE_NUMBER_SOURCE_LAYER}
-          minzoom={HOUSE_NUMBER_MIN_ZOOM}
-          layout={houseNumberLayout}
-          paint={houseNumberPaint(mapTheme)}
-        />
+        {houseNumbers && (
+          <Layer
+            type="symbol"
+            id={HOUSE_NUMBER_LAYER}
+            source={ROAD_NAME_SOURCE}
+            source-layer={HOUSE_NUMBER_SOURCE_LAYER}
+            minzoom={HOUSE_NUMBER_MIN_ZOOM}
+            layout={houseNumberLayout}
+            paint={houseNumberPaint(mapTheme)}
+          />
+        )}
         {roadNames && (
           <Layer
             type="symbol"
@@ -351,8 +355,8 @@ export function LiveMap({
       </Map>
 
       {mapFailed && (
-        // Below whatever floats over the top of the map (Search's box), not hidden under it.
-        <View style={[styles.failed, { top: 16 + overlayTop }]} pointerEvents="none">
+        // Low on the map, above what floats at the bottom: at the top it covered PLACES (30 Oct).
+        <View style={[styles.failed, { bottom: 16 + overlayBottom }]} pointerEvents="none">
           <Text style={styles.failedTitle}>Map couldn’t load</Text>
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>
@@ -393,8 +397,7 @@ const baseStyles = StyleSheet.create({
   failed: {
     position: "absolute",
     left: 16,
-    right: 16,
-    top: 16,
+    right: 72,
     backgroundColor: colors.panel,
     borderColor: colors.amber,
     borderWidth: 1,

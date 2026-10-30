@@ -39,6 +39,8 @@ export interface LiveMapProps {
   zoomControl?: boolean;
   /** Bigger, brighter road names than the map style's own. */
   roadNames?: boolean;
+  /** House numbers close in (off while navigating, where they crowded the road). */
+  houseNumbers?: boolean;
   /** Show the vehicle as an arrow pointing the way it's going (navigation, pursuit). */
   vehicleArrow?: boolean;
   /** Named blocks and estates to label (points with a "name"), when zoomed in. */

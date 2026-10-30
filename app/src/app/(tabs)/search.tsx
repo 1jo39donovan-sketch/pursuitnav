@@ -210,29 +210,7 @@ export default function SearchScreen() {
         (err: unknown) => recorder.event({ type: "plan-failed", ms: recorder.sinceStart(), outcome: rerouteFailure(err) ?? "error" }),
       );
       let fullDone = false;
-      quick
-        .then((plan) => {
-          if (!controller.signal.aborted && !fullDone) setState({ status: "ready", plan, checking: !!full, origin });
-        })
-        .catch(() => {});
-      try {
-        if (!full) {
-          const plan = await quick;
-          if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
-          return;
-        }
-        const plan = await full;
-        fullDone = true;
-        if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
-      } catch (err) {
-        fullDone = true;
-        if (controller.signal.aborted) return;
-        // The blue-light check failed but the standard route may be fine.
-        const standard = await quick.catch(() => null);
-        if (standard) {
-          setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" }, origin });
-          return;
-        }
+      const failed = (err: unknown) => {
         if (err instanceof NoSignalRouteError) {
           setState({ status: "error", message: NO_SIGNAL_ROUTE_START, noSignal: true });
           return;
@@ -245,6 +223,38 @@ export default function SearchScreen() {
         }
         const message = err instanceof RouteError ? err.message : "Something went wrong working out routes.";
         setState({ status: "error", message });
+      };
+      quick.then(
+        (plan) => {
+          if (!controller.signal.aborted && !fullDone) setState({ status: "ready", plan, checking: !!full, origin });
+        },
+        (err: unknown) => {
+          // No standard route: say so now, not after the blue-light check gives up too.
+          if (controller.signal.aborted || fullDone || !full) return;
+          fullDone = true;
+          controller.abort();
+          failed(err);
+        },
+      );
+      try {
+        if (!full) {
+          const plan = await quick;
+          if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
+          return;
+        }
+        const plan = await full;
+        fullDone = true;
+        if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
+      } catch (err) {
+        if (controller.signal.aborted || fullDone) return;
+        fullDone = true;
+        // The blue-light check failed but the standard route may be fine.
+        const standard = await quick.catch(() => null);
+        if (standard) {
+          setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" }, origin });
+          return;
+        }
+        failed(err);
       }
     },
     [fix, vehicle, policeRoutes, roads],

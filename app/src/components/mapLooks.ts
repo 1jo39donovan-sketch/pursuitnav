@@ -232,21 +232,36 @@ function styleJson(base: string): Promise<StyleSpecification> {
  * style) recoloured dark. Standard by day is `base` itself; anything else
  * shows `base` until it's ready, or if it can't be made.
  */
-export function useMapStyle(base: string, look: MapLook, theme: MapTheme, day?: string): string | StyleSpecification {
+export function useMapStyle(
+  base: string,
+  look: MapLook,
+  theme: MapTheme,
+  day?: string,
+  /** false: no house numbers (navigating: they crowded the road on 30 Oct). */
+  houseNumbers = true,
+): string | StyleSpecification {
   const [made, setMade] = useState<{ key: string; style: StyleSpecification } | null>(null);
   const fromDay = theme === "night" && !!day;
-  const plain = look === "standard" && !fromDay;
+  const plain = look === "standard" && !fromDay && houseNumbers;
   const source = fromDay ? day! : base;
-  const key = `${look}|${theme}|${source}`;
+  const key = `${look}|${theme}|${source}|${houseNumbers}`;
   useEffect(() => {
     if (plain) return;
     let live = true;
     styleJson(source)
-      .then((s) => live && setMade({ key, style: restyle(fromDay ? nightify(s) : s, look, theme) }))
+      .then((s) => {
+        const style = restyle(fromDay ? nightify(s) : s, look, theme);
+        if (live) setMade({ key, style: houseNumbers ? style : withoutHouseNumbers(style) });
+      })
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [source, look, theme, key, plain, fromDay]);
+  }, [source, look, theme, key, plain, fromDay, houseNumbers]);
   return !plain && made?.key === key ? made.style : base;
+}
+
+/** The style without its house-number labels. */
+export function withoutHouseNumbers(style: StyleSpecification): StyleSpecification {
+  return { ...style, layers: style.layers.filter((l) => sourceLayer(l) !== "housenumber") };
 }

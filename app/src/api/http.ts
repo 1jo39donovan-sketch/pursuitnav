@@ -10,6 +10,8 @@
 export const SERVER_TIMEOUT_MS = 8000;
 /** Route plans do real work on the server (the blue-light check), so they get longer. */
 export const ROUTE_TIMEOUT_MS = 30_000;
+/** The standard route alone answers in a second or two: no answer in this is a lost request, worth asking again. */
+export const QUICK_ROUTE_TIMEOUT_MS = 12_000;
 
 /** The network failed: the request couldn't be sent. */
 export class NoSignalError extends Error {

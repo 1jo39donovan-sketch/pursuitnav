@@ -12,6 +12,7 @@ import { FavouritesSection } from "../../components/FavouritesSection";
 import { TeamSection } from "../../components/TeamSection";
 import { VoiceSettings } from "../../components/VoiceSettings";
 import { timingsText, useRouteTimings } from "../../navigation/timings";
+import { voiceSettings } from "../../navigation/speaker";
 import { useFavourites } from "../../search/favourites";
 import { store } from "../../storage/store";
 import { useTeam } from "../../team/TeamProvider";
@@ -82,6 +83,8 @@ const APPEARANCE_NAMES: Record<Appearance, string> = {
   light: "Light screens",
 };
 
+const MAP_CHOICE_NAMES = { auto: "Map matches screens", night: "☾ Night map", day: "☀ Day map" } as const;
+
 const LOOK_HINTS: Record<MapLook, string> = {
   standard: "The everyday map.",
   clear: "High contrast: wider, brighter roads and bold names, for reading on the move.",
@@ -108,7 +111,7 @@ export default function SessionScreen() {
     setVoice,
     showPursuit,
     setShowPursuit,
-    mapTheme,
+    mapChoice,
     mapLook,
     setMapLook,
     largeText,
@@ -138,6 +141,8 @@ export default function SessionScreen() {
   const favourites = useFavourites();
   // Which sections are open, kept for next time. At first: start of shift until it's
   // filled in, the team while in one, and testing in the browser version.
+  // The voice and speed live outside the session: re-read for the summary when changed.
+  const [, setVoiceTick] = useState(0);
   const [open, setOpen] = useState<Set<SectionId>>(() => {
     try {
       const kept = store.getSetting("sessionOpen");
@@ -197,11 +202,12 @@ export default function SessionScreen() {
         : team.status === "ended" || team.status === "notfound"
           ? "In a team · check the code"
           : "In a team · connecting";
+  const { voiceName, rate: voiceRate } = voiceSettings();
   const mapSummary = [
-    mapTheme === "night" ? "Night map" : "Day map",
+    appearance === "system" ? "Screens match phone" : appearance === "dark" ? "Dark screens" : "Light screens",
+    mapChoice === "auto" ? null : mapChoice === "night" ? "night map" : "day map",
     MAP_LOOK_NAMES[mapLook],
-    appearance === "system" ? null : appearance === "dark" ? "dark screens" : "light screens",
-    voice ? "voice on" : "voice off",
+    voice ? `voice: ${voiceName ?? "best on phone"}${voiceRate === "faster" ? ", faster" : ""}` : "voice off",
     largeText ? "larger text" : null,
   ]
     .filter(Boolean)
@@ -424,7 +430,7 @@ export default function SessionScreen() {
               trackColor={{ false: palette.line, true: palette.amber }}
             />
           </View>
-          {voice && <VoiceSettings />}
+          {voice && <VoiceSettings onChange={() => setVoiceTick((n) => n + 1)} />}
           <View style={styles.toggleRow}>
             <Text style={[styles.placeName, styles.placeText]} nativeID="pursuit-label">
               Pursuit tab
@@ -453,8 +459,8 @@ export default function SessionScreen() {
             })}
           </View>
           <View style={styles.chips}>
-            {(["night", "day"] as const).map((t) => {
-              const on = mapTheme === t;
+            {(["auto", "night", "day"] as const).map((t) => {
+              const on = mapChoice === t;
               return (
                 <Pressable
                   key={t}
@@ -463,9 +469,7 @@ export default function SessionScreen() {
                   onPress={() => setMapTheme(t)}
                   style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
                 >
-                  <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                    {t === "night" ? "☾ Night map" : "☀ Day map"}
-                  </Text>
+                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{MAP_CHOICE_NAMES[t]}</Text>
                 </Pressable>
               );
             })}
