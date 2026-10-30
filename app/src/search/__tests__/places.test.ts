@@ -76,6 +76,15 @@ describe("named places", () => {
     expect(hit.lat).toBeCloseTo(51.538, 3);
   });
 
+  it("finds a business named with its road and no comma (30 Oct browser test)", () => {
+    for (const q of ["Costa Coffee Upper Street", "Costa Upper Street", "costa coffee upper st"]) {
+      const hit = top(q)!;
+      expect(hit.label, q).toBe("Costa");
+      expect(hit.lat, q).toBeCloseTo(51.538, 3);
+    }
+    expect(top("Coffee Corner Holloway Road")?.label).toBe("Coffee Corner");
+  });
+
   it("finds a named block, and still offers the road", () => {
     const labels = index.search("Smith House, Holloway Road", ISLINGTON).inArea.map((r) => r.label);
     expect(labels[0]).toBe("Smith House");

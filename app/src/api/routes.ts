@@ -4,6 +4,7 @@ import type { LngLat } from "@maplibre/maplibre-react-native";
 import { API_URL, DEMO_MODE } from "../config";
 import type { RoadChoice } from "../session/SessionProvider";
 import type { VehicleType } from "../vehicles";
+import { noteRequest, serverDuration } from "../navigation/timings";
 import { isNoAnswer, isNoSignal, ROUTE_TIMEOUT_MS, serverJson } from "./http";
 
 export interface Maneuver {
@@ -152,7 +153,8 @@ export async function fetchRoutes(
         : "Routing server not set up in this build.",
     );
   }
-  let res: { ok: boolean; status: number; body: unknown };
+  let res: { ok: boolean; status: number; body: unknown; serverTiming?: string | null };
+  const asked = Date.now();
   try {
     res = await serverJson(
       `${API_URL}/v1/routes`,
@@ -174,6 +176,7 @@ export async function fetchRoutes(
   } catch (err) {
     throw routeFailure(err);
   }
+  if (!prefetch) noteRequest(standardOnly, Date.now() - asked, serverDuration(res.serverTiming ?? null));
   if (!res.ok || !res.body) {
     const error = (res.body as { error?: string } | null)?.error ?? "";
     if (error === "routing-unavailable" || (res.status >= 500 && !MESSAGES[error])) throw new ServerDownRouteError();

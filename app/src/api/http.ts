@@ -127,11 +127,17 @@ export function serverJson<T = unknown>(
   url: string,
   init: RequestInit = {},
   opts?: RequestOptions,
-): Promise<{ ok: boolean; status: number; body: T | null }> {
+): Promise<{ ok: boolean; status: number; body: T | null; serverTiming: string | null }> {
   return serverRequest(
     url,
     init,
-    async (res) => ({ ok: res.ok, status: res.status, body: (await res.json().catch(() => null)) as T | null }),
+    async (res) => ({
+      ok: res.ok,
+      status: res.status,
+      body: (await res.json().catch(() => null)) as T | null,
+      // How long the server spent (its "server-timing" header), for Session → Testing.
+      serverTiming: res.headers?.get?.("server-timing") ?? null,
+    }),
     opts,
   );
 }

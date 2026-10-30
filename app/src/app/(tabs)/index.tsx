@@ -11,6 +11,7 @@ import { OfflineMapSection } from "../../components/OfflineMapSection";
 import { FavouritesSection } from "../../components/FavouritesSection";
 import { TeamSection } from "../../components/TeamSection";
 import { VoiceSettings } from "../../components/VoiceSettings";
+import { timingsText, useRouteTimings } from "../../navigation/timings";
 import { useFavourites } from "../../search/favourites";
 import { store } from "../../storage/store";
 import { useTeam } from "../../team/TeamProvider";
@@ -205,6 +206,7 @@ export default function SessionScreen() {
   ]
     .filter(Boolean)
     .join(" · ");
+  const timings = useRouteTimings();
   const testingSummary = [
     DEMO_MODE ? "Demo version" : demoDrive ? "Demo drive on" : "Demo drive off",
     recording.enabled ? "recording trips" : null,
@@ -551,6 +553,10 @@ export default function SessionScreen() {
           <Text style={styles.placeMeta}>
             Records your trips on this phone only, for testing. Nothing is sent anywhere. Export or delete from the Log.
           </Text>
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.label}>Last route timings</Text>
+          <Text style={styles.placeMeta}>{timingsText(timings) ?? "Plan a route to see how long each step takes."}</Text>
         </View>
       </Section>
 

@@ -55,6 +55,7 @@ import { recordEvent } from "../../usage/usage";
 import { useTextStyles, useColors } from "../../textSize";
 import { samePlace, setFavourites, toggled, useFavourites, type Favourite } from "../../search/favourites";
 import { quickPlaces } from "../../search/quickPlaces";
+import { noteCards, noteEntrance, noteGo, routeStarted } from "../../navigation/timings";
 import { fetchEntrances } from "../../api/entrances";
 import { fetchWhere } from "../../api/where";
 import { bestEntrance, entranceLabel, entrancesFor } from "../../search/entrances";
@@ -135,12 +136,18 @@ export default function SearchScreen() {
         : "Shops, cafés and other places aren't on this phone yet. They download from the BlueRoute server."
       : null;
 
+  // Session → Testing shows how long the route cards took to appear.
+  useEffect(() => {
+    if (state?.status === "ready") noteCards();
+  }, [state?.status]);
+
   const entranceAsk = useRef(0);
   const routeTo = useCallback(
     async (given: Destination, opts: { quiet?: boolean } = {}) => {
       let dest = given;
       request.current?.abort();
       const ask = ++entranceAsk.current;
+      routeStarted();
       setDestination(dest);
       if (dest.findEntrance) {
         // The way in, not the middle of the building: asked for first (at most ~1 s).
@@ -148,8 +155,11 @@ export default function SearchScreen() {
         const [lng, lat] = dest.point;
         // Only entrances that can be this building's: a door address's own
         // number, else unnumbered ones close by (further for a whole block).
+        const askedAt = Date.now();
+        const found = await fetchEntrances(lat, lng);
+        noteEntrance(Date.now() - askedAt);
         const entrances = entrancesFor(
-          await fetchEntrances(lat, lng),
+          found,
           dest.title ?? "",
           dest.road || !/\d/.test(dest.title ?? "") ? 40 : 20,
         );
@@ -880,6 +890,7 @@ export default function SearchScreen() {
             // Not on a demo drive: navigating puts the demo car at the route's start anyway.
             const stale = !simulated && (!shown.origin || planIsStale(shown.origin, fix, Date.now()));
             recorder.event({ type: "go", kind, staleRefresh: stale });
+            noteGo();
             navigation.start(
               kind,
               shown.plan,
