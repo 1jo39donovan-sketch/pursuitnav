@@ -1,8 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { rankVoices } from "../speaker";
+import { rankVoices, say } from "../speaker";
 
-vi.mock("expo-speech", () => ({}));
+const speech = vi.hoisted(() => ({
+  speak: vi.fn(),
+  stop: vi.fn(() => Promise.resolve()),
+  // Safari's voice list can never arrive: speaking mustn't wait for it.
+  getAvailableVoicesAsync: vi.fn(() => new Promise(() => {})),
+}));
+vi.mock("expo-speech", () => speech);
 vi.mock("../../storage/store", () => ({ store: { getSetting: () => null, setSetting: () => {} } }));
 
 describe("choosing a voice", () => {
@@ -26,5 +32,32 @@ describe("choosing a voice", () => {
     expect(rankVoices([{ identifier: "x", name: "Samantha", language: "en-US" }]).map((v) => v.name)).toEqual([
       "Samantha",
     ]);
+  });
+
+  it("offers a voice Safari lists twice only once", () => {
+    const ranked = rankVoices([
+      { identifier: "Daniel", name: "Daniel", language: "en-GB" },
+      { identifier: "Daniel-2", name: "Daniel", language: "en-GB" },
+    ]);
+    expect(ranked).toHaveLength(1);
+  });
+});
+
+describe("speaking", () => {
+  beforeEach(() => speech.speak.mockClear());
+
+  it("speaks at once, even when the phone never lists its voices", () => {
+    say("Turn left onto Clapham Road.", "urgent");
+    expect(speech.speak).toHaveBeenCalledTimes(1);
+    expect(speech.speak.mock.calls[0][0]).toBe("Turn left onto Clapham Road.");
+  });
+
+  it("carries on if the phone never says a prompt finished", () => {
+    vi.useFakeTimers();
+    say("Re-routing.", "urgent");
+    vi.advanceTimersByTime(12_000);
+    say("In 200 yards, turn right.");
+    expect(speech.speak).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 });

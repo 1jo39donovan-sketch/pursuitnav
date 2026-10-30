@@ -42,10 +42,13 @@ export function rankVoices(
 ): VoiceOption[] {
   const gb = voices.filter((v) => /^en[-_]gb/i.test(v.language));
   const pool = gb.length ? gb : voices.filter((v) => /^en/i.test(v.language));
-  return pool
+  const ranked = pool
     .map((v) => ({ id: v.identifier, name: cleanName(v.name), language: v.language, score: scoreOf(v) }))
     .filter((v) => v.score > -50)
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  // Safari lists some voices twice ("Daniel", "Daniel"): keep the better of each name.
+  const seen = new Set<string>();
+  return ranked.filter((v) => !seen.has(v.name) && seen.add(v.name));
 }
 
 /** "Serena (Enhanced)" stays; "com.apple.voice.compact.en-GB.Daniel" becomes "Daniel". */
@@ -67,26 +70,43 @@ export function voiceSettings(): { voiceId: string | null; rate: VoiceRate } {
 export function setVoiceSettings(s: { voiceId?: string | null; rate?: VoiceRate }) {
   if (s.voiceId !== undefined) store.setSetting("voiceId", s.voiceId ?? "");
   if (s.rate) store.setSetting("voiceRate", s.rate);
-  best = null;
+  best = undefined;
+  looked = false;
+  lookForVoice();
 }
 
-// The voice to use: the crew's choice if the phone still has it, else the best there is.
-let best: Promise<string | undefined> | null = null;
-function voiceToUse(): Promise<string | undefined> {
-  best ??= Speech.getAvailableVoicesAsync()
-    .then((voices) => {
-      const ranked = rankVoices(voices);
-      const chosen = voiceSettings().voiceId;
-      return ranked.find((v) => v.id === chosen)?.id ?? ranked[0]?.id;
-    })
-    .catch(() => undefined);
-  return best;
+/**
+ * The phone's voices, or [] if it doesn't say within a moment. expo-speech's
+ * web version waits for Safari's "voices changed" event, which can never come
+ * (or go to another caller): waiting on it once left the 30 Oct drives silent.
+ */
+function voicesSoon(): Promise<Speech.Voice[]> {
+  return Promise.race([
+    Speech.getAvailableVoicesAsync().catch(() => []),
+    new Promise<Speech.Voice[]>((done) => setTimeout(() => done([]), VOICES_WAIT_MS)),
+  ]);
+}
+const VOICES_WAIT_MS = 1500;
+
+// The voice to use, once known: the crew's choice if the phone still has it,
+// else the best there is. Speaking never waits for it; until it's known the
+// phone's default voice speaks.
+let best: string | undefined;
+let looked = false;
+function lookForVoice() {
+  if (looked) return;
+  looked = true;
+  void voicesSoon().then((voices) => {
+    const ranked = rankVoices(voices);
+    const chosen = voiceSettings().voiceId;
+    best = ranked.find((v) => v.id === chosen)?.id ?? ranked[0]?.id;
+    // Nothing listed yet (Safari fills the list late): look again next time.
+    if (!voices.length) looked = false;
+  });
 }
 
 export function availableVoices(): Promise<VoiceOption[]> {
-  return Speech.getAvailableVoicesAsync()
-    .then(rankVoices)
-    .catch(() => []);
+  return voicesSoon().then(rankVoices);
 }
 
 /** A queued prompt older than this is dropped: it's about a place already passed. */
@@ -99,22 +119,32 @@ interface Queued {
 
 let speaking = false;
 let queue: Queued[] = [];
+/** If the phone never says a prompt finished, carry on after this. */
+const STUCK_MS = 12_000;
+let stuck: ReturnType<typeof setTimeout> | undefined;
 
-async function sayNow(text: string) {
+function sayNow(text: string) {
+  lookForVoice();
   speaking = true;
-  const voice = await voiceToUse();
+  clearTimeout(stuck);
   const done = () => {
+    clearTimeout(stuck);
+    if (!speaking) return;
     speaking = false;
     next();
   };
+  stuck = setTimeout(done, STUCK_MS);
+  // Called straight away, not after waiting for anything: Safari only lets a
+  // page speak promptly, and a prompt said late is about a junction passed.
   Speech.speak(pronounced(text), {
     language: "en-GB",
-    voice,
+    voice: best,
     rate: RATES[voiceSettings().rate],
     // iOS: its own audio session, so music or a radio app is lowered, not stopped.
     useApplicationAudioSession: false,
     onDone: done,
     onStopped: () => {
+      clearTimeout(stuck);
       speaking = false;
     },
     onError: done,
@@ -125,7 +155,7 @@ function next() {
   const now = Date.now();
   queue = queue.filter((q) => now - q.at <= STALE_MS);
   const item = queue.shift();
-  if (item) void sayNow(item.text);
+  if (item) sayNow(item.text);
 }
 
 /**
@@ -137,11 +167,11 @@ export function say(text: string, priority: "urgent" | "normal" = "normal") {
     queue = [];
     void Speech.stop();
     speaking = false;
-    void sayNow(text);
+    sayNow(text);
     return;
   }
   if (!speaking) {
-    void sayNow(text);
+    sayNow(text);
     return;
   }
   // At most one waiting: a newer routine prompt replaces an older one.
@@ -151,6 +181,7 @@ export function say(text: string, priority: "urgent" | "normal" = "normal") {
 /** Silence now (muted, or navigation ended). */
 export function hush() {
   queue = [];
+  clearTimeout(stuck);
   speaking = false;
   void Speech.stop();
 }
@@ -158,5 +189,5 @@ export function hush() {
 /** Says a sample with the chosen voice and speed, for the Session picker. */
 export function testVoice() {
   hush();
-  void sayNow("In 200 yards, turn left onto Clapham Road. Then the second right, towards Southwark.");
+  sayNow("In 200 yards, turn left onto Clapham Road. Then the second right, towards Southwark.");
 }
