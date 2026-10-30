@@ -60,15 +60,18 @@ function cleanName(name: string): string {
 export type VoiceRate = "normal" | "faster";
 export const RATES: Record<VoiceRate, number> = { normal: 1, faster: 1.15 };
 
-export function voiceSettings(): { voiceId: string | null; rate: VoiceRate } {
+export function voiceSettings(): { voiceId: string | null; voiceName: string | null; rate: VoiceRate } {
+  const voiceId = store.getSetting("voiceId") || null;
   return {
-    voiceId: store.getSetting("voiceId") || null,
+    voiceId,
+    voiceName: voiceId ? store.getSetting("voiceName") || null : null,
     rate: store.getSetting("voiceRate") === "faster" ? "faster" : "normal",
   };
 }
 
-export function setVoiceSettings(s: { voiceId?: string | null; rate?: VoiceRate }) {
+export function setVoiceSettings(s: { voiceId?: string | null; voiceName?: string | null; rate?: VoiceRate }) {
   if (s.voiceId !== undefined) store.setSetting("voiceId", s.voiceId ?? "");
+  if (s.voiceName !== undefined) store.setSetting("voiceName", s.voiceName ?? "");
   if (s.rate) store.setSetting("voiceRate", s.rate);
   best = undefined;
   looked = false;
@@ -186,8 +189,42 @@ export function hush() {
   void Speech.stop();
 }
 
-/** Says a sample with the chosen voice and speed, for the Session picker. */
-export function testVoice() {
+export type TestState = "speaking" | "done" | "silent";
+/** No start from the phone within this: speech is blocked or muted. */
+const SILENT_AFTER_MS = 3000;
+
+/**
+ * Says a sample with the chosen voice and speed, for the Session picker, and
+ * tells the picker how it went: speaking, done, or silent (it never started,
+ * so the browser blocked it or the phone has no voice).
+ */
+export function testVoice(onState: (s: TestState) => void = () => {}) {
   hush();
-  sayNow("In 200 yards, turn left onto Clapham Road. Then the second right, towards Southwark.");
+  lookForVoice();
+  let started = false;
+  const silent = setTimeout(() => {
+    if (!started) onState("silent");
+  }, SILENT_AFTER_MS);
+  onState("speaking");
+  Speech.speak(pronounced("In 200 yards, turn left onto Clapham Road. Then the second right, towards Southwark."), {
+    language: "en-GB",
+    voice: best,
+    rate: RATES[voiceSettings().rate],
+    useApplicationAudioSession: false,
+    onStart: () => {
+      started = true;
+    },
+    onDone: () => {
+      clearTimeout(silent);
+      onState("done");
+    },
+    onStopped: () => {
+      clearTimeout(silent);
+      onState("done");
+    },
+    onError: () => {
+      clearTimeout(silent);
+      onState("silent");
+    },
+  });
 }

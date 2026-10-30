@@ -28,6 +28,7 @@ import {
 } from "../navigation/reroute";
 import { hush, say } from "../navigation/speaker";
 import { arrivalSide, instructionWithPlace, nextCallout } from "../navigation/voice";
+import { noteTurnCard } from "../navigation/timings";
 import { recordEvent } from "../usage/usage";
 import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
 import { recorder, useRecorder } from "../fieldtest/instance";
@@ -51,6 +52,7 @@ import {
   upcomingInstruction,
   OFF_ROUTE_FIXES,
   briefInstruction,
+  thenText,
   courseDiff,
   offRouteCount,
   prepare,
@@ -83,10 +85,14 @@ function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
 /** Turn-by-turn guidance, readable at a glance by the operator. */
 /** Degrees between the car's course and the route's direction where it is; null when not moving. */
 function headingOff(prepared: PreparedRoute, progress: Progress, fix: { course: number | null; speed: number | null }) {
-  if (fix.course == null || fix.speed == null || fix.speed < 3) return null;
+  // From about 3 mph: the 30 Oct missed turns were all made crawling in traffic.
+  if (fix.course == null || fix.speed == null || fix.speed < COURSE_FROM_MS) return null;
   const here = pointAlong(prepared, progress.along);
   return here ? courseDiff(fix.course, here.course) : null;
 }
+
+/** A phone's course is steady enough to compare from this speed, m/s. */
+const COURSE_FROM_MS = 1.4;
 
 /** Drawn on the route line when GPS puts the vehicle within this of it, metres. */
 const SNAP_DRAW_M = 30;
@@ -104,6 +110,8 @@ export default function NavigateScreen() {
   const { active, replan, rerouteNow, stop } = useNavigation();
   // Usage counts: one navigation session per time this screen opens.
   useEffect(() => recordEvent("navigation"), []);
+  // The turn card is on screen from the first render: GO took this long (Session → Testing).
+  useEffect(() => noteTurnCard(), []);
   const { fix: lastFix, simulated, facing } = useLocation();
   // When this screen opened. On a demo drive, a fix from before then is from
   // the patrol, not the route the car is about to be put on: not used.
@@ -160,10 +168,24 @@ export default function NavigateScreen() {
       offCount:
         fresh || (simulated && fix.timestamp - demoDriveStartedAt() < DEMO_GRACE_MS)
           ? 0
-          : offRouteCount(track.offCount, progress.offRouteBy, fix.accuracy, headingOff(prepared, progress, fix)),
+          : offRouteCount(
+              track.offCount,
+              progress.offRouteBy,
+              fix.accuracy,
+              headingOff(prepared, progress, fix),
+              progress.nearTurnM,
+            ),
     });
   }
   const progress = track.prepared === prepared ? track.progress : null;
+  // Until the first fix on this screen (on the demo drive, the car's next
+  // tick), the card shows the first turn from the route's start, which is
+  // where the phone was when the route was planned: no "Waiting for GPS…".
+  const startCard = useMemo(() => {
+    const first = prepared?.route.shape[0];
+    return prepared && first ? progressAt(prepared, { lng: first[0], lat: first[1] }) : null;
+  }, [prepared]);
+  const card = progress ?? startCard;
   const offRoute = track.prepared === prepared && track.offCount >= OFF_ROUTE_FIXES;
 
   // Signal. Guidance carries on without it (the route is on the phone); only
@@ -401,7 +423,8 @@ export default function NavigateScreen() {
   const [confirmEnd, setConfirmEnd] = useState(false);
   useEffect(() => {
     if (!confirmEnd) return;
-    const t = setTimeout(() => setConfirmEnd(false), 3000);
+    // Long enough to look back at the road and still tap again (30 Oct test).
+    const t = setTimeout(() => setConfirmEnd(false), 5000);
     return () => clearTimeout(t);
   }, [confirmEnd]);
 
@@ -446,9 +469,9 @@ export default function NavigateScreen() {
       : null;
   const turnPanel = (
     <View style={[styles.turn, showOff && styles.turnOff]}>
-      {!progress ? (
+      {!card ? (
         <Text style={styles.instruction}>Waiting for GPS…</Text>
-      ) : progress.arrived ? (
+      ) : card.arrived ? (
         <>
           <Text style={styles.distance}>⚑ Arrived</Text>
           <Text style={styles.instruction}>{active.destination.title}</Text>
@@ -482,21 +505,21 @@ export default function NavigateScreen() {
       ) : (
         <>
           <View style={styles.turnRow}>
-            <Text style={[styles.arrow, compact && styles.arrowCompact]}>{maneuverArrow(progress.next?.type ?? 4)}</Text>
+            <Text style={[styles.arrow, compact && styles.arrowCompact]}>{maneuverArrow(card.next?.type ?? 4)}</Text>
             <Text style={[styles.distance, compact && styles.distanceCompact]}>
               {/* At the junction "0 yd" read like a fault: say it's now. */}
-              {progress.distanceToNextM < 15 ? "Now" : formatDistance(progress.distanceToNextM)}
+              {card.distanceToNextM < 15 ? "Now" : formatDistance(card.distanceToNextM)}
             </Text>
           </View>
           <Text style={[styles.instruction, compact && styles.instructionCompact]} numberOfLines={compact ? 2 : 3}>
-            {progress.next
-              ? briefInstruction(instructionWithPlace(progress.next, active.destination.title))
+            {card.next
+              ? briefInstruction(instructionWithPlace(card.next, active.destination.title))
               : "Continue to your destination."}
           </Text>
-          {progress.after && (
+          {card.after && (
             <Text style={styles.then} numberOfLines={compact ? 1 : 2}>
-              Then {maneuverArrow(progress.after.type)}{" "}
-              {briefInstruction(instructionWithPlace(progress.after, active.destination.title))}
+              Then {maneuverArrow(card.after.type)}{" "}
+              {thenText(card.after, instructionWithPlace(card.after, active.destination.title))}
             </Text>
           )}
         </>
@@ -522,8 +545,8 @@ export default function NavigateScreen() {
     <View style={[styles.bottom, { paddingBottom: insets.bottom + 10 }]}>
       <View style={styles.etaRow}>
         <Text style={styles.etaClock} numberOfLines={1}>
-          {progress
-            ? new Date(track.fixAt + progress.remainingS * 1000).toLocaleTimeString("en-GB", {
+          {card
+            ? new Date((progress ? track.fixAt : openedAt) + card.remainingS * 1000).toLocaleTimeString("en-GB", {
                 hour: "2-digit",
                 minute: "2-digit",
               })
@@ -531,14 +554,14 @@ export default function NavigateScreen() {
         </Text>
         <View style={styles.eta}>
           <Text style={styles.etaMeta} numberOfLines={1}>
-            {progress ? `${formatMinutes(progress.remainingS)} · ${formatDistance(progress.remainingM)}` : ""}
+            {card ? `${formatMinutes(card.remainingS)} · ${formatDistance(card.remainingM)}` : ""}
           </Text>
           <Text style={styles.road} numberOfLines={narrow ? 1 : 2}>
-            On {(progress && roadLabel(progress.current.streetNames)) ?? "—"}
+            On {(card && roadLabel(card.current.streetNames)) ?? "—"}
           </Text>
           {narrow && routeBadge}
           {/* The crew's note on the block, as they get close. */}
-          {blockNote && progress && !progress.arrived && progress.remainingM < NOTE_WITHIN_M && (
+          {blockNote && card && !card.arrived && card.remainingM < NOTE_WITHIN_M && (
             <Text style={styles.blockNote} numberOfLines={2}>
               ✎ {blockNote}
             </Text>
@@ -625,6 +648,7 @@ export default function NavigateScreen() {
               zoomControl
               autoZoom
               roadNames
+              houseNumbers={false}
               vehicleArrow
               followZoom={16.5}
               routes={routes}
@@ -650,6 +674,7 @@ export default function NavigateScreen() {
               zoomControl
               autoZoom
               roadNames
+              houseNumbers={false}
               vehicleArrow
               followZoom={16.5}
               routes={routes}
@@ -866,7 +891,8 @@ const baseStyles = StyleSheet.create({
   },
   instruction: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26, lineHeight: 30 },
   instructionCompact: { fontSize: 22, lineHeight: 26 },
-  then: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
+  // Text colour, not muted grey: grey was the weakest line on light screens (30 Oct).
+  then: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
   bottom: {
     paddingHorizontal: 12,

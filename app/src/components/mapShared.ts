@@ -39,6 +39,8 @@ export interface LiveMapProps {
   zoomControl?: boolean;
   /** Bigger, brighter road names than the map style's own. */
   roadNames?: boolean;
+  /** House numbers close in (off while navigating, where they crowded the road). */
+  houseNumbers?: boolean;
   /** Show the vehicle as an arrow pointing the way it's going (navigation, pursuit). */
   vehicleArrow?: boolean;
   /** Named blocks and estates to label (points with a "name"), when zoomed in. */
@@ -165,6 +167,16 @@ export const FIT_DELAY_MS = 150;
 export function cameraFor(view: MapView, course: number | null): { bearing: number; pitch: number } {
   if (view === "north" || course == null) return { bearing: 0, pitch: view === "3d" ? 55 : 0 };
   return { bearing: course, pitch: view === "3d" ? 55 : 0 };
+}
+
+/**
+ * One frame's step of the map's turn towards `to`, the short way round: at a
+ * junction the map swings round over a second or so rather than snapping with
+ * the vehicle's course (30 Oct drive, 1:27).
+ */
+export function easeBearing(from: number, to: number, f = 0.04): number {
+  const diff = ((to - from + 540) % 360) - 180;
+  return Math.abs(diff) < 0.5 ? to : (from + diff * f + 360) % 360;
 }
 
 export const RESTRICTION_RED = "#e5484d";

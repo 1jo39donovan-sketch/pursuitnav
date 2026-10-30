@@ -30,6 +30,8 @@ export interface Progress {
   /** The one after next, for "then …". */
   after: Maneuver | null;
   distanceToNextM: number;
+  /** Metres from the snapped position to the nearest turn (the next one, or the one just made). */
+  nearTurnM: number;
   remainingM: number;
   remainingS: number;
   arrived: boolean;
@@ -117,6 +119,7 @@ export function progressAt(
     next,
     after,
     distanceToNextM: Math.max(0, nextAt - along),
+    nearTurnM: Math.min(Math.max(0, nextAt - along), Math.max(0, along - curStart)),
     remainingM,
     remainingS,
     arrived: remainingM < ARRIVED_M,
@@ -132,22 +135,39 @@ export const WRONG_WAY_M = 20;
 /** Degrees between the car's course and the route's direction that count as across it. */
 export const WRONG_WAY_DEG = 60;
 
+/** Snapped within this of a turn counts as at the turn. */
+export const AT_TURN_M = 12;
+/** Off the line at a turn by this much: driven past it (a London road is about 10 m wide). */
+export const PAST_TURN_M = 12;
+/** Off the line at a turn by this much: certainly past it, re-route at once. */
+export const WELL_PAST_TURN_M = 20;
+
 /**
  * Off-route fixes so far. A car well off the line counts one a fix (4 to
- * re-route, about 4 s). One that has gone past a turn shows it sooner: a
- * little off the line and driving across the route's direction counts two a
- * fix, so a missed turn re-routes in about 2 s. `headingOff` is degrees between
- * the car's course and the route's direction there (null when not moving).
+ * re-route, about 4 s). A missed turn shows sooner, because on the 30 Oct
+ * drives, crawling in traffic, "Now" stayed up 5–8 s past each turn:
+ * - snapped to a turn and 15 m off the line (driven on past it): two a fix,
+ *   and 20 m off re-routes at once;
+ * - a little off the line and driving across the route's direction: two a fix.
+ * `headingOff` is degrees between the car's course and the route's direction
+ * there (null when too slow to have a course); `nearTurnM` is how far the
+ * snapped position is from the nearest turn.
  */
 export function offRouteCount(
   previous: number,
   offRouteBy: number,
   accuracy: number | null,
   headingOff: number | null = null,
+  nearTurnM = Infinity,
 ): number {
-  const limit = Math.max(OFF_ROUTE_M, (accuracy ?? 0) * 1.5);
-  const wrongWay = headingOff != null && headingOff > WRONG_WAY_DEG && offRouteBy > Math.max(WRONG_WAY_M, accuracy ?? 0);
+  const acc = accuracy ?? 0;
+  if (nearTurnM <= AT_TURN_M) {
+    if (offRouteBy > Math.max(WELL_PAST_TURN_M, acc * 1.5)) return Math.max(previous + 2, OFF_ROUTE_FIXES);
+    if (offRouteBy > Math.max(PAST_TURN_M, acc * 1.2)) return previous + 2;
+  }
+  const wrongWay = headingOff != null && headingOff > WRONG_WAY_DEG && offRouteBy > Math.max(WRONG_WAY_M, acc);
   if (wrongWay) return previous + 2;
+  const limit = Math.max(OFF_ROUTE_M, acc * 1.5);
   return offRouteBy > limit ? previous + 1 : 0;
 }
 
@@ -217,8 +237,28 @@ export function upcomingInstruction(m: Maneuver): string {
  * the turn itself out of the "Then" line.
  */
 export function briefInstruction(text: string): string {
-  const brief = text.replace(/\s+Continue (on|for|along)\b[^.]*\.?\s*$/i, "").trim();
+  const brief = text
+    .replace(/\s+Continue (on|for|along)\b[^.]*\.?\s*$/i, "")
+    // "A203/South Lambeth Road": the name is what's on the street sign.
+    .replace(new RegExp(String.raw`\b${ROAD_REF}/(?=[A-Z][a-z])`, "g"), "")
+    .replace(new RegExp(String.raw`([a-z])/${ROAD_REF}\b`, "g"), "$1")
+    .trim();
   return brief || text;
+}
+
+const ROAD_REF = String.raw`[ABM]\d{1,4}(?:\(M\))?`;
+
+/**
+ * The "Then" line: the road's name (its number if it has none), shown after
+ * the turn's arrow, so it fits on one line ("Then → Wandsworth Road") rather
+ * than "Then → Turn right onto Wandsworth Road/A30…". The full instruction for
+ * an arrival or a turn with no road named.
+ */
+export function thenText(m: Maneuver, full: string): string {
+  if (m.type in ARRIVAL || !m.streetNames.length) return briefInstruction(full);
+  const parts = m.streetNames.flatMap((n) => n.split("/").map((p) => p.trim())).filter(Boolean);
+  const ref = new RegExp(`^${ROAD_REF}$`);
+  return parts.find((p) => !ref.test(p)) ?? parts[0] ?? briefInstruction(full);
 }
 
 /**

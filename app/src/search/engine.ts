@@ -112,6 +112,10 @@ const distanceKm = (a: { lat: number; lng: number }, b: { lat: number; lng: numb
   return 2 * 6371 * Math.asin(Math.sqrt(h));
 };
 
+/** The last word of a road's name ("Holloway Road", "Upper St"). */
+const ROAD_ENDING =
+  /^(road|rd|street|st|lane|ln|avenue|ave|way|grove|gr|place|pl|hill|terrace|gardens|gdns|crescent|close|square|sq|parade|row|walk|mews|drive|dr|green|rise|broadway|park|vale|wharf|yard|court|ct)$/i;
+
 export class SearchIndex {
   private roads: Indexed<Road>[];
   private places: Indexed<Place>[] = [];
@@ -429,8 +433,13 @@ export class SearchIndex {
     const hits = best.map(([item, score]) =>
       "kind" in item ? this.placeResult(item, prefix, score) : this.roadResult(item, prefix, score),
     );
-    // Named places can be any part ("Costa, Upper Street"; "Smith House, Holloway Road").
-    if (!q.number && !q.flat) hits.push(...this.matchPointsOfInterest(q.parts, area));
+    // Named places can be any part ("Costa, Upper Street"; "Smith House, Holloway Road"),
+    // or a name then a road with no comma ("Costa Coffee Holloway Road").
+    if (!q.number && !q.flat) {
+      const split = q.parts.length === 1 ? this.nameThenRoad(q.parts[0]!) : [];
+      hits.push(...this.matchPointsOfInterest(q.parts, area));
+      for (const parts of split) hits.push(...this.matchPointsOfInterest(parts, area));
+    }
 
     // A postcode on the end pins the right one of several same-named roads,
     // and gives a closer point than the road's own.
@@ -449,6 +458,26 @@ export class SearchIndex {
       }
     }
     return hits;
+  }
+
+  /**
+   * "Costa Coffee Holloway Road" as ["Costa Coffee", "Holloway Road"] (and
+   * ["Costa", "Holloway Road"], as the map may call it just "Costa"): each way
+   * of ending the words with a road's name. Empty when no ending is a road.
+   */
+  private nameThenRoad(part: string): string[][] {
+    const words = part.trim().split(/\s+/);
+    const out: string[][] = [];
+    // Only when it ends like a road: the check against every road costs ~40 ms.
+    if (!ROAD_ENDING.test(words.at(-1) ?? "")) return out;
+    for (let k = 1; k < words.length; k++) {
+      const road = words.slice(k).join(" ");
+      const roadNorm = normalise(road);
+      if (roadNorm.length < 4 || !this.roads.some((r) => matchScore(r.norm, roadNorm) >= 90)) continue;
+      out.push([words.slice(0, k).join(" "), road]);
+      if (k > 1) out.push([words[0]!, road]);
+    }
+    return out;
   }
 
   private matchPointsOfInterest(parts: string[], area: AreaFilter): SearchResult[] {

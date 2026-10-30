@@ -55,6 +55,7 @@ import { recordEvent } from "../../usage/usage";
 import { useTextStyles, useColors } from "../../textSize";
 import { samePlace, setFavourites, toggled, useFavourites, type Favourite } from "../../search/favourites";
 import { quickPlaces } from "../../search/quickPlaces";
+import { noteCards, noteEntrance, noteGo, routeStarted } from "../../navigation/timings";
 import { fetchEntrances } from "../../api/entrances";
 import { fetchWhere } from "../../api/where";
 import { bestEntrance, entranceLabel, entrancesFor } from "../../search/entrances";
@@ -135,21 +136,30 @@ export default function SearchScreen() {
         : "Shops, cafés and other places aren't on this phone yet. They download from the BlueRoute server."
       : null;
 
+  // Session → Testing shows how long the route cards took to appear.
+  useEffect(() => {
+    if (state?.status === "ready") noteCards();
+  }, [state?.status]);
+
   const entranceAsk = useRef(0);
   const routeTo = useCallback(
-    async (given: Destination) => {
+    async (given: Destination, opts: { quiet?: boolean } = {}) => {
       let dest = given;
       request.current?.abort();
       const ask = ++entranceAsk.current;
+      routeStarted();
       setDestination(dest);
       if (dest.findEntrance) {
         // The way in, not the middle of the building: asked for first (at most ~1 s).
-        setState({ status: "loading" });
+        setState({ status: "loading", quiet: opts.quiet });
         const [lng, lat] = dest.point;
         // Only entrances that can be this building's: a door address's own
         // number, else unnumbered ones close by (further for a whole block).
+        const askedAt = Date.now();
+        const found = await fetchEntrances(lat, lng);
+        noteEntrance(Date.now() - askedAt);
         const entrances = entrancesFor(
-          await fetchEntrances(lat, lng),
+          found,
           dest.title ?? "",
           dest.road || !/\d/.test(dest.title ?? "") ? 40 : 20,
         );
@@ -176,7 +186,7 @@ export default function SearchScreen() {
       if (pre && !ready) pre.controller.abort();
       const controller = ready?.controller ?? new AbortController();
       request.current = controller;
-      setState({ status: "loading" });
+      setState({ status: "loading", quiet: opts.quiet });
       const from = ready?.origin.from ?? routeOrigin(fix);
       const origin = ready?.origin ?? { madeAt: Date.now(), from };
       // The standard route comes back in a second or so; the blue-light one
@@ -200,29 +210,7 @@ export default function SearchScreen() {
         (err: unknown) => recorder.event({ type: "plan-failed", ms: recorder.sinceStart(), outcome: rerouteFailure(err) ?? "error" }),
       );
       let fullDone = false;
-      quick
-        .then((plan) => {
-          if (!controller.signal.aborted && !fullDone) setState({ status: "ready", plan, checking: !!full, origin });
-        })
-        .catch(() => {});
-      try {
-        if (!full) {
-          const plan = await quick;
-          if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
-          return;
-        }
-        const plan = await full;
-        fullDone = true;
-        if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
-      } catch (err) {
-        fullDone = true;
-        if (controller.signal.aborted) return;
-        // The blue-light check failed but the standard route may be fine.
-        const standard = await quick.catch(() => null);
-        if (standard) {
-          setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" }, origin });
-          return;
-        }
+      const failed = (err: unknown) => {
         if (err instanceof NoSignalRouteError) {
           setState({ status: "error", message: NO_SIGNAL_ROUTE_START, noSignal: true });
           return;
@@ -235,6 +223,38 @@ export default function SearchScreen() {
         }
         const message = err instanceof RouteError ? err.message : "Something went wrong working out routes.";
         setState({ status: "error", message });
+      };
+      quick.then(
+        (plan) => {
+          if (!controller.signal.aborted && !fullDone) setState({ status: "ready", plan, checking: !!full, origin });
+        },
+        (err: unknown) => {
+          // No standard route: say so now, not after the blue-light check gives up too.
+          if (controller.signal.aborted || fullDone || !full) return;
+          fullDone = true;
+          controller.abort();
+          failed(err);
+        },
+      );
+      try {
+        if (!full) {
+          const plan = await quick;
+          if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
+          return;
+        }
+        const plan = await full;
+        fullDone = true;
+        if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
+      } catch (err) {
+        if (controller.signal.aborted || fullDone) return;
+        fullDone = true;
+        // The blue-light check failed but the standard route may be fine.
+        const standard = await quick.catch(() => null);
+        if (standard) {
+          setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" }, origin });
+          return;
+        }
+        failed(err);
       }
     },
     [fix, vehicle, policeRoutes, roads],
@@ -395,7 +415,8 @@ export default function SearchScreen() {
 
   // Back from navigation: a plan from where the crew were before is never
   // offered again. After arriving, or "New destination", start clean (the map, no
-  // keyboard); after End, work the routes out again from here.
+  // keyboard); after End, work the routes out again from here, quietly: no
+  // "Working out the standard route…" flash (three trials running).
   const handledEnd = useRef(navigation.ended);
   useEffect(() => {
     const ended = navigation.ended;
@@ -403,7 +424,7 @@ export default function SearchScreen() {
     const t = setTimeout(() => {
       handledEnd.current = ended;
       if (ended.reason === "end" && destination) {
-        routeTo(destination);
+        routeTo(destination, { quiet: true });
         return;
       }
       clear();
@@ -879,6 +900,7 @@ export default function SearchScreen() {
             // Not on a demo drive: navigating puts the demo car at the route's start anyway.
             const stale = !simulated && (!shown.origin || planIsStale(shown.origin, fix, Date.now()));
             recorder.event({ type: "go", kind, staleRefresh: stale });
+            noteGo();
             navigation.start(
               kind,
               shown.plan,

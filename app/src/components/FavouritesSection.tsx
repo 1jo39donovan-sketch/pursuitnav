@@ -120,9 +120,10 @@ const baseStyles = StyleSheet.create({
   },
   name: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 17 },
   meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
+  // Big enough to hit with gloves on (30 Oct browser test).
   small: {
-    width: 44,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -131,7 +132,7 @@ const baseStyles = StyleSheet.create({
     borderWidth: 1,
   },
   off: { opacity: 0.35 },
-  smallText: { color: colors.fg, fontSize: 18 },
+  smallText: { color: colors.fg, fontSize: 22 },
   remove: { color: colors.warn },
   input: {
     flex: 1,

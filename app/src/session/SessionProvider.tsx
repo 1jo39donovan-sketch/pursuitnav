@@ -29,8 +29,11 @@ interface Session {
   vehicle: VehicleType;
   setVehicle: (v: VehicleType) => void;
   /** Night (dark) or day (light) map. */
+  /** The map's colours now: the choice, or the screens' when it's "auto". */
   mapTheme: MapTheme;
-  setMapTheme: (t: MapTheme) => void;
+  /** "auto": the map matches the screens (night map with dark screens). */
+  mapChoice: MapChoice;
+  setMapTheme: (t: MapChoice) => void;
   /** Standard, high-contrast, plain or the OS road map. */
   mapLook: MapLook;
   setMapLook: (l: MapLook) => void;
@@ -62,6 +65,7 @@ interface Session {
 export type RoadChoice = "main" | "any";
 
 export type MapTheme = "night" | "day";
+export type MapChoice = MapTheme | "auto";
 export type MapView = "north" | "heading" | "3d";
 export const MAP_VIEWS: MapView[] = ["3d", "heading", "north"];
 
@@ -123,18 +127,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return isService(saved) ? saved : null;
   });
 
-  const [mapTheme, setMapTheme] = useSetting<MapTheme>("mapTheme", ["night", "day"], "day");
+  // A new key: the 30 Oct browser test found dark screens on a day map (and
+  // light on night) clashing, so everyone starts with the map matching.
+  const [mapChoice, setMapTheme] = useSetting<MapChoice>("mapChoice", ["auto", "night", "day"], "auto");
   const [mapLook, setMapLook] = useSetting<MapLook>("mapLook", MAP_LOOKS, "standard");
   const [mapView, setMapView] = useSetting<MapView>("mapView", MAP_VIEWS, "3d");
   // "voice" was first stored by the navigation screen as "1"/"0".
   const [voiceSetting, setVoiceSetting] = useSetting<"1" | "0">("voice", ["1", "0"], "1");
   const voice = voiceSetting === "1";
   const [roads, setRoads] = useSetting<RoadChoice>("roads", ["main", "any"], "main");
-  const [appearance, setAppearance] = useSetting<Appearance>("appearance", APPEARANCES, "system");
+  const [appearance, setAppearanceSetting] = useSetting<Appearance>("appearance", APPEARANCES, "system");
+  // Changing the screens brings the map back to matching them.
+  const setAppearance = useCallback(
+    (a: Appearance) => {
+      setAppearanceSetting(a);
+      setMapTheme("auto");
+    },
+    [setAppearanceSetting, setMapTheme],
+  );
   // app.json still says "dark" (changing it needs a new native build), so until then
   // the phone always reports dark here and "Match phone" means dark.
   const scheme = useColorScheme();
   const dark = appearance === "dark" || (appearance === "system" && scheme !== "light");
+  const mapTheme: MapTheme = mapChoice === "auto" ? (dark ? "night" : "day") : mapChoice;
   const [largeSetting, setLargeSetting] = useSetting<"1" | "0">("largeText", ["1", "0"], "0");
   const largeText = largeSetting === "1";
   const setLargeText = useCallback((on: boolean) => setLargeSetting(on ? "1" : "0"), [setLargeSetting]);
@@ -207,6 +222,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       vehicle,
       setVehicle,
       mapTheme,
+      mapChoice,
       setMapTheme,
       mapLook,
       setMapLook,
@@ -245,6 +261,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       vehicle,
       setVehicle,
       mapTheme,
+      mapChoice,
       setMapTheme,
       mapLook,
       setMapLook,

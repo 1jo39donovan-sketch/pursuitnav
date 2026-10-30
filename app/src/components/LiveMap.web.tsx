@@ -19,6 +19,7 @@ import {
   ARROW_LAYOUT,
   boundsOf,
   cameraFor,
+  easeBearing,
   LABEL_LAYOUT,
   labelPaint,
   TEAM_CIRCLE_PAINT,
@@ -70,6 +71,7 @@ export function LiveMap({
   autoZoom = false,
   zoomControl = false,
   roadNames = false,
+  houseNumbers = true,
   labels,
   team,
   vehicleArrow = false,
@@ -141,7 +143,7 @@ export function LiveMap({
   const [styleVersion, setStyleVersion] = useState(0);
   // Opens where the vehicle is, so a new screen doesn't fly in from the middle of London.
   const startAt = useRef({ fix, zoom });
-  const looked = useMapStyle(MAP_STYLES[mapTheme], mapLook, mapTheme, MAP_STYLES.day);
+  const looked = useMapStyle(MAP_STYLES[mapTheme], mapLook, mapTheme, MAP_STYLES.day, houseNumbers);
   const style = DEMO_MODE ? demoMapStyle : looked;
   const firstStyle = useRef(style);
 
@@ -219,7 +221,7 @@ export function LiveMap({
         paint: { "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] },
       });
       // House numbers close in, under the road names so a street name always wins the space.
-      if (m.getSource(ROAD_NAME_SOURCE)) {
+      if (houseNumbers && m.getSource(ROAD_NAME_SOURCE)) {
         m.addLayer({
           id: HOUSE_NUMBER_LAYER,
           type: "symbol",
@@ -386,7 +388,13 @@ export function LiveMap({
       m.on(cancel, () => clearTimeout(pressTimer));
     }
     map.current = m;
+    // The map's box can get its size after the map starts (Pursuit on its
+    // side): redraw at the new size, or it stays a blank background.
+    const box = container.current as unknown as HTMLElement | null;
+    const sized = typeof ResizeObserver !== "undefined" && box ? new ResizeObserver(() => m.resize()) : null;
+    if (sized && box) sized.observe(box);
     return () => {
+      sized?.disconnect();
       m.remove();
       map.current = null;
       // A new map (different style or view) has to load before it's drawn on.
@@ -394,7 +402,7 @@ export function LiveMap({
     };
     // Day/night, the view and the labels change the map in place (below):
     // making a new one would jump the camera back to the middle of London.
-  }, [compact, roadNames, vehicleArrow]);
+  }, [compact, roadNames, houseNumbers, vehicleArrow]);
 
   // Day or night: the new style, same camera.
   useEffect(() => {
@@ -472,12 +480,15 @@ export function LiveMap({
       (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(p.lng, p.lat, p.course));
       const c = cam.current;
       if (!c.following) return;
-      // Zoom eases towards the speed's zoom a little each frame, rather than stepping.
+      // Zoom eases towards the speed's zoom a little each frame, rather than
+      // stepping; the map's turn eases too, so a junction doesn't spin it.
       const z = m.getZoom();
+      const want = cameraFor(c.view, p.course);
       m.jumpTo({
         center: [p.lng, p.lat],
         zoom: Math.abs(c.zoom - z) < 0.01 ? c.zoom : z + (c.zoom - z) * 0.08,
-        ...cameraFor(c.view, p.course),
+        pitch: want.pitch,
+        bearing: c.view === "north" ? 0 : easeBearing(m.getBearing(), want.bearing),
         padding: paddingFor(m, c),
       });
     });
@@ -511,8 +522,8 @@ export function LiveMap({
       {/* flex rather than absoluteFill: maplibre-gl's CSS sets position: relative on this element. */}
       <View ref={container} style={styles.map} />
       {mapFailed && (
-        // Below whatever floats over the top of the map (Search's box), not hidden under it.
-        <View style={[styles.failed, { top: 16 + overlayTop }]} pointerEvents="none">
+        // Low on the map, above what floats at the bottom: at the top it covered PLACES (30 Oct).
+        <View style={[styles.failed, { bottom: 16 + overlayBottom }]} pointerEvents="none">
           <Text style={styles.failedTitle}>Map couldn’t load</Text>
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>
@@ -556,8 +567,7 @@ const baseStyles = StyleSheet.create({
   failed: {
     position: "absolute",
     left: 16,
-    right: 16,
-    top: 16,
+    right: 72,
     backgroundColor: colors.panel,
     borderColor: colors.amber,
     borderWidth: 1,

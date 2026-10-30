@@ -6,7 +6,7 @@ import type { PointOfInterest } from "../search/places";
 import { formatDistance, formatDuration, formatMinutes } from "../format";
 import { recorder, useRecorder } from "../fieldtest/instance";
 import { RETRYING_WHEN_BACK } from "../navigation/connectivity";
-import { planningText } from "../navigation/planning";
+import { planningText, STILL_PLANNING_MS } from "../navigation/planning";
 import {
   cardSlots,
   createTapGuard,
@@ -22,7 +22,8 @@ import { useElapsed } from "./useElapsed";
 import { useTextStyles, useColors } from "../textSize";
 
 export type PlanState =
-  | { status: "loading" }
+  /** quiet: routes being freshened after End; nothing said unless it's slow. */
+  | { status: "loading"; quiet?: boolean }
   /** waitingForFix: refused for want of a GPS position; routes when the first fix arrives. */
   /** noSignal: the network failed; the card offers the hand-offs and retries when signal is back. */
   /** serverDown: the server is down or didn't answer; the hand-offs come first, big. */
@@ -153,7 +154,9 @@ export function RoutePanel({
       )}
       {onSaveNote && <BlockNoteLine key={noteKey} note={blockNote} onSave={onSaveNote} />}
       {ageText && <Text style={styles.age}>{`${ageText} · Go updates it from here`}</Text>}
-      {state.status === "loading" && <Text style={styles.status}>{planningText("routes", waited)}</Text>}
+      {state.status === "loading" && (!state.quiet || waited >= STILL_PLANNING_MS) && (
+        <Text style={styles.status}>{planningText("routes", waited)}</Text>
+      )}
       {state.status === "error" && (
         <View style={styles.errorBox}>
           <Text style={[styles.status, styles.error]}>{state.message}</Text>

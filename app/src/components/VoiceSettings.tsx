@@ -10,6 +10,7 @@ import {
   setVoiceSettings,
   testVoice,
   voiceSettings,
+  type TestState,
   type VoiceOption,
   type VoiceRate,
 } from "../navigation/speaker";
@@ -20,11 +21,12 @@ import { Button } from "./Button";
 /** At most this many voices offered: the best ones. */
 const SHOWN = 4;
 
-export function VoiceSettings() {
+export function VoiceSettings({ onChange }: { onChange?: () => void }) {
   const styles = useTextStyles(baseStyles);
   const [voices, setVoices] = useState<VoiceOption[] | null>(null);
   const [chosen, setChosen] = useState(() => voiceSettings().voiceId);
   const [rate, setRate] = useState<VoiceRate>(() => voiceSettings().rate);
+  const [test, setTest] = useState<TestState | null>(null);
   useEffect(() => {
     let live = true;
     void availableVoices().then((v) => live && setVoices(v));
@@ -57,12 +59,14 @@ export function VoiceSettings() {
         <View style={styles.chips}>
           {chip("best", "Best on this phone", current === null, () => {
             setChosen(null);
-            setVoiceSettings({ voiceId: null });
+            setVoiceSettings({ voiceId: null, voiceName: null });
+            onChange?.();
           })}
           {shown.map((v) =>
             chip(v.id, v.name, current === v.id, () => {
               setChosen(v.id);
-              setVoiceSettings({ voiceId: v.id });
+              setVoiceSettings({ voiceId: v.id, voiceName: v.name });
+              onChange?.();
             }),
           )}
         </View>
@@ -71,13 +75,22 @@ export function VoiceSettings() {
         {chip("normal", "Normal speed", rate === "normal", () => {
           setRate("normal");
           setVoiceSettings({ rate: "normal" });
+          onChange?.();
         })}
         {chip("faster", "A little faster", rate === "faster", () => {
           setRate("faster");
           setVoiceSettings({ rate: "faster" });
+          onChange?.();
         })}
       </View>
-      <Button label="Test voice" onPress={testVoice} />
+      <Button label={test === "speaking" ? "Speaking…" : "Test voice"} onPress={() => testVoice(setTest)} />
+      {test === "silent" && (
+        <Text style={[styles.meta, styles.warn]} accessibilityLiveRegion="polite">
+          No sound started. Turn the volume up and the silent switch off, then try again. In a browser, tap the page
+          once first: some browsers only speak after a tap.
+        </Text>
+      )}
+      {test === "done" && <Text style={styles.meta}>Did you hear it? If not, check the volume.</Text>}
       <Text style={styles.meta}>
         {Platform.OS === "ios" || (Platform.OS === "web" && /iPhone|iPad/.test(navigator.userAgent))
           ? "More natural voices are free: iPhone Settings → Accessibility → Spoken Content → Voices → English (UK), and download an Enhanced or Premium one."
@@ -97,6 +110,7 @@ const baseStyles = StyleSheet.create({
     textTransform: "uppercase",
   },
   meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
+  warn: { color: colors.amber },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     minHeight: 44,

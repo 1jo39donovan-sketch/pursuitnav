@@ -4,7 +4,8 @@ import type { LngLat } from "@maplibre/maplibre-react-native";
 import { API_URL, DEMO_MODE } from "../config";
 import type { RoadChoice } from "../session/SessionProvider";
 import type { VehicleType } from "../vehicles";
-import { isNoAnswer, isNoSignal, ROUTE_TIMEOUT_MS, serverJson } from "./http";
+import { noteRequest, serverDuration } from "../navigation/timings";
+import { isNoAnswer, isNoSignal, QUICK_ROUTE_TIMEOUT_MS, ROUTE_TIMEOUT_MS, serverJson } from "./http";
 
 export interface Maneuver {
   type: number;
@@ -111,8 +112,14 @@ export function planRequests(
   opts: { vehicle: VehicleType; roads: RoadChoice; blueLight: boolean; signal: AbortSignal; prefetch?: boolean },
 ): { quick: Promise<RoutePlan>; full: Promise<RoutePlan> | null } {
   const { vehicle, roads, blueLight, signal, prefetch = false } = opts;
+  const standard = () => fetchRoutes(from, to, vehicle, signal, true, roads, prefetch);
   return {
-    quick: fetchRoutes(from, to, vehicle, signal, true, roads, prefetch),
+    // A lost request (no answer in 12 s) is asked once more: at most ~24 s, not
+    // the blue-light check's 30 s (a favourite's route took 40 s to fail on 30 Oct).
+    quick: standard().catch((err: unknown) => {
+      if (err instanceof NoAnswerRouteError && !signal.aborted) return standard();
+      throw err;
+    }),
     full: blueLight ? fetchRoutes(from, to, vehicle, signal, false, roads, prefetch) : null,
   };
 }
@@ -152,7 +159,8 @@ export async function fetchRoutes(
         : "Routing server not set up in this build.",
     );
   }
-  let res: { ok: boolean; status: number; body: unknown };
+  let res: { ok: boolean; status: number; body: unknown; serverTiming?: string | null };
+  const asked = Date.now();
   try {
     res = await serverJson(
       `${API_URL}/v1/routes`,
@@ -169,11 +177,12 @@ export async function fetchRoutes(
         }),
         signal,
       },
-      { timeoutMs: ROUTE_TIMEOUT_MS },
+      { timeoutMs: standardOnly ? QUICK_ROUTE_TIMEOUT_MS : ROUTE_TIMEOUT_MS },
     );
   } catch (err) {
     throw routeFailure(err);
   }
+  if (!prefetch) noteRequest(standardOnly, Date.now() - asked, serverDuration(res.serverTiming ?? null));
   if (!res.ok || !res.body) {
     const error = (res.body as { error?: string } | null)?.error ?? "";
     if (error === "routing-unavailable" || (res.status >= 500 && !MESSAGES[error])) throw new ServerDownRouteError();
