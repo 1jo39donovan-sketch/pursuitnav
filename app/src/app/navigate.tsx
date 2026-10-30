@@ -51,6 +51,7 @@ import {
   upcomingInstruction,
   OFF_ROUTE_FIXES,
   briefInstruction,
+  thenText,
   courseDiff,
   offRouteCount,
   prepare,
@@ -83,10 +84,14 @@ function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
 /** Turn-by-turn guidance, readable at a glance by the operator. */
 /** Degrees between the car's course and the route's direction where it is; null when not moving. */
 function headingOff(prepared: PreparedRoute, progress: Progress, fix: { course: number | null; speed: number | null }) {
-  if (fix.course == null || fix.speed == null || fix.speed < 3) return null;
+  // From about 3 mph: the 30 Oct missed turns were all made crawling in traffic.
+  if (fix.course == null || fix.speed == null || fix.speed < COURSE_FROM_MS) return null;
   const here = pointAlong(prepared, progress.along);
   return here ? courseDiff(fix.course, here.course) : null;
 }
+
+/** A phone's course is steady enough to compare from this speed, m/s. */
+const COURSE_FROM_MS = 1.4;
 
 /** Drawn on the route line when GPS puts the vehicle within this of it, metres. */
 const SNAP_DRAW_M = 30;
@@ -160,7 +165,13 @@ export default function NavigateScreen() {
       offCount:
         fresh || (simulated && fix.timestamp - demoDriveStartedAt() < DEMO_GRACE_MS)
           ? 0
-          : offRouteCount(track.offCount, progress.offRouteBy, fix.accuracy, headingOff(prepared, progress, fix)),
+          : offRouteCount(
+              track.offCount,
+              progress.offRouteBy,
+              fix.accuracy,
+              headingOff(prepared, progress, fix),
+              progress.nearTurnM,
+            ),
     });
   }
   const progress = track.prepared === prepared ? track.progress : null;
@@ -496,7 +507,7 @@ export default function NavigateScreen() {
           {progress.after && (
             <Text style={styles.then} numberOfLines={compact ? 1 : 2}>
               Then {maneuverArrow(progress.after.type)}{" "}
-              {briefInstruction(instructionWithPlace(progress.after, active.destination.title))}
+              {thenText(progress.after, instructionWithPlace(progress.after, active.destination.title))}
             </Text>
           )}
         </>

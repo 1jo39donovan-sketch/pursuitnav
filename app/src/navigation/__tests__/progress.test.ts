@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Maneuver, Route } from "../../api/routes";
-import { comingUp, maneuverArrow, offRouteCount, prepare, progressAt } from "../progress";
+import { briefInstruction, comingUp, maneuverArrow, offRouteCount, prepare, progressAt, thenText } from "../progress";
 
 // An L-shaped route: 500 m east, then right (south) 300 m.
 // ~0.00719° of longitude is 500 m at this latitude; 0.0027° of latitude is 300 m.
@@ -90,6 +90,38 @@ describe("offRouteCount", () => {
   });
 });
 
+describe("a missed turn, crawling in traffic", () => {
+  // Drives on east past the right turn at 2.5 m/s (about 6 mph), a fix a
+  // second with ±8 m GPS and no usable course, as on the 30 Oct drives.
+  const secondsToOffRoute = (useTurn: boolean) => {
+    const turnLng = LNG + 0.00719;
+    const mPerDegLng = 111320 * Math.cos((LAT * Math.PI) / 180);
+    let count = 0;
+    let segment = 0;
+    for (let t = 1; t <= 30; t++) {
+      const p = progressAt(prepared, at(turnLng + (2.5 * t) / mPerDegLng, LAT), segment);
+      segment = p.segment;
+      count = offRouteCount(count, p.offRouteBy, 8, null, useTurn ? p.nearTurnM : Infinity);
+      if (count >= 4) return t;
+    }
+    return Infinity;
+  };
+
+  it("is noticed within about 7 s of the junction, not 19 s", () => {
+    expect(secondsToOffRoute(false)).toBeGreaterThanOrEqual(19);
+    expect(secondsToOffRoute(true)).toBeLessThanOrEqual(7);
+  });
+
+  it("doesn't re-route a car waiting at the turn with GPS wandering a few metres", () => {
+    let count = 0;
+    for (let i = 0; i < 20; i++) {
+      const p = progressAt(prepared, at(LNG + 0.00719 + (i % 2 ? 1 : -1) * 0.00012, LAT + 0.00005), 1);
+      count = offRouteCount(count, p.offRouteBy, 8, null, p.nearTurnM);
+    }
+    expect(count).toBe(0);
+  });
+});
+
 describe("maneuverArrow", () => {
   it("draws the turn", () => {
     expect(maneuverArrow(10)).toBe("→");
@@ -148,10 +180,29 @@ describe("drawing the vehicle on the route", () => {
 describe("briefInstruction", () => {
   it("drops the trailing 'Continue on …' so the turn itself fits", async () => {
     const { briefInstruction } = await import("../progress");
-    expect(briefInstruction("Turn left onto A501/Penton Rise. Continue on A501.")).toBe("Turn left onto A501/Penton Rise.");
+    expect(briefInstruction("Turn left onto A501/Penton Rise. Continue on A501.")).toBe("Turn left onto Penton Rise.");
     expect(briefInstruction("Turn right onto Bedford Road/B221. Continue for 200 metres.")).toBe(
-      "Turn right onto Bedford Road/B221.",
+      "Turn right onto Bedford Road.",
     );
     expect(briefInstruction("Continue on A3.")).toBe("Continue on A3.");
+  });
+});
+
+describe("short text for a glance", () => {
+  it("shows the road's name, not its number, where it has both", () => {
+    expect(briefInstruction("Keep left to take A203/South Lambeth Road.")).toBe("Keep left to take South Lambeth Road.");
+    expect(briefInstruction("Turn right onto Wandsworth Road/A3036.")).toBe("Turn right onto Wandsworth Road.");
+    expect(briefInstruction("Turn left onto A3.")).toBe("Turn left onto A3.");
+  });
+
+  it("makes the Then line the road alone, so it fits", () => {
+    const turn = m(10, "Turn right onto Wandsworth Road/A3036.", "Wandsworth Road/A3036", 0, 1, 100, 10);
+    expect(thenText(turn, turn.instruction)).toBe("Wandsworth Road");
+    const numbered = { ...turn, streetNames: ["A3"] };
+    expect(thenText(numbered, "Turn right onto A3.")).toBe("A3");
+    const arrive = m(5, "Your destination is on the right.", "", 4, 4, 0, 0);
+    expect(thenText({ ...arrive, streetNames: [] }, "Your destination is on the right: 54 Caledonian Road")).toBe(
+      "Your destination is on the right: 54 Caledonian Road",
+    );
   });
 });
