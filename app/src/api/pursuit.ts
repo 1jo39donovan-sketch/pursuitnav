@@ -1,5 +1,6 @@
 // Client for the server's POST /v1/pursuit.
 import { API_URL } from "../config";
+import { notePursuitServer, serverDuration } from "../navigation/timings";
 import { isNoAnswer, isNoSignal, serverJson } from "./http";
 
 export interface PursuitInfo {
@@ -35,6 +36,7 @@ export async function fetchPursuitInfo(
       body: JSON.stringify(heading === undefined ? { points } : { points, heading }),
       signal,
     });
+    notePursuitServer(serverDuration(res.serverTiming));
     return res.ok && res.body ? { status: "ok", info: res.body } : { status: "unavailable" };
   } catch (err) {
     if (isNoSignal(err)) return { status: "no-signal" };

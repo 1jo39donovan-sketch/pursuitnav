@@ -90,6 +90,9 @@ const MAX_RESULTS = 30;
 const MAX_LIST_RESULTS = 1000;
 // A named place near the road given with it ("Costa, Upper Street") ranks higher.
 const NEAR_ROAD_KM = 0.6;
+const ON_ROAD_BONUS = 15;
+const NEAR_ROAD_BONUS = 5;
+const OFFICE_PENALTY = 12;
 
 /** The parts of the query that aren't the road or place itself. */
 interface Prefix {
@@ -493,9 +496,13 @@ export class SearchIndex {
         let score = 0;
         for (const n of p.norms) score = Math.max(score, matchScore(n, norm));
         if (!score) continue;
-        if (others.some((o) => p.address.includes(o)) || nearRoads.some((r) => distanceKm(r, p.item) < NEAR_ROAD_KM)) {
-          score += 8;
-        }
+        // On the road named (its address says so: the weekly data fills in
+        // the road a place fronts) beats merely near the road's one mapped point,
+        // which on a long road can be 1 km away (Costa, Junction Road).
+        if (others.some((o) => p.address.includes(o))) score += ON_ROAD_BONUS;
+        else if (nearRoads.some((r) => distanceKm(r, p.item) < NEAR_ROAD_KM)) score += NEAR_ROAD_BONUS;
+        // A brand's head office is rarely where a crew is going: after its shops.
+        if (/office/i.test(p.item.type) && p.item.group === "services") score -= OFFICE_PENALTY;
         scored.push({ idx, score });
       }
     });
