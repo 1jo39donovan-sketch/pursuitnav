@@ -19,6 +19,7 @@ import {
   ARROW_LAYOUT,
   boundsOf,
   cameraFor,
+  easeBearing,
   LABEL_LAYOUT,
   labelPaint,
   TEAM_CIRCLE_PAINT,
@@ -387,7 +388,13 @@ export function LiveMap({
       m.on(cancel, () => clearTimeout(pressTimer));
     }
     map.current = m;
+    // The map's box can get its size after the map starts (Pursuit on its
+    // side): redraw at the new size, or it stays a blank background.
+    const box = container.current as unknown as HTMLElement | null;
+    const sized = typeof ResizeObserver !== "undefined" && box ? new ResizeObserver(() => m.resize()) : null;
+    if (sized && box) sized.observe(box);
     return () => {
+      sized?.disconnect();
       m.remove();
       map.current = null;
       // A new map (different style or view) has to load before it's drawn on.
@@ -473,12 +480,15 @@ export function LiveMap({
       (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(p.lng, p.lat, p.course));
       const c = cam.current;
       if (!c.following) return;
-      // Zoom eases towards the speed's zoom a little each frame, rather than stepping.
+      // Zoom eases towards the speed's zoom a little each frame, rather than
+      // stepping; the map's turn eases too, so a junction doesn't spin it.
       const z = m.getZoom();
+      const want = cameraFor(c.view, p.course);
       m.jumpTo({
         center: [p.lng, p.lat],
         zoom: Math.abs(c.zoom - z) < 0.01 ? c.zoom : z + (c.zoom - z) * 0.08,
-        ...cameraFor(c.view, p.course),
+        pitch: want.pitch,
+        bearing: c.view === "north" ? 0 : easeBearing(m.getBearing(), want.bearing),
         padding: paddingFor(m, c),
       });
     });

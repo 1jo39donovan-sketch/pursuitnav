@@ -423,7 +423,8 @@ export default function NavigateScreen() {
   const [confirmEnd, setConfirmEnd] = useState(false);
   useEffect(() => {
     if (!confirmEnd) return;
-    const t = setTimeout(() => setConfirmEnd(false), 3000);
+    // Long enough to look back at the road and still tap again (30 Oct test).
+    const t = setTimeout(() => setConfirmEnd(false), 5000);
     return () => clearTimeout(t);
   }, [confirmEnd]);
 
@@ -890,7 +891,8 @@ const baseStyles = StyleSheet.create({
   },
   instruction: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26, lineHeight: 30 },
   instructionCompact: { fontSize: 22, lineHeight: 26 },
-  then: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
+  // Text colour, not muted grey: grey was the weakest line on light screens (30 Oct).
+  then: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
   bottom: {
     paddingHorizontal: 12,

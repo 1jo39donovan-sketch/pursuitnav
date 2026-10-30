@@ -17,6 +17,8 @@ export interface RouteTimings {
   cardsMs?: number;
   /** From GO to the turn card on screen. */
   goToCardMs?: number;
+  /** From opening Pursuit to the first road shown. */
+  pursuitMs?: number;
 }
 
 let current: RouteTimings = {};
@@ -57,6 +59,17 @@ export function noteTurnCard(now = Date.now()) {
   goAt = 0;
 }
 
+let pursuitAsked = false;
+/** The first road on Pursuit since it opened (once per opening: the screen resets it). */
+export function notePursuit(ms: number) {
+  if (pursuitAsked) return;
+  pursuitAsked = true;
+  set({ pursuitMs: ms });
+}
+export function pursuitOpened() {
+  pursuitAsked = false;
+}
+
 /** "server-timing: plan;dur=812" → 812. */
 export function serverDuration(header: string | null): number | undefined {
   const m = header?.match(/dur=([\d.]+)/);
@@ -72,6 +85,7 @@ export function timingsText(t: RouteTimings): string | null {
     t.standardMs != null ? `standard ${s(t.standardMs)}${t.standardServerMs != null ? ` (server ${s(t.standardServerMs)})` : ""}` : null,
     t.fullMs != null ? `blue-light check ${s(t.fullMs)}${t.fullServerMs != null ? ` (server ${s(t.fullServerMs)})` : ""}` : null,
     t.goToCardMs != null ? `GO to turn card ${s(t.goToCardMs)}` : null,
+    t.pursuitMs != null ? `Pursuit road ${s(t.pursuitMs)}` : null,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }

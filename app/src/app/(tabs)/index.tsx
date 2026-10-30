@@ -65,7 +65,8 @@ function Section({
       >
         <View style={styles.areaText}>
           <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={styles.logMeta} numberOfLines={isOpen ? 2 : 1}>
+          {/* Two lines: one cut "Police · Car · DEMO1 · Central South · blue…" (30 Oct). */}
+          <Text style={styles.logMeta} numberOfLines={isOpen ? 3 : 2}>
             {summary}
           </Text>
         </View>

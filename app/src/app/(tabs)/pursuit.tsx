@@ -10,6 +10,7 @@ import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import { formatDistance } from "../../format";
 import { useLocation, type Fix } from "../../location/LocationProvider";
+import { notePursuit, pursuitOpened } from "../../navigation/timings";
 import { EMPTY_FEED, feedNote, nextFeed, shownInfo } from "../../navigation/serverFeed";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
@@ -71,6 +72,14 @@ export default function PursuitScreen() {
   // request gives up after 8 s rather than hanging; answers older
   // than 10 s are shown as "—", never as last known.
   const [feed, setFeed] = useState(EMPTY_FEED);
+  const hasFix = trace.fixes.length > 0;
+  // When the tab came into view, for Session → Testing's "Pursuit road" time.
+  const openedAt = useRef(0);
+  useEffect(() => {
+    if (!focused) return;
+    openedAt.current = Date.now();
+    pursuitOpened();
+  }, [focused]);
   const [now, setNow] = useState(() => Date.now());
   const traceRef = useRef(trace);
   useEffect(() => {
@@ -92,14 +101,18 @@ export default function PursuitScreen() {
       );
       busy = false;
       if (controller.signal.aborted) return;
+      if (lookup.status === "ok" && lookup.info.road) notePursuit(Date.now() - openedAt.current);
       setFeed((cur) => nextFeed(cur, lookup, Date.now()));
     };
     const timer = setInterval(tick, POLL_MS);
+    // At once, not a second later: the 30 Oct browser test took ~7 s to show the road.
+    void tick();
     return () => {
       clearInterval(timer);
       controller.abort();
     };
-  }, [focused]);
+    // Again as soon as the first fix arrives.
+  }, [focused, hasFix]);
 
   const areas = useMemo(
     () => (data.status === "ready" && places.status === "ready" ? data.index.namedAreas() : []),
@@ -153,11 +166,10 @@ export default function PursuitScreen() {
         {pursuit?.road ?? "—"}
       </Text>
       {/* The nearest numbered door: for a foot chase, or where something was thrown. */}
-      {pursuit && door.near && (speed == null || speed <= DOOR_MAX_MPH) && (
-        <Text style={styles.dist} numberOfLines={1}>
-          by {door.near}
-        </Text>
-      )}
+      {/* Always takes its line, blank when hidden, so the tiles don't jump at 10 mph. */}
+      <Text style={styles.dist} numberOfLines={1}>
+        {pursuit && door.near && (speed == null || speed <= DOOR_MAX_MPH) ? `by ${door.near}` : " "}
+      </Text>
     </View>
   );
   const headingCell = (
