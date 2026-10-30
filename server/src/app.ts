@@ -97,6 +97,9 @@ const teamParams = {
 } as const;
 const token = { type: "string", minLength: 32, maxLength: 64 } as const;
 
+
+/** How long a pursuit answer waits for the house number once the road is known, ms. */
+const DOOR_WAIT_MS = 500;
 export function buildApp(
   config: ServerConfig,
   router: Router,
@@ -304,13 +307,16 @@ export function buildApp(
       if (!points.every(inBounds)) {
         return reply.code(422).send({ error: "outside-area", message: "Outside the area BlueRoute covers." });
       }
+      const started = performance.now();
       try {
         const here = points[points.length - 1]!;
-        // Both at once: the house number never holds up the road and limit.
-        const [info, near] = await Promise.all([
-          pursuitInfo(matcher, points.map((p) => [p.lng, p.lat] as LngLat), heading),
-          nearestDoor ? nearestDoor(here.lat, here.lng).catch(() => null) : Promise.resolve(null),
-        ]);
+        // Both at once, and the house number never holds up the road and limit:
+        // it gets as long as they take, or half a second, then the answer goes
+        // without it (the next one, a second later, has it).
+        const door = nearestDoor ? nearestDoor(here.lat, here.lng).catch(() => null) : Promise.resolve(null);
+        const info = await pursuitInfo(matcher, points.map((p) => [p.lng, p.lat] as LngLat), heading);
+        const near = await Promise.race([door, new Promise<null>((done) => setTimeout(() => done(null), DOOR_WAIT_MS))]);
+        reply.header("server-timing", `pursuit;dur=${Math.round(performance.now() - started)}`);
         return { ...info, near };
       } catch (err) {
         if (err instanceof ValhallaError) {

@@ -55,7 +55,7 @@ import { recordEvent } from "../../usage/usage";
 import { useTextStyles, useColors } from "../../textSize";
 import { samePlace, setFavourites, toggled, useFavourites, type Favourite } from "../../search/favourites";
 import { quickPlaces } from "../../search/quickPlaces";
-import { noteCards, noteEntrance, noteGo, routeStarted } from "../../navigation/timings";
+import { noteCards, noteEntrance, noteGo, noteTap, routeStarted } from "../../navigation/timings";
 import { fetchEntrances } from "../../api/entrances";
 import { fetchWhere } from "../../api/where";
 import { bestEntrance, entranceLabel, entrancesFor } from "../../search/entrances";
@@ -341,6 +341,7 @@ export default function SearchScreen() {
   }, [params.from, params.lat, params.lng, params.title]);
 
   const pick = (r: SearchResult) => {
+    noteTap();
     Keyboard.dismiss();
     setQuery(r.label);
     const note = destinationNote(r);
@@ -656,6 +657,7 @@ export default function SearchScreen() {
             away={fix ? formatDistance(distanceM(fix, { lat: tapped.point[1], lng: tapped.point[0] })) : undefined}
             onClose={() => setTapped(null)}
             onRoute={() => {
+              noteTap();
               const { marker, point, exact } = tapped;
               setTapped(null);
               // Before the address is back, it's a point on the map.
@@ -691,6 +693,7 @@ export default function SearchScreen() {
             ]}
             onClose={() => setMateId(null)}
             onRoute={() => {
+              noteTap();
               setMateId(null);
               const title = `${mate.callsign} (last seen ${new Date(mate.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })})`;
               setQuery(title);
