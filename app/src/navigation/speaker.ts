@@ -122,6 +122,13 @@ interface Queued {
 
 let speaking = false;
 let queue: Queued[] = [];
+
+export type SpeechState = "start" | "done" | "stopped";
+let heard: ((state: SpeechState, text: string) => void) | null = null;
+/** Tells the field-test recorder when each prompt starts, finishes or is cut off. */
+export function onSpeech(listener: ((state: SpeechState, text: string) => void) | null) {
+  heard = listener;
+}
 /** If the phone never says a prompt finished, carry on after this. */
 const STUCK_MS = 12_000;
 let stuck: ReturnType<typeof setTimeout> | undefined;
@@ -145,12 +152,20 @@ function sayNow(text: string) {
     rate: RATES[voiceSettings().rate],
     // iOS: its own audio session, so music or a radio app is lowered, not stopped.
     useApplicationAudioSession: false,
-    onDone: done,
+    onStart: () => heard?.("start", text),
+    onDone: () => {
+      heard?.("done", text);
+      done();
+    },
     onStopped: () => {
+      heard?.("stopped", text);
       clearTimeout(stuck);
       speaking = false;
     },
-    onError: done,
+    onError: () => {
+      heard?.("stopped", text);
+      done();
+    },
   });
 }
 

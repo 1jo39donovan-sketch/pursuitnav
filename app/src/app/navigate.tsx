@@ -2,7 +2,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
 import { useNetworkState } from "expo-network";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchRoutes, restrictionPoints, type RoutePlan } from "../api/routes";
@@ -26,9 +26,10 @@ import {
   type LastReroute,
   type RerouteFailure,
 } from "../navigation/reroute";
-import { hush, say } from "../navigation/speaker";
+import { hush, onSpeech, say } from "../navigation/speaker";
 import { arrivalSide, instructionWithPlace, nextCallout } from "../navigation/voice";
 import { noteTurnCard } from "../navigation/timings";
+import { store } from "../storage/store";
 import { recordEvent } from "../usage/usage";
 import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
 import { recorder, useRecorder } from "../fieldtest/instance";
@@ -53,6 +54,8 @@ import {
   OFF_ROUTE_FIXES,
   briefInstruction,
   thenText,
+  repeatTurn,
+  REPEAT_AFTER_GO_MS,
   courseDiff,
   offRouteCount,
   prepare,
@@ -417,7 +420,30 @@ export default function NavigateScreen() {
       recorder.event({ type: "speech", text: callout.text });
     }
   }, [progress, prepared, offRoute, voiceOn, active?.destination.title]);
-  useEffect(() => () => hush(), []);
+  // Every GO starts silent and clean: anything still queued or being said
+  // from before (a route popup, the last route) is dropped first. And the
+  // recorder hears what the phone actually did with each prompt.
+  useEffect(() => {
+    hush();
+    onSpeech((state, text) => recorder.event({ type: "speech-state", state, text }));
+    return () => {
+      onSpeech(null);
+      hush();
+    };
+  }, []);
+
+  // The next turn repeated under the map for the first seconds after GO (and
+  // close to each turn), in case a notification covers the card at the top.
+  const [justStarted, setJustStarted] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setJustStarted(false), REPEAT_AFTER_GO_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const [focusTip, setFocusTip] = useState(() => store.getSetting("focusTipSeen") !== "1");
+  const closeFocusTip = () => {
+    store.setSetting("focusTipSeen", "1");
+    setFocusTip(false);
+  };
 
   // Ending takes a second tap, so a bump on the way doesn't drop the route.
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -543,6 +569,30 @@ export default function NavigateScreen() {
   // Two rows, so nothing has to squeeze: arrival time and road, then the buttons.
   const etaPanel = (
     <View style={[styles.bottom, { paddingBottom: insets.bottom + 10 }]}>
+      {card?.next && !card.arrived && !showOff && repeatTurn(justStarted, card.distanceToNextM) && (
+        <View style={styles.repeat} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Text style={styles.repeatArrow}>{maneuverArrow(card.next.type)}</Text>
+          <Text style={styles.repeatDistance}>
+            {card.distanceToNextM < 15 ? "Now" : formatDistance(card.distanceToNextM)}
+          </Text>
+          <Text style={styles.repeatRoad} numberOfLines={1}>
+            {thenText(card.next, instructionWithPlace(card.next, active.destination.title))}
+          </Text>
+          {!voiceOn && <Text style={styles.repeatMuted}>Voice off</Text>}
+        </View>
+      )}
+      {focusTip && (
+        <View style={styles.focusTip}>
+          <Text style={styles.focusTipText}>
+            {Platform.OS === "android"
+              ? "Tip: turn on Do Not Disturb (or Driving mode) so notifications don’t cover your directions."
+              : "Tip: turn on Driving Focus (Control Centre → Focus) so notifications don’t cover your directions."}
+          </Text>
+          <Pressable accessibilityRole="button" onPress={closeFocusTip} hitSlop={10} style={styles.focusTipOk}>
+            <Text style={styles.focusTipOkText}>OK</Text>
+          </Pressable>
+        </View>
+      )}
       <View style={styles.etaRow}>
         <Text style={styles.etaClock} numberOfLines={1}>
           {card
@@ -612,9 +662,15 @@ export default function NavigateScreen() {
     </View>
   );
 
+  // GPS warnings float on the map just under the turn card: never over it, never moving it (3 Nov).
+  const gpsFloat = (
+    <View style={[styles.gpsFloat, { top: landscape ? 8 : turnHeight }]} pointerEvents="box-none">
+      <GpsStatus />
+    </View>
+  );
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }]}>
-      <GpsStatus />
       {landscape ? (
         <View style={styles.row}>
           <View style={styles.landscapeSide}>
@@ -657,6 +713,7 @@ export default function NavigateScreen() {
               labels={blockLabels}
               compact
             />
+            {gpsFloat}
           </View>
         </View>
       ) : (
@@ -690,6 +747,7 @@ export default function NavigateScreen() {
             >
               {turnPanel}
             </View>
+            {gpsFloat}
           </View>
           {etaPanel}
         </>
@@ -894,6 +952,24 @@ const baseStyles = StyleSheet.create({
   // Text colour, not muted grey: grey was the weakest line on light screens (30 Oct).
   then: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
+  repeat: { flexDirection: "row", alignItems: "center", gap: 10 },
+  repeatArrow: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 30 },
+  repeatDistance: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 24 },
+  repeatRoad: { flex: 1, color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 18 },
+  repeatMuted: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 13 },
+  focusTip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+  },
+  focusTipText: { flex: 1, color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
+  focusTipOk: { minWidth: 48, minHeight: 40, alignItems: "center", justifyContent: "center" },
+  focusTipOkText: { color: colors.blue, fontFamily: fonts.bodySemiBold, fontSize: 16 },
+  gpsFloat: { position: "absolute", left: 8, right: 64 },
   bottom: {
     paddingHorizontal: 12,
     paddingTop: 8,

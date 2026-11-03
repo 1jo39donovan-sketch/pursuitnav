@@ -82,14 +82,16 @@ export function nextCallout(
   // The last call before arriving says which side and the address, door number and all.
   const text = next ? speakable(instructionWithPlace(next, title)) : "";
   if (!said.has("start")) {
-    if (opts.rerouted && next) {
-      // One complete line, with the turn, rather than "Re-routing" cut off by the next prompt.
+    // A new route, or a first turn too close for its own early prompt: the
+    // first line is the turn itself. "Head along Clap-" was cut off on 3 Nov
+    // by the turn 50 m on, which then interrupted it.
+    if (next && (opts.rerouted || d < EARLY_MIN_M)) {
       const turn = d <= NOW_M ? text : `In ${spokenDistance(d)}, ${continuing(text)}`;
       return {
         key: "start",
-        covers: [d <= NOW_M ? `${id}:now` : `${id}:early`],
-        text: `New route. ${turn}`.replace(/\.?$/, "."),
-        priority: "normal",
+        covers: d <= NOW_M ? [`${id}:now`, `${id}:early`] : [`${id}:early`],
+        text: `${opts.rerouted ? "New route. " : ""}${turn}`.replace(/\.?$/, "."),
+        priority: d <= NOW_M ? "urgent" : "normal",
       };
     }
     return {
