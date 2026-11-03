@@ -7,11 +7,13 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { moved, renamed, setFavourites, toggled, useFavourites, type Favourite } from "../search/favourites";
 import { colors, fonts } from "../theme";
+import { noteTap } from "../navigation/timings";
 import { useTextStyles } from "../textSize";
 import { Button } from "./Button";
 
 /** To Search, routing to the place at once. */
 function routeTo(f: Favourite) {
+  noteTap();
   router.navigate({
     pathname: "/search",
     params: { lat: String(f.lat), lng: String(f.lng), title: f.name, q: "", from: `favourite-${Date.now()}` },

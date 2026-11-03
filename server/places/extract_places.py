@@ -9,18 +9,21 @@ Usage: python extract_places.py <london.osm.pbf> <out.txt.gz>
 Output, gzipped UTF-8, one place per line after a header line:
     name|other names|type|group|borough index|lat*1e5|lng*1e5|address
 "other names" are ;-separated (alt_name, old_name, brand). The borough index
-follows BOROUGHS below, which matches app/src/search/boroughs.ts.
+follows BOROUGHS below, which matches app/src/search/boroughs.ts. A place with
+no addr:street gets the name of the road it fronts (the nearest named road
+within 50 m), so "Costa Holloway Road" finds the Costa on Holloway Road.
 """
 
 import datetime
 import gzip
 import json
+import re
 import sys
 from pathlib import Path
 
 import osmium
 from shapely import STRtree
-from shapely.geometry import MultiPolygon, Point, Polygon, shape
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon, shape
 from shapely.prepared import prep
 
 from categories import classify
@@ -85,11 +88,43 @@ def other_names(tags, name: str) -> str:
     return ";".join(out)
 
 
+# Roads a shop or other place fronts onto (not footpaths or service roads).
+FRONTING_ROADS = {
+    "trunk", "primary", "secondary", "tertiary", "unclassified", "residential",
+    "living_street", "pedestrian", "road",
+}
+FRONTS_WITHIN_M = 50
+# Metres per degree in London (51.5° N): good to a few metres over a few km.
+M_PER_DEG_LAT = 111_320
+M_PER_DEG_LNG = 69_300
+
+
+def metres(lng: float, lat: float) -> tuple[float, float]:
+    return lng * M_PER_DEG_LNG, lat * M_PER_DEG_LAT
+
+
 class PlaceCollector(osmium.SimpleHandler):
     def __init__(self, boroughs: BoroughFinder):
         super().__init__()
         self.boroughs = boroughs
         self.places = []
+        # Named roads as lines in metres, for the street a place is on.
+        self.road_lines: list[LineString] = []
+        self.road_names: list[str] = []
+
+    def way(self, w):
+        if w.tags.get("highway") not in FRONTING_ROADS:
+            return
+        name = clean(w.tags.get("name"))
+        if not name:
+            return
+        try:
+            pts = [metres(n.lon, n.lat) for n in w.nodes if n.location.valid()]
+        except osmium.InvalidLocationError:
+            return
+        if len(pts) >= 2:
+            self.road_lines.append(LineString(pts))
+            self.road_names.append(name)
 
     def add(self, tags, lng: float, lat: float):
         kind = classify(tags)
@@ -130,6 +165,32 @@ class PlaceCollector(osmium.SimpleHandler):
         self.add(a.tags, p.x, p.y)
 
 
+POSTCODE = re.compile(r"^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$", re.I)
+
+
+def with_streets(places, road_lines: list[LineString], road_names: list[str]):
+    """Each place without a street in its address gets the road it fronts:
+    the nearest named road within 50 m. Kept as it is when there's none."""
+    if not road_lines:
+        return places
+    tree = STRtree(road_lines)
+    out = []
+    for p in places:
+        address = p[7]
+        first = address.split(",")[0].strip()
+        if first and not POSTCODE.match(first):
+            out.append(p)
+            continue
+        here = Point(metres(p[6] / 1e5, p[5] / 1e5))
+        i = tree.nearest(here)
+        if i is None or road_lines[i].distance(here) > FRONTS_WITHIN_M:
+            out.append(p)
+            continue
+        street = road_names[i]
+        out.append(p[:7] + (", ".join(x for x in (street, address) if x),))
+    return out
+
+
 DUPLICATE_WITHIN_M = 300
 
 
@@ -153,7 +214,7 @@ def dedupe(places):
 def main(pbf: str, out: str):
     collector = PlaceCollector(BoroughFinder(BOUNDARIES))
     collector.apply_file(pbf, locations=True, idx="flex_mem")
-    places = dedupe(sorted(collector.places))
+    places = with_streets(dedupe(sorted(collector.places)), collector.road_lines, collector.road_names)
     tmp = Path(out + ".tmp")
     with gzip.open(tmp, "wt", encoding="utf-8") as f:
         f.write(f"#blueroute-places v1 {datetime.date.today().isoformat()} {len(places)}\n")

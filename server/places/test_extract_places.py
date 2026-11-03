@@ -49,6 +49,14 @@ def write_fixture(path):
         id=1, members=[("w", 5, "outer")], version=1,
         tags={"type": "multipolygon", "amenity": "school", "name": "Highbury Grove School"},
     ))
+    # Holloway Road running east-west 20 m south of a Costa that has no address,
+    # and a footpath nearer still that isn't a road a shop fronts.
+    road = [node(LAT - 60 * D - 0.00018, LNG - 5 * D), node(LAT - 60 * D - 0.00018, LNG + 5 * D)]
+    w.add_way(osmium.osm.mutable.Way(id=6, nodes=road, version=1, tags={"highway": "primary", "name": "Holloway Road"}))
+    path = [node(LAT - 60 * D + 0.00005, LNG - D), node(LAT - 60 * D + 0.00005, LNG + D)]
+    w.add_way(osmium.osm.mutable.Way(id=7, nodes=path, version=1, tags={"highway": "footway", "name": "Back Path"}))
+    node(LAT - 60 * D, LNG, amenity="cafe", name="Costa Holloway", **{"addr:postcode": "N7 6PA"})
+    node(LAT - 90 * D, LNG, amenity="cafe", name="Far Cafe")  # 1 km from any road here: no street
     w.close()
 
 
@@ -86,6 +94,13 @@ def test_borough_and_point(places):
 def test_area_point_is_inside_the_area(places):
     lat, lng = int(places["Highbury Fields"][5]) / 1e5, int(places["Highbury Fields"][6]) / 1e5
     assert LAT + 2 * D <= lat <= LAT + 3 * D and LNG <= lng <= LNG + D
+
+
+def test_a_place_without_a_street_gets_the_road_it_fronts(places):
+    assert places["Costa Holloway"][7] == "Holloway Road, N7 6PA"
+    assert places["Far Cafe"][7] == ""
+    # A street from OSM itself is kept.
+    assert places["Coffee Corner"][7] == "12 Holloway Road, N7 8LA"
 
 
 def test_address_and_other_names(places):

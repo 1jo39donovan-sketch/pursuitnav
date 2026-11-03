@@ -9,7 +9,7 @@ import { boroughAt, cardinal, generallyTowards } from "../../area/area";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import { formatDistance } from "../../format";
-import { useLocation, type Fix } from "../../location/LocationProvider";
+import { recentFixes, useLocation, type Fix } from "../../location/LocationProvider";
 import { notePursuit, pursuitOpened } from "../../navigation/timings";
 import { EMPTY_FEED, feedNote, nextFeed, shownInfo } from "../../navigation/serverFeed";
 import { useSearch } from "../../search/SearchProvider";
@@ -60,7 +60,12 @@ export default function PursuitScreen() {
   const insets = useSafeAreaInsets();
 
   // Recent fixes for map matching, and the last real direction of travel.
-  const [trace, setTrace] = useState<{ fixes: Fix[]; course: number | null }>({ fixes: [], course: null });
+  // Starts from the last few fixes, so the first request can already be matched to a road.
+  const [trace, setTrace] = useState<{ fixes: Fix[]; course: number | null }>(() => {
+    const fixes = recentFixes().slice(-TRACE_POINTS);
+    const moving = [...fixes].reverse().find((f) => f.speed != null && f.speed >= MOVING_MS && f.course != null);
+    return { fixes, course: moving?.course ?? null };
+  });
   const lastFix = trace.fixes[trace.fixes.length - 1];
   if (fix && fix.timestamp !== lastFix?.timestamp) {
     const fixes = [...trace.fixes, fix].filter((f) => fix.timestamp - f.timestamp <= TRACE_MAX_AGE_MS).slice(-TRACE_POINTS);

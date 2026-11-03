@@ -175,3 +175,31 @@ describe("a name with the kind of place after it", () => {
     expect(index.search("hospitals", ISLINGTON).inArea.map((r) => r.label)).toContain("The Whittington Hospital");
   });
 });
+
+describe("a brand and a road (30 Oct browser test)", () => {
+  // Holloway Road's one mapped point (N7) is at 51.55707, -0.11849.
+  const BRANDS = `#blueroute-places v1 2026-10-31 4
+Costa||Coffee shop|food|18|5156200|-11900|35 Junction Road, N19 5QU
+Costa||Coffee shop|food|18|5154200|-10600|Holloway Road, N7 6PA
+Tesco||Office|services|18|5155800|-11800|Holloway Road
+Tesco Express|Tesco|Convenience store|shop|18|5156900|-12500|Holloway Road, N19 4QZ
+`;
+  let brands: SearchIndex;
+  beforeAll(async () => {
+    brands = new SearchIndex(
+      parseRoads(readFileSync(join(dataDir, "roads.dat"), "utf8")),
+      parsePostcodes(readFileSync(join(dataDir, "postcodes.dat"), "utf8")),
+    );
+    await brands.setPointsOfInterest(parsePlacesFile(BRANDS).places);
+  });
+  const first = (q: string) => brands.search(q, ISLINGTON).inArea[0];
+
+  it("puts the branch on the road named first, not one merely near its mapped point", () => {
+    expect(first("Costa Coffee Holloway Road")?.detail).toContain("Holloway Road, N7 6PA");
+    expect(first("Costa, Holloway Road")?.detail).toContain("Holloway Road, N7 6PA");
+  });
+
+  it("puts a brand's shop before its office", () => {
+    expect(first("Tesco Holloway Road")?.placeType).toBe("Convenience store");
+  });
+});

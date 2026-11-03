@@ -71,6 +71,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const [lastCourse, setLastCourse] = useState<number | null>(null);
   const [compass, setCompass] = useState<number | null>(null);
   const setFix = useCallback((f: Fix) => {
+    remember(f);
     setGpsFix(f);
     if (isMoving(f)) setLastCourse(f.course);
   }, []);
@@ -102,7 +103,11 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!simulated) return;
-    const tick = () => setDemoFix(demoFixNow());
+    const tick = () => {
+      const f = demoFixNow();
+      remember(f);
+      setDemoFix(f);
+    };
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [simulated]);
@@ -156,6 +161,20 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 }
 
 /** The fix as a route origin, with its direction of travel when moving. */
+// The last half-minute of fixes, in memory only: Pursuit starts from them, so
+// its first request can already be matched to a road (30 Oct: ~5 s to show it).
+const RECENT_MS = 30_000;
+let recent: Fix[] = [];
+function remember(f: Fix) {
+  if (recent.at(-1)?.timestamp === f.timestamp) return;
+  recent = [...recent.filter((r) => f.timestamp - r.timestamp <= RECENT_MS), f].slice(-10);
+}
+
+/** Fixes from the last 30 s, oldest first. */
+export function recentFixes(now = Date.now()): Fix[] {
+  return recent.filter((r) => now - r.timestamp <= RECENT_MS);
+}
+
 export function routeOrigin(fix: Fix): { lat: number; lng: number; heading?: number } {
   return isMoving(fix) ? { lat: fix.lat, lng: fix.lng, heading: Math.round(fix.course!) % 360 } : { lat: fix.lat, lng: fix.lng };
 }
