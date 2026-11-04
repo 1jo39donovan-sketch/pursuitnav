@@ -12,13 +12,13 @@ import { colors, fonts } from "../theme";
 import { useThemed } from "../textSize";
 
 /** The terms' date (server/src/pages.ts, UPDATED): a new date asks again. */
-export const TERMS_VERSION = "28 October 2026";
+export const TERMS_VERSION = "4 November 2026";
 const KEY = "termsAccepted";
 
 const POINTS = [
-  "BlueRoute is an independent navigation aid, still being field-tested. It is not made or approved by any police, ambulance or fire service, and doesn’t replace your training, control room, radio or your service’s policies.",
+  "BlueRoute is an independent navigation aid. It is not made or approved by any police, ambulance or fire service, and doesn’t replace your training, control room, radio or your service’s policies.",
   "You and the driver alone are responsible for how the vehicle is driven, for obeying the law and your service’s policies, and for everyone’s safety. The driver must not use the app while driving.",
-  "Blue-light routes are only for drivers legally entitled to use the emergency exemptions, on an authorised call. Whether a route or manoeuvre is lawful and safe is your decision.",
+  "Blue-light routes are only for drivers legally entitled to use them, on an authorised call. Whether a route or manoeuvre is lawful and safe is your decision.",
   "Addresses, routes, speed limits, closures and everything else in the app can be wrong or out of date. Confirm the address with control, and follow the road, not the app.",
 ];
 

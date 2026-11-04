@@ -109,9 +109,19 @@ jobs:
             echo
             echo "Map data © OpenStreetMap contributors, under the Open Database License."
           } > "$RUNNER_TEMP/notes.md"
-          gh release create "$tag" data/release/* --title "Map data $(date -u +%Y-%m-%d)" \
-            --notes-file "$RUNNER_TEMP/notes.md" --prerelease --latest=false
-          echo "Published $tag"
+          # GitHub's API now and then answers 500 (4 Nov): try again rather than lose
+          # a 40-minute build, removing any half-made release first.
+          for try in 1 2 3 4; do
+            if gh release create "$tag" data/release/* --title "Map data $(date -u +%Y-%m-%d)" \
+              --notes-file "$RUNNER_TEMP/notes.md" --prerelease --latest=false; then
+              echo "Published $tag"
+              exit 0
+            fi
+            echo "Publishing failed (try $try); trying again shortly"
+            gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+            sleep $((try * 30))
+          done
+          exit 1
 
       - name: Keep the newest three
         run: |

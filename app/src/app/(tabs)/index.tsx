@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
+import { BUILD_ID, STORE_BUILD } from "../../build";
 import { API_URL, DEMO_MODE } from "../../config";
 
 import { BoroughPicker } from "../../components/BoroughPicker";
@@ -16,12 +17,12 @@ import { voiceSettings } from "../../navigation/speaker";
 import { useFavourites } from "../../search/favourites";
 import { store } from "../../storage/store";
 import { useTeam } from "../../team/TeamProvider";
-import { setRecording, useRecorder } from "../../fieldtest/instance";
+import { setRecording, useRecorder, APP_VERSION } from "../../fieldtest/instance";
 import { serverLearns } from "../../learning/queue";
 import { useLog } from "../../log/LogProvider";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
-import { currentInstallId, newInstallId } from "../../usage/usage";
+import { currentInstallId, newInstallId, setUsageOn, usageOn } from "../../usage/usage";
 import { APPEARANCES, colors, fonts, type Appearance } from "../../theme";
 import { bcuFor } from "../../search/boroughGroups";
 import { SERVICES, VEHICLES, vehiclesFor } from "../../vehicles";
@@ -390,7 +391,7 @@ export default function SessionScreen() {
           </View>
           <Text style={styles.placeMeta}>
             {policeRoutes
-              ? "Shown beside the standard route when meaningfully faster. They use bus lanes, bus gates and bus-only roads and ignore turn restrictions (never the wrong way down a one-way street), and list every restriction used. Only for police, fire and ambulance drivers using the emergency exemptions: you choose each time."
+              ? "Shown beside the standard route when meaningfully faster. They can use bus lanes, bus gates and bus-only roads and ignore turn restrictions where permitted (never the wrong way down a one-way street), and list the restrictions they use. Only for drivers authorised to use them: you choose each time."
               : "Off: standard, fully legal routes only."}
           </Text>
         </View>
@@ -541,29 +542,42 @@ export default function SessionScreen() {
         </Section>
       )}
 
-      <Section id="testing" title="Testing" summary={testingSummary} open={open} toggle={toggle}>
-        {!DEMO_MODE && demoToggle}
-        <View style={styles.field}>
-          <View style={styles.toggleRow}>
-            <Text style={[styles.label, styles.placeText]} nativeID="fieldtest-label">
-              Field-test recording
+      {STORE_BUILD ? (
+        // In the stores, only the demo drive (for reviewers): the test tools stay out of sight.
+        <Section
+          id="testing"
+          title="Demo drive"
+          summary={demoDrive ? "On" : "Off"}
+          open={open}
+          toggle={toggle}
+        >
+          {demoToggle}
+        </Section>
+      ) : (
+        <Section id="testing" title="Testing" summary={testingSummary} open={open} toggle={toggle}>
+          {!DEMO_MODE && demoToggle}
+          <View style={styles.field}>
+            <View style={styles.toggleRow}>
+              <Text style={[styles.label, styles.placeText]} nativeID="fieldtest-label">
+                Field-test recording
+              </Text>
+              <Switch
+                accessibilityLabelledBy="fieldtest-label"
+                value={recording.enabled}
+                onValueChange={setRecording}
+                trackColor={{ false: palette.line, true: palette.amber }}
+              />
+            </View>
+            <Text style={styles.placeMeta}>
+              Records your trips on this phone only, for testing. Nothing is sent anywhere. Export or delete from the Log.
             </Text>
-            <Switch
-              accessibilityLabelledBy="fieldtest-label"
-              value={recording.enabled}
-              onValueChange={setRecording}
-              trackColor={{ false: palette.line, true: palette.amber }}
-            />
           </View>
-          <Text style={styles.placeMeta}>
-            Records your trips on this phone only, for testing. Nothing is sent anywhere. Export or delete from the Log.
-          </Text>
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.label}>Last route timings</Text>
-          <Text style={styles.placeMeta}>{timingsText(timings) ?? "Plan a route to see how long each step takes."}</Text>
-        </View>
-      </Section>
+          <View style={styles.field}>
+            <Text style={styles.label}>Last route timings</Text>
+            <Text style={styles.placeMeta}>{timingsText(timings) ?? "Plan a route to see how long each step takes."}</Text>
+          </View>
+        </Section>
+      )}
 
       <Section
         id="privacy"
@@ -594,6 +608,9 @@ export default function SessionScreen() {
           </View>
         )}
         <UsageNote />
+        <Text style={styles.placeMeta} selectable>
+          BlueRoute {APP_VERSION} · build {BUILD_ID}
+        </Text>
 
         {API_URL !== "" && (
           <View style={styles.linkRow}>
@@ -621,7 +638,9 @@ export default function SessionScreen() {
 /** Exactly what usage counting sends, and a way to start again as a new install. */
 function UsageNote() {
   const styles = useTextStyles(baseStyles);
+  const palette = useColors();
   const [id, setId] = useState(() => currentInstallId());
+  const [on, setOn] = useState(() => usageOn());
   return (
     <View style={styles.field}>
       <Text style={styles.label}>Usage data</Text>
@@ -633,11 +652,32 @@ function UsageNote() {
         it once the day (or week) is over, keeping just the totals.
       </Text>
       <View style={styles.toggleRow}>
-        <Text style={[styles.placeMeta, styles.placeText]} selectable>
-          Install ID: {id.slice(0, 8)}…
+        <Text style={[styles.placeName, styles.placeText]} nativeID="usage-label">
+          Count my usage
         </Text>
-        <Button label="Reset ID" onPress={() => setId(newInstallId())} />
+        <Switch
+          accessibilityLabelledBy="usage-label"
+          value={on}
+          onValueChange={(v) => {
+            setUsageOn(v);
+            setOn(v);
+          }}
+          trackColor={{ false: palette.line, true: palette.amber }}
+        />
       </View>
+      {on ? (
+        <View style={styles.toggleRow}>
+          <Text style={[styles.placeMeta, styles.placeText]} selectable>
+            Install ID: {id.slice(0, 8)}…
+          </Text>
+          <Button label="Reset ID" onPress={() => setId(newInstallId())} />
+        </View>
+      ) : (
+        <Text style={styles.placeMeta}>
+          Off: no install ID is sent and this phone counts nothing. The server still adds each route planned to its
+          daily total, with nothing that tells this phone apart.
+        </Text>
+      )}
     </View>
   );
 }

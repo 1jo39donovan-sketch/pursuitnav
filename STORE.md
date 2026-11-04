@@ -96,83 +96,100 @@ Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code r
 
 ## Store listing (ready to paste)
 
-Checked 25 October 2026 against the app as it is now. The privacy policy, support page and terms are live at `https://bluerouteapp.com/privacy`, `/support` and `/terms` (the same pages are on `https://api.bluerouteapp.com`).
+Updated 4 November 2026 to the Launch Manager's redraft of 3 November (patrol and route-planning framing, no "emergency", "999", force names or test wording), with one change Josh made: **blue light stays on by default**, and one switch on Session turns it off. The privacy policy, support page and terms are live at `https://bluerouteapp.com/privacy`, `/support` and `/terms` (the same pages are on `https://api.bluerouteapp.com`).
+
+**Before pasting, check these are in the build you submit** (all in the 4 November store-ready changes): the field-test wording gone from the terms, the Testing tools hidden (store builds show only Demo drive), police stations by their own name only, and the usage-data switch-off.
 
 | Field | Apple (App Store Connect) | Google (Play Console) |
 |---|---|---|
-| **Name** (30 max) | BlueRoute – Response Sat Nav | BlueRoute – Response Sat Nav |
-| **Subtitle** (Apple, 30 max) | Blue-light navigation | |
-| **Short description** (Google, 80 max) | | Blue-light navigation for emergency services: police, ambulance and fire. |
+| **Name** (30 max) | BlueRoute – Patrol Sat Nav | BlueRoute – Patrol Sat Nav |
+| **Subtitle** (Apple, 30 max) | For police patrol in London | |
+| **Short description** (Google, 80 max) | | Independent patrol sat nav for police in London: postcode search, pursuit. |
 | **Category** | Navigation (secondary: Utilities) | Maps & Navigation |
 | **Price** | Free, no in-app purchases | Free, no in-app purchases, no ads |
 | **Privacy policy URL** | `https://bluerouteapp.com/privacy` | `https://bluerouteapp.com/privacy` |
 | **Support URL** | `https://bluerouteapp.com/support` | Website: `https://bluerouteapp.com` |
-| **Marketing URL** (optional) | `https://bluerouteapp.com` | |
-| **Contact email** | | `support@bluerouteapp.com` (it must receive mail: Google emails it) |
-| **Copyright** | © 2026 *your legal name* (fill in) | |
+| **Marketing URL** (optional) | leave blank | |
+| **Contact email** | | `hello@bluerouteapp.com` (shown publicly, and Google emails it: check it receives mail) |
+| **Seller / copyright** | © 2026 *the developer account's legal name* (fill in) | |
 | **Bundle ID / package** | `com.blueroute.patrol` | `com.blueroute.patrol` |
 
-The name under the icon on the phone stays **BlueRoute**. If the name is taken in either store, use "BlueRoute Patrol – Sat Nav" (26 characters).
+The name under the icon on the phone stays **BlueRoute**. "Response" is left out of the store name until Josh decides: the Launch Manager flags it as the one word Apple could read as emergency response (guideline 5.1.5). With it, the name is "BlueRoute – Response Sat Nav" (28).
 
-**Keywords** (Apple, 100 max, commas, no spaces):
+**Keywords** (Apple, 100 max, commas, no spaces; none repeat the name or subtitle):
 
 ```
-blue light,emergency,police,ambulance,fire,satnav,bus lane,pursuit,postcode,999,response,officer
+pursuit,bus lane,bus gate,borough,postcode,address,officer,operator,callsign,satnav,route planner
 ```
 
-**What's new** (first release): `First release.`
+**What's new** (first release): `First release, for officers in London.`
 
 **Promotional text** (Apple, 170 max, can change any time without review):
 
-> Built with crews on London's roads: search the way control gives it, two routes side by side, big turn-by-turn and a pursuit screen. No account, no tracking.
+> Patrol navigation for police in London: search addresses the way control gives them, routes sized to your vehicle, turn-by-turn and a pursuit screen. Free, no ads.
 
-**Description** (both stores, 4,000 max; this is about 2,600):
+**Description** (both stores, 4,000 max; about 3,300):
 
-> BlueRoute is blue-light navigation built for emergency services (police, ambulance and fire), around crews' needs rather than a general sat nav. It's made for the operator in the passenger seat: big text, few taps, spoken directions.
+> BlueRoute is patrol and route-planning navigation for police officers in London, built around the way jobs come in rather than as a general-purpose sat nav. It's made for the operator in the passenger seat: big text, few taps, spoken directions.
 >
 > SEARCH THE WAY CONTROL GIVES IT
-> Type what the control room says: a road, "54 Caledonian Rd", "Flat 3, 54 Caledonian Road", a postcode, an outward code like N7, or an estate or block by name. Misspellings and nicknames are forgiven ("Cally Road"). Pick the boroughs you're working at the start of a shift and their results come first, so you get the right Church Street first time. Recent and favourite places sit at the top, and road search works with no signal.
+> Type what the control room says: a road, a house number and road, a postcode, an outward code like N7, or an estate or block by name. Streets and postcodes come from OS Open Names; house numbers come from OpenStreetMap, so not every door is there yet. Misspellings are forgiven. Pick the boroughs you're working at the start of a shift, or a whole part of London, and their results come first, so you get the right Church Street first time. Road and postcode search work with no signal; routes need a connection. Save blocks and estates that aren't found, with the road they're on.
 >
-> PLACES AND THE NEAREST A&E
-> Find shops, cafés, takeaways, pubs, schools, parks, stations, hospitals and more by name, or list every one of a kind in your boroughs. One tap for the nearest A&E. Tap any building on the map for its address and a route there.
+> PLACES
+> Shops, cafés, takeaways, pubs, schools, parks, stations, hospitals with A&E, health services and more, by name (with the road: "Tesco Holloway Road") or by kind ("coffee shops", "schools") in your boroughs.
 >
-> TWO ROUTES, YOUR CHOICE
-> Every search gives journey times from where you are now, sized to your vehicle (car to fire appliance) so it never sends you under a low bridge or down a road too narrow. A blue-light route that uses bus lanes and bus gates and ignores turn restrictions is offered beside the standard route when it's meaningfully faster. It never goes the wrong way down a one-way street, and it lists every restriction it relies on. You choose; it never routes through a restriction without telling you. Roads TfL lists as closed are avoided automatically.
+> ROUTES SIZED TO YOUR VEHICLE
+> Choose car, SUV, van or carrier, and routes avoid bridges, narrow roads and weight limits it can't take, and roads TfL lists as fully closed (checked every 5 minutes). Journey times count from where you are now.
 >
-> TO THE DOOR *(paste only once building entrances are live, after the weekly map build around 31 October; otherwise leave this paragraph out)*
-> Where the map knows the way into a block, the route ends at the entrance, not the middle of the building. Keep your own notes on blocks and estates.
+> A ROUTE FOR AUTHORISED VEHICLES
+> For drivers authorised to use them, a second route that can use bus lanes and gates where permitted is offered beside the standard route when it's quicker. It's on unless you switch it off on Session, and the standard route is always there to pick. The route card shows the restrictions it found. Road signs and your force's driving policy always come first, and the app never switches your route on its own.
 >
 > TURN-BY-TURN
-> Large, glanceable directions with spoken turns, which side the destination is on, automatic re-routing, and a map that carries on with no signal (download the offline map on Wi-Fi). Day and night maps, heading-up or 3D, a larger text setting, and an Ordnance Survey map style. Or hand over to Google Maps or Waze.
+> Large, glanceable directions with spoken instructions and automatic re-routing, in portrait or landscape, with day and night maps. Or hand over to Google Maps or Waze. Guidance runs while BlueRoute is open on screen.
 >
 > PURSUIT SCREEN
-> Speed, the road's speed limit (or "—" when it isn't known, never a guess), road name, heading, borough, next junction and the area you're heading towards, with a heading-up map. Updates every second and keeps the screen awake.
+> Built for the operator in the passenger seat: speed, the road's speed limit (or "—" when it isn't known, never a guess), road name, heading, borough, next junction and the area you're heading towards, with a heading-up map. Updates every second and keeps the screen awake.
 >
-> WHERE AM I
-> Your nearest address, postcode, OS grid reference and how accurate the fix is, ready to read out or share.
->
-> TEAM SESSIONS
-> Opt in, share a code, and see colleagues on the map while the app is open. Follow in along a colleague's track. End-to-end encrypted: the server can't read it.
+> TEAM SESSIONS (OPTIONAL)
+> Share a code with your team and see each other on the map while the app is open. Positions are end-to-end encrypted: the server can't read them and forgets them within a week. It doesn't replace your radio or any force system.
 >
 > LOG
-> Every search and route picked is kept on your phone until you clear it.
+> Every search and route you pick is kept on your phone until you clear it.
 >
 > PRIVATE BY DESIGN
-> No accounts, no ads and no third-party analytics. Addresses and your log stay on your phone; the server works out routes without logging them.
+> No accounts, adverts, tracking or third-party analytics. Your callsign, settings and log stay on your phone. The server works out routes and searches without keeping them, and counts usage only as daily totals, using a random install ID you can reset or switch off.
 >
-> BlueRoute is independent and is not affiliated with or endorsed by any police, ambulance or fire service. Blue-light routes are for emergency-service drivers using the exemptions only, and can be turned off. Maps and search cover London for now, with more areas to come.
+> GOOD TO KNOW
+> - Covers Greater London only.
+> - Journey times are estimates, and speed limits and road data come from OpenStreetMap, which can be wrong or out of date. Road signs and your training always come first.
+> - BlueRoute is an aid. Set it up before you move off, or let the passenger operate it; don't handle the phone while driving.
+> - BlueRoute is independent. It is not made, approved or endorsed by any police force or other public service, and is not affiliated with one.
+>
+> Map and place data © OpenStreetMap contributors. Contains OS data © Crown copyright and database right. Powered by TfL Open Data.
 
 ### Notes for the reviewers (Apple "App Review Information"; Google "App access")
 
 Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes**. Google: choose **All functionality is available without any access restrictions**, then paste the same text into **Instructions** anyway so the reviewer knows about Demo drive.
 
-> BlueRoute is blue-light navigation for emergency services (police, ambulance and fire). Maps and search cover London for now. No account or login is needed.
+> BlueRoute is patrol and route-planning navigation for police officers in London. No account or login is needed.
 >
-> To try it outside London: on the Session tab, turn on "Demo drive". It simulates driving through north London, so search, routes, turn-by-turn and the Pursuit tab all work. For example, search "Caledonian Road" or "N7", pick a result, and compare the two routes.
+> TRYING IT OUTSIDE LONDON
+> On the Session tab, open "Demo drive" and turn it on. It simulates a patrol in north London, so search, routes, turn-by-turn and the Pursuit tab all work. For example, search "Caledonian Road" or "N7", pick a result and tap Go.
 >
-> The "Blue light" route (bus lanes, bus gates, ignoring turn restrictions, never against one-way streets) is on by default, by design: the app is for emergency-service drivers using the legal exemptions, and the first launch asks the user to accept terms that say so. It can be turned off on the Session tab, and then the app gives standard, fully legal routes only. The standard route is always offered beside it; when a blue-light route is shown, every restriction it uses is listed and the user chooses.
+> THE TWO ROUTES
+> Every search shows the standard route, which follows normal road rules and is sized to the chosen vehicle (bridge height, width and weight), avoiding roads TfL lists as closed. For authorised drivers, a second route labelled "Blue light", which can use bus lanes and gates where permitted, is shown beside it when it's quicker, with the restrictions it uses listed. It is on by default because the app is for police drivers; the first launch asks the user to accept terms saying it is only for drivers authorised to use it, and one switch on the Session tab ("Blue-light routes") turns it off, after which only standard routes are offered. The standard route can always be chosen, and the app never swaps routes on its own while driving.
 >
-> The app is independent and not affiliated with any police, ambulance or fire service. Location is used only while the app is open.
+> LOCATION
+> Location is used only while the app is open and on screen (When In Use permission). Turn-by-turn guidance and the pursuit screen need the current position; nothing is tracked when the app is closed.
+>
+> DATA
+> No accounts, ads or third-party analytics. Route and search requests are processed and not kept. Each request carries a random install ID and the app version, used only to count daily totals; the install ID can be reset, or switched off in Session > Privacy and data ("Count my usage"). Team sessions are optional, need a shared team code, and are end-to-end encrypted; the server deletes them within a week.
+>
+> INDEPENDENCE
+> BlueRoute is independent. It is not made, approved or endorsed by any police force or other public service, and is not affiliated with one. Police stations are shown by their own name only.
+>
+> CONTACT
+> hello@bluerouteapp.com · Privacy: https://bluerouteapp.com/privacy · Support: https://bluerouteapp.com/support
 
 ### Other questions in the forms
 
@@ -201,14 +218,14 @@ The PM took both sets at these sizes on 26 October (round 5). Retake the Android
 | Google | Feature graphic | 1024 × 500 (`store/feature-graphic.png`) | 1 |
 | Google | App icon | 512 × 512 (`store/play-icon.png`) | 1 |
 
-Order, both stores:
+Order and captions, both stores (Launch Manager, 3 November). Every shot: Demo drive on, a made-up callsign, no force name, crest or livery, no Privacy or Demo drive sections in view, no notifications, a legal speed on Pursuit, and alpha stripped (both stores reject transparent PNGs).
 
-1. Search ("stroud green rd" or "Bemerton", results in Islington)
-2. Route choice (Standard beside Blue light, with the restrictions listed)
-3. Turn-by-turn navigation (day)
-4. Turn-by-turn navigation (night)
-5. Pursuit screen
-6. Start of shift (Session: callsign, boroughs, vehicle)
+1. Search results for "stroud green rd": *Search the way control gives it*
+2. Session, start of shift with boroughs and vehicle: *Your boroughs first: the right Church Street*
+3. Route choice with the Standard route selected: *Routes sized to your vehicle*
+4. Turn-by-turn: *Big, spoken turn-by-turn*
+5. Pursuit: *For the operator: road, limit, heading*
+6. The Log with demo searches only: *Your log stays on your phone*
 
 ## Privacy answers (ready to paste)
 
@@ -347,6 +364,6 @@ Keep safety features free: the one-way protection, the "—" for unknown speed l
 
 ## If something goes wrong
 
-- **Apple rejects it under guideline 1.4 (physical harm) or 5 (legal) because of the police route.** Reply in Resolution Center explaining that blue-light routes are for emergency-service drivers under the emergency exemptions, are always offered beside a fully legal standard route with every restriction listed, and can be turned off on the Session tab, and point to the reviewer notes. If Apple still says no, ask Claude to leave police routes out of the iOS store build only (a small change). Officers still get search, standard routes, navigation, pursuit mode and the log, and TestFlight can carry the full version.
+- **Apple rejects it under guideline 1.4 (physical harm) or 5 (legal) because of the police route.** Reply in Resolution Center the same day explaining that the blue-light route is for drivers authorised to use it, is always offered beside a standard route with the restrictions it uses listed, never replaces the route on its own, and can be turned off on the Session tab, and point to the reviewer notes. If Apple still says no, ask Claude to leave police routes out of the iOS store build only (a small change). Officers still get search, standard routes, navigation, pursuit mode and the log, and TestFlight can carry the full version.
 - **The Play closed test is stuck in review.** New accounts are often slower. It usually clears within 7 days. In the meantime, Android officers can use the APK from the GitHub release page.
 - **Fewer than 12 Android testers join.** The production clock doesn't start until 12 are opted in. Testers have to join through the link, not just be on the list.

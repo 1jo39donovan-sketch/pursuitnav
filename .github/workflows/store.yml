@@ -78,7 +78,8 @@ jobs:
       # Keys go into files in the runner's temp folder, never into the repo.
       - name: Point the app at the server and add the store keys
         run: |
-          cfg=$(jq --arg url "https://${SERVER_DOMAIN}" '.build.production.env.EXPO_PUBLIC_API_URL = $url' eas.json)
+          cfg=$(jq --arg url "https://${SERVER_DOMAIN}" --arg id "${GITHUB_SHA::7} $(date -u +'%d %b %Y')" \
+            '.build.production.env.EXPO_PUBLIC_API_URL = $url | .build.production.env.EXPO_PUBLIC_BUILD_ID = $id' eas.json)
           if [ -n "$ASC_API_KEY_P8" ]; then
             printf '%s\n' "$ASC_API_KEY_P8" > "$RUNNER_TEMP/asc.p8"
             cfg=$(jq --arg p "$RUNNER_TEMP/asc.p8" --arg k "$ASC_KEY_ID" --arg i "$ASC_ISSUER_ID" --arg a "$ASC_APP_ID" \
