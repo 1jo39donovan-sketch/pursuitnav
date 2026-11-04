@@ -47,7 +47,8 @@ describe("spoken directions", () => {
   });
 
   it("still calls a turn that comes up too soon for the warning", () => {
-    expect(drive([100, 50])).toEqual(["Drive north on Holloway Road.", "Turn right onto Seven Sisters Road."]);
+    // Too close for "Head along…" first: the first line is the turn's warning.
+    expect(drive([100, 50])).toEqual(["In 100 yards, turn right onto Seven Sisters Road.", "Turn right onto Seven Sisters Road."]);
   });
 
   it("says the destination is ahead, not that you've arrived, before you get there", () => {
@@ -104,6 +105,23 @@ describe("prompts that don't cut each other off", () => {
       text: "Turn right onto Seven Sisters Road.",
       priority: "urgent",
     });
+  });
+
+  it("starts 50 m before a turn by saying the turn, once, not a road name cut off by it (3 Nov)", () => {
+    const said = new Set<string>();
+    const first = nextCallout(at(50), said)!;
+    expect(first).toMatchObject({ key: "start", text: "Turn right onto Seven Sisters Road.", priority: "urgent" });
+    said.add(first.key);
+    first.covers?.forEach((k) => said.add(k));
+    expect(nextCallout(at(30), said)).toBeNull();
+    // 120 m away: "In …" as the first line, and the turn itself still called after.
+    const later = new Set<string>();
+    const start = nextCallout(at(120), later)!;
+    expect(start.text).toBe("In 150 yards, turn right onto Seven Sisters Road.");
+    later.add(start.key);
+    start.covers?.forEach((k) => later.add(k));
+    expect(nextCallout(at(100), later)).toBeNull();
+    expect(nextCallout(at(50), later)?.text).toBe("Turn right onto Seven Sisters Road.");
   });
 
   it("starts with the road's name, never a slash", () => {

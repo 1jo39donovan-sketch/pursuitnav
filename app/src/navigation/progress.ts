@@ -299,3 +299,18 @@ export function pointAlong(prepared: PreparedRoute, along: number): { lng: numbe
   const course = ((Math.atan2((bx - ax) * cosLat, by - ay) * 180) / Math.PI + 360) % 360;
   return { lng: ax + (bx - ax) * t, lat: ay + (by - ay) * t, course };
 }
+
+/** The next turn is repeated under the map for this long after GO, ms. */
+export const REPEAT_AFTER_GO_MS = 10_000;
+/** …and whenever the next turn is this close, metres. */
+export const REPEAT_WITHIN_M = 200;
+
+/**
+ * Whether the bottom panel repeats the next turn. A notification can cover
+ * the turn card at the top (3 Nov, 01:14–01:18): the turn is then still on
+ * screen at the bottom, at the two moments it matters most.
+ */
+export function repeatTurn(justStarted: boolean, distanceToNextM: number | null): boolean {
+  if (distanceToNextM == null) return false;
+  return justStarted || distanceToNextM <= REPEAT_WITHIN_M;
+}

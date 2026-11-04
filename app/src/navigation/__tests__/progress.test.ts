@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Maneuver, Route } from "../../api/routes";
-import { briefInstruction, comingUp, maneuverArrow, offRouteCount, prepare, progressAt, thenText } from "../progress";
+import { briefInstruction, comingUp, maneuverArrow, offRouteCount, prepare, progressAt, repeatTurn, thenText } from "../progress";
 
 // An L-shaped route: 500 m east, then right (south) 300 m.
 // ~0.00719° of longitude is 500 m at this latitude; 0.0027° of latitude is 300 m.
@@ -204,5 +204,14 @@ describe("short text for a glance", () => {
     expect(thenText({ ...arrive, streetNames: [] }, "Your destination is on the right: 54 Caledonian Road")).toBe(
       "Your destination is on the right: 54 Caledonian Road",
     );
+  });
+});
+
+describe("the turn repeated under the map", () => {
+  it("shows for the first seconds after GO and close to each turn, so a notification can't hide it", () => {
+    expect(repeatTurn(true, 900)).toBe(true);
+    expect(repeatTurn(false, 900)).toBe(false);
+    expect(repeatTurn(false, 180)).toBe(true);
+    expect(repeatTurn(true, null)).toBe(false);
   });
 });

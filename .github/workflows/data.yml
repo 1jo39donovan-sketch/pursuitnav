@@ -62,10 +62,29 @@ jobs:
           du -sh data/valhalla-next data/places-next
 
       - name: Offline map for phones
+        id: offline
+        # It downloads coastline and water shapes from outside servers, which
+        # can be down (3 Nov: "No route to host" twice). The routing map and
+        # places must still go out: last week's offline map is used instead.
+        continue-on-error: true
         run: |
           start=$(date +%s)
           bash scripts/offline-map.sh
           echo "OFFLINE_MINUTES=$(( ($(date +%s) - start + 59) / 60 ))" >> "$GITHUB_ENV"
+          echo "OFFLINE_MB=$(python3 -c 'import json; print(round(json.load(open("data/places-next/offline/manifest.json"))["bytes"] / 1e6))')" >> "$GITHUB_ENV"
+
+      - name: Last week's offline map, if this week's couldn't be built
+        if: steps.offline.outcome == 'failure'
+        run: |
+          prev=$(gh release list --limit 20 --json tagName --jq '.[].tagName' | grep '^data-' | sort -r | head -1)
+          [ -n "$prev" ] || { echo "No earlier data release to take the offline map from"; exit 1; }
+          echo "Taking the offline map from $prev"
+          rm -rf "$RUNNER_TEMP/prev" && sudo rm -rf data/places-next/offline && mkdir -p "$RUNNER_TEMP/prev"
+          gh release download "$prev" --pattern 'places.tar.zst.part*' --dir "$RUNNER_TEMP/prev"
+          # The map build's folder belongs to root (its container wrote it).
+          cat "$RUNNER_TEMP"/prev/places.tar.zst.part* | sudo tar --zstd -x -C data/places-next ./offline
+          test -s data/places-next/offline/map.pmtiles
+          echo "OFFLINE_MINUTES=0 (last week's, from $prev)" >> "$GITHUB_ENV"
           echo "OFFLINE_MB=$(python3 -c 'import json; print(round(json.load(open("data/places-next/offline/manifest.json"))["bytes"] / 1e6))')" >> "$GITHUB_ENV"
 
       - name: House-number search
