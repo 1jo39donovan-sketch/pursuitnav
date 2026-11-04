@@ -1,0 +1,34 @@
+# One-off: fetch Kent's district boundaries (ONS, Open Government Licence)
+# for the Kent pilot. Removed once the file is committed.
+name: Kent boundaries
+on:
+  push:
+    branches: [claude/new-session-qaulzf]
+    paths: [.github/workflows/kent-boundaries.yml]
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch
+        run: |
+          set -x
+          CODES="'E07000105','E07000106','E07000107','E07000108','E07000109','E07000110','E07000111','E07000112','E07000113','E07000114','E07000115','E07000116','E06000035'"
+          mkdir out
+          curl -s "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services?f=json" | python3 -c "import json,sys;[print(s['name']) for s in json.load(sys.stdin)['services'] if 'Local_Authority_Districts' in s['name']]" | tee out/services.txt
+          for yr in 24 23 22; do
+            for kind in BFC BGC BUC; do
+              svc=$(grep -E "^Local_Authority_Districts_(December|May)_20${yr}_Boundaries_UK_${kind}$" out/services.txt | head -1) || true
+              [ -n "$svc" ] || continue
+              curl -sG "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/$svc/FeatureServer/0/query" \
+                --data-urlencode "where=LAD${yr}CD IN ($CODES)" --data-urlencode "outFields=LAD${yr}CD,LAD${yr}NM" \
+                --data-urlencode "outSR=4326" --data-urlencode "f=geojson" -o "out/kent-$kind.geojson"
+              python3 -c "import json;d=json.load(open('out/kent-$kind.geojson'));print('$svc', len(d['features']))" || true
+            done
+            ls out/kent-*.geojson 2>/dev/null && break
+          done
+          curl -sI https://download.geofabrik.de/europe/united-kingdom/england/kent-latest.osm.pbf | grep -i content-length
+          curl -sI https://download.geofabrik.de/europe/united-kingdom/england/greater-london-latest.osm.pbf | grep -i content-length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kent
+          path: out
