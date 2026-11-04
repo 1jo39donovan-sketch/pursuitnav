@@ -203,3 +203,13 @@ Tesco Express|Tesco|Convenience store|shop|18|5156900|-12500|Holloway Road, N19 
     expect(first("Tesco Holloway Road")?.placeType).toBe("Convenience store");
   });
 });
+
+describe("police stations by their own name (store review: no force names)", () => {
+  it("drops the force's name from a police station, and leaves other places alone", async () => {
+    const { stationName } = await import("../places");
+    expect(stationName("Metropolitan Police Coldharbour Ward Office", "Police station")).toBe("Coldharbour Ward Office");
+    expect(stationName("City of London Police - Bishopsgate", "Police station")).toBe("Bishopsgate");
+    expect(stationName("Holloway Police Station", "Police station")).toBe("Holloway Police Station");
+    expect(stationName("Metropolitan Police Sports Club", "Sports centre")).toBe("Metropolitan Police Sports Club");
+  });
+});

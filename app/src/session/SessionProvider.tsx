@@ -145,8 +145,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
     [setAppearanceSetting, setMapTheme],
   );
-  // app.json still says "dark" (changing it needs a new native build), so until then
-  // the phone always reports dark here and "Match phone" means dark.
+  // Follows the phone from builds made after 4 Nov (app.json "automatic"); an
+  // older build always reports dark here, so "Match phone" means dark there.
   const scheme = useColorScheme();
   const dark = appearance === "dark" || (appearance === "system" && scheme !== "light");
   const mapTheme: MapTheme = mapChoice === "auto" ? (dark ? "night" : "day") : mapChoice;

@@ -5,7 +5,7 @@
 import type { Borough } from "./boroughs";
 import { expandNicknames } from "./nicknames";
 import { formatPostcode, parseQuery } from "./parse";
-import { splitKind, typesForQuery, type PlaceGroup, type PointOfInterest } from "./places";
+import { splitKind, stationName, typesForQuery, type PlaceGroup, type PointOfInterest } from "./places";
 import { matchScore, normalise } from "./text";
 
 export interface Road {
@@ -542,7 +542,7 @@ export class SearchIndex {
   private poiResult(p: PointOfInterest, score: number): SearchResult {
     return {
       key: `poi:${p.name}|${p.type}|${p.lat}|${p.lng}`,
-      label: p.name,
+      label: stationName(p.name, p.type),
       detail: [p.type, p.borough, p.address].filter(Boolean).join(" · "),
       borough: p.borough,
       lat: p.lat,

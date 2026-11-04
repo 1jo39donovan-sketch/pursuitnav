@@ -3,7 +3,7 @@
 import { CUSTODY_SUITES, custodyStation } from "../area/custody";
 import { distanceM } from "../geo";
 import type { ServiceType } from "../vehicles";
-import type { PointOfInterest } from "./places";
+import { stationName, type PointOfInterest } from "./places";
 
 export interface QuickPlace {
   /** "Nearest A&E" */
@@ -80,6 +80,11 @@ export function quickPlaces(
   const station = STATION[service ?? "police"];
   // Not the custody suite again: its police station is already listed.
   const listed = new Set(out.map((q) => `${q.place.lat},${q.place.lng}`));
-  add(station.label, pois.filter((p) => station.types.includes(p.type) && !listed.has(`${p.lat},${p.lng}`)));
+  add(
+    station.label,
+    pois
+      .filter((p) => station.types.includes(p.type) && !listed.has(`${p.lat},${p.lng}`))
+      .map((p) => ({ ...p, name: stationName(p.name, p.type) })),
+  );
   return out;
 }

@@ -3,7 +3,7 @@
 
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
 // Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
-const UPDATED = "28 October 2026";
+const UPDATED = "4 November 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -115,7 +115,8 @@ Turning it off deletes anything not yet sent.</p>
 <h2>Usage counts</h2>
 <p>So we know how many crews use BlueRoute, every request to the server carries a random install ID, made on your
 phone the first time the app runs, and the app's version number. You can reset the ID in the Session tab, after which
-the app counts as a new install. The app also reports how many navigation and pursuit sessions were started and how
+the app counts as a new install, or switch usage counting off there (Privacy and data → Count my usage): then no
+install ID is sent and the app reports nothing, and the server only adds each route planned to its daily total. The app also reports how many navigation and pursuit sessions were started and how
 many requests got no answer in time, as plain numbers.</p>
 <p>The server keeps, for each day: how many different installs it heard from (and on which app versions), how many
 routes were planned, how many navigation and pursuit sessions were started, and how many requests timed out or
@@ -209,7 +210,7 @@ don’t agree, don’t use it.</p>
     ambulance or fire service, and is not an official system of any of them.</li>
   <li>It is an aid only. It does not replace your training, your judgement, your control room, your radio, your
     service’s systems or your service’s policies.</li>
-  <li>It is still being field-tested and may change, stop working or be withdrawn at any time, without notice.</li>
+  <li>It may change, stop working or be withdrawn at any time, without notice.</li>
 </ul>
 
 <h2>2. You are responsible for how you drive</h2>
