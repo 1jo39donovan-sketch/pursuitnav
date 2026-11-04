@@ -1,5 +1,5 @@
-// Which London borough a point is in, from the borough boundaries in
-// places/london-boroughs.geojson (the file the places build uses too).
+// Which area (London borough, Kent district) a point is in, from the
+// boundaries in places/ (the files the places build uses too).
 import { readFileSync } from "node:fs";
 
 import { BOROUGH_NAMES } from "./boroughs.js";
@@ -12,8 +12,11 @@ interface Area {
   box: [number, number, number, number];
 }
 
-/** places/ beside src/ (development, tests) or dist/ (the API image copies it there). */
-export const BOROUGHS_FILE = new URL("../places/london-boroughs.geojson", import.meta.url);
+/** places/ beside src/ (development, tests) or dist/ (the API image copies them there). */
+export const BOUNDARY_FILES = [
+  new URL("../places/london-boroughs.geojson", import.meta.url),
+  new URL("../places/kent-districts.geojson", import.meta.url),
+];
 
 function inRing(ring: Ring, lng: number, lat: number): boolean {
   let inside = false;
@@ -47,11 +50,12 @@ export class BoroughLookup {
       });
   }
 
-  static fromFile(file: URL | string = BOROUGHS_FILE): BoroughLookup {
-    return new BoroughLookup(JSON.parse(readFileSync(file, "utf8")));
+  static fromFile(files: (URL | string)[] = BOUNDARY_FILES): BoroughLookup {
+    const features = files.flatMap((f) => JSON.parse(readFileSync(f, "utf8")).features);
+    return new BoroughLookup({ features });
   }
 
-  /** The borough name, or null outside Greater London. */
+  /** The area's name, or null outside London and Kent. */
   at(lat: number, lng: number): string | null {
     for (const a of this.areas) {
       const [w, s, e, n] = a.box;

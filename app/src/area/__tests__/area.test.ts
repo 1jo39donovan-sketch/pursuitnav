@@ -3,6 +3,19 @@ import { describe, expect, it } from "vitest";
 import { boroughAt, cardinal, generallyTowards, nearBoroughs, projectAhead } from "../area";
 
 describe("boroughAt", () => {
+  it("knows Kent's districts and Medway", () => {
+    expect(boroughAt(51.2798, 1.0828)).toBe("Canterbury"); // the cathedral
+    expect(boroughAt(51.272, 0.529)).toBe("Maidstone"); // town centre
+    expect(boroughAt(51.3887, 0.5054)).toBe("Medway"); // Rochester
+    expect(boroughAt(51.4436, 0.2185)).toBe("Dartford"); // Bluewater
+    expect(boroughAt(51.1306, 1.3124)).toBe("Dover"); // the docks road
+  });
+
+  it("says when a road leaves Kent", () => {
+    // East Sussex border south of Tunbridge Wells, heading south.
+    expect(generallyTowards(51.12, 0.27, 180)).toBe("Leaving Kent");
+  });
+
   it("names the borough at well-known spots", () => {
     expect(boroughAt(51.5466, -0.1035)).toBe("Islington"); // Highbury Corner
     expect(boroughAt(51.4613, -0.1156)).toBe("Lambeth"); // Brixton

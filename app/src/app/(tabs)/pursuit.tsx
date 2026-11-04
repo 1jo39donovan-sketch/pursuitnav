@@ -12,6 +12,7 @@ import { formatDistance } from "../../format";
 import { recentFixes, useLocation, type Fix } from "../../location/LocationProvider";
 import { notePursuit, pursuitOpened } from "../../navigation/timings";
 import { EMPTY_FEED, feedNote, nextFeed, shownInfo } from "../../navigation/serverFeed";
+import { COVERED_NAME } from "../../search/boroughs";
 import { useSearch } from "../../search/SearchProvider";
 import { useSession } from "../../session/SessionProvider";
 import { snapToLine } from "../../navigation/snapLine";
@@ -197,7 +198,7 @@ export default function PursuitScreen() {
     <View style={[styles.cell, styles.grow]}>
       <Text style={styles.label}>Borough</Text>
       <Text style={styles.big} numberOfLines={2}>
-        {borough ?? (fix ? "Outside London" : "—")}
+        {borough ?? (fix ? `Outside ${COVERED_NAME}` : "—")}
       </Text>
     </View>
   );

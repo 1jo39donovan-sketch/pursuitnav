@@ -144,3 +144,25 @@ def test_a_mental_health_unit_is_not_an_ae():
 
 def test_an_unnamed_ae_entrance_is_kept(places):
     assert places["A&E entrance"][2] == "A&E entrance"
+
+
+def test_area_list_matches_the_app():
+    # The app reads area numbers from these files, so both lists must agree, in order.
+    import re
+    from pathlib import Path
+
+    app = (Path(__file__).parents[2] / "app/src/search/boroughs.ts").read_text()
+    names = []
+    for block in ("LONDON_BOROUGHS", "KENT_DISTRICTS"):
+        body = app.split(f"export const {block} = [", 1)[1].split("]", 1)[0]
+        names += re.findall(r'"([^"]+)"', body)
+    assert names == extract_places.BOROUGHS
+
+
+def test_kent_districts_and_medway_are_found():
+    finder = extract_places.BoroughFinder(extract_places.BOUNDARIES)
+    at = lambda lng, lat: extract_places.BOROUGHS[finder.index_of(lng, lat)]
+    assert at(1.0828, 51.2798) == "Canterbury"
+    assert at(0.5054, 51.3887) == "Medway"
+    assert at(-0.1035, 51.5466) == "Islington"
+    assert finder.index_of(0.27, 51.0) is None  # East Sussex

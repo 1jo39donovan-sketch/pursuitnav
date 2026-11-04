@@ -49,8 +49,8 @@ export interface ServerConfig {
   version?: string;
 }
 
-// Greater London with a margin, matching the app's region config.
-const LONDON_BOUNDS: ServerConfig["bounds"] = [-0.8, 51.2, 0.6, 51.8];
+// Greater London and Kent with a margin, matching the app's region config.
+const DEFAULT_BOUNDS: ServerConfig["bounds"] = [-0.8, 50.8, 1.6, 51.8];
 
 function num(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -63,7 +63,7 @@ function num(name: string, fallback: number): number {
 export function loadConfig(): ServerConfig {
   const bounds = process.env.REGION_BOUNDS
     ? (process.env.REGION_BOUNDS.split(",").map(Number) as ServerConfig["bounds"])
-    : LONDON_BOUNDS;
+    : DEFAULT_BOUNDS;
   if (bounds.length !== 4 || bounds.some((n) => !Number.isFinite(n))) {
     throw new Error("REGION_BOUNDS must be west,south,east,north");
   }

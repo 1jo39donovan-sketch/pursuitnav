@@ -22,8 +22,8 @@ import osmium
 # no handle outside); "exit" is a way out only; garages and loading bays
 # aren't a way to someone's door.
 KINDS = {"main", "yes", "staircase", "home", "service", "secondary", "entrance"}
-# Greater London with a margin, as the server's REGION_BOUNDS.
-BOUNDS = (-0.8, 51.2, 0.6, 51.8)
+# Greater London and Kent with a margin, as the server's REGION_BOUNDS.
+BOUNDS = (-0.8, 50.8, 1.6, 51.8)
 
 
 def clean(s: str | None) -> str:

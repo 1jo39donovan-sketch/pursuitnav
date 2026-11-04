@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useRecorder } from "../fieldtest/instance";
 import { useLog } from "../log/LogProvider";
+import { COVERED_NAME } from "../search/boroughs";
 import { store } from "../storage/store";
 import type { LogEntry, LoggedRoute } from "../storage/types";
 import { colors, fonts } from "../theme";
@@ -140,7 +141,7 @@ function Entry({ entry }: { entry: LogEntry }) {
       </Text>
       <Text style={styles.chosen}>{entry.chosen}</Text>
       <View style={styles.row}>
-        <Text style={styles.borough}>{entry.borough ?? "Outside London"}</Text>
+        <Text style={styles.borough}>{entry.borough ?? `Outside ${COVERED_NAME}`}</Text>
         <Text
           style={[
             styles.route,
