@@ -26,8 +26,8 @@ jobs:
             done
             ls out/kent-*.geojson 2>/dev/null && break
           done
-          curl -sI https://download.geofabrik.de/europe/united-kingdom/england/kent-latest.osm.pbf | grep -i content-length
-          curl -sI https://download.geofabrik.de/europe/united-kingdom/england/greater-london-latest.osm.pbf | grep -i content-length
+          curl -sIL https://download.geofabrik.de/europe/united-kingdom/england/kent-latest.osm.pbf | grep -i content-length || true
+          curl -sIL https://download.geofabrik.de/europe/united-kingdom/england/greater-london-latest.osm.pbf | grep -i content-length || true
       - uses: actions/upload-artifact@v4
         with:
           name: kent
