@@ -552,7 +552,7 @@ export default function NavigateScreen() {
           {card.after && (
             <Text style={styles.then} numberOfLines={compact ? 1 : 2}>
               Then {maneuverArrow(card.after.type)}{" "}
-              {thenText(card.after, instructionWithPlace(card.after, active.destination.title))}
+              {thenText(card.after, instructionWithPlace(card.after, active.destination.title), card.next?.streetNames)}
             </Text>
           )}
         </>

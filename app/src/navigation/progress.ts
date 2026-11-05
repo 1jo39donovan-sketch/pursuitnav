@@ -27,7 +27,10 @@ export interface Progress {
   /** The manoeuvre being driven now (its road), and the next one to make. */
   current: Maneuver;
   next: Maneuver | null;
-  /** The one after next, for "then …". */
+  /**
+   * The one after next, for the "Then" line: only when it comes soon after
+   * the next (THEN_WITHIN_M or THEN_WITHIN_S), else null.
+   */
   after: Maneuver | null;
   distanceToNextM: number;
   /** Metres from the snapped position to the nearest turn (the next one, or the one just made). */
@@ -100,9 +103,15 @@ export function progressAt(
   let idx = 0;
   for (let i = 0; i < ms.length; i++) if (ms[i]!.beginShapeIndex <= segment) idx = i;
   const current = ms[idx]!;
-  const next = ms[idx + 1] ?? null;
-  const after = ms[idx + 2] ?? null;
+  const nextIdx = turnAfter(ms, idx);
+  const next = ms[nextIdx] ?? null;
+  const afterIdx = next ? turnAfter(ms, nextIdx) : -1;
   const nextAt = next ? cumulative[next.beginShapeIndex]! : total;
+  const soonAfter =
+    afterIdx >= 0 &&
+    (cumulative[ms[afterIdx]!.beginShapeIndex]! - nextAt <= THEN_WITHIN_M ||
+      ms.slice(nextIdx, afterIdx).reduce((t, m) => t + m.timeS, 0) <= THEN_WITHIN_S);
+  const after = soonAfter ? ms[afterIdx]! : null;
 
   // Time left: the rest of this manoeuvre pro rata, plus every later one.
   const curStart = cumulative[current.beginShapeIndex]!;
@@ -124,6 +133,28 @@ export function progressAt(
     remainingS,
     arrived: remainingM < ARRIVED_M,
   };
+}
+
+/** The "Then" line only when the turn after next is this close behind it. */
+export const THEN_WITHIN_M = 300;
+export const THEN_WITHIN_S = 20;
+
+/** Valhalla's "continue" and "stay straight": no turn to make. */
+const CARRY_ON = new Set([8, 22]);
+
+/**
+ * A step that just carries on along the same street ("Continue on Bedford
+ * Road"): nothing to do there, so it isn't shown or said as a turn.
+ */
+export function sameStreetStep(m: Maneuver, prev: Maneuver | undefined): boolean {
+  if (!prev || !CARRY_ON.has(m.type)) return false;
+  return !m.streetNames.length || m.streetNames.some((n) => prev.streetNames.includes(n));
+}
+
+/** Index of the first real turn after manoeuvre `i` (-1 if none). */
+function turnAfter(ms: readonly Maneuver[], i: number): number {
+  for (let j = i + 1; j < ms.length; j++) if (!sameStreetStep(ms[j]!, ms[j - 1])) return j;
+  return -1;
 }
 
 /**
@@ -248,15 +279,41 @@ export function briefInstruction(text: string): string {
 
 const ROAD_REF = String.raw`[ABM]\d{1,4}(?:\(M\))?`;
 
+/** The way to go, for a turn that stays on the road you're already on. */
+const VERB: Record<number, string> = {
+  9: "slight right",
+  10: "right",
+  11: "sharp right",
+  12: "U-turn",
+  13: "U-turn",
+  14: "sharp left",
+  15: "left",
+  16: "slight left",
+  23: "keep right",
+  24: "keep left",
+  18: "right",
+  19: "left",
+  20: "exit right",
+  21: "exit left",
+  22: "straight on",
+  8: "straight on",
+};
+
+const roadParts = (names: readonly string[]) => names.flatMap((n) => n.split("/").map((p) => p.trim())).filter(Boolean);
+
 /**
  * The "Then" line: the road's name (its number if it has none), shown after
  * the turn's arrow, so it fits on one line ("Then → Wandsworth Road") rather
- * than "Then → Turn right onto Wandsworth Road/A30…". The full instruction for
+ * than "Then → Turn right onto Wandsworth Road/A30…". A turn that keeps you
+ * on the road the next turn puts you on says which way ("Then → right"), as
+ * the bare name would read as if nothing changes. The full instruction for
  * an arrival or a turn with no road named.
  */
-export function thenText(m: Maneuver, full: string): string {
+export function thenText(m: Maneuver, full: string, onRoad: readonly string[] = []): string {
   if (m.type in ARRIVAL || !m.streetNames.length) return briefInstruction(full);
-  const parts = m.streetNames.flatMap((n) => n.split("/").map((p) => p.trim())).filter(Boolean);
+  const parts = roadParts(m.streetNames);
+  const here = new Set(roadParts(onRoad));
+  if (parts.some((p) => here.has(p)) && VERB[m.type]) return VERB[m.type]!;
   const ref = new RegExp(`^${ROAD_REF}$`);
   return parts.find((p) => !ref.test(p)) ?? parts[0] ?? briefInstruction(full);
 }
@@ -271,7 +328,11 @@ export function comingUp(prepared: PreparedRoute, progress: Progress, count = 5)
   if (!from) return [];
   const start = ms.indexOf(from) + 1;
   if (start <= 0) return [];
-  return ms.slice(start, start + count).map((m) => ({
+  return ms
+    .slice(start)
+    .filter((m, k) => !sameStreetStep(m, ms[start + k - 1]))
+    .slice(0, count)
+    .map((m) => ({
     maneuver: m,
     inM: Math.max(0, (prepared.cumulative[m.beginShapeIndex] ?? 0) - progress.along),
   }));
