@@ -8,9 +8,14 @@ Usage: python make_fixture.py <out.osm.pbf> <out-points.json>
 """
 
 import json
+import os
 import sys
 
 import osmium
+
+# The map build's tag fixes, so the tests see what the real tiles see.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "places"))
+from practical_speeds import locked_gate  # noqa: E402
 
 LAT0, LNG0 = 51.50, -0.10
 DLAT, DLNG = -0.002, 0.003  # one block south, one block east (~220 m, ~210 m)
@@ -22,6 +27,7 @@ nodes = {}  # (cluster, r, c) -> (id, lat, lng)
 ways = []  # (id, [node ids], tags)
 relations = []  # (id, members, tags)
 points = {}  # name -> {lat, lng} for the tests
+node_tags = {}  # grid node id -> tags (gates, bollards)
 next_id = {"n": 1, "w": 1, "r": 1}
 
 
@@ -145,6 +151,56 @@ point("main_east", 7, 1, 3)
 point("high_road_1", 7, 0.8, 1)  # a block of High Road, closed in the live-closure test
 point("high_road_2", 7, 0.8, 2)
 
+# Clusters 8-11: a short cut along the middle row that no crew can drive, so
+# both routes must go round by Row 0 or Row 2 Street. Each holds one way a
+# road is closed to them: a private road, a private gate, a locked gate
+# and bollards across the road.
+def shortcut(cluster, name, gate=None, far=False, **extra):
+    if far:
+        # The only other way is a loop ~9 km long, far more than any time
+        # penalty Valhalla adds: proves the road is shut, not just slow.
+        way(cluster, [(1, 0), (-20, 0), (-20, 2), (1, 2)], "Long Way Round")
+        name = f"{name} Far"
+    else:
+        grid(cluster, skip={"row1"})
+    way(cluster, [(1, 0), (1, 1), (1, 2)], name, **extra)
+    if gate:
+        node_tags[nid(cluster, 1, 1)] = locked_gate(gate) or gate
+    # Approach roads, so the short cut is mid-route: a route may always start
+    # or end on a private road (someone lives there), never pass through it.
+    way(cluster, [(1, -1), (1, 0)], "West Approach")
+    way(cluster, [(1, 2), (1, 3)], "East Approach")
+    key = name.lower().replace(" ", "_")
+    point(f"{key}_west", cluster, 1, -1)
+    point(f"{key}_east", cluster, 1, 3)
+    point(f"{key}_middle", cluster, 1, 1)
+
+
+shortcut(8, "Private Road", access="private")
+shortcut(9, "Gated Mews", gate={"barrier": "gate", "access": "private"})
+shortcut(10, "Locked Gate Lane", gate={"barrier": "gate", "locked": "yes"})
+shortcut(11, "Bollard Lane", gate={"barrier": "bollard"})
+shortcut(12, "Private Road", far=True, access="private")
+shortcut(13, "Gated Mews", far=True, gate={"barrier": "gate", "access": "private"})
+shortcut(14, "Locked Gate Lane", far=True, gate={"barrier": "gate", "locked": "yes"})
+shortcut(15, "Bollard Lane", far=True, gate={"barrier": "bollard"})
+
+# Cluster 16: the call is behind a private gate, the only way in. The route
+# goes through it and says so (the crew may need a code).
+way(16, [(1, -1), (1, 0)], "Estate Approach")
+way(16, [(1, 0), (1, 1)], "Gated Close")
+node_tags[nid(16, 1, 0)] = {"barrier": "gate", "access": "private"}
+point("gated_close_start", 16, 1, -1)
+point("gated_close_end", 16, 1, 1)
+
+# Cluster 17: the call is on a private road off a public street. The route
+# ends there: a private road is fine to finish on.
+way(17, [(1, -1), (1, 0), (1, 1)], "Public Street")
+way(17, [(1, 0), (2, 0)], "Private Mews", access="private")
+point("private_mews_start", 17, 1, -1)
+point("private_mews_end", 17, 2, 0)
+
+
 # House-numbered addresses, away from the street grids (the smoke test picks a
 # door-level address from these). Not roads, so routing ignores them.
 tagged_nodes = []  # (id, lat, lng, tags)
@@ -183,7 +239,7 @@ address_node("7", "Other Street", 0.0020)
 def main(pbf_path, points_path):
     writer = osmium.SimpleWriter(pbf_path, overwrite=True)
     for node_id, lat, lng in sorted(nodes.values()):
-        writer.add_node(osmium.osm.mutable.Node(id=node_id, location=(lng, lat), version=1))
+        writer.add_node(osmium.osm.mutable.Node(id=node_id, location=(lng, lat), tags=node_tags.get(node_id, {}), version=1))
     for node_id, lat, lng, tags in tagged_nodes:
         writer.add_node(osmium.osm.mutable.Node(id=node_id, location=(lng, lat), tags=tags, version=1))
     for way_id, refs, tags in ways:

@@ -406,6 +406,7 @@ export function avoidingClosures(
     },
     traceEdges: (shape, costing) => router.traceEdges(shape, costing),
     ...(router.sizeLimitsAt ? { sizeLimitsAt: (points) => router.sizeLimitsAt!(points) } : {}),
+    ...(router.closedBarriersAt ? { closedBarriersAt: (points) => router.closedBarriersAt!(points) } : {}),
     // A colleague's track is followed as they drove it.
     ...(router.traceRoute ? { traceRoute: (points, costing) => router.traceRoute!(points, costing) } : {}),
   };

@@ -9,7 +9,7 @@ import { ValhallaClient } from "../../src/valhalla.js";
 
 const points = inject("points");
 const client = new ValhallaClient(inject("valhallaUrl"));
-const app = buildApp({ bounds: [-0.8, 51.2, 0.6, 51.8] } as ServerConfig, client, undefined, client);
+const app = buildApp({ bounds: [-0.8, 51.2, 1.0, 51.8] } as ServerConfig, client, undefined, client);
 beforeAll(() => app.ready());
 afterAll(() => app.close());
 
