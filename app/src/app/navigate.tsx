@@ -15,6 +15,7 @@ import { LiveMap } from "../components/LiveMap";
 import type { MapRoute } from "../components/mapShared";
 import { ExternalLinks } from "../components/RoutePanel";
 import { formatDistance, formatMinutes, roadLabel } from "../format";
+import { useDrivingService } from "../location/drivingService";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation, type RouteKind } from "../navigation/NavigationProvider";
 import {
@@ -116,6 +117,8 @@ export default function NavigateScreen() {
   // The turn card is on screen from the first render: GO took this long (Session → Testing).
   useEffect(() => noteTurnCard(), []);
   const { fix: lastFix, simulated, facing } = useLocation();
+  // Directions and voice carry on with the screen locked (Android).
+  useDrivingService("navigate", !simulated);
   // When this screen opened. On a demo drive, a fix from before then is from
   // the patrol, not the route the car is about to be put on: not used.
   const [openedAt] = useState(() => Date.now());

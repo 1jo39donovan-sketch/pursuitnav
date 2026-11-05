@@ -3,7 +3,7 @@
 
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
 // Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
-const UPDATED = "4 November 2026";
+const UPDATED = "5 November 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -155,7 +155,9 @@ BlueRoute in your service, we use your message only to reply.</p>
 
 <h2>Location permission</h2>
 <p>The app asks for your location only while you’re using it, to give journey times and directions from where you
-are. It doesn’t use location in the background.</p>
+are. On Android, while you navigate or have Pursuit open, it keeps directions and voice going if the screen locks or
+you switch app, and shows a “BlueRoute: directions on” notification while it does; that stops when you finish or close
+the app. It never asks for location “all the time”, and doesn’t use location at any other time.</p>
 
 <h2>Children</h2>
 <p>BlueRoute is meant for emergency-service crews and isn’t directed at children.</p>
