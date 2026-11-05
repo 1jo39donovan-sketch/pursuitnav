@@ -13,7 +13,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The **i
 | Must-pass items | 6 ✅, 2 🟡 (54 Caledonian Road is an estimated door without OS Places; the log surviving a restart is still to confirm on a phone) |
 | Spec areas | 14 ✅, 3 🟡, 1 ⏳ (entrances, waiting on the weekly build), 0 ❌ |
 | Still to do before calling v1 done | the real drive (build order step 6) |
-| Decisions for Josh | OS Places key (paid), store accounts, turning learning on |
+| Decisions for OPSVALE | OS Places key (paid), store accounts, turning learning on |
 | Automated tests | app 214, server 200, Python 25+, plus the live London smoke test after every deploy |
 
 ## Must pass before calling v1 done
@@ -74,7 +74,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The **i
    - Field-test recording on, so any problem can be replayed afterwards
 2. **After the weekly build (~31 October):** check routes to a block of flats end at an entrance, and the nearest A&E shows "(A&E entrance)". Claude checks this then.
 
-## Decisions for Josh
+## Decisions for OPSVALE
 
 - **54 Caledonian Road / flats:** accept the estimated door for v1, or pay for OS Places (Premium) for exact doors and flats.
 - **Store accounts:** Apple (£79 a year) and Google ($25 once). The listing and privacy answers are ready in STORE.md.

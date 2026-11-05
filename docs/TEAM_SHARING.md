@@ -24,7 +24,7 @@ This applies to all three choices. "Always" means "always while BlueRoute is ope
 - Google Play's background-location declaration and review (including a video);
 - Intune policies, which can block it on force phones.
 
-It's deferred until the store accounts exist and Josh decides it's worth those reviews.
+It's deferred until the store accounts exist and OPSVALE decides it's worth those reviews.
 
 ## Police Location (hidden by default)
 

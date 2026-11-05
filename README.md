@@ -1,6 +1,6 @@
 # BlueRoute
 
-Patrol and pursuit navigation for Met Police officers. `CLAUDE.md` is the brief.
+Patrol and pursuit navigation for Met Police officers. An OPSVALE product. `CLAUDE.md` is the brief.
 
 - `app/`: the phone app (Expo / React Native, TypeScript). See `app/README.md`.
 - `server/`: Valhalla routing for London, the API, the places extractor, and Docker setup for one VPS. See `server/README.md`.
