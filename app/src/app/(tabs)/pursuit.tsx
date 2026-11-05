@@ -271,6 +271,10 @@ export default function PursuitScreen() {
         followZoom={16}
         compact
       />
+      {/* GPS warnings float over the map, never pushing the readouts about (PM, item 5). */}
+      <View style={styles.gpsFloat} pointerEvents="box-none">
+        <GpsStatus />
+      </View>
     </View>
   );
 
@@ -278,7 +282,6 @@ export default function PursuitScreen() {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Every pixel counts here: no app header, the readouts and map start at the top. */}
       <Tabs.Screen options={{ headerShown: false }} />
-      <GpsStatus />
       {landscape ? (
         <View style={styles.row}>
           <ScrollView style={styles.side} contentContainerStyle={styles.cells}>
@@ -366,5 +369,6 @@ const baseStyles = StyleSheet.create({
   },
   noSignalTitle: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 16, letterSpacing: 1 },
   noSignalText: { flex: 1, color: colors.fg, fontFamily: fonts.body, fontSize: 13 },
+  gpsFloat: { position: "absolute", top: 8, left: 8, right: 64, zIndex: 5 },
   map: { flex: 1, minHeight: 140, borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth },
 });
