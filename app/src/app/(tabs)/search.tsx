@@ -47,6 +47,7 @@ import { useAddressLookup } from "../../search/useAddressLookup";
 import { useSession } from "../../session/SessionProvider";
 import { accuracyText, roughFix, useTeam } from "../../team/TeamProvider";
 import { useFollowIn } from "../../team/useFollowIn";
+import { FlaggedRoutes } from "../../components/FlaggedRoutes";
 import { ago, useNow } from "../../components/TeamSection";
 import { TEAM_COLOR } from "../../components/mapShared";
 import { store } from "../../storage/store";
@@ -852,6 +853,7 @@ export default function SearchScreen() {
         )}
         {lookupNote && <Text style={styles.dataNote}>{lookupNote}</Text>}
         {placesNote && <Text style={styles.dataNote}>{placesNote}</Text>}
+        {!destination && <FlaggedRoutes />}
         <GpsStatus />
 
       </View>

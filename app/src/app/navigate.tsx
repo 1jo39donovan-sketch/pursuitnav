@@ -2,7 +2,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
 import { useNetworkState } from "expo-network";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchRoutes, restrictionPoints, type RoutePlan } from "../api/routes";
@@ -66,7 +66,7 @@ import {
   type Progress,
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
-import { reportUrl } from "../feedback";
+import { flagRoute } from "../flags";
 import { loadNotes, noteNear } from "../search/blockNotes";
 import { useTextStyles } from "../textSize";
 
@@ -374,6 +374,14 @@ export default function NavigateScreen() {
 
   // Quick actions: one tap each, no second End tap needed.
   const [sheet, setSheet] = useState(false);
+  // "Flag route": noted on the phone, sent after END (Search offers it), so
+  // nothing takes the crew out of navigation mid-drive.
+  const [flagged, setFlagged] = useState(false);
+  useEffect(() => {
+    if (!flagged) return;
+    const t = setTimeout(() => setFlagged(false), 4000);
+    return () => clearTimeout(t);
+  }, [flagged]);
   // Field test: one-tap marks while recording ("Wrong instruction", …).
   const { recording } = useRecorder();
   const [marking, setMarking] = useState(false);
@@ -558,6 +566,11 @@ export default function NavigateScreen() {
         </>
       )}
       {active.note && <Text style={styles.note}>{active.note}</Text>}
+      {flagged && (
+        <Text accessibilityRole="alert" style={styles.linkBanner}>
+          Route flagged. Send it after you end, from Search.
+        </Text>
+      )}
       {banner && !back && (
         <Text accessibilityRole="alert" style={styles.linkBanner}>
           {banner}
@@ -787,20 +800,19 @@ export default function NavigateScreen() {
             rerouteNow();
           }}
           destination={active.destination}
-          onReport={() => {
+          onFlag={() => {
             setSheet(false);
             const r = active.route;
-            void Linking.openURL(
-              reportUrl({
-                kind: active.kind,
-                vehicle,
-                roads,
-                mapLook,
-                distanceM: r.distanceM,
-                durationS: r.durationS,
-                restrictions: "restrictions" in r ? r.restrictions.length : undefined,
-              }),
-            ).catch(() => {});
+            flagRoute({
+              kind: active.kind,
+              vehicle,
+              roads,
+              mapLook,
+              distanceM: r.distanceM,
+              durationS: r.durationS,
+              restrictions: "restrictions" in r ? r.restrictions.length : undefined,
+            });
+            setFlagged(true);
           }}
           bottomInset={insets.bottom}
         />
@@ -857,7 +869,7 @@ function RouteSheet({
   onSwitch,
   onRerouteNow,
   destination,
-  onReport,
+  onFlag,
   bottomInset,
 }: {
   kind: RouteKind;
@@ -867,7 +879,7 @@ function RouteSheet({
   onSwitch: (kind: "standard" | "police") => void;
   onRerouteNow: () => void;
   destination: { lat: number; lng: number };
-  onReport: () => void;
+  onFlag: () => void;
   bottomInset: number;
 }) {
   const styles = useTextStyles(baseStyles);
@@ -889,11 +901,12 @@ function RouteSheet({
         {/* Follow-in keeps to the colleague's way in, so there's nothing to switch to. */}
         {kind === "police" && action("Switch to standard", () => onSwitch("standard"))}
         {kind === "standard" && blueLightOn && action("Switch to blue light", () => onSwitch("police"))}
-        {action("Re-route now", onRerouteNow)}
         {/* Handing over to another app leaves this navigation running underneath. */}
         <ExternalLinks lat={destination.lat} lng={destination.lng} onOpen={onClose} />
-        {/* An email in the tester's own mail app, with nothing about the call in it. */}
-        {action("Report a problem with this route", onReport)}
+        {/* One tap, and navigation carries on: it's sent after END, from Search. */}
+        {action("Flag route", onFlag)}
+        {/* Nearest the thumb: the one most needed in a hurry. */}
+        {action("Re-route now", onRerouteNow)}
         {action("Cancel", onClose, styles.sheetCancel)}
       </View>
     </View>
@@ -1053,6 +1066,8 @@ const baseStyles = StyleSheet.create({
   },
   sheetButton: {
     minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.blue,
@@ -1068,6 +1083,9 @@ const baseStyles = StyleSheet.create({
     color: colors.fg,
     fontFamily: fonts.displayBold,
     fontSize: 22,
+    lineHeight: 26,
+    // Big text may wrap a label onto two lines; it never clips.
+    textAlign: "center",
     letterSpacing: 1,
     textTransform: "uppercase",
   },
