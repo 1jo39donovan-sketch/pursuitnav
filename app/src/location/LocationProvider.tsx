@@ -13,6 +13,7 @@ import { AppState } from "react-native";
 import { DEMO_MODE } from "../config";
 import { demoFixNow } from "../demo/demoDrive";
 import { useSession } from "../session/SessionProvider";
+import { onDrivingFix } from "./drivingService";
 import { facing as facingFrom, isMoving } from "./facing";
 import { checkLocation, watchCompass, watchLocation } from "./locationSource";
 
@@ -70,7 +71,12 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   // The last direction of travel, kept when the vehicle stops.
   const [lastCourse, setLastCourse] = useState<number | null>(null);
   const [compass, setCompass] = useState<number | null>(null);
+  // Fixes come from the app's watch and, while driving on Android, the
+  // foreground service too: keep only ones newer than the last.
+  const lastAt = useRef(0);
   const setFix = useCallback((f: Fix) => {
+    if (f.timestamp <= lastAt.current) return;
+    lastAt.current = f.timestamp;
     remember(f);
     setGpsFix(f);
     if (isMoving(f)) setLastCourse(f.course);
@@ -146,6 +152,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       stop?.();
     };
   }, [needCompass]);
+
+  useEffect(() => (simulated ? undefined : onDrivingFix(setFix)), [simulated, setFix]);
 
   const requestPermission = useCallback(() => refresh(true), [refresh]);
 

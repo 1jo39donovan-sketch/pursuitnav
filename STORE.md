@@ -180,7 +180,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 > Every search shows the standard route, which follows normal road rules and is sized to the chosen vehicle (bridge height, width and weight), avoiding roads TfL lists as closed. For authorised drivers, a second route labelled "Blue light", which can use bus lanes and gates where permitted, is shown beside it when it's quicker, with the restrictions it uses listed. It is on by default because the app is for police drivers; the first launch asks the user to accept terms saying it is only for drivers authorised to use it, and one switch on the Session tab ("Blue-light routes") turns it off, after which only standard routes are offered. The standard route can always be chosen, and the app never swaps routes on its own while driving.
 >
 > LOCATION
-> Location is used only while the app is open and on screen (When In Use permission). Turn-by-turn guidance and the pursuit screen need the current position; nothing is tracked when the app is closed.
+> Location is used only while the app is in use (When In Use permission). Turn-by-turn guidance and the pursuit screen need the current position; on Android they keep going with the screen locked, with a notification showing, until you finish. Nothing is tracked when the app is closed.
 >
 > DATA
 > No accounts, ads or third-party analytics. Route and search requests are processed and not kept. Each request carries a random install ID and the app version, used only to count daily totals; the install ID can be reset, or switched off in Session > Privacy and data ("Count my usage"). Team sessions are optional, need a shared team code, and are end-to-end encrypted; the server deletes them within a week.
@@ -204,7 +204,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 
 - **Ads**: No. **Target audience**: 18 and over only. **News app**: No. **Government app**: No (it's independent). **Financial features**: None. **Health**: None. **COVID-19**: not a contact tracing or status app.
 - **Content rating** (IARC questionnaire): category **All Other App Types**. Answer **No** to every question except one: "Does the app share the user's current physical location with other users?" is **Yes**, because team sessions do when the user opts in. That adds a "Shares location" note but doesn't change the age. Result: Everyone / PEGI 3.
-- **Permissions**: the app uses location only while open (no background location), so no permission declaration form is needed. If Play asks about foreground service or exact alarms, the answer is that the app doesn't use them.
+- **Permissions**: no background location ("all the time") permission, so no location declaration form. The app does use a **foreground service of type location** (`FOREGROUND_SERVICE_LOCATION`), so Play Console's **App content → Foreground service permissions** form needs filling in: type **Location**, use **Navigation**, "Keeps turn-by-turn directions, spoken directions and the pursuit screen's live speed going while the screen is locked or another app is open. It starts only when the user starts navigating or opens Pursuit, shows a notification throughout, and stops when they finish." Play asks for a short video of it: start a route, lock the screen, show the notification and the directions still being spoken. Exact alarms: not used.
 
 ### Screenshots
 

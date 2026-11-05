@@ -1,5 +1,5 @@
 """Adds realistic travel speeds to an OpenStreetMap extract before the routing
-tiles are built.
+tiles are built, and marks locked gates private (see locked_gate).
 
 Valhalla times a road at its speed limit, so a 20 mph side street looks as
 quick as a 20 mph main road. On a blue-light run it isn't: main roads are
@@ -85,6 +85,23 @@ def practical_mph(tags):
     return round(limit * min(share, NEVER_ABOVE))
 
 
+# Gates Valhalla knows; it reads them as open unless access says otherwise.
+GATES = {"gate", "lift_gate", "swing_gate", "sliding_gate"}
+
+
+def locked_gate(tags):
+    """A locked gate's tags marked private, or None to leave the node alone.
+
+    Valhalla ignores locked=yes and drives through for a few minutes' penalty.
+    As private, the routing server finds it and routes round it.
+    """
+    if tags.get("locked") != "yes" or tags.get("barrier") not in GATES:
+        return None
+    if tags.get("access") in ("private", "no"):
+        return None
+    return {**tags, "access": "private"}
+
+
 def load_learned(path):
     learned = {}
     if not path:
@@ -102,9 +119,15 @@ class Writer(osmium.SimpleHandler):
         self.writer = writer
         self.learned = learned
         self.changed = 0
+        self.locked = 0
 
     def node(self, n):
-        self.writer.add_node(n)
+        tags = locked_gate({t.k: t.v for t in n.tags}) if "locked" in n.tags else None
+        if tags is None:
+            self.writer.add_node(n)
+            return
+        self.writer.add_node(n.replace(tags=tags))
+        self.locked += 1
 
     def relation(self, r):
         self.writer.add_relation(r)
@@ -127,7 +150,7 @@ def main(src, dst, learned_path=None):
     handler = Writer(writer, load_learned(learned_path))
     handler.apply_file(src)
     writer.close()
-    print(f"practical speeds on {handler.changed} roads")
+    print(f"practical speeds on {handler.changed} roads; {handler.locked} locked gates marked private")
 
 
 if __name__ == "__main__":

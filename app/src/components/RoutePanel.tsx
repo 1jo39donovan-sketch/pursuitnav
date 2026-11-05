@@ -346,6 +346,7 @@ function StandardRow({
           {formatDistance(route.distanceM)}
         </Text>
         <TrafficLine route={route} />
+        <PrivateLine route={route} />
       </View>
       <Eta seconds={route.durationS} />
       <GoButton onPress={onGo} color={palette.blue} label="Go on the standard route" />
@@ -392,6 +393,22 @@ function TrafficLine({ route }: { route: Route }) {
     );
   }
   return null;
+}
+
+/**
+ * A private gate or road the route has to use, because there's no other way
+ * in: the crew may need a code or key. Nothing when there are none.
+ */
+function PrivateLine({ route }: { route: Route }) {
+  const styles = useTextStyles(baseStyles);
+  const bits = route.privateAccess ?? [];
+  if (!bits.length) return null;
+  return (
+    <Text style={styles.traffic} numberOfLines={2}>
+      🔒 {bits[0]!.description}
+      {bits.length > 1 ? ` (+${bits.length - 1})` : ""}. Only way in: may need a code or key.
+    </Text>
+  );
 }
 
 /** TfL writes street names in capitals: "[A23] PURLEY WAY (CR0)" → "[A23] Purley Way (CR0)". */
@@ -444,6 +461,7 @@ function PoliceRow({
             Saves {formatDuration(route.savingS)}
           </Text>
           <TrafficLine route={route} />
+          <PrivateLine route={route} />
         </View>
         <Eta seconds={route.durationS} />
         <GoButton onPress={onGo} color={palette.amber} label="Go on the blue-light route" />

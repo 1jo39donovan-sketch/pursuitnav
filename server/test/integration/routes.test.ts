@@ -7,7 +7,7 @@ import { avoidingClosures, boxesAlong, ClosureFeed } from "../../src/closures.js
 import type { ServerConfig } from "../../src/config.js";
 import { POLICE, policeFor, STANDARD } from "../../src/costing.js";
 import type { LngLat } from "../../src/geo.js";
-import type { Plan } from "../../src/plan.js";
+import { withinLimits, type Plan } from "../../src/plan.js";
 import { ValhallaClient } from "../../src/valhalla.js";
 
 const points = inject("points");
@@ -16,7 +16,7 @@ const config: ServerConfig = {
   port: 0,
   host: "127.0.0.1",
   valhallaUrl: inject("valhallaUrl"),
-  bounds: [-0.8, 51.2, 0.6, 51.8],
+  bounds: [-0.8, 51.2, 1.0, 51.8],
   minSavingSeconds: 30,
   minSavingFraction: 0.05,
   restrictionCheckBudget: 150,
@@ -239,6 +239,61 @@ describe("main roads", () => {
     });
     const streets = (res.json() as Plan).standard.maneuvers.flatMap((m) => m.streetNames);
     expect(streets).toContain("Back Street");
+  });
+});
+
+describe("private roads and gates", () => {
+  const passes = (shape: LngLat[], name: string) =>
+    shape.some(([lng, lat]) => Math.abs(lng - at(name).lng) < 1e-5 && Math.abs(lat - at(name).lat) < 1e-5);
+  const safe = async (costing: typeof STANDARD, from: string, to: string) => {
+    const found = await withinLimits(client, costing, "car", { point: lngLat(from) }, { point: lngLat(to) }, []);
+    expect(found).not.toBeNull();
+    return found!.route;
+  };
+  const cases = [
+    ["a private road", "private_road"],
+    ["a private gate", "gated_mews"],
+    ["a locked gate", "locked_gate_lane"],
+    ["bollards", "bollard_lane"],
+  ] as const;
+
+  for (const [what, key] of cases) {
+    it(`neither route cuts through ${what}`, async () => {
+      const result = await plan(`${key}_west`, `${key}_east`);
+      expect(passes(result.standard.shape, `${key}_middle`)).toBe(false);
+      if (result.police) expect(passes(result.police.shape, `${key}_middle`)).toBe(false);
+    });
+
+    it(`goes ~9 km round rather than through ${what}, on either costing`, async () => {
+      for (const costing of [STANDARD, POLICE]) {
+        const route = await safe(costing, `${key}_far_west`, `${key}_far_east`);
+        expect(passes(route.shape, `${key}_far_middle`)).toBe(false);
+        expect(route.distanceM).toBeGreaterThan(9000);
+        expect(route.privateAccess).toBeUndefined();
+      }
+    });
+  }
+
+  it("Valhalla on its own would cut through the private road and gates (why the check exists)", async () => {
+    for (const key of ["private_road", "gated_mews", "locked_gate_lane"]) {
+      const route = await client.route({ costing: POLICE, from: { point: lngLat(`${key}_far_west`) }, to: { point: lngLat(`${key}_far_east`) } });
+      expect(route.distanceM, key).toBeLessThan(1000);
+    }
+  });
+
+  it("goes through a private gate that is the only way in, and says so", async () => {
+    const result = await plan("gated_close_start", "gated_close_end");
+    expect(result.standard.privateAccess).toEqual([
+      expect.objectContaining({ kind: "private-gate", description: "Private gate: Gated Close", streets: ["Gated Close"] }),
+    ]);
+    const police = await safe(POLICE, "gated_close_start", "gated_close_end");
+    expect(police.privateAccess).toHaveLength(1);
+  });
+
+  it("finishes on a private road without fuss", async () => {
+    const result = await plan("private_mews_start", "private_mews_end");
+    expect(result.standard.maneuvers.flatMap((m) => m.streetNames)).toContain("Private Mews");
+    expect(result.standard.privateAccess).toBeUndefined();
   });
 });
 

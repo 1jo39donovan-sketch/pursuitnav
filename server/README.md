@@ -61,6 +61,7 @@ Both route responses avoid roads TfL lists as fully closed (`src/closures.ts`) a
 ### How the police route works
 
 - Valhalla `bus` costing, so bus lanes, bus-only roads and bus gates are usable, with `ignore_restrictions: true` (turn restrictions ignored) and `ignore_oneways: false`.
+- **Private roads and gates:** with a departure time Valhalla only adds a time penalty for a private road or a private gate, and ignores `locked=yes`, so a long enough way round loses to a short cut through them. The map build marks locked gates private, and after routing every road and barrier on both routes is checked: a private road or closed gate part-way along is excluded and the route recalculated. A private road the route starts or ends on is fine. If the only way in is through a private gate or road, the route keeps it and says so ("Private gate: …", may need a code or key).
 - **One-way streets:** bus costing still allows contraflow bus lanes. After routing, every stretch the route uses is checked, and any that drives against the flow of a one-way street is excluded and the route recalculated. If that can't be avoided, no police route is offered.
 - **Finding the restrictions:** for stretches of the police route, a legal car route is requested between the same two points. If the car has to detour, the stretch is split in half and each half re-checked, down to a single road (bus-only) or a pair of roads (a banned turn). See `src/restrictions.ts`.
 - **Only when worth it:** offered only if it saves at least 30 s and 5% (`MIN_SAVING_SECONDS`, `MIN_SAVING_FRACTION`), and only if the restrictions it relies on were found.
@@ -86,7 +87,7 @@ npm run typecheck
 npm test          # unit tests, plus integration tests against a real Valhalla
 ```
 
-The integration tests build a small synthetic street network (`test/fixtures/make_fixture.py`) with a one-way street, a one-way street with a contraflow bus lane, a bus gate, a banned right turn and a plain grid. They run a real Valhalla on it and check the API end to end, including that neither route ever goes the wrong way down a one-way street. Set `VALHALLA_PYTHON` if `python3` isn't the one with those packages.
+The integration tests build a small synthetic street network (`test/fixtures/make_fixture.py`) with a one-way street, a one-way street with a contraflow bus lane, a bus gate, a banned right turn, private roads, private and locked gates, bollards and a plain grid. They run a real Valhalla on it and check the API end to end, including that neither route ever goes the wrong way down a one-way street. Set `VALHALLA_PYTHON` if `python3` isn't the one with those packages.
 
 To run against a local Valhalla: `VALHALLA_URL=http://localhost:8002 npm run dev`.
 

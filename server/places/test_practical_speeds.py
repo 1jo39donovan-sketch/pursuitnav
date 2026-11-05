@@ -1,6 +1,6 @@
 import osmium
 
-from practical_speeds import limit_mph, main, practical_mph
+from practical_speeds import limit_mph, locked_gate, main, practical_mph
 
 
 def test_reads_signed_limits():
@@ -58,3 +58,24 @@ def test_writes_the_tag_and_learned_speeds_win(tmp_path):
     assert ways[10]["maxspeed:practical"] == "13 mph"
     assert ways[10]["maxspeed"] == "20 mph"  # the signed limit is untouched
     assert ways[11]["maxspeed:practical"] == "24 mph"
+
+
+def test_locked_gates_are_marked_private():
+    assert locked_gate({"barrier": "gate", "locked": "yes"})["access"] == "private"
+    assert locked_gate({"barrier": "lift_gate", "locked": "yes", "access": "yes"})["access"] == "private"
+    assert locked_gate({"barrier": "gate", "locked": "yes", "access": "no"}) is None  # already shut
+    assert locked_gate({"barrier": "gate"}) is None  # an open gate
+    assert locked_gate({"barrier": "gate", "locked": "no"}) is None
+    assert locked_gate({"barrier": "bollard", "locked": "yes"}) is None  # bollards are closed anyway
+
+
+def test_writes_locked_gates_private(tmp_path):
+    src, dst = tmp_path / "in.osm.pbf", tmp_path / "out.osm.pbf"
+    w = osmium.SimpleWriter(str(src), overwrite=True)
+    w.add_node(osmium.osm.mutable.Node(id=1, location=(0.0, 51.5), tags={"barrier": "gate", "locked": "yes"}, version=1))
+    w.add_node(osmium.osm.mutable.Node(id=2, location=(0.001, 51.5), tags={"barrier": "gate"}, version=1))
+    w.close()
+    main(str(src), str(dst))
+    nodes = {n.id: {t.k: t.v for t in n.tags} for n in osmium.FileProcessor(str(dst))}
+    assert nodes[1]["access"] == "private"
+    assert "access" not in nodes[2]

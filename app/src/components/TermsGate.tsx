@@ -12,7 +12,7 @@ import { colors, fonts } from "../theme";
 import { useThemed } from "../textSize";
 
 /** The terms' date (server/src/pages.ts, UPDATED): a new date asks again. */
-export const TERMS_VERSION = "4 November 2026";
+export const TERMS_VERSION = "5 November 2026";
 const KEY = "termsAccepted";
 
 const POINTS = [

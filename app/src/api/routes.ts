@@ -28,6 +28,16 @@ export interface Route {
   delays?: TrafficDelay[];
   /** Serious TfL holdups it was routed round. */
   delaysAvoided?: TrafficDelay[];
+  /** Private gates or roads it can't avoid (no other way in): may need a code or key. */
+  privateAccess?: PrivateAccess[];
+}
+
+export interface PrivateAccess {
+  kind: "private-gate" | "private-road";
+  /** E.g. "Private gate: Gated Close". */
+  description: string;
+  location: { lat: number; lng: number };
+  streets: string[];
 }
 
 /** A holdup TfL rates Serious or Severe (works, a collision, queues) on an open street. */

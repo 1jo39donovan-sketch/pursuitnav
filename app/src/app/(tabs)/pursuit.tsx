@@ -9,6 +9,7 @@ import { boroughAt, cardinal, generallyTowards } from "../../area/area";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import { formatDistance } from "../../format";
+import { useDrivingService } from "../../location/drivingService";
 import { recentFixes, useLocation, type Fix } from "../../location/LocationProvider";
 import { notePursuit, pursuitOpened } from "../../navigation/timings";
 import { EMPTY_FEED, feedNote, nextFeed, shownInfo } from "../../navigation/serverFeed";
@@ -52,7 +53,8 @@ export default function PursuitScreen() {
       deactivateKeepAwake("pursuit").catch(() => {});
     };
   }, [focused]);
-  const { fix } = useLocation();
+  const { fix, simulated } = useLocation();
+  useDrivingService("pursuit", focused && !simulated);
   const { mapView } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const { data, places, blockLabels } = useSearch();
