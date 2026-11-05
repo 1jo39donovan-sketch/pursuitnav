@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DEMO_MODE } from "../config";
-import { useLocation } from "../location/LocationProvider";
+import { gpsWarning, WARN_OVER_M, WARN_OVER_ON_ROUTE_M } from "../location/gpsWarning";
+import { recentFixes, useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 import { useThemed, useColors } from "../textSize";
@@ -49,8 +50,13 @@ export function roughGpsText(accuracy: number, where: WebDevice | "app"): string
 const device = (): WebDevice => webDevice(typeof navigator === "undefined" ? "" : navigator.userAgent);
 const reload = () => window.location.reload();
 
-/** A line when the GPS position can't be trusted, with a fix if there is one. Nothing when it's good. */
-export function GpsStatus() {
+/**
+ * A line when the GPS position can't be trusted, with a fix if there is one.
+ * Nothing when it's good. A poor position is only flagged once it has stayed
+ * poor for a few seconds (over 100 m on a route, else 50 m), and the line
+ * goes again after a few good seconds.
+ */
+export function GpsStatus({ onRoute = false }: { onRoute?: boolean } = {}) {
   const styles = useThemed(baseStyles);
   const { status, fix, requestPermission, simulated } = useLocation();
   const { setDemoDrive } = useSession();
@@ -139,7 +145,8 @@ export function GpsStatus() {
     );
   }
   // A good position needs no line on screen: the map's space is worth more.
-  if (fix.accuracy != null && fix.accuracy <= 50) return null;
+  // `fix` changing re-renders this, so the recent readings are current.
+  if (!gpsWarning(recentFixes(), onRoute ? WARN_OVER_ON_ROUTE_M : WARN_OVER_M)) return null;
   if (fix.accuracy != null && fix.accuracy > ROUGH_GPS_M) {
     return WEB ? (
       <Banner tone="warn" text={roughGpsText(fix.accuracy, device())}>

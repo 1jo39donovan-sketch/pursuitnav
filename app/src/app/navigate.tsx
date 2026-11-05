@@ -672,7 +672,7 @@ export default function NavigateScreen() {
   // GPS warnings float on the map just under the turn card: never over it, never moving it (3 Nov).
   const gpsFloat = (
     <View style={[styles.gpsFloat, { top: landscape ? 8 : turnHeight }]} pointerEvents="box-none">
-      <GpsStatus />
+      <GpsStatus onRoute />
     </View>
   );
 
