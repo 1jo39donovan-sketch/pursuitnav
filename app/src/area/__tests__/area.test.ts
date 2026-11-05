@@ -11,6 +11,13 @@ describe("boroughAt", () => {
     expect(boroughAt(51.1306, 1.3124)).toBe("Dover"); // the docks road
   });
 
+  it("knows Essex's districts, Southend and Thurrock", () => {
+    expect(boroughAt(51.8892, 0.9025)).toBe("Colchester"); // town centre
+    expect(boroughAt(51.7356, 0.4685)).toBe("Chelmsford");
+    expect(boroughAt(51.5376, 0.7105)).toBe("Southend-on-Sea");
+    expect(boroughAt(51.4872, 0.3256)).toBe("Thurrock"); // Lakeside
+  });
+
   it("says when a road leaves Kent", () => {
     // East Sussex border south of Tunbridge Wells, heading south.
     expect(generallyTowards(51.12, 0.27, 180)).toBe("Leaving Kent");

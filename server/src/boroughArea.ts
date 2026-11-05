@@ -1,4 +1,4 @@
-// Which area (London borough, Kent district) a point is in, from the
+// Which area (London borough, Kent or Essex district) a point is in, from the
 // boundaries in places/ (the files the places build uses too).
 import { readFileSync } from "node:fs";
 
@@ -16,6 +16,7 @@ interface Area {
 export const BOUNDARY_FILES = [
   new URL("../places/london-boroughs.geojson", import.meta.url),
   new URL("../places/kent-districts.geojson", import.meta.url),
+  new URL("../places/essex-districts.geojson", import.meta.url),
 ];
 
 function inRing(ring: Ring, lng: number, lat: number): boolean {
@@ -55,7 +56,7 @@ export class BoroughLookup {
     return new BoroughLookup({ features });
   }
 
-  /** The area's name, or null outside London and Kent. */
+  /** The area's name, or null outside London, Kent and Essex. */
   at(lat: number, lng: number): string | null {
     for (const a of this.areas) {
       const [w, s, e, n] = a.box;

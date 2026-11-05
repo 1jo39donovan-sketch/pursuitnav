@@ -69,6 +69,10 @@ Kent's 12 districts and Medway are added on the current server, as a first step 
 - **Search:** roads, postcodes and named places from OS Names and OpenStreetMap. House numbers stay London only: the house-number database is the heavy part (3.6 GB for London), and Kent's would not fit beside it on a 4 GB server.
 - **Not yet in Kent:** TfL closures (TfL covers London only), custody suites, and the offline road list bundled in the app (Kent's roads come from the server's road list instead, kept on the phone once downloaded).
 
+### Essex pilot (November 2026)
+
+Added the same way as Kent, on the same server: Essex's 12 districts, Southend-on-Sea and Thurrock, under an "Essex" heading with North, Mid and West, and South Essex as big areas. Geofabrik's Essex extract is about 50 MB. House numbers stay London only.
+
 ### Order of work
 
 1. **Regions as data.** The server publishes its regions (name, bounds, areas and data files) and the app downloads them instead of bundling London. This is the main code change; everything else is data.

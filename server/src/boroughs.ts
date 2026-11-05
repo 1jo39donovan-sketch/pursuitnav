@@ -53,8 +53,26 @@ export const KENT_CUSTODIANS: Record<number, string> = {
   2280: "Medway",
 };
 
-/** Every area BlueRoute covers, by local custodian code. */
-export const AREA_CUSTODIANS: Record<number, string> = { ...LONDON_CUSTODIANS, ...KENT_CUSTODIANS };
+// Essex's 12 districts, Southend-on-Sea and Thurrock. Same TODO as above.
+export const ESSEX_CUSTODIANS: Record<number, string> = {
+  1505: "Basildon",
+  1510: "Braintree",
+  1515: "Brentwood",
+  1520: "Castle Point",
+  1525: "Chelmsford",
+  1530: "Colchester",
+  1535: "Epping Forest",
+  1540: "Harlow",
+  1545: "Maldon",
+  1550: "Rochford",
+  1560: "Tendring",
+  1570: "Uttlesford",
+  1590: "Southend-on-Sea",
+  1595: "Thurrock",
+};
 
-/** The area names (London boroughs, Kent districts), exactly as the app has them (app/src/search/boroughs.ts). */
+/** Every area BlueRoute covers, by local custodian code. */
+export const AREA_CUSTODIANS: Record<number, string> = { ...LONDON_CUSTODIANS, ...KENT_CUSTODIANS, ...ESSEX_CUSTODIANS };
+
+/** The area names (London boroughs, Kent and Essex districts), exactly as the app has them (app/src/search/boroughs.ts). */
 export const BOROUGH_NAMES: ReadonlySet<string> = new Set(Object.values(AREA_CUSTODIANS));

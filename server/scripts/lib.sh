@@ -30,8 +30,8 @@ inactive_geocoder_slot() {
 }
 
 # The area the server covers, west,south,east,north: REGION_BOUNDS from .env,
-# or Greater London and Kent with a margin (the default in src/config.ts).
-DEFAULT_REGION_BOUNDS=-0.8,50.8,1.6,51.8
+# or Greater London, Kent and Essex with a margin (the default in src/config.ts).
+DEFAULT_REGION_BOUNDS=-0.8,50.8,1.6,52.2
 region_bounds() {
   local b
   b=$(setting REGION_BOUNDS)

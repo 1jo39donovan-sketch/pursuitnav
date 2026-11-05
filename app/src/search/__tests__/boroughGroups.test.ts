@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BOROUGH_GROUPS, KENT_GROUPS, LONDON_AREAS, areaSummary } from "../boroughGroups";
-import { BOROUGHS, KENT_DISTRICTS, LONDON_BOROUGHS } from "../boroughs";
+import { BOROUGH_GROUPS, ESSEX_GROUPS, KENT_GROUPS, LONDON_AREAS, areaSummary } from "../boroughGroups";
+import { BOROUGHS, ESSEX_DISTRICTS, KENT_DISTRICTS, LONDON_BOROUGHS } from "../boroughs";
 
 describe("borough groups", () => {
   it("has every London borough exactly once", () => {
@@ -19,11 +19,18 @@ describe("borough groups", () => {
     expect([...listed].sort()).toEqual([...KENT_DISTRICTS].sort());
   });
 
+  it("has every Essex area in exactly one of North, Mid and West, or South Essex", () => {
+    const listed = ESSEX_GROUPS.flatMap((g) => g.boroughs);
+    expect([...listed].sort()).toEqual([...ESSEX_DISTRICTS].sort());
+  });
+
   it("keeps London's areas first, in the order the data files number them", () => {
     expect(BOROUGHS.slice(0, 33)).toEqual([...LONDON_BOROUGHS]);
     expect(BOROUGHS[0]).toBe("Barking and Dagenham");
     expect(BOROUGHS[32]).toBe("Westminster");
     expect(BOROUGHS[33]).toBe("Ashford");
+    expect(BOROUGHS[46]).toBe("Basildon");
+    expect(BOROUGHS.length).toBe(60);
   });
 });
 
@@ -31,7 +38,8 @@ describe("areaSummary", () => {
   it("names whole regions", () => {
     expect(areaSummary([...LONDON_BOROUGHS])).toBe("All London");
     expect(areaSummary([...KENT_DISTRICTS])).toBe("All Kent");
-    expect(areaSummary([...BOROUGHS])).toBe("All London and Kent");
+    expect(areaSummary([...LONDON_BOROUGHS, ...KENT_DISTRICTS])).toBe("All London and Kent");
+    expect(areaSummary([...BOROUGHS])).toBe("All London, Kent and Essex");
   });
 
   it("names big areas, with the region's word for its areas", () => {

@@ -8,7 +8,7 @@
 # download one (fetch-data.sh).
 #
 # The region comes from PBF_URL in .env (Greater London by default), plus
-# EXTRA_PBF_URLS (space-separated; Kent by default, for the Kent pilot; "none"
+# EXTRA_PBF_URLS (space-separated; Kent and Essex by default, the pilots; "none"
 # for none), merged into one extract. House-number search is imported from
 # PBF_URL's extract alone (data/osm/geocoder.osm.pbf), which keeps it within
 # a 4 GB server. Learned speeds, if any, are read from
@@ -19,7 +19,7 @@ cd "$(dirname "$0")/.."
 
 IMAGE=ghcr.io/valhalla/valhalla-scripted:3.9.1
 DEFAULT_PBF_URL=https://download.geofabrik.de/europe/united-kingdom/england/greater-london-latest.osm.pbf
-DEFAULT_EXTRA_PBF_URLS=https://download.geofabrik.de/europe/united-kingdom/england/kent-latest.osm.pbf
+DEFAULT_EXTRA_PBF_URLS="https://download.geofabrik.de/europe/united-kingdom/england/kent-latest.osm.pbf https://download.geofabrik.de/europe/united-kingdom/england/essex-latest.osm.pbf"
 PBF_URL=$(setting PBF_URL)
 PBF_URL=${PBF_URL:-$DEFAULT_PBF_URL}
 EXTRA_PBF_URLS=$(setting EXTRA_PBF_URLS)

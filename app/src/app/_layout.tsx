@@ -13,6 +13,7 @@ import { NavigationProvider } from "../navigation/NavigationProvider";
 import { OfflineMapProvider } from "../offline/OfflineMapProvider";
 import { SearchProvider } from "../search/SearchProvider";
 import { SessionProvider, useSession } from "../session/SessionProvider";
+import { SetupFlow } from "../setup/SetupFlow";
 import { TeamProvider } from "../team/TeamProvider";
 import { startUsage } from "../usage/usage";
 import { useColors } from "../textSize";
@@ -48,6 +49,8 @@ export default function RootLayout() {
                   <TeamProvider>
                     <AppStack />
                     <RecIndicator />
+                    {/* First launch: service, area, vehicle, callsign, blue light (under the terms). */}
+                    <SetupFlow />
                     {/* Over everything until the terms are agreed to. */}
                     <TermsGate />
                   </TeamProvider>

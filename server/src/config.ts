@@ -49,8 +49,8 @@ export interface ServerConfig {
   version?: string;
 }
 
-// Greater London and Kent with a margin, matching the app's region config.
-const DEFAULT_BOUNDS: ServerConfig["bounds"] = [-0.8, 50.8, 1.6, 51.8];
+// Greater London, Kent and Essex with a margin, matching the app's region config.
+const DEFAULT_BOUNDS: ServerConfig["bounds"] = [-0.8, 50.8, 1.6, 52.2];
 
 function num(name: string, fallback: number): number {
   const raw = process.env[name];
