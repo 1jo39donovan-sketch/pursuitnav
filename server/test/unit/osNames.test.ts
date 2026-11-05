@@ -47,7 +47,7 @@ describe("OS Names", () => {
     await client.search("Caledonian Road");
     await client.search("n78la");
     expect(f.calls[0]).toContain("/find?");
-    expect(f.calls[0]).toContain("bounds=500000%2C125000%2C660000%2C205000");
+    expect(f.calls[0]).toContain("bounds=500000%2C125000%2C660000%2C250000");
     expect(f.calls[0]).not.toContain("fq=");
     expect(f.calls[1]).toContain("query=N7+8LA");
     expect(f.calls[1]).toContain("fq=LOCAL_TYPE%3APostcode");

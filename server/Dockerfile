@@ -13,7 +13,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
 # Borough boundaries, to name the borough of each address found.
-COPY places/london-boroughs.geojson places/kent-districts.geojson ./places/
+COPY places/london-boroughs.geojson places/kent-districts.geojson places/essex-districts.geojson ./places/
 # Usage counts live here, on a Docker volume the node user can write.
 RUN mkdir -p /data/usage && chown node:node /data/usage
 USER node

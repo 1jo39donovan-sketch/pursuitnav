@@ -171,7 +171,7 @@ export function supportPage(email?: string): string {
     "Support",
     `<p>BlueRoute gives emergency-service crews address and place search filtered to the area they're working, a standard
 route and (for emergency-service drivers) a faster blue-light route, sized to their vehicle, turn-by-turn navigation
-with spoken directions, and a pursuit screen. Maps and search cover London and Kent for now.</p>
+with spoken directions, and a pursuit screen. Maps and search cover London, Kent and Essex for now.</p>
 
 <h2>Getting help or reporting a problem</h2>
 <p>${contact(email).replace(/^./, (c) => c.toUpperCase())}. Say what you searched for or tapped, what you expected,

@@ -1,7 +1,8 @@
 // Where the car is and where it's heading, in local terms: borough (or
-// Kent district), and the next one or well-known area ahead. Works offline.
+// Kent or Essex district), and the next one or well-known area ahead. Works offline.
 import type { Borough } from "../search/boroughs";
 import { BOROUGHS, regionOf } from "../search/boroughs";
+import essex from "./essex-districts.json";
 import kent from "./kent-districts.json";
 import london from "./london-boroughs.json";
 
@@ -13,7 +14,7 @@ interface BoroughShape {
   polygons: Ring[][]; // each polygon: outer ring, then holes
 }
 
-const FEATURES = [...(london as GeoJSON.FeatureCollection).features, ...(kent as GeoJSON.FeatureCollection).features];
+const FEATURES = [london, kent, essex].flatMap((g) => (g as GeoJSON.FeatureCollection).features);
 
 const SHAPES: BoroughShape[] = FEATURES.flatMap((f) => {
   const name = String(f.properties?.name ?? "");
@@ -41,7 +42,7 @@ function inRing(x: number, y: number, ring: Ring): boolean {
   return inside;
 }
 
-/** The London borough or Kent district a point is in, or null outside both. */
+/** The London borough, or Kent or Essex district, a point is in; null outside them all. */
 export function boroughAt(lat: number, lng: number): Borough | null {
   for (const b of SHAPES) {
     const [w, s, e, n] = b.bbox;

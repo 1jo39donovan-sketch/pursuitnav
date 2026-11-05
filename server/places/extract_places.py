@@ -39,16 +39,21 @@ BOROUGHS = [
     "Ashford", "Canterbury", "Dartford", "Dover", "Folkestone and Hythe", "Gravesham",
     "Maidstone", "Sevenoaks", "Swale", "Thanet", "Tonbridge and Malling", "Tunbridge Wells",
     "Medway",
+    # Essex's 12 districts, then Southend-on-Sea and Thurrock.
+    "Basildon", "Braintree", "Brentwood", "Castle Point", "Chelmsford", "Colchester",
+    "Epping Forest", "Harlow", "Maldon", "Rochford", "Tendring", "Uttlesford",
+    "Southend-on-Sea", "Thurrock",
 ]
 
 BOUNDARIES = [
     Path(__file__).with_name("london-boroughs.geojson"),
     Path(__file__).with_name("kent-districts.geojson"),
+    Path(__file__).with_name("essex-districts.geojson"),
 ]
 
 
 class BoroughFinder:
-    """Which area (London borough, Kent district) a point is in (None outside them all)."""
+    """Which area (London borough, Kent or Essex district) a point is in (None outside them all)."""
 
     def __init__(self, geojson_paths: list[Path] | Path):
         if isinstance(geojson_paths, Path):

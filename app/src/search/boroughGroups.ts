@@ -1,7 +1,7 @@
 // London's boroughs grouped by the Met's 12 Basic Command Units (BCUs), in
 // the Met's own order and codes, plus the City, which has its own force, so
 // picking an operating area is a short list rather than 33 names.
-import { AREA_REGIONS, type Borough } from "./boroughs";
+import { AREA_REGIONS, listed, type Borough, type RegionId } from "./boroughs";
 
 export interface BoroughGroup {
   /** The Met's BCU code (AS, CN…), or "" for the City. */
@@ -73,10 +73,18 @@ export const KENT_GROUPS: BoroughGroup[] = [
   { code: "", name: "West Kent", boroughs: ["Maidstone", "Sevenoaks", "Tonbridge and Malling", "Tunbridge Wells"] },
 ];
 
+/** Essex in three parts, by geography. One tap picks every area in one. */
+export const ESSEX_GROUPS: BoroughGroup[] = [
+  { code: "", name: "North Essex", boroughs: ["Braintree", "Colchester", "Tendring", "Uttlesford"] },
+  { code: "", name: "Mid and West Essex", boroughs: ["Brentwood", "Chelmsford", "Epping Forest", "Harlow", "Maldon"] },
+  { code: "", name: "South Essex", boroughs: ["Basildon", "Castle Point", "Rochford", "Southend-on-Sea", "Thurrock"] },
+];
+
 /** The one-tap big areas, per region (London's are "North" and so on; Kent's say "Kent"). */
-export const BIG_AREAS: Record<"london" | "kent", { name: string; boroughs: Borough[] }[]> = {
+export const BIG_AREAS: Record<RegionId, { name: string; boroughs: Borough[] }[]> = {
   london: LONDON_AREAS.map((a) => ({ name: `${a.name} London`, boroughs: a.boroughs })),
   kent: KENT_GROUPS.map((g) => ({ name: g.name, boroughs: g.boroughs })),
+  essex: ESSEX_GROUPS.map((g) => ({ name: g.name, boroughs: g.boroughs })),
 };
 
 /**
@@ -88,7 +96,7 @@ export function areaSummary(chosen: readonly Borough[], short = false): string {
   const has = (list: readonly Borough[]) => list.every((b) => chosen.includes(b));
   const whole = AREA_REGIONS.filter((r) => has(r.areas));
   const covered = whole.reduce((n, r) => n + r.areas.length, 0);
-  if (whole.length && covered === chosen.length) return `All ${whole.map((r) => r.name).join(" and ")}`;
+  if (whole.length && covered === chosen.length) return `All ${listed(whole.map((r) => r.name))}`;
   for (const r of AREA_REGIONS) {
     const big = BIG_AREAS[r.id].find((a) => a.boroughs.length === chosen.length && has(a.boroughs));
     if (big) return short ? big.name : `${big.name} (${chosen.length} ${r.unit}s)`;

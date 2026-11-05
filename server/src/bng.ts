@@ -106,7 +106,7 @@ export function bngToWgs84(easting: number, northing: number): { lat: number; ln
 }
 
 /**
- * Greater London and Kent in BNG, [xmin, ymin, xmax, ymax], with a margin:
- * OS Names searches are kept to it (the area boundaries decide in the end).
+ * Greater London, Kent and Essex in BNG, [xmin, ymin, xmax, ymax], with a
+ * margin: OS Names searches are kept to it (the area boundaries decide in the end).
  */
-export const REGION_BNG_BOUNDS: [number, number, number, number] = [500000, 125000, 660000, 205000];
+export const REGION_BNG_BOUNDS: [number, number, number, number] = [500000, 125000, 660000, 250000];

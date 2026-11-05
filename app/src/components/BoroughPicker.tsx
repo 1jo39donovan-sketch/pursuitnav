@@ -1,21 +1,21 @@
 // The operating area on Session: a one-line summary once chosen, opening
-// to the areas, region by region (London's boroughs, Kent's districts).
-// For police, London's are grouped by Met BCU (Basic Command Unit) and
-// Kent's by North, East and West; tapping a group selects (or clears) all
+// to the areas, region by region (London's boroughs, Kent's and Essex's
+// districts). For police, London's are grouped by Met BCU (Basic Command
+// Unit), Kent's and Essex's in three parts each; tapping a group selects (or clears) all
 // of it. Other services see one A–Z list per region. Each area can be set alone.
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { boroughAt } from "../area/area";
 import { useLocation } from "../location/LocationProvider";
-import { BIG_AREAS, BOROUGH_GROUPS, KENT_GROUPS, areaSummary, type BoroughGroup } from "../search/boroughGroups";
-import { AREA_REGIONS, BOROUGHS, type Borough } from "../search/boroughs";
+import { BIG_AREAS, BOROUGH_GROUPS, ESSEX_GROUPS, KENT_GROUPS, areaSummary, type BoroughGroup } from "../search/boroughGroups";
+import { AREA_REGIONS, BOROUGHS, type Borough, type RegionId } from "../search/boroughs";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
 import { Button } from "./Button";
 import { useThemed } from "../textSize";
 
-const GROUPS: Record<"london" | "kent", BoroughGroup[]> = { london: BOROUGH_GROUPS, kent: KENT_GROUPS };
+const GROUPS: Record<RegionId, BoroughGroup[]> = { london: BOROUGH_GROUPS, kent: KENT_GROUPS, essex: ESSEX_GROUPS };
 
 export function BoroughPicker() {
   const styles = useThemed(baseStyles);

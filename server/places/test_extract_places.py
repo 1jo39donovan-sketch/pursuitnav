@@ -153,7 +153,7 @@ def test_area_list_matches_the_app():
 
     app = (Path(__file__).parents[2] / "app/src/search/boroughs.ts").read_text()
     names = []
-    for block in ("LONDON_BOROUGHS", "KENT_DISTRICTS"):
+    for block in ("LONDON_BOROUGHS", "KENT_DISTRICTS", "ESSEX_DISTRICTS"):
         body = app.split(f"export const {block} = [", 1)[1].split("]", 1)[0]
         names += re.findall(r'"([^"]+)"', body)
     assert names == extract_places.BOROUGHS
@@ -165,4 +165,6 @@ def test_kent_districts_and_medway_are_found():
     assert at(1.0828, 51.2798) == "Canterbury"
     assert at(0.5054, 51.3887) == "Medway"
     assert at(-0.1035, 51.5466) == "Islington"
+    assert at(0.9025, 51.8892) == "Colchester"
+    assert at(0.7105, 51.5376) == "Southend-on-Sea"
     assert finder.index_of(0.27, 51.0) is None  # East Sussex
