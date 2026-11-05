@@ -395,6 +395,8 @@ export default function NavigateScreen() {
     setVoice(!voiceOn);
     if (voiceOn) hush();
   };
+  // Calls come earlier when faster. Changes with each fix, as progress does.
+  const speedMs = lastFix?.speed ?? null;
   const said = useRef<{ route: unknown; keys: Set<string>; routes: number }>({
     route: null,
     keys: new Set(),
@@ -414,6 +416,8 @@ export default function NavigateScreen() {
     }
     const callout = nextCallout(progress, said.current.keys, active?.destination.title, {
       rerouted: said.current.routes > 1,
+      // Faster, the calls come earlier: seconds ahead, not a fixed distance.
+      speedMs,
     });
     if (!callout) return;
     said.current.keys.add(callout.key);
@@ -422,7 +426,7 @@ export default function NavigateScreen() {
       say(callout.text, callout.priority);
       recorder.event({ type: "speech", text: callout.text });
     }
-  }, [progress, prepared, offRoute, voiceOn, active?.destination.title]);
+  }, [progress, prepared, offRoute, voiceOn, active?.destination.title, speedMs]);
   // Every GO starts silent and clean: anything still queued or being said
   // from before (a route popup, the last route) is dropped first. And the
   // recorder hears what the phone actually did with each prompt.

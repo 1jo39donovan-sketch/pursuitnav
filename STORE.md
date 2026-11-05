@@ -7,7 +7,7 @@ Plan written 10 October 2026; listing, privacy answers and launch plan updated 2
 | | By day 14 | Public listing |
 |---|---|---|
 | **iPhone** | On the **App Store**, if Apple's review passes first or second time. **TestFlight** (a public invite link, up to 10,000 people) is the fallback and usually works within days 4–6. | Same thing. |
-| **Android** | On **Google Play as a closed test**: officers tap an invite link, join, and install from the Play Store like any app. Updates come through Play. | Not before about **day 20–25**. Google makes new personal developer accounts run a closed test with **at least 12 testers for 14 days in a row** before the app can go public, then reviews the request (up to about 7 days). |
+| **Android** | On **Google Play as a closed test**: officers tap an invite link, join, and install from the Play Store like any app. Updates come through Play. | Not before about **day 20–25**. Google makes new personal developer accounts (not organisation accounts) run a closed test with **at least 12 testers for 14 days in a row** before the app can go public, then reviews the request (up to about 7 days). |
 
 Officers get the app through the stores in time on both platforms. Only the public Play listing comes later, and the closed test the officers join is what unlocks it. Start it early, and get 12 or more officers to join on day one.
 
@@ -24,7 +24,7 @@ Charging officers nothing is fine on both stores: list it as a free app.
 
 ## Before you start
 
-- **Use a personal developer account.** Your name will show as the seller. An organisation account needs a D-U-N-S number, which can take weeks.
+- **Publish as OPSVALE.** BlueRoute is an OPSVALE product, so the seller on both stores should read OPSVALE, not a person's name. That needs an **organisation** developer account on each store: OPSVALE has to be a legal entity (for example a registered company) with a D-U-N-S number, which is free from Dun & Bradstreet but can take a couple of weeks. A Google organisation account also skips the 12-testers-for-14-days rule above. A personal account is quicker but shows the account holder's own name as seller.
 - **Don't use Met or police branding.** Don't use the Met name, crest or logos, and don't say "official". The listing below says it's independent and lists the police route as needing the user's declaration. Apple and Google both reject apps that look as if they're from an organisation they aren't.
 - **The name.** "BlueRoute" may already be taken on one of the stores. If it is, use "BlueRoute Patrol" (only the name on the store changes).
 - **The server is up** at `api.bluerouteapp.com`, and the privacy, support and terms pages the stores ask for are at `https://bluerouteapp.com/privacy`, `/support` and `/terms`.
@@ -40,7 +40,7 @@ Charging officers nothing is fine on both stores: list it as a free app.
 
 ### Apple
 
-1. Enrol at [developer.apple.com/programs](https://developer.apple.com/programs/enroll/) as an **individual**. Your Apple ID needs two-factor authentication turned on. Approval usually takes 1–2 days.
+1. Enrol at [developer.apple.com/programs](https://developer.apple.com/programs/enroll/) as an **organisation** (OPSVALE, with its D-U-N-S number), so OPSVALE shows as the seller. Enrolling as an individual shows a person's name instead. Your Apple ID needs two-factor authentication turned on. Approval usually takes 1–2 days.
 2. **First iOS build, once.** No Mac is needed.
    1. On the repository page on GitHub, click **Code → Codespaces → Create codespace** (free).
    2. In the terminal that opens, run:
@@ -96,7 +96,7 @@ Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code r
 
 ## Store listing (ready to paste)
 
-Updated 4 November 2026 to the Launch Manager's redraft of 3 November (patrol and route-planning framing, no "emergency", "999", force names or test wording), with one change Josh made: **blue light stays on by default**, and one switch on Session turns it off. The privacy policy, support page and terms are live at `https://bluerouteapp.com/privacy`, `/support` and `/terms` (the same pages are on `https://api.bluerouteapp.com`).
+Updated 4 November 2026 to the Launch Manager's redraft of 3 November (patrol and route-planning framing, no "emergency", "999", force names or test wording), with one change OPSVALE made: **blue light stays on by default**, and one switch on Session turns it off. The privacy policy, support page and terms are live at `https://bluerouteapp.com/privacy`, `/support` and `/terms` (the same pages are on `https://api.bluerouteapp.com`).
 
 **Before pasting, check these are in the build you submit** (all in the 4 November store-ready changes): the field-test wording gone from the terms, the Testing tools hidden (store builds show only Demo drive), police stations by their own name only, and the usage-data switch-off.
 
@@ -111,10 +111,10 @@ Updated 4 November 2026 to the Launch Manager's redraft of 3 November (patrol an
 | **Support URL** | `https://bluerouteapp.com/support` | Website: `https://bluerouteapp.com` |
 | **Marketing URL** (optional) | leave blank | |
 | **Contact email** | | `hello@bluerouteapp.com` (shown publicly, and Google emails it: check it receives mail) |
-| **Seller / copyright** | © 2026 *the developer account's legal name* (fill in) | |
+| **Seller / copyright** | © 2026 OPSVALE (must match the developer account's legal name) | |
 | **Bundle ID / package** | `com.blueroute.patrol` | `com.blueroute.patrol` |
 
-The name under the icon on the phone stays **BlueRoute**. "Response" is left out of the store name until Josh decides: the Launch Manager flags it as the one word Apple could read as emergency response (guideline 5.1.5). With it, the name is "BlueRoute – Response Sat Nav" (28).
+The name under the icon on the phone stays **BlueRoute**. "Response" is left out of the store name until OPSVALE decides: the Launch Manager flags it as the one word Apple could read as emergency response (guideline 5.1.5). With it, the name is "BlueRoute – Response Sat Nav" (28).
 
 **Keywords** (Apple, 100 max, commas, no spaces; none repeat the name or subtitle):
 

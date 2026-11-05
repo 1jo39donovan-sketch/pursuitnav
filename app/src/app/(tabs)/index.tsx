@@ -625,6 +625,7 @@ export default function SessionScreen() {
             ? `Places: ${places.count.toLocaleString("en-GB")} shops, cafés, schools, parks and more, from ${places.builtOn}.`
             : "Places (shops, cafés, schools, parks…) download from the BlueRoute server when it’s connected."}
         </Text>
+        <Text style={styles.attribution}>BlueRoute is an OPSVALE product.</Text>
         <Text style={styles.attribution}>
           Search data: contains OS data © Crown copyright and database right; Royal Mail data © Royal Mail copyright and
           database right; National Statistics data © Crown copyright and database right. Map data © OpenStreetMap

@@ -1,6 +1,8 @@
 // The privacy policy and support pages the app stores ask for. Plain HTML,
 // served by the API so they live at the same address as the server.
 
+/** Who makes BlueRoute, as named on its pages. */
+const MAKER = "OPSVALE";
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
 // Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
 const UPDATED = "5 November 2026";
@@ -49,6 +51,7 @@ function page(title: string, body: string): string {
 <div class="brand">${LOGO}<span>Blue<b>Route</b></span></div>
 <h1>${title}</h1>
 ${body}
+<p class="muted">BlueRoute is an ${MAKER} product.</p>
 </main></body>
 </html>`;
 }
@@ -58,8 +61,8 @@ export function privacyPage(email?: string): string {
     "Privacy policy",
     `<p class="muted">BlueRoute · last updated ${UPDATED}</p>
 
-<p>BlueRoute is a navigation app for police, fire and ambulance crews. It’s an independent app, not a police force or emergency service
-system. It has no accounts and no third-party analytics. It counts how much it's used, in the way described
+<p>BlueRoute is a navigation app for police, fire and ambulance crews, made by ${MAKER}. It’s independent: not a police
+force or emergency service system. It has no accounts and no third-party analytics. It counts how much it's used, in the way described
 under “Usage counts” below.</p>
 
 <h2>Kept on your phone only</h2>
@@ -203,12 +206,12 @@ export function termsPage(email?: string): string {
     "Terms of use",
     `<p class="muted">BlueRoute · last updated ${UPDATED}</p>
 
-<p>These terms apply to anyone who uses the BlueRoute app or its website. By using BlueRoute you agree to them. If you
+<p>These terms are set by ${MAKER}, which makes BlueRoute, and apply to anyone who uses the BlueRoute app or its website. By using BlueRoute you agree to them. If you
 don’t agree, don’t use it.</p>
 
 <h2>1. What BlueRoute is, and isn’t</h2>
 <ul>
-  <li>BlueRoute is an independent navigation aid. It is not made, endorsed, supplied or approved by any police,
+  <li>BlueRoute is an independent navigation aid made by ${MAKER}. It is not made, endorsed, supplied or approved by any police,
     ambulance or fire service, and is not an official system of any of them.</li>
   <li>It is an aid only. It does not replace your training, your judgement, your control room, your radio, your
     service’s systems or your service’s policies.</li>

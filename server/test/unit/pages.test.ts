@@ -14,6 +14,7 @@ describe("privacy and support pages", () => {
       expect(res.statusCode).toBe(200);
       expect(res.headers["content-type"]).toContain("text/html");
       expect(res.body).toContain("BlueRoute");
+      expect(res.body).toContain("an OPSVALE product");
     }
   });
 
