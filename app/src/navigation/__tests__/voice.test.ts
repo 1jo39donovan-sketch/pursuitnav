@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Maneuver } from "../../api/routes";
 import type { Progress } from "../progress";
-import { nextCallout, spokenDistance, spokenPlace } from "../voice";
+import { nextCallout, promptDistances, spokenDistance, spokenPlace } from "../voice";
 
 const m = (instruction: string, beginShapeIndex: number): Maneuver => ({
   type: 10,
@@ -24,11 +24,11 @@ const at = (distanceToNextM: number, arrived = false): Progress =>
   }) as unknown as Progress;
 
 /** Plays a drive towards the turn, saying what comes up, as the screen does. */
-function drive(distances: number[]): string[] {
+function drive(distances: number[], speedMs?: number): string[] {
   const said = new Set<string>();
   const out: string[] = [];
   for (const d of distances) {
-    const c = nextCallout(at(d), said);
+    const c = nextCallout(at(d), said, undefined, { speedMs });
     if (c) {
       said.add(c.key);
       out.push(c.text);
@@ -36,6 +36,41 @@ function drive(distances: number[]): string[] {
   }
   return out;
 }
+
+describe("calls scaled to speed", () => {
+  const mph = (n: number) => n * 0.44704;
+
+  it("keeps town distances at town speeds or when speed is unknown", () => {
+    for (const v of [null, 0, mph(20)]) expect(promptDistances(v)).toEqual({ earlyMaxM: 450, earlyMinM: 150, nowM: 70 });
+  });
+
+  it("calls the turn seconds ahead when fast", () => {
+    const at60 = promptDistances(mph(60));
+    expect(at60.nowM).toBeGreaterThan(110); // ~5 s at 60 mph
+    expect(at60.earlyMinM).toBeGreaterThan(300);
+    expect(at60.earlyMaxM).toBeGreaterThan(750);
+  });
+
+  it("never warns absurdly early", () => {
+    const at120 = promptDistances(mph(120));
+    expect(at120.earlyMaxM).toBeLessThanOrEqual(1300);
+    expect(at120.nowM).toBeLessThanOrEqual(250);
+    expect(at120.earlyMinM).toBeGreaterThan(at120.nowM);
+  });
+
+  it("at 60 mph the warning and the 'now' call come earlier", () => {
+    const fast = drive([1500, 900, 700, 500, 300, 200, 150, 100, 60], mph(60));
+    expect(fast).toEqual([
+      "Drive north on Holloway Road.",
+      "In half a mile, turn right onto Seven Sisters Road.",
+      "Turn right onto Seven Sisters Road.",
+    ]);
+    // The "now" call at 100 m, not 60 m as in town.
+    const said = new Set(["start", "turn:5:early"]);
+    expect(nextCallout(at(100), said, undefined, { speedMs: mph(60) })?.key).toBe("turn:5:now");
+    expect(nextCallout(at(100), said)).toBeNull();
+  });
+});
 
 describe("spoken directions", () => {
   it("says where to start, warns of the turn, then calls it", () => {

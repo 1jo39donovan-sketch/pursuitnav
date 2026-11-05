@@ -5,10 +5,38 @@ import type { Maneuver } from "../api/routes";
 import { upcomingInstruction, type Progress } from "./progress";
 import { speakable, startPrompt } from "./spokenText";
 
-/** Approach call between these distances, then the "now" call. */
+/**
+ * When each call is made: the approach call somewhere between earlyMinM and
+ * earlyMaxM out, then the "now" call within nowM. At town speeds these are
+ * the fixed distances below; faster, they're seconds ahead, so a crew at 60
+ * mph hears the turn as early (in time) as one at 20, and has time to act.
+ */
+export interface PromptDistances {
+  earlyMaxM: number;
+  earlyMinM: number;
+  nowM: number;
+}
+
 const EARLY_MAX_M = 450;
 const EARLY_MIN_M = 150;
 const NOW_M = 70;
+/** Seconds ahead at speed: the warning, its latest point, and the "now" call (said, then acted on). */
+const EARLY_MAX_S = 30;
+const EARLY_MIN_S = 13;
+const NOW_S = 5;
+/** Never further out than this: a warning a mile early is forgotten. */
+const EARLY_CAP_M = 1300;
+const NOW_CAP_M = 250;
+
+/** Call distances for a speed in m/s (null or 0: town distances). */
+export function promptDistances(speedMs: number | null | undefined): PromptDistances {
+  const v = speedMs && speedMs > 0 ? speedMs : 0;
+  return {
+    earlyMaxM: Math.min(EARLY_CAP_M, Math.max(EARLY_MAX_M, v * EARLY_MAX_S)),
+    earlyMinM: Math.min(EARLY_CAP_M / 2, Math.max(EARLY_MIN_M, v * EARLY_MIN_S)),
+    nowM: Math.min(NOW_CAP_M, Math.max(NOW_M, v * NOW_S)),
+  };
+}
 
 export interface Callout {
   /** Said once per route: remembered so it isn't repeated. */
@@ -64,9 +92,10 @@ export function nextCallout(
   said: ReadonlySet<string>,
   title?: string,
   /** rerouted: a new route after leaving the old one, said as one line ("New route. Turn right onto Union Road."). */
-  opts: { rerouted?: boolean; towards?: string | null } = {},
+  opts: { rerouted?: boolean; towards?: string | null; speedMs?: number | null } = {},
 ): Callout | null {
   const place = spokenPlace(title);
+  const { earlyMaxM, earlyMinM, nowM } = promptDistances(opts.speedMs);
   if (progress.arrived) {
     if (said.has("arrived")) return null;
     const side = ARRIVAL_SIDE[progress.current.type] ?? ARRIVAL_SIDE[progress.next?.type ?? -1] ?? null;
@@ -85,13 +114,13 @@ export function nextCallout(
     // A new route, or a first turn too close for its own early prompt: the
     // first line is the turn itself. "Head along Clap-" was cut off on 3 Nov
     // by the turn 50 m on, which then interrupted it.
-    if (next && (opts.rerouted || d < EARLY_MIN_M)) {
-      const turn = d <= NOW_M ? text : `In ${spokenDistance(d)}, ${continuing(text)}`;
+    if (next && (opts.rerouted || d < earlyMinM)) {
+      const turn = d <= nowM ? text : `In ${spokenDistance(d)}, ${continuing(text)}`;
       return {
         key: "start",
-        covers: d <= NOW_M ? [`${id}:now`, `${id}:early`] : [`${id}:early`],
+        covers: d <= nowM ? [`${id}:now`, `${id}:early`] : [`${id}:early`],
         text: `${opts.rerouted ? "New route. " : ""}${turn}`.replace(/\.?$/, "."),
-        priority: d <= NOW_M ? "urgent" : "normal",
+        priority: d <= nowM ? "urgent" : "normal",
       };
     }
     return {
@@ -101,12 +130,12 @@ export function nextCallout(
     };
   }
   if (!next) return null;
-  if (d <= NOW_M) {
+  if (d <= nowM) {
     return said.has(`${id}:now`)
       ? null
       : { key: `${id}:now`, text: `${text}.`.replace(/\.\.$/, "."), priority: "urgent" };
   }
-  if (d <= EARLY_MAX_M && d >= EARLY_MIN_M && !said.has(`${id}:early`)) {
+  if (d <= earlyMaxM && d >= earlyMinM && !said.has(`${id}:early`)) {
     return {
       key: `${id}:early`,
       text: `In ${spokenDistance(d)}, ${continuing(text)}`.replace(/\.?$/, "."),
