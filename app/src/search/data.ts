@@ -36,8 +36,10 @@ export function parseServerRoads(text: string): Road[] {
   for (const line of lines) {
     if (!line) continue;
     const [name, b, lat, lng] = line.split("|");
-    if (!name || !b) continue;
-    out.push({ name, borough: borough(b), outcodes: [], lat: Number(lat) / 1e5, lng: Number(lng) / 1e5 });
+    // An area this version doesn't know yet (one added to the server later): skip it.
+    const area = BOROUGHS[Number(b)];
+    if (!name || !area) continue;
+    out.push({ name, borough: area, outcodes: [], lat: Number(lat) / 1e5, lng: Number(lng) / 1e5 });
   }
   return out;
 }

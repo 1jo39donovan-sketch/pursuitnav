@@ -36,5 +36,25 @@ export const LONDON_CUSTODIANS: Record<number, string> = {
   5990: "Westminster",
 };
 
-/** The London borough names, exactly as the app has them (app/src/search/boroughs.ts). */
-export const BOROUGH_NAMES: ReadonlySet<string> = new Set(Object.values(LONDON_CUSTODIANS));
+// The Kent pilot: Kent's 12 districts and Medway. Same TODO as above.
+export const KENT_CUSTODIANS: Record<number, string> = {
+  2205: "Ashford",
+  2210: "Canterbury",
+  2215: "Dartford",
+  2220: "Dover",
+  2230: "Gravesham",
+  2235: "Maidstone",
+  2245: "Sevenoaks",
+  2250: "Folkestone and Hythe",
+  2255: "Swale",
+  2260: "Thanet",
+  2265: "Tonbridge and Malling",
+  2270: "Tunbridge Wells",
+  2280: "Medway",
+};
+
+/** Every area BlueRoute covers, by local custodian code. */
+export const AREA_CUSTODIANS: Record<number, string> = { ...LONDON_CUSTODIANS, ...KENT_CUSTODIANS };
+
+/** The area names (London boroughs, Kent districts), exactly as the app has them (app/src/search/boroughs.ts). */
+export const BOROUGH_NAMES: ReadonlySet<string> = new Set(Object.values(AREA_CUSTODIANS));

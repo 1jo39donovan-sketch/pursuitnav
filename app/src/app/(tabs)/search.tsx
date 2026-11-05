@@ -497,7 +497,7 @@ export default function SearchScreen() {
 
   const dataNote =
     data.status === "loading"
-      ? "Loading London roads…"
+      ? "Loading roads…"
       : data.status === "error"
         ? `Search data didn't load: ${data.message}`
         : null;

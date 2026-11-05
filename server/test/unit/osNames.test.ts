@@ -41,13 +41,13 @@ describe("OS Names", () => {
     for (const t of ["Suburban_Area", "Railway_Station", "Hospital"]) expect(precisionFor(t)).toBe("place");
   });
 
-  it("searches within London, and asks for postcodes only for a full postcode", async () => {
+  it("searches within London and Kent, and asks for postcodes only for a full postcode", async () => {
     const f = fakeFetch(() => json({ header: {} }));
     const client = new OsNamesClient("KEY", boroughs, f.impl);
     await client.search("Caledonian Road");
     await client.search("n78la");
     expect(f.calls[0]).toContain("/find?");
-    expect(f.calls[0]).toContain("bounds=500000%2C150000%2C565000%2C205000");
+    expect(f.calls[0]).toContain("bounds=500000%2C125000%2C660000%2C205000");
     expect(f.calls[0]).not.toContain("fq=");
     expect(f.calls[1]).toContain("query=N7+8LA");
     expect(f.calls[1]).toContain("fq=LOCAL_TYPE%3APostcode");
@@ -85,7 +85,7 @@ describe("OS Names", () => {
     expect(out.map((a) => a.label)).toEqual(["Caledonian Road, N7", "Caledonian Road, N1"]);
   });
 
-  it("converts to latitude and longitude, names the borough, and drops places outside London", async () => {
+  it("converts to latitude and longitude, names the borough or district, and drops places outside London and Kent", async () => {
     const f = fakeFetch(() =>
       json({
         results: [
@@ -99,6 +99,16 @@ describe("OS Names", () => {
             GEOMETRY_Y: 182989,
             DISTRICT_BOROUGH: undefined,
             COUNTY_UNITARY: "Greater London",
+          }),
+          // Kent pilot: a district OS names.
+          entry({
+            ID: "cant",
+            NAME1: "High Street",
+            LOCAL_TYPE: "Named_Road",
+            GEOMETRY_X: 614900,
+            GEOMETRY_Y: 157900,
+            DISTRICT_BOROUGH: "Canterbury",
+            COUNTY_UNITARY: "Kent",
           }),
           entry({
             ID: "watford",
@@ -116,6 +126,7 @@ describe("OS Names", () => {
     expect(out.map((a) => [a.id, a.precision, a.borough])).toEqual([
       ["os-names:osgb4000000074558316", "road", "Islington"],
       ["os-names:kx", "place", "Camden"],
+      ["os-names:cant", "road", "Canterbury"],
     ]);
     expect(out[0]).toMatchObject({ source: "os-names", label: "Caledonian Road, N7", postcode: "" });
     expect(out[0]!.lat).toBeCloseTo(51.547, 3);

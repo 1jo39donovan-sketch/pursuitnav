@@ -1,4 +1,4 @@
-# Builds London's map and search data each week on GitHub's machines (free
+# Builds London and Kent's map and search data each week on GitHub's machines (free
 # for a public repository, and far bigger than the server) and publishes them
 # as a release, data-YYYYMMDD-HHMM. Servers download the newest one daily
 # (server/scripts/fetch-data.sh) instead of building it themselves: minutes
@@ -8,7 +8,8 @@
 #   - the routing map: Valhalla tiles with travel speeds (map-build.sh)
 #   - the places and named-roads lists the app keeps offline (map-build.sh)
 #   - the map phones keep for no signal: tiles, styles, fonts (offline-map.sh)
-#   - the house-number search: a Nominatim database (geocoder-import.sh)
+#   - the house-number search: a Nominatim database (geocoder-import.sh),
+#     London only for now (Kent's would need a bigger server)
 # All of it is OpenStreetMap data (© OpenStreetMap contributors, ODbL),
 # already public; no officer or search data is involved.
 name: Map data
@@ -20,7 +21,8 @@ on:
   workflow_dispatch:
   # A change to this workflow on main builds and publishes at once, so it's
   # tried for real. Only main: a branch (a Dependabot update, a pull request)
-  # mustn't publish data that servers then download.
+  # mustn't publish data that servers then download. Run by hand on a branch
+  # (workflow_dispatch), it builds everything and publishes nothing.
   push:
     branches: [main]
     paths: [".github/workflows/data.yml"]
@@ -98,11 +100,27 @@ jobs:
           sudo bash scripts/data-package.sh ./data/nominatim/a data/release "$RUNNER_TEMP/geocoder.json"
           ls -la data/release
 
+      - name: What's in it
+        run: |
+          # Rows per region (area numbers: London 0–32, Kent 33–45), so a build that lost Kent shows.
+          for f in places roads; do
+            sudo zcat "data/places-next/$f.txt.gz" | tail -n +2 | python3 -c "
+          import sys
+          col = 4 if '$f' == 'places' else 1
+          n = [0, 0]
+          for line in sys.stdin:
+              n[int(line.split('|')[col]) >= 33] += 1
+          print('$f: London', n[0], 'Kent', n[1])
+          assert n[1] > 0, 'no Kent rows'
+          "
+          done
+
       - name: Publish
+        if: github.ref == 'refs/heads/main'
         run: |
           tag="data-$(date -u +%Y%m%d-%H%M)"
           {
-            echo "London map and search data built $(date -u '+%d %b %Y %H:%M') UTC for BlueRoute servers."
+            echo "London and Kent map and search data built $(date -u '+%d %b %Y %H:%M') UTC for BlueRoute servers."
             echo
             echo "Servers download this themselves (server/scripts/fetch-data.sh); there's nothing to install by hand."
             echo "Map build: ${MAP_MINUTES} min. Offline map: ${OFFLINE_MB} MB in ${OFFLINE_MINUTES} min. House-number search: $(cat "$RUNNER_TEMP/geocoder.json")"
@@ -124,6 +142,7 @@ jobs:
           exit 1
 
       - name: Keep the newest three
+        if: github.ref == 'refs/heads/main'
         run: |
           gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^data-' | sort -r | tail -n +4 |
             while read -r old; do gh release delete "$old" --yes --cleanup-tag; echo "Deleted $old"; done

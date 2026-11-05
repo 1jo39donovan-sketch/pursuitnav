@@ -2,7 +2,7 @@
 // free under the Open Government Licence, but it needs a (free) key from an
 // OS Data Hub project. Results come in British National Grid; bng.ts turns
 // them into latitude and longitude.
-import { bngToWgs84, LONDON_BNG_BOUNDS } from "./bng.js";
+import { bngToWgs84, REGION_BNG_BOUNDS } from "./bng.js";
 import type { BoroughLookup } from "./boroughArea.js";
 import { BOROUGH_NAMES } from "./boroughs.js";
 import { parseAddressQuery } from "./addressQuery.js";
@@ -68,7 +68,7 @@ export class OsNamesClient implements PlacesClient {
     const params = new URLSearchParams({
       query: text,
       maxresults: "50",
-      bounds: LONDON_BNG_BOUNDS.join(","),
+      bounds: REGION_BNG_BOUNDS.join(","),
       key: this.key,
     });
     if (fq) params.set("fq", fq);

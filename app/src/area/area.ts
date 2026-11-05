@@ -1,8 +1,9 @@
-// Where the car is and where it's heading, in London terms: borough, and
-// the next borough or well-known area ahead. Works offline.
+// Where the car is and where it's heading, in local terms: borough (or
+// Kent district), and the next one or well-known area ahead. Works offline.
 import type { Borough } from "../search/boroughs";
-import { BOROUGHS } from "../search/boroughs";
-import boundaries from "./london-boroughs.json";
+import { BOROUGHS, regionOf } from "../search/boroughs";
+import kent from "./kent-districts.json";
+import london from "./london-boroughs.json";
 
 type Ring = [number, number][];
 
@@ -12,7 +13,9 @@ interface BoroughShape {
   polygons: Ring[][]; // each polygon: outer ring, then holes
 }
 
-const SHAPES: BoroughShape[] = (boundaries as GeoJSON.FeatureCollection).features.flatMap((f) => {
+const FEATURES = [...(london as GeoJSON.FeatureCollection).features, ...(kent as GeoJSON.FeatureCollection).features];
+
+const SHAPES: BoroughShape[] = FEATURES.flatMap((f) => {
   const name = String(f.properties?.name ?? "");
   if (!(BOROUGHS as readonly string[]).includes(name)) return [];
   const g = f.geometry;
@@ -38,7 +41,7 @@ function inRing(x: number, y: number, ring: Ring): boolean {
   return inside;
 }
 
-/** The London borough a point is in, or null outside London. */
+/** The London borough or Kent district a point is in, or null outside both. */
 export function boroughAt(lat: number, lng: number): Borough | null {
   for (const b of SHAPES) {
     const [w, s, e, n] = b.bbox;
@@ -111,7 +114,7 @@ export function generallyTowards(
   for (const m of AHEAD_STEPS_M) {
     const p = projectAhead(lat, lng, heading, m);
     const b = boroughAt(p.lat, p.lng);
-    if (b !== here) return b ?? "Leaving London";
+    if (b !== here) return b ?? (here ? `Leaving ${regionOf(here).name}` : null);
   }
   // Same borough all the way: name the area ahead instead.
   const origin = { lat, lng };

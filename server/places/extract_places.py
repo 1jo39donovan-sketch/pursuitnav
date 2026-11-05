@@ -35,16 +35,25 @@ BOROUGHS = [
     "Kingston upon Thames", "Lambeth", "Lewisham", "Merton", "Newham", "Redbridge",
     "Richmond upon Thames", "Southwark", "Sutton", "Tower Hamlets", "Waltham Forest",
     "Wandsworth", "Westminster",
+    # The Kent pilot: Kent's 12 districts, then Medway. New areas go on the end.
+    "Ashford", "Canterbury", "Dartford", "Dover", "Folkestone and Hythe", "Gravesham",
+    "Maidstone", "Sevenoaks", "Swale", "Thanet", "Tonbridge and Malling", "Tunbridge Wells",
+    "Medway",
 ]
 
-BOUNDARIES = Path(__file__).with_name("london-boroughs.geojson")
+BOUNDARIES = [
+    Path(__file__).with_name("london-boroughs.geojson"),
+    Path(__file__).with_name("kent-districts.geojson"),
+]
 
 
 class BoroughFinder:
-    """Which London borough a point is in (None outside London)."""
+    """Which area (London borough, Kent district) a point is in (None outside them all)."""
 
-    def __init__(self, geojson_path: Path):
-        features = json.loads(geojson_path.read_text())["features"]
+    def __init__(self, geojson_paths: list[Path] | Path):
+        if isinstance(geojson_paths, Path):
+            geojson_paths = [geojson_paths]
+        features = [f for p in geojson_paths for f in json.loads(p.read_text())["features"]]
         self.names = []
         geoms = []
         for f in features:
