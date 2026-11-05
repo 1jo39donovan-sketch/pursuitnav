@@ -148,8 +148,9 @@ describe("comingUp", () => {
     expect(ahead.map((a) => a.maneuver.instruction)).toEqual(["Turn left.", "You have arrived."]);
     expect(ahead[0]!.inM).toBeGreaterThan(640);
     expect(ahead[0]!.inM).toBeLessThan(660);
-    // Near the end there's nothing more to read ahead.
-    expect(comingUp(prepared, progressAt(prepared, at(LNG, LAT)))).toEqual([]);
+    // The arrival is just over 300 m after the last turn, too far for the
+    // Then line, so it's read ahead in the list instead; then nothing more.
+    expect(comingUp(prepared, progressAt(prepared, at(LNG, LAT))).map((a) => a.maneuver.type)).toEqual([4]);
   });
 });
 
@@ -185,6 +186,76 @@ describe("briefInstruction", () => {
       "Turn right onto Bedford Road.",
     );
     expect(briefInstruction("Continue on A3.")).toBe("Continue on A3.");
+  });
+});
+
+describe("the Then line", () => {
+  // Five 160 m legs east along one row of points (~0.0023° each).
+  const row: [number, number][] = [0, 1, 2, 3, 4, 5].map((k) => [LNG + k * 0.0023, LAT]);
+  const plan = (maneuvers: Maneuver[]) => prepare({ ...route, shape: row, maneuvers });
+
+  it("skips a step that just carries on along the same street", () => {
+    const p = progressAt(
+      plan([
+        m(1, "Drive east on Bedford Road.", "Bedford Road", 0, 1, 160, 16),
+        m(8, "Continue on Bedford Road.", "Bedford Road", 1, 2, 160, 16),
+        m(10, "Turn right onto Stockwell Road.", "Stockwell Road", 2, 3, 160, 16),
+        m(15, "Turn left onto Clapham Road.", "Clapham Road", 3, 5, 320, 32),
+        m(4, "You have arrived.", "", 5, 5, 0, 0),
+      ]),
+      at(LNG, LAT),
+    );
+    expect(p.next?.instruction).toBe("Turn right onto Stockwell Road.");
+    expect(p.distanceToNextM).toBeGreaterThan(300);
+    expect(p.after?.instruction).toBe("Turn left onto Clapham Road.");
+  });
+
+  it("is hidden when the turn after next is far behind it", () => {
+    const p = progressAt(
+      plan([
+        m(1, "Drive east.", "A Road", 0, 1, 160, 16),
+        m(10, "Turn right onto B Road.", "B Road", 1, 4, 480, 40),
+        m(15, "Turn left onto C Road.", "C Road", 4, 5, 160, 16),
+        m(4, "You have arrived.", "", 5, 5, 0, 0),
+      ]),
+      at(LNG, LAT),
+    );
+    expect(p.next?.instruction).toBe("Turn right onto B Road.");
+    expect(p.after).toBeNull();
+  });
+
+  it("shows a far turn when it comes within 20 seconds (a fast road)", () => {
+    const p = progressAt(
+      plan([
+        m(1, "Drive east.", "A Road", 0, 1, 160, 16),
+        m(10, "Turn right onto B Road.", "B Road", 1, 4, 480, 18),
+        m(15, "Turn left onto C Road.", "C Road", 4, 5, 160, 16),
+        m(4, "You have arrived.", "", 5, 5, 0, 0),
+      ]),
+      at(LNG, LAT),
+    );
+    expect(p.after?.instruction).toBe("Turn left onto C Road.");
+  });
+
+  it("says which way rather than repeat the road you'll be on", () => {
+    const stay = m(10, "Turn right to stay on Bedford Road.", "Bedford Road", 2, 3, 160, 16);
+    expect(thenText(stay, stay.instruction, ["Bedford Road"])).toBe("right");
+    expect(thenText({ ...stay, type: 15 }, stay.instruction, ["Bedford Road/A23"])).toBe("left");
+    // Onto a different road: its name, as before.
+    expect(thenText(stay, stay.instruction, ["Stockwell Road"])).toBe("Bedford Road");
+  });
+
+  it("leaves carry-on steps out of the list read ahead", () => {
+    const long = plan([
+      m(1, "Drive east.", "A", 0, 1, 160, 16),
+      m(9, "Bear right.", "B", 1, 2, 160, 16),
+      m(10, "Turn right.", "C", 2, 3, 160, 16),
+      m(8, "Continue on C.", "C", 3, 4, 160, 16),
+      m(15, "Turn left.", "D", 4, 5, 160, 16),
+      m(4, "You have arrived.", "", 5, 5, 0, 0),
+    ]);
+    const ahead = comingUp(long, progressAt(long, at(LNG, LAT)));
+    expect(ahead.map((a) => a.maneuver.instruction)).toEqual(["Turn left.", "You have arrived."]);
   });
 });
 
