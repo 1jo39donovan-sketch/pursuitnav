@@ -133,7 +133,6 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     // refresh() only sets state after awaiting the permission check, so this
     // subscribes to an external system rather than updating state in the effect.
     // Asks once a launch; when precision changes this runs again without asking.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh(!asked.current).catch(() => setStatus("denied"));
     asked.current = true;
     // Coming back from Settings is the usual way a denied permission gets
