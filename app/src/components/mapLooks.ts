@@ -162,6 +162,38 @@ function nightLayer(l: Layer): Layer {
   }
 }
 
+// Day, tuned for reading in daylight from a moving car (PM, item 8): a
+// warmer background that doesn't glare, darker, wider road edges, and
+// near-black labels on a white halo.
+const DAY = { background: "#e9e6e1", casing: "#6b6b6b", casingWidth: 1.4, text: "#111111", halo: "#ffffff", haloWidth: 2 };
+
+function dayLayer(l: Layer): Layer {
+  if (l.type === "background") return { ...l, paint: { ...l.paint, "background-color": DAY.background } };
+  if (l.type === "line" && sourceLayer(l) === ROADS && /casing|outline/.test(l.id)) {
+    return {
+      ...l,
+      paint: {
+        ...l.paint,
+        "line-color": DAY.casing,
+        "line-width": scaleWidth(l.paint?.["line-width"], DAY.casingWidth) as never,
+      },
+    };
+  }
+  // Road number shields keep their own colours.
+  if (l.type === "symbol" && !/shield/.test(l.id)) {
+    return {
+      ...l,
+      paint: { ...l.paint, "text-color": DAY.text, "text-halo-color": DAY.halo, "text-halo-width": DAY.haloWidth },
+    };
+  }
+  return l;
+}
+
+/** The standard day style tuned for daylight. */
+export function dayify(style: StyleSpecification): StyleSpecification {
+  return { ...style, layers: style.layers.map(dayLayer) };
+}
+
 /** The day style recoloured for night. */
 export function nightify(style: StyleSpecification): StyleSpecification {
   return { ...style, layers: style.layers.map(nightLayer) };
@@ -242,7 +274,8 @@ export function useMapStyle(
 ): string | StyleSpecification {
   const [made, setMade] = useState<{ key: string; style: StyleSpecification } | null>(null);
   const fromDay = theme === "night" && !!day;
-  const plain = look === "standard" && !fromDay && houseNumbers;
+  // Only the night map without its day source is drawn as it comes; day is always tuned.
+  const plain = look === "standard" && theme === "night" && !fromDay && houseNumbers;
   const source = fromDay ? day! : base;
   const key = `${look}|${theme}|${source}|${houseNumbers}`;
   useEffect(() => {
@@ -250,7 +283,8 @@ export function useMapStyle(
     let live = true;
     styleJson(source)
       .then((s) => {
-        const style = restyle(fromDay ? nightify(s) : s, look, theme);
+        const tuned = fromDay ? nightify(s) : theme === "day" ? dayify(s) : s;
+        const style = restyle(tuned, look, theme);
         if (live) setMade({ key, style: houseNumbers ? style : withoutHouseNumbers(style) });
       })
       .catch(() => {});

@@ -71,7 +71,7 @@ export function MapButtons({
       )}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={mapTheme === "night" ? "Switch to day map" : "Switch to night map"}
+        accessibilityLabel={mapTheme === "night" ? "Switch to day: map and screens" : "Switch to night: map and screens"}
         onPress={() => setMapTheme(mapTheme === "night" ? "day" : "night")}
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
       >

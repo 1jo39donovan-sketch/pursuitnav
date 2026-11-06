@@ -7,6 +7,8 @@ import { MAP_LOOKS, type MapLook } from "../components/mapLooks";
 import { store } from "../storage/store";
 import { APPEARANCES, type Appearance } from "../theme";
 import { isService, isVehicle, vehiclesFor, type ServiceType, type VehicleType } from "../vehicles";
+import { region } from "../config";
+import { isDaylight } from "../sun";
 
 interface Session {
   callsign: string;
@@ -28,19 +30,17 @@ interface Session {
   /** What's being driven; routes avoid limits it can't take. */
   vehicle: VehicleType;
   setVehicle: (v: VehicleType) => void;
-  /** Night (dark) or day (light) map. */
-  /** The map's colours now: the choice, or the screens' when it's "auto". */
+  /** The map's colours now: always the same as the screens' (one day/night state). */
   mapTheme: MapTheme;
-  /** "auto": the map matches the screens (night map with dark screens). */
-  mapChoice: MapChoice;
-  setMapTheme: (t: MapChoice) => void;
+  /** The map's Day/Night button: switches the screens and the map together. */
+  setMapTheme: (t: MapTheme) => void;
   /** Standard, high-contrast, plain or the OS road map. */
   mapLook: MapLook;
   setMapLook: (l: MapLook) => void;
   /** How the navigation and pursuit maps turn: north up, direction of travel up, or tilted 3D. */
   mapView: MapView;
   setMapView: (v: MapView) => void;
-  /** Dark or light screens: following the phone, or chosen. */
+  /** Day and night: by the sun (the default), following the phone, or chosen. */
   appearance: Appearance;
   setAppearance: (a: Appearance) => void;
   /** The screens are dark now. */
@@ -65,7 +65,22 @@ interface Session {
 export type RoadChoice = "main" | "any";
 
 export type MapTheme = "night" | "day";
-export type MapChoice = MapTheme | "auto";
+/** Whether the sun is up over the covered area, checked each minute while `on`. */
+function useSunUp(on: boolean): boolean {
+  const [centreLng, centreLat] = region.defaultCentre;
+  const now = () => isDaylight(new Date(), centreLat, centreLng);
+  const [up, setUp] = useState(now);
+  useEffect(() => {
+    if (!on) return;
+    const tick = () => setUp(now());
+    tick();
+    const t = setInterval(tick, 60_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on]);
+  return up;
+}
+
 export type MapView = "north" | "heading" | "3d";
 export const MAP_VIEWS: MapView[] = ["3d", "heading", "north"];
 
@@ -127,29 +142,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return isService(saved) ? saved : null;
   });
 
-  // A new key: the 30 Oct browser test found dark screens on a day map (and
-  // light on night) clashing, so everyone starts with the map matching.
-  const [mapChoice, setMapTheme] = useSetting<MapChoice>("mapChoice", ["auto", "night", "day"], "auto");
   const [mapLook, setMapLook] = useSetting<MapLook>("mapLook", MAP_LOOKS, "standard");
   const [mapView, setMapView] = useSetting<MapView>("mapView", MAP_VIEWS, "3d");
   // "voice" was first stored by the navigation screen as "1"/"0".
   const [voiceSetting, setVoiceSetting] = useSetting<"1" | "0">("voice", ["1", "0"], "1");
   const voice = voiceSetting === "1";
   const [roads, setRoads] = useSetting<RoadChoice>("roads", ["main", "any"], "main");
-  const [appearance, setAppearanceSetting] = useSetting<Appearance>("appearance", APPEARANCES, "system");
-  // Changing the screens brings the map back to matching them.
-  const setAppearance = useCallback(
-    (a: Appearance) => {
-      setAppearanceSetting(a);
-      setMapTheme("auto");
-    },
-    [setAppearanceSetting, setMapTheme],
-  );
+  // One day/night state for the map and the panels (PM, item 8): by the sun
+  // unless chosen. A new key, so everyone starts on Auto.
+  const [appearance, setAppearance] = useSetting<Appearance>("dayNight", APPEARANCES, "auto");
   // Follows the phone from builds made after 4 Nov (app.json "automatic"); an
   // older build always reports dark here, so "Match phone" means dark there.
   const scheme = useColorScheme();
-  const dark = appearance === "dark" || (appearance === "system" && scheme !== "light");
-  const mapTheme: MapTheme = mapChoice === "auto" ? (dark ? "night" : "day") : mapChoice;
+  const sunUp = useSunUp(appearance === "auto");
+  const dark =
+    appearance === "dark" ||
+    (appearance === "system" && scheme !== "light") ||
+    (appearance === "auto" && !sunUp);
+  const mapTheme: MapTheme = dark ? "night" : "day";
+  // The map's button picks day or night for everything, until Auto is chosen again on Session.
+  const setMapTheme = useCallback((t: MapTheme) => setAppearance(t === "night" ? "dark" : "light"), [setAppearance]);
   const [largeSetting, setLargeSetting] = useSetting<"1" | "0">("largeText", ["1", "0"], "0");
   const largeText = largeSetting === "1";
   const setLargeText = useCallback((on: boolean) => setLargeSetting(on ? "1" : "0"), [setLargeSetting]);
@@ -222,7 +234,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       vehicle,
       setVehicle,
       mapTheme,
-      mapChoice,
       setMapTheme,
       mapLook,
       setMapLook,
@@ -261,7 +272,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       vehicle,
       setVehicle,
       mapTheme,
-      mapChoice,
       setMapTheme,
       mapLook,
       setMapLook,
