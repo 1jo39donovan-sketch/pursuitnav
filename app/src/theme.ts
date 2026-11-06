@@ -32,9 +32,12 @@ export const lightColors: Palette = {
   warn: "#d0342c",
 };
 
-/** "system" follows the phone's dark or light setting. */
-export type Appearance = "system" | "dark" | "light";
-export const APPEARANCES: Appearance[] = ["system", "dark", "light"];
+/**
+ * Day and night for the screens and the map together: "auto" goes light at
+ * sunrise and dark at sunset, "system" follows the phone's own setting.
+ */
+export type Appearance = "auto" | "system" | "dark" | "light";
+export const APPEARANCES: Appearance[] = ["auto", "system", "light", "dark"];
 
 const toLight = new Map<string, string>([
   ...(Object.keys(colors) as (keyof typeof colors)[]).map((k) => [colors[k].toLowerCase(), lightColors[k]] as const),

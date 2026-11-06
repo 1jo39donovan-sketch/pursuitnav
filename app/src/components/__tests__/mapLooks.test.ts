@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { nightify, restyle, scaleWidth } from "../mapLooks";
+import { dayify, nightify, restyle, scaleWidth } from "../mapLooks";
 
 // Hoisted above the imports by vitest.
 vi.mock("../../config", () => ({ API_URL: "https://api.example" }));
@@ -73,5 +73,29 @@ describe("map looks", () => {
     expect((n.layers[0] as unknown as Painted).paint["background-color"]).toBe("#0f1520");
     expect((n.layers[2] as unknown as Painted).paint["line-color"]).toBe("#06090f");
     expect((n.layers[4] as unknown as Painted).paint["text-color"]).toBe("#c4ccda");
+  });
+});
+
+describe("the day map, tuned for daylight", () => {
+  type L = { id: string; paint?: Record<string, unknown> };
+  const day = dayify(style) as unknown as { layers: L[] };
+  const layer = (id: string) => day.layers.find((l) => l.id === id)!;
+
+  it("has a warm background that doesn't glare", () => {
+    expect(layer("background").paint!["background-color"]).toBe("#e9e6e1");
+  });
+
+  it("draws road edges darker and 1.4 times wider", () => {
+    const casing = layer("road_minor_casing").paint!;
+    expect(casing["line-color"]).toBe("#6b6b6b");
+    expect(casing["line-width"]).toEqual({ stops: [[12, 1.4], [18, 6 * 1.4]] });
+    // The road itself keeps its own colour and width.
+    expect(layer("road_primary").paint!["line-color"]).toBe("#333");
+  });
+
+  it("writes labels near-black on a 2 px white halo", () => {
+    for (const id of ["poi", "road_label"]) {
+      expect(layer(id).paint).toMatchObject({ "text-color": "#111111", "text-halo-color": "#ffffff", "text-halo-width": 2 });
+    }
   });
 });

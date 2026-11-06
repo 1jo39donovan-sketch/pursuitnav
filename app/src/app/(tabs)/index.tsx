@@ -79,13 +79,14 @@ function Section({
 }
 
 /** Dark or light screens (the map has its own Day and Night). */
+// One choice for the screens and the map together (PM, item 8).
 const APPEARANCE_NAMES: Record<Appearance, string> = {
+  auto: "Auto: sunrise and sunset",
   system: "◐ Match phone",
-  dark: "Dark screens",
-  light: "Light screens",
+  light: "☀ Day",
+  dark: "☾ Night",
 };
 
-const MAP_CHOICE_NAMES = { auto: "Map matches screens", night: "☾ Night map", day: "☀ Day map" } as const;
 
 const LOOK_HINTS: Record<MapLook, string> = {
   standard: "The everyday map.",
@@ -113,12 +114,11 @@ export default function SessionScreen() {
     setVoice,
     showPursuit,
     setShowPursuit,
-    mapChoice,
     mapLook,
     setMapLook,
     largeText,
     setLargeText,
-    setMapTheme,
+    mapTheme,
     appearance,
     setAppearance,
     roads,
@@ -206,8 +206,13 @@ export default function SessionScreen() {
           : "In a team · connecting";
   const { voiceName, rate: voiceRate } = voiceSettings();
   const mapSummary = [
-    appearance === "system" ? "Screens match phone" : appearance === "dark" ? "Dark screens" : "Light screens",
-    mapChoice === "auto" ? null : mapChoice === "night" ? "night map" : "day map",
+    appearance === "auto"
+      ? `day/night by the sun (${mapTheme === "night" ? "night" : "day"} now)`
+      : appearance === "system"
+        ? "day/night matches phone"
+        : appearance === "dark"
+          ? "night"
+          : "day",
     MAP_LOOK_NAMES[mapLook],
     voice ? `voice: ${voiceName ?? "best on phone"}${voiceRate === "faster" ? ", faster" : ""}` : "voice off",
     largeText ? "larger text" : null,
@@ -444,7 +449,7 @@ export default function SessionScreen() {
               trackColor={{ false: palette.line, true: palette.amber }}
             />
           </View>
-          <View style={styles.chips} accessibilityLabel="Screens">
+          <View style={styles.chips} accessibilityLabel="Day and night: screens and map">
             {APPEARANCES.map((a) => {
               const on = appearance === a;
               return (
@@ -456,22 +461,6 @@ export default function SessionScreen() {
                   style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
                 >
                   <Text style={[styles.chipText, on && styles.chipTextOn]}>{APPEARANCE_NAMES[a]}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.chips}>
-            {(["auto", "night", "day"] as const).map((t) => {
-              const on = mapChoice === t;
-              return (
-                <Pressable
-                  key={t}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: on }}
-                  onPress={() => setMapTheme(t)}
-                  style={[styles.chip, styles.vehicleChip, on && styles.chipOn]}
-                >
-                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{MAP_CHOICE_NAMES[t]}</Text>
                 </Pressable>
               );
             })}
