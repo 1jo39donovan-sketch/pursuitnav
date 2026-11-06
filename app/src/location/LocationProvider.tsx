@@ -16,6 +16,7 @@ import { useSession } from "../session/SessionProvider";
 import { onDrivingFix } from "./drivingService";
 import { facing as facingFrom, isMoving } from "./facing";
 import { checkLocation, watchCompass, watchLocation } from "./locationSource";
+import { usePreciseWanted } from "./precision";
 
 export type LocationStatus =
   | "checking"
@@ -83,6 +84,10 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   }, []);
   const [demoFix, setDemoFix] = useState<Fix | null>(null);
   const subscription = useRef<(() => void) | null>(null);
+  const asked = useRef(false);
+  // Full-precision GPS only while navigating or in Pursuit (PM, item 13).
+  // A change re-runs the permission effect below, which watches again at the new level.
+  const precise = usePreciseWanted();
 
   const stopWatching = useCallback(() => {
     subscription.current?.();
@@ -91,11 +96,16 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
   const startWatching = useCallback(async () => {
     if (subscription.current) return;
-    subscription.current = await watchLocation(setFix, () => {
-      stopWatching();
-      setStatus("denied");
-    });
-  }, [stopWatching, setFix]);
+    subscription.current = await watchLocation(
+      setFix,
+      () => {
+        stopWatching();
+        setStatus("denied");
+      },
+      precise,
+    );
+  }, [stopWatching, setFix, precise]);
+
 
   const refresh = useCallback(
     async (ask: boolean) => {
@@ -122,12 +132,17 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     if (simulated) return;
     // refresh() only sets state after awaiting the permission check, so this
     // subscribes to an external system rather than updating state in the effect.
+    // Asks once a launch; when precision changes this runs again without asking.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh(true).catch(() => setStatus("denied"));
+    refresh(!asked.current).catch(() => setStatus("denied"));
+    asked.current = true;
     // Coming back from Settings is the usual way a denied permission gets
     // fixed, so check again whenever the app returns to the foreground.
+    // In the background the app's own watch stops, saving battery; on
+    // Android while navigating, the foreground service carries on instead.
     const appState = AppState.addEventListener("change", (next) => {
       if (next === "active") refresh(false).catch(() => {});
+      else if (next === "background") stopWatching();
     });
     return () => {
       appState.remove();
