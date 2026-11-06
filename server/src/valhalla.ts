@@ -6,6 +6,12 @@ export interface Waypoint {
   point: LngLat;
   /** Direction of travel at this point, degrees from north; snaps to roads going this way. */
   heading?: number;
+  /**
+   * Only snap to a road from which at least this many junctions can be
+   * reached: keeps a start off a small island of roads (inside a park or
+   * an estate) that leads nowhere. Valhalla's default is 50.
+   */
+  reachability?: number;
 }
 
 export interface Maneuver {
@@ -158,6 +164,7 @@ const location = (w: Waypoint) => ({
   lat: w.point[1],
   lon: w.point[0],
   ...(w.heading !== undefined ? { heading: Math.round(w.heading), heading_tolerance: 45 } : {}),
+  ...(w.reachability !== undefined ? { minimum_reachability: w.reachability } : {}),
 });
 
 interface ValhallaRouteResponse {

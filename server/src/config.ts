@@ -47,6 +47,13 @@ export interface ServerConfig {
   statsToken?: string;
   /** The code version running (a commit, set by scripts/update.sh), shown by GET /health. */
   version?: string;
+  /**
+   * Web pages allowed to call the API from a browser (the web app). The
+   * phone apps send no Origin, so this doesn't touch them. Default: ours.
+   */
+  corsOrigins?: string[];
+  /** Requests a minute from one address before 429; 0 turns the limit off. */
+  rateLimitPerMinute?: number;
 }
 
 // Greater London, Kent and Essex with a margin, matching the app's region config.
@@ -92,5 +99,7 @@ export function loadConfig(): ServerConfig {
     usageDb: process.env.USAGE_DB ?? "/data/usage/usage.sqlite",
     statsToken: process.env.STATS_TOKEN || undefined,
     version: process.env.VERSION || undefined,
+    corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean) : undefined,
+    rateLimitPerMinute: process.env.RATE_LIMIT_PER_MINUTE ? Number(process.env.RATE_LIMIT_PER_MINUTE) : undefined,
   };
 }

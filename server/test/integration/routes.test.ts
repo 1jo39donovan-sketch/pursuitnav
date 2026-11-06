@@ -297,6 +297,21 @@ describe("private roads and gates", () => {
   });
 });
 
+describe("a start inside a park", () => {
+  it("Valhalla on its own snaps to the island of roads and finds no way off (why the retry exists)", async () => {
+    await expect(
+      client.route({ costing: STANDARD, from: { point: lngLat("common_island") }, to: { point: lngLat("common_town") } }),
+    ).rejects.toMatchObject({ httpStatus: 400 });
+  });
+
+  it("still gets a route, from the nearest road joined to the rest", async () => {
+    const result = await plan("common_island", "common_town");
+    const names = result.standard.maneuvers.flatMap((m) => m.streetNames);
+    expect(names.some((n) => n.startsWith("Town"))).toBe(true);
+    expect(names).not.toContain("Common Drive");
+  });
+});
+
 describe("live road closures", () => {
   // A block of High Road is fully closed: both routes go by Back Street instead.
   const feed = new ClosureFeed();

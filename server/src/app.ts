@@ -8,6 +8,7 @@ import Fastify, { LogController, type FastifyInstance, type FastifyReply, type F
 import type { ClosureAwareRoute, ClosureFeed } from "./closures.js";
 import type { ServerConfig } from "./config.js";
 import { BANDS, type LearningStore, type Sample } from "./learning.js";
+import { RateLimiter } from "./rateLimit.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
 import type { NearestDoor, WhereIs } from "./nominatim.js";
@@ -100,6 +101,17 @@ const token = { type: "string", minLength: 32, maxLength: 64 } as const;
 
 /** How long a pursuit answer waits for the house number once the road is known, ms. */
 const DOOR_WAIT_MS = 500;
+/** Where the web app is served (own domain and GitHub Pages) and local development. */
+export const DEFAULT_ORIGINS = [
+  "https://bluerouteapp.com",
+  "https://www.bluerouteapp.com",
+  "https://1jo39donovan-sketch.github.io",
+  "http://localhost:8081",
+  "http://localhost:19006",
+];
+/** Requests a minute from one address. */
+export const RATE_LIMIT_PER_MINUTE = 600;
+
 export function buildApp(
   config: ServerConfig,
   router: Router,
@@ -120,6 +132,9 @@ export function buildApp(
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
   const app = Fastify({
+    // Requests reach the API only through Caddy on Docker's private network:
+    // trust the address it forwards, and only from there.
+    trustProxy: "loopback,uniquelocal",
     logger: { level: "warn" },
     logController: new LogController({ disableRequestLogging: true }),
   });
@@ -131,7 +146,34 @@ export function buildApp(
   // an extra round trip every time. Browsers cap this (Safari at 10 minutes,
   // Chrome at 2 hours).
   // ETag readable from the web app, so it re-downloads the places file only when it has changed.
-  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"], maxAge: 86_400, exposedHeaders: ["etag"] });
+  // Only our own web pages may call from a browser (PM, item 15).
+  const origins = new Set(config.corsOrigins ?? DEFAULT_ORIGINS);
+  app.register(cors, {
+    origin: (origin, cb) => cb(null, !origin || origins.has(origin)),
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    maxAge: 86_400,
+    exposedHeaders: ["etag"],
+  });
+
+  // A limit per address, so one misbehaving client (or a scraper) can't
+  // starve the crews. Generous: phones on mobile data can share an address,
+  // and Pursuit alone asks once a second. Kept in memory only; addresses are
+  // never logged or stored.
+  const perMinute = config.rateLimitPerMinute ?? RATE_LIMIT_PER_MINUTE;
+  if (perMinute > 0) {
+    const limiter = new RateLimiter(perMinute);
+    app.addHook("onRequest", async (req, reply) => {
+      if (req.url === "/health" || req.method === "OPTIONS") return;
+      // Behind Cloudflare, the visitor's own address; else the one Caddy saw.
+      const key = (req.headers["cf-connecting-ip"] as string | undefined) ?? req.ip;
+      if (!limiter.allow(key)) {
+        return reply
+          .code(429)
+          .header("retry-after", "60")
+          .send({ error: "rate-limited", message: "Too many requests from this connection. Try again in a minute." });
+      }
+    });
+  }
 
   // Answers that mean "this feature isn't set up here" (no OS Places key, map
   // data not built yet). Deliberate, so not counted as server errors.

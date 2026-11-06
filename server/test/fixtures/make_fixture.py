@@ -201,6 +201,23 @@ point("private_mews_start", 17, 1, -1)
 point("private_mews_end", 17, 2, 0)
 
 
+# Cluster 18: a start inside a park. A little island of roads (8 x 8
+# junctions, joined to nothing) sits beside a big town grid (23 x 23). By
+# default Valhalla snaps a point on the island to it, and there's no way off
+# (Clapham Common, 3 Nov: "No route found"). Snapping only to roads well
+# joined to the rest finds the town instead.
+STEP = 0.2  # grid units: about 44 m
+for k in range(23):
+    way(18, [(k * STEP, c * STEP) for c in range(23)], f"Town Row {k}")
+    way(18, [(r * STEP, k * STEP) for r in range(23)], f"Town Column {k}")
+ISLAND = 23 * STEP + 0.3  # just east of the town, not touching it
+for k in range(8):
+    way(18, [(k * STEP, ISLAND + c * STEP) for c in range(8)], "Common Drive")
+    way(18, [(r * STEP, ISLAND + k * STEP) for r in range(8)], "Common Drive")
+point("common_island", 18, 4 * STEP, ISLAND + 4 * STEP)
+point("common_town", 18, 20 * STEP, 2 * STEP)
+
+
 # House-numbered addresses, away from the street grids (the smoke test picks a
 # door-level address from these). Not roads, so routing ignores them.
 tagged_nodes = []  # (id, lat, lng, tags)
