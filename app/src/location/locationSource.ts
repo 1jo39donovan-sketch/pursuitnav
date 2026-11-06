@@ -29,12 +29,25 @@ export async function checkLocation(ask: boolean): Promise<LocationStatus> {
   return "granted";
 }
 
-/** Streams positions about once a second; returns a function that stops it. */
-export async function watchLocation(onFix: (fix: Fix) => void, _onRefused: () => void): Promise<() => void> {
-  const last = await Location.getLastKnownPositionAsync();
+/** A cached position older than this isn't shown or routed from: it may be miles away. */
+const LAST_KNOWN_MAX_AGE_MS = 60_000;
+
+/**
+ * Streams positions; returns a function that stops it. `precise`: full
+ * navigation accuracy once a second (navigating, Pursuit); otherwise a
+ * lighter fix every few seconds, which saves battery while searching.
+ */
+export async function watchLocation(
+  onFix: (fix: Fix) => void,
+  _onRefused: () => void,
+  precise = true,
+): Promise<() => void> {
+  const last = await Location.getLastKnownPositionAsync({ maxAge: LAST_KNOWN_MAX_AGE_MS });
   if (last) onFix(toFix(last));
   const sub = await Location.watchPositionAsync(
-    { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 },
+    precise
+      ? { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 }
+      : { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
     (loc) => onFix(toFix(loc)),
   );
   return () => sub.remove();

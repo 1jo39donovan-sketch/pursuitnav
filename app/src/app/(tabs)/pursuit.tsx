@@ -10,6 +10,7 @@ import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import { formatDistance } from "../../format";
 import { useDrivingService } from "../../location/drivingService";
+import { usePrecise } from "../../location/precision";
 import { recentFixes, useLocation, type Fix } from "../../location/LocationProvider";
 import { notePursuit, pursuitOpened } from "../../navigation/timings";
 import { EMPTY_FEED, feedNote, nextFeed, shownInfo } from "../../navigation/serverFeed";
@@ -23,6 +24,9 @@ import { colors, fonts } from "../../theme";
 import { useThemed } from "../../textSize";
 
 const POLL_MS = 1000;
+/** Below this (m/s, about 10 mph), the road changes slowly: ask the server every 2 s instead (PM, item 13). */
+const SLOW_MS = 4.5;
+const SLOW_POLL_MS = 2000;
 const TRACE_POINTS = 8;
 const TRACE_MAX_AGE_MS = 30000;
 // Below walking pace GPS course is noise.
@@ -55,6 +59,7 @@ export default function PursuitScreen() {
   }, [focused]);
   const { fix, simulated } = useLocation();
   useDrivingService("pursuit", focused && !simulated);
+  usePrecise("pursuit", focused && !simulated);
   const { mapView } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const { data, places, blockLabels } = useSearch();
@@ -96,12 +101,17 @@ export default function PursuitScreen() {
   useEffect(() => {
     if (!focused) return;
     let busy = false;
+    let lastSent = 0;
     const controller = new AbortController();
     const tick = async () => {
       setNow(Date.now());
       const { fixes, course } = traceRef.current;
       if (busy || !fixes.length) return;
+      const speed = fixes[fixes.length - 1]!.speed;
+      const slow = speed == null || speed < SLOW_MS;
+      if (slow && Date.now() - lastSent < SLOW_POLL_MS) return;
       busy = true;
+      lastSent = Date.now();
       const lookup = await fetchPursuitInfo(
         fixes.map((f) => ({ lat: f.lat, lng: f.lng })),
         course ?? undefined,

@@ -39,7 +39,12 @@ export async function checkLocation(ask: boolean): Promise<LocationStatus> {
   );
 }
 
-export async function watchLocation(onFix: (fix: Fix) => void, onRefused: () => void): Promise<() => void> {
+export async function watchLocation(
+  onFix: (fix: Fix) => void,
+  onRefused: () => void,
+  // Browsers always give their best: no battery choice to make here.
+  _precise = true,
+): Promise<() => void> {
   const id = navigator.geolocation.watchPosition(
     (p) => onFix(toFix(p)),
     (err) => {
