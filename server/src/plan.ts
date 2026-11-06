@@ -232,19 +232,31 @@ export async function planRoutes(
   heading?: number,
   vehicle: VehicleType = "car",
 ): Promise<Plan> {
+  const noWay = (err: unknown) => err instanceof ValhallaError && err.httpStatus < 500;
   try {
     return await planFrom(router, from, to, opts, heading, vehicle);
   } catch (err) {
-    // Starting the way the car is facing can leave no way at all (GPS a few
-    // metres onto a one-way side street, or on a junction): the crew saw "No
-    // route found", then a route on Retry. Try again from the same point in any
-    // direction before saying there's no route.
-    if (heading !== undefined && err instanceof ValhallaError && err.httpStatus < 500) {
-      return planFrom(router, from, to, opts, undefined, vehicle);
-    }
-    throw err;
+    if (!noWay(err)) throw err;
   }
+  // Starting the way the car is facing can leave no way at all (GPS a few
+  // metres onto a one-way side street, or on a junction): the crew saw "No
+  // route found", then a route on Retry. Try again from the same point in any
+  // direction before saying there's no route.
+  if (heading !== undefined) {
+    try {
+      return await planFrom(router, from, to, opts, undefined, vehicle);
+    } catch (err) {
+      if (!noWay(err)) throw err;
+    }
+  }
+  // A point inside a park or an estate can snap to a little island of roads
+  // that leads nowhere (Clapham Common, 3 Nov: 422). Snap both ends only to
+  // roads well joined to the rest instead.
+  return planFrom(router, from, to, opts, undefined, vehicle, WELL_JOINED);
 }
+
+/** Junctions a snapped road must reach on the retry: more than any island in a park or estate. */
+const WELL_JOINED = 500;
 
 async function planFrom(
   router: Router,
@@ -253,11 +265,12 @@ async function planFrom(
   opts: PlanOptions,
   heading: number | undefined,
   vehicle: VehicleType,
+  reachability?: number,
 ): Promise<Plan> {
   const STANDARD = standardFor(vehicle, opts.roads);
   const POLICE = policeFor(vehicle, opts.roads);
-  const start = { point: from, heading };
-  const end = { point: to };
+  const start = { point: from, heading, reachability };
+  const end = { point: to, reachability };
   const [firstStandard, firstPolice] = await Promise.all([
     router.route({ costing: STANDARD, from: start, to: end }),
     opts.standardOnly ? null : router.route({ costing: POLICE, from: start, to: end }),

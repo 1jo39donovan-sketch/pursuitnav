@@ -31,6 +31,12 @@ Both route responses avoid roads TfL lists as fully closed (`src/closures.ts`) a
 
 `routing` and `places`: the map data is built. `addresses`: which address providers the server has; `nominatim` is true once its database is built and answering.
 
+### Who may call it
+
+- **Browsers:** only our own web pages (`bluerouteapp.com`, `www.bluerouteapp.com`, the GitHub Pages copy and local development) get CORS headers. Set `CORS_ORIGINS` (comma-separated) to change the list. The phone apps send no `Origin` and aren't affected.
+- **Rate limit:** 600 requests a minute per address, then `429 rate-limited` with `Retry-After: 60`. Set `RATE_LIMIT_PER_MINUTE` to change it, or `0` to turn it off. `/health` is never limited. Counts are kept in memory for the current minute only; addresses are never logged or stored. The address is the one Caddy forwards (or Cloudflare's `CF-Connecting-IP`).
+- **Starts inside a park or estate:** if a start or destination snaps to a small island of roads with no way off, the route is tried again snapping only to roads that reach at least 500 junctions (Valhalla `minimum_reachability`).
+
 ### Places
 
 **Map build.** `scripts/build-map.sh` downloads the OSM extract named by `PBF_URL` in `.env` (Greater London by default), adds travel speeds with `places/practical_speeds.py`, builds Valhalla's tiles and swaps them in. Travel speeds go in `maxspeed:practical`, which Valhalla uses for timing while `maxspeed` stays the signed limit: main roads are timed near their limit, side streets slower, so routes favour main roads as blue-light drives do. Learned speeds in `data/learned/practical_speeds.csv` (`way_id,mph`) override the model road by road. Cron runs it weekly as `rebuild-tiles.sh`.
