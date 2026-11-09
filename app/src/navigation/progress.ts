@@ -310,7 +310,14 @@ const roadParts = (names: readonly string[]) => names.flatMap((n) => n.split("/"
  * an arrival or a turn with no road named.
  */
 export function thenText(m: Maneuver, full: string, onRoad: readonly string[] = []): string {
-  if (m.type in ARRIVAL || !m.streetNames.length) return briefInstruction(full);
+  if (m.type in ARRIVAL) {
+    // "Mayflower Road, on the right", not "Destination ahead on the right: Mayflo…" (9 Nov drive).
+    const place = full.includes(": ") ? full.slice(full.indexOf(": ") + 2).trim() : "";
+    const side = m.type === 5 ? "on the right" : m.type === 6 ? "on the left" : "";
+    if (place) return side ? `${place}, ${side}` : place;
+    return side ? `Destination, ${side}` : "Destination";
+  }
+  if (!m.streetNames.length) return briefInstruction(full);
   const parts = roadParts(m.streetNames);
   const here = new Set(roadParts(onRoad));
   if (parts.some((p) => here.has(p)) && VERB[m.type]) return VERB[m.type]!;

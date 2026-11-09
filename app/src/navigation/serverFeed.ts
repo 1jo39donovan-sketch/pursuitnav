@@ -15,6 +15,8 @@ export interface PursuitFeed {
   asked?: boolean;
   /** A different road from one answer only, waiting for the next to agree before it's shown. */
   pending?: PursuitInfo | null;
+  /** How many answers in a row have given the pending road. */
+  pendingSeen?: number;
 }
 
 export const EMPTY_FEED: PursuitFeed = { info: null, okAt: 0, trouble: null };
@@ -52,9 +54,27 @@ function steadied(feed: PursuitFeed, info: PursuitInfo, now: number): PursuitFee
       info.nextJunction ?? (cur.nextJunction && cur.nextJunction.distanceM > 25 ? cur.nextJunction : null);
     return { info: { ...info, nextJunction: junction }, okAt: now, trouble: null, pending: null };
   }
-  // Another road: shown once the next answer agrees.
-  if (feed.pending?.road === info.road) return { info, okAt: now, trouble: null, pending: null };
-  return { ...feed, info: { ...cur, near: info.near ?? cur.near }, okAt: now, trouble: null, pending: info };
+  // Another road: shown once the next answer agrees. The side road at the
+  // junction being passed needs one more: GPS sits on it for a couple of
+  // answers as the car goes by (9 Nov drive: "Bedford Road" and "Aristotle
+  // Road" flashed up while driving along Clapham Road).
+  const seen = feed.pending?.road === info.road ? (feed.pendingSeen ?? 1) + 1 : 1;
+  if (seen >= (sideRoadAtJunction(cur, info.road) ? 3 : 2)) {
+    return { info, okAt: now, trouble: null, pending: null, pendingSeen: 0 };
+  }
+  return { ...feed, info: { ...cur, near: info.near ?? cur.near }, okAt: now, trouble: null, pending: info, pendingSeen: seen };
+}
+
+/** Close enough to a junction that GPS may sit on the side road for a moment. */
+const AT_JUNCTION_M = 40;
+const parts = (name: string) => name.split("/").map((p) => p.trim().toLowerCase());
+
+/** Whether `road` is one of the roads at the junction just ahead. */
+function sideRoadAtJunction(cur: PursuitInfo, road: string): boolean {
+  const j = cur.nextJunction;
+  if (!j || j.distanceM > AT_JUNCTION_M) return false;
+  const atJunction = new Set(parts(j.name));
+  return parts(road).some((p) => atJunction.has(p));
 }
 
 /** The server's answer if it's recent enough to show; null otherwise (shown as "—"). */

@@ -272,9 +272,11 @@ describe("short text for a glance", () => {
     const numbered = { ...turn, streetNames: ["A3"] };
     expect(thenText(numbered, "Turn right onto A3.")).toBe("A3");
     const arrive = m(5, "Your destination is on the right.", "", 4, 4, 0, 0);
-    expect(thenText({ ...arrive, streetNames: [] }, "Your destination is on the right: 54 Caledonian Road")).toBe(
-      "Your destination is on the right: 54 Caledonian Road",
+    // The place first, so it isn't cut off (9 Nov: "Destination ahead on the right: Mayflo…").
+    expect(thenText({ ...arrive, streetNames: [] }, "Destination ahead on the right: 54 Caledonian Road")).toBe(
+      "54 Caledonian Road, on the right",
     );
+    expect(thenText({ ...arrive, type: 4, streetNames: [] }, "Destination ahead")).toBe("Destination");
   });
 });
 

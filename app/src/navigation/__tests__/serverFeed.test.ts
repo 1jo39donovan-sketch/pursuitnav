@@ -60,6 +60,22 @@ describe("pursuit server feed", () => {
     expect(shownInfo(feed, 6000)).toEqual(side);
   });
 
+  it("needs a third answer before showing the side road at the junction being passed (9 Nov drive)", () => {
+    const main = {
+      road: "Clapham Road / A3",
+      speedLimitMph: 20,
+      nextJunction: { name: "Bedford Road", distanceM: 20 },
+    };
+    const side = { road: "Bedford Road / B221", speedLimitMph: 20, nextJunction: null };
+    let feed = nextFeed(EMPTY_FEED, { status: "ok", info: main }, 1000);
+    feed = nextFeed(feed, { status: "ok", info: side }, 2000);
+    feed = nextFeed(feed, { status: "ok", info: side }, 3000);
+    expect(shownInfo(feed, 3000)).toMatchObject({ road: main.road });
+    // Really turned into it: the third answer in a row shows it.
+    feed = nextFeed(feed, { status: "ok", info: side }, 4000);
+    expect(shownInfo(feed, 4000)).toEqual(side);
+  });
+
   it("shows no road once it's been lost for longer than a moment", () => {
     const main = { road: "Clapham Road", speedLimitMph: 20, nextJunction: null };
     const none = { road: null, speedLimitMph: null, nextJunction: null };
