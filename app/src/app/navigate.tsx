@@ -29,6 +29,7 @@ import {
   type RerouteFailure,
 } from "../navigation/reroute";
 import { hush, onSpeech, say } from "../navigation/speaker";
+import { speakable } from "../navigation/spokenText";
 import { arrivalSide, instructionWithPlace, nextCallout } from "../navigation/voice";
 import { noteTurnCard } from "../navigation/timings";
 import { store } from "../storage/store";
@@ -403,7 +404,19 @@ export default function NavigateScreen() {
   // Remembered between routes (and set on Session), so a muted app stays muted.
   const toggleVoice = () => {
     setVoice(!voiceOn);
-    if (voiceOn) hush();
+    if (voiceOn) {
+      hush();
+      return;
+    }
+    // Turned on mid-route: say the next turn straight away. Useful, and on an
+    // iPhone in Safari it's what lets speech play at all: Safari only speaks
+    // after speaking in answer to a tap (9 Nov drive: voice turned on after
+    // GO stayed silent for the rest of the route).
+    const next = card?.next;
+    say(
+      next ? speakable(instructionWithPlace(next, active?.destination.title)).replace(/\.?$/, ".") : "Voice on.",
+      "urgent",
+    );
   };
   // Calls come earlier when faster. Changes with each fix, as progress does.
   const speedMs = lastFix?.speed ?? null;
