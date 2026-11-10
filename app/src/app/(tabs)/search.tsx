@@ -39,6 +39,7 @@ import { useNavigation } from "../../navigation/NavigationProvider";
 import { planIsStale } from "../../navigation/routeChoice";
 import type { SearchResult } from "../../search/engine";
 import { destinationNote } from "../../search/destinationNote";
+import { jobSearches, looksLikeJob } from "../../search/jobText";
 import { mergeAddresses } from "../../search/merge";
 import { DEFAULT_MARKER_GROUPS, GROUP_COLOR, MARKER_GROUPS } from "../../search/placeGroups";
 import type { PlaceGroup } from "../../search/places";
@@ -102,6 +103,8 @@ export default function SearchScreen() {
   const navigation = useNavigation();
   const log = useLog();
   const [query, setQuery] = useState("");
+  // A pasted job ("Male outside Flat 3, Smith House, 54 Caledonian Road N7 8LA…"): its address parts.
+  const jobFound = useMemo(() => (looksLikeJob(query) ? jobSearches(query) : []), [query]);
   const input = useRef<TextInput>(null);
   const [showOutside, setShowOutside] = useState(false);
   const [destination, setDestination] = useState<Destination | null>(null);
@@ -845,6 +848,26 @@ export default function SearchScreen() {
             </Pressable>
           )}
         </View>
+        {/* Pasted the job from the control room: the address parts in it, one tap each. */}
+        {!destination && jobFound.length > 0 && (
+          <View style={styles.job} accessibilityLabel="Addresses found in the job">
+            <Text style={styles.jobTitle}>From the job</Text>
+            {jobFound.map((q) => (
+              <Pressable
+                key={q}
+                accessibilityRole="button"
+                accessibilityLabel={`Search for ${q}`}
+                onPress={() => {
+                  setQuery(q);
+                  setShowOutside(false);
+                }}
+                style={({ pressed }) => [styles.jobChip, pressed && { opacity: 0.8 }]}
+              >
+                <Text style={styles.jobChipText}>{q}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         {dataNote && <Text style={styles.dataNote}>{dataNote}</Text>}
         {data.status === "ready" && boroughs.length === 0 && !destination && (
           // Before anything else: results are sorted by the area being worked.
@@ -986,6 +1009,25 @@ const baseStyles = StyleSheet.create({
   },
   areaPromptText: { flex: 1, color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 20 },
   areaPromptButton: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 16 },
+  job: {
+    gap: 8,
+    backgroundColor: colors.panel,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  jobTitle: { color: colors.muted, fontFamily: fonts.displaySemiBold, fontSize: 13, letterSpacing: 1.2, textTransform: "uppercase" },
+  jobChip: {
+    minHeight: 48,
+    justifyContent: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  jobChipText: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   dataNote: {
     color: colors.fg,
     fontFamily: fonts.body,
