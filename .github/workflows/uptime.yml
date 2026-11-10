@@ -5,6 +5,9 @@
 # the server is back, the issue is closed with a note. So a broken server is
 # noticed before an officer finds it. (GitHub runs schedules late when busy,
 # so "every 10 minutes" is often every 30–60 in practice.)
+# It also checks the server's map data is under 9 days old (the weekly build
+# can fail, or the server miss the download): a separate "Map data out of
+# date" issue, opened and closed the same way.
 # GitHub pauses scheduled workflows after 60 days with no commits; re-enable
 # it from the Actions tab if that happens.
 name: Uptime
@@ -41,6 +44,43 @@ jobs:
           # One retry a minute later: a restart during an update takes seconds.
           bash server/scripts/check-server.sh "https://$DOMAIN" ||
             { sleep 60; bash server/scripts/check-server.sh "https://$DOMAIN"; }
+
+      # Routes run on the weekly map build. Over 9 days old means a build or
+      # its download has failed at least once: new roads, closures of roads
+      # since removed and the like start to drift (PM, item 16).
+      - name: Check the map data is under 9 days old
+        id: data
+        if: vars.SERVER_DOMAIN != '' && steps.check.outcome == 'success'
+        continue-on-error: true
+        env:
+          DOMAIN: ${{ vars.SERVER_DOMAIN }}
+        run: |
+          built=$(curl -fsS --max-time 20 "https://$DOMAIN/health" | jq -r '.data.built // empty')
+          [ -n "$built" ] || { echo "The server doesn't say when its data was built: nothing to check."; exit 0; }
+          days=$(( ( $(date -u +%s) - $(date -u -d "$built" +%s) ) / 86400 ))
+          echo "Map data built $built: $days days ago."
+          [ "$days" -le 9 ] || { echo "::warning::The map data is $days days old."; exit 1; }
+
+      - name: Open or close the "Map data out of date" issue
+        if: steps.data.outcome == 'success' || steps.data.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OUTCOME: ${{ steps.data.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create data-stale --color D93F0B --description "Opened and closed by the uptime check" >/dev/null 2>&1 || true
+          open=$(gh issue list --state open --label data-stale --json number --jq '.[0].number // empty')
+          now=$(date -u +'%d %b %Y %H:%M UTC')
+          if [ "$OUTCOME" = failure ] && [ -z "$open" ]; then
+            gh issue create --label data-stale --title "Map data out of date" --body "At $now the server's map data was more than 9 days old. Routes still work, on older roads and places.
+
+          Check the Map data workflow's last run (Actions tab) and the server's weekly download. Details: $RUN_URL
+
+          This issue closes by itself when fresh data is in."
+          elif [ "$OUTCOME" = success ] && [ -n "$open" ]; then
+            gh issue close "$open" --comment "Fresh map data is in: checked at $now."
+          fi
 
       # One open issue while the server is down; closed when it's back.
       - name: Open or close the "Server down" issue
