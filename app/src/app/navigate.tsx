@@ -71,6 +71,8 @@ import { colors, fonts } from "../theme";
 import { flagRoute } from "../flags";
 import { loadNotes, noteNear } from "../search/blockNotes";
 import { useTextStyles } from "../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../components/ScreenError";
 
 const DEMO_GRACE_MS = 5000;
 const ARRIVAL_GRACE_MS = 10_000;
@@ -102,6 +104,35 @@ const COURSE_FROM_MS = 1.4;
 
 /** Drawn on the route line when GPS puts the vehicle within this of it, metres. */
 const SNAP_DRAW_M = 30;
+
+/**
+ * Instead of a crash mid-drive: try again, or carry on in Google Maps or
+ * Waze to the same place, or end. The crew is never left with nothing.
+ */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <NavigateError {...props} />;
+}
+
+function NavigateError(props: ErrorBoundaryProps) {
+  const { active, stop } = useNavigation();
+  const dest = active?.destination;
+  return (
+    <ScreenError {...props}>
+      {dest && <ExternalLinks lat={dest.lat} lng={dest.lng} prominent />}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          stop("end");
+          if (router.canGoBack()) router.back();
+          else router.replace("/search");
+        }}
+        style={({ pressed }) => [{ minHeight: 52, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.8 }]}
+      >
+        <Text style={{ color: "#ff8a8d", fontSize: 18, fontWeight: "700" }}>End navigation</Text>
+      </Pressable>
+    </ScreenError>
+  );
+}
 
 export default function NavigateScreen() {
   const styles = useTextStyles(baseStyles);

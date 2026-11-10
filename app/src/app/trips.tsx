@@ -13,6 +13,13 @@ import { formatDuration } from "../format";
 import { store } from "../storage/store";
 import { colors, fonts } from "../theme";
 import { useThemed, useColors } from "../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../components/ScreenError";
+
+/** Instead of a crash: try again, with the rest of the app still there. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
 
 export default function TripsScreen() {
   const palette = useColors();

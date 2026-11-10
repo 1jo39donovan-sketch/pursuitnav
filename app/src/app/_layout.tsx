@@ -17,10 +17,20 @@ import { SetupFlow } from "../setup/SetupFlow";
 import { TeamProvider } from "../team/TeamProvider";
 import { startUsage } from "../usage/usage";
 import { useColors } from "../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../components/ScreenError";
 
 SplashScreen.preventAutoHideAsync();
 // Every request to the server carries the install ID and app version (usage counts).
 startUsage();
+
+/**
+ * The last safety net: if the app's own start-up fails (settings, storage),
+ * a plain screen with Try again rather than a blank one.
+ */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
 
 export default function RootLayout() {
   // Fonts are bundled with the app, so this works with no signal.

@@ -62,6 +62,8 @@ import { fetchWhere } from "../../api/where";
 import { bestEntrance, entranceLabel, entrancesFor } from "../../search/entrances";
 import { loadNotes, noteNear, saveNotes, withNote, type BlockNote } from "../../search/blockNotes";
 import { BOROUGHS, type Borough } from "../../search/boroughs";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../../components/ScreenError";
 
 const FINDING = "Finding the address…";
 
@@ -79,6 +81,11 @@ interface Destination {
 
 // Type what the control room gave, pick the match, get both routes from
 // where the phone is now. A long press on the map also sets a destination.
+/** Instead of a crash: try again, with the rest of the app still there. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
+
 export default function SearchScreen() {
   const palette = useColors();
   const styles = useTextStyles(baseStyles);
