@@ -23,6 +23,8 @@ import { store } from "../storage/store";
 import { colors, fonts } from "../theme";
 import type { ServiceType } from "../vehicles";
 import { useThemed, useColors } from "../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../components/ScreenError";
 
 /** The stations each service wants listed, by OpenStreetMap place type. */
 const STATIONS: Record<ServiceType, { types: string[]; label: string }> = {
@@ -42,6 +44,11 @@ function boroughUnits(chosen: readonly Borough[]): BoroughGroup[] {
 function go(title: string, lat: number, lng: number) {
   // Every parameter is given, so none is left over from an earlier visit.
   router.navigate({ pathname: "/search", params: { lat: String(lat), lng: String(lng), title, q: "", from: `area-${Date.now()}` } });
+}
+
+/** Instead of a crash: try again, with the rest of the app still there. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
 }
 
 export default function AreaScreen() {

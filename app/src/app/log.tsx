@@ -10,6 +10,8 @@ import { store } from "../storage/store";
 import type { LogEntry, LoggedRoute } from "../storage/types";
 import { colors, fonts } from "../theme";
 import { useColors, useThemed, useTint } from "../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../components/ScreenError";
 
 const ROUTE_LABEL: Record<LoggedRoute, { text: string; color: string }> = {
   standard: { text: "STANDARD ROUTE", color: colors.blue },
@@ -32,6 +34,11 @@ function dayLabel(iso: string): string {
  * Every search and the route picked. Kept on the phone until cleared here.
  * Opened from the Session tab.
  */
+/** Instead of a crash: try again, with the rest of the app still there. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
+
 export default function LogScreen() {
   const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();

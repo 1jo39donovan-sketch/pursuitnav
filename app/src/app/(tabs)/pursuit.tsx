@@ -22,6 +22,8 @@ import { useTeam } from "../../team/TeamProvider";
 import { recordEvent } from "../../usage/usage";
 import { colors, fonts } from "../../theme";
 import { useThemed } from "../../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../../components/ScreenError";
 
 const POLL_MS = 1000;
 /** Below this (m/s, about 10 mph), the road changes slowly: ask the server every 2 s instead (PM, item 13). */
@@ -43,6 +45,11 @@ const mph = (ms: number) => ms * 2.236936;
 const DOOR_EVERY_MS = 5_000;
 /** Above this the door number is gone before it's read (29 Oct trial): shown only on foot or crawling. */
 const DOOR_MAX_MPH = 10;
+
+/** Instead of a crash: try again, with the rest of the app still there. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
 
 export default function PursuitScreen() {
   const styles = useThemed(baseStyles);

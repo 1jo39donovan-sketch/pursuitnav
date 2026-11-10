@@ -27,6 +27,8 @@ import { APPEARANCES, colors, fonts, type Appearance } from "../../theme";
 import { bcuFor } from "../../search/boroughGroups";
 import { SERVICES, VEHICLES, vehiclesFor } from "../../vehicles";
 import { useTextStyles, useColors } from "../../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../../components/ScreenError";
 
 // Once a shift is set up, the app opens on Search: the job is usually to type
 // an address straight away. Only on the first screen shown after launch.
@@ -94,6 +96,11 @@ const LOOK_HINTS: Record<MapLook, string> = {
   plain: "Just the streets: no shop and business icons.",
   os: "Ordnance Survey's road map. Needs signal; very close in, it shows larger rather than sharper.",
 };
+
+/** Instead of a crash: try again, with the rest of the app still there. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
 
 export default function SessionScreen() {
   const palette = useColors();

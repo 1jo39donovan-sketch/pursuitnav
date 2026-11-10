@@ -7,6 +7,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   availableVoices,
+  hasNaturalVoice,
   setVoiceSettings,
   testVoice,
   voiceSettings,
@@ -20,6 +21,14 @@ import { Button } from "./Button";
 
 /** At most this many voices offered: the best ones. */
 const SHOWN = 4;
+
+const onIphone = () => Platform.OS === "ios" || (Platform.OS === "web" && /iPhone|iPad/.test(navigator.userAgent));
+
+/** Where to download a natural British voice, for this phone. */
+const naturalSteps = () =>
+  onIphone()
+    ? "iPhone Settings → Accessibility → Spoken Content → Voices → English → English (UK), then download a Premium voice (or Enhanced)."
+    : "Android Settings → Text-to-speech output → Speech Services by Google → Install voice data → English (United Kingdom), then pick a higher-quality voice.";
 
 export function VoiceSettings({ onChange }: { onChange?: () => void }) {
   const styles = useTextStyles(baseStyles);
@@ -91,11 +100,15 @@ export function VoiceSettings({ onChange }: { onChange?: () => void }) {
         </Text>
       )}
       {test === "done" && <Text style={styles.meta}>Did you hear it? If not, check the volume.</Text>}
-      <Text style={styles.meta}>
-        {Platform.OS === "ios" || (Platform.OS === "web" && /iPhone|iPad/.test(navigator.userAgent))
-          ? "More natural voices are free: iPhone Settings → Accessibility → Spoken Content → Voices → English (UK), and download an Enhanced or Premium one."
-          : "More natural voices are free: Android Settings → Text-to-speech output → Speech Services by Google → Install voice data → English (UK)."}
-      </Text>
+      {/* Only the phone's basic voice (9 Nov: "Daniel" sounded like a robot): say so plainly, with the free fix. */}
+      {voices && voices.length > 0 && !hasNaturalVoice(voices) ? (
+        <Text style={[styles.meta, styles.warn]}>
+          This phone only has a basic voice ({voices[0]!.name}), which can sound robotic. A natural one is free: {naturalSteps()}{" "}
+          It’s about 100–200 MB, so use Wi-Fi. BlueRoute uses it by itself once it’s downloaded.
+        </Text>
+      ) : (
+        <Text style={styles.meta}>More natural voices are free: {naturalSteps()}</Text>
+      )}
     </View>
   );
 }

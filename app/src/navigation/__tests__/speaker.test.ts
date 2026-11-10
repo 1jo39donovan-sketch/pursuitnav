@@ -61,3 +61,17 @@ describe("speaking", () => {
     vi.useRealTimers();
   });
 });
+
+describe("natural or basic voice", () => {
+  it("knows when the phone only has its basic, robotic voice (9 Nov: Daniel)", async () => {
+    const { hasNaturalVoice, rankVoices } = await import("../speaker");
+    const basic = rankVoices([{ identifier: "com.apple.voice.compact.en-GB.Daniel", name: "Daniel", language: "en-GB" }]);
+    expect(hasNaturalVoice(basic)).toBe(false);
+    const premium = rankVoices([
+      { identifier: "com.apple.voice.compact.en-GB.Daniel", name: "Daniel", language: "en-GB" },
+      { identifier: "com.apple.voice.premium.en-GB.Serena", name: "Serena (Premium)", language: "en-GB" },
+    ]);
+    expect(premium[0]!.name).toBe("Serena (Premium)");
+    expect(hasNaturalVoice(premium)).toBe(true);
+  });
+});

@@ -36,6 +36,14 @@ function scoreOf(v: { identifier: string; name: string; quality?: string; langua
   return s;
 }
 
+/** At or above this, a voice sounds natural (Premium, Enhanced or Google); below, it's the phone's basic one. */
+export const NATURAL_SCORE = 20;
+
+/** Whether the best voice the phone has sounds natural, or only its basic, robotic one. */
+export function hasNaturalVoice(ranked: readonly VoiceOption[]): boolean {
+  return (ranked[0]?.score ?? 0) >= NATURAL_SCORE;
+}
+
 /** British English voices on the phone, best first (other English as a fallback when there are none). */
 export function rankVoices(
   voices: readonly { identifier: string; name: string; quality?: string; language: string }[],
