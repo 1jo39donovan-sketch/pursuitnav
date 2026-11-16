@@ -57,7 +57,7 @@ async function shot(page, device, file, steps) {
     console.log(`ok   ${device.name}-${file}`);
   } catch (e) {
     failed++;
-    console.log(`FAIL ${device.name}-${file}: ${e.message.split("\n")[0]}`);
+    console.log(`FAIL ${device.name}-${file}: ${e.message.split("\n").slice(0, 4).join(" | ")}`);
     await page.screenshot({ path: `${out}/debug-${device.name}-${file}.png` }).catch(() => {});
   }
 }
@@ -99,7 +99,8 @@ for (const device of DEVICES) {
   await shot(page, device, "5-pursuit", async () => {
     // The demo drive, so Pursuit shows a moving car at a legal speed.
     await tab(page, "Session");
-    await page.getByText("Testing", exact()).last().click();
+    // The section's button is named "Testing: <summary>".
+    await page.getByRole("button", { name: /^Testing:/ }).last().click();
     // The switch's name isn't exposed on the web, so find it in the row with the words.
     // The nearest box round the label that holds a switch is the row.
     await page
