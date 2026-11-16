@@ -127,7 +127,9 @@ export default function SearchScreen() {
 
   // Searching 40,000 roads on every keystroke can lag a little; let typing win.
   const deferredQuery = useDeferredValue(query);
-  const showResults = query.trim().length >= 2 && !destination;
+  // A pasted job shows its address parts ("From the job"), not a search of
+  // the whole text, which matched nonsense miles away (16 Nov screenshots).
+  const showResults = query.trim().length >= 2 && !destination && jobFound.length === 0;
   const lookup = useAddressLookup(query, showResults);
   const area = useMemo(() => new Set(boroughs), [boroughs]);
   const results = useMemo(() => {
