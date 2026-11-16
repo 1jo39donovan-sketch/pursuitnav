@@ -99,15 +99,15 @@ for (const device of DEVICES) {
   await shot(page, device, "5-pursuit", async () => {
     // The demo drive, so Pursuit shows a moving car at a legal speed.
     await tab(page, "Session");
-    // The section's button is named "Testing: <summary>".
-    await page.getByRole("button", { name: /^Testing:/ }).last().click();
-    // The switch's name isn't exposed on the web, so find it in the row with the words.
-    // The nearest box round the label that holds a switch is the row.
-    await page
-      .locator("#demo-drive-label")
-      .last()
-      .locator('xpath=ancestor::div[.//*[@role="switch" or @type="checkbox"]][1]')
-      .locator('[role="switch"], input[type="checkbox"]')
+    // Testing starts open on the web: a tap would close it, so open it only if shut.
+    const blurb = page.getByText(/^Simulates a drive/).last();
+    if (!(await blurb.isVisible().catch(() => false))) {
+      await page.getByRole("button", { name: /^Testing:/ }).last().click();
+    }
+    // The switch's label isn't exposed on the web: the switch in the row with the blurb.
+    await blurb
+      .locator('xpath=ancestor::div[.//*[@role="switch"]][1]')
+      .locator('[role="switch"]')
       .first()
       .click();
     await tab(page, "Pursuit");
