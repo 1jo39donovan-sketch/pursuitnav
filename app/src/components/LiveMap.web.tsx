@@ -9,7 +9,8 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DEMO_MODE, MAP_STYLES, region } from "../config";
-import { useMapStyle } from "./mapLooks";
+import { useImageryOffered } from "./imagery";
+import { lookToDraw, useMapStyle } from "./mapLooks";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
@@ -93,7 +94,7 @@ export function LiveMap({
 }: LiveMapProps) {
   const styles = useThemed(baseStyles);
   const { fix, facing } = useLocation();
-  const { mapTheme, mapLook } = useSession();
+  const { mapTheme, mapLook, transport } = useSession();
   // For layers re-added on each style load: the theme now, not when the map was made.
   const theme = useRef(mapTheme);
   useEffect(() => {
@@ -143,7 +144,8 @@ export function LiveMap({
   const [styleVersion, setStyleVersion] = useState(0);
   // Opens where the vehicle is, so a new screen doesn't fly in from the middle of London.
   const startAt = useRef({ fix, zoom });
-  const looked = useMapStyle(MAP_STYLES[mapTheme], mapLook, mapTheme, MAP_STYLES.day, houseNumbers);
+  const imagery = useImageryOffered();
+  const looked = useMapStyle(MAP_STYLES[mapTheme], lookToDraw(mapLook, imagery), mapTheme, MAP_STYLES.day, houseNumbers, transport);
   const style = DEMO_MODE ? demoMapStyle : looked;
   const firstStyle = useRef(style);
 

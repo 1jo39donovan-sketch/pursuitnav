@@ -81,6 +81,11 @@ if [ -z "${STATS_TOKEN:-}" ] && [ -f "$DIR/server/.env" ]; then
   STATS_TOKEN=$(grep -E '^STATS_TOKEN=' "$DIR/server/.env" | cut -d= -f2- || true)
 fi
 STATS_TOKEN=${STATS_TOKEN:-}
+# Optional ArcGIS Location Platform key for the Satellite map style.
+if [ -z "${IMAGERY_KEY:-}" ] && [ -f "$DIR/server/.env" ]; then
+  IMAGERY_KEY=$(grep -E '^IMAGERY_KEY=' "$DIR/server/.env" | cut -d= -f2- || true)
+fi
+IMAGERY_KEY=${IMAGERY_KEY:-}
 
 say "Installing Docker and basics"
 apt-get update -qq
@@ -136,7 +141,7 @@ cd "$DIR/server"
 [ -f docker-compose.yml ] || fail "No server code on branch $BRANCH. Merge the pull request into main first, or run with BRANCH=<branch>."
 
 umask 077
-printf 'DOMAIN=%s\nALSO_SERVE=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\nBRANCH=%s\nVERSION=%s\n' "$DOMAIN" "$ALSO_SERVE" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" "$BRANCH" "$(git -C "$DIR" rev-parse --short HEAD)" >.env
+printf 'DOMAIN=%s\nALSO_SERVE=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\nIMAGERY_KEY=%s\nBRANCH=%s\nVERSION=%s\n' "$DOMAIN" "$ALSO_SERVE" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" "$IMAGERY_KEY" "$BRANCH" "$(git -C "$DIR" rev-parse --short HEAD)" >.env
 [ -n "$GEOCODER_SETTINGS" ] && printf '%s\n' "$GEOCODER_SETTINGS" >>.env
 umask 022
 
