@@ -8,14 +8,26 @@
 import { getRandomBytes } from "expo-crypto";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { deleteMember, getMembers, NoTeamError, putMember } from "../api/teams";
+import { deleteMember, deleteMessage, getMembers, NoTeamError, postMessage, putMember } from "../api/teams";
 import { useLocation } from "../location/LocationProvider";
 import { useNavigation } from "../navigation/NavigationProvider";
+import { say } from "../navigation/speaker";
 import { BOROUGHS } from "../search/boroughs";
 import { useSearch } from "../search/SearchProvider";
 import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import { codeIn, formatCode, newTeamCode, normaliseCode, open, randomHex, seal, teamKeys } from "./crypto";
+import {
+  cautionsNear,
+  MAX_TEXT,
+  MESSAGE_KEEP_MS,
+  spokenArrival,
+  toMessage,
+  type MessageBody,
+  type MessageKind,
+  type MessagePlace,
+  type TeamMessage,
+} from "./messages";
 import { atPoliceStation, shareDecision, type SharePolicy } from "./sharePolicy";
 import { addFix, decodeTrack, encodeTrack, type TrackPoint } from "./track";
 
@@ -31,6 +43,12 @@ export interface TeamMember {
   accuracy: number | null;
   /** Where they've driven lately, oldest first, ending where they are. */
   track: { lat: number; lng: number }[];
+  me: boolean;
+}
+
+export interface TeamContact {
+  memberId: string;
+  callsign: string;
   me: boolean;
 }
 
@@ -59,6 +77,18 @@ interface TeamValue {
   /** Shares even at a police station (off by default). */
   shareAtPolice: boolean;
   setShareAtPolice: (on: boolean) => void;
+  /** Everyone in the team, sharing their position or not (a desk member), to address messages to. */
+  contacts: { memberId: string; callsign: string; me: boolean }[];
+  /** Team messages this phone can see (sent to everyone, to it, or by it), newest first. */
+  messages: TeamMessage[];
+  /** Messages from colleagues not yet put away, newest first. */
+  unread: TeamMessage[];
+  /** Sends a message; throws (with a message for the crew) if it isn't sent. */
+  send: (m: { kind: MessageKind; to: TeamContact | null; text: string; place?: MessagePlace }) => Promise<void>;
+  /** Withdraws a message this phone sent. */
+  withdraw: (id: string) => Promise<void>;
+  /** Puts a message away (it stays in the list on Session until it runs out). */
+  dismiss: (id: string) => void;
   create: () => void;
   /** Joins with a code as typed. False if it isn't a team code. */
   join: (typed: string) => boolean;
@@ -95,7 +125,7 @@ const STILL_M = 25;
 const TeamContext = createContext<TeamValue | null>(null);
 
 export function TeamProvider({ children }: { children: ReactNode }) {
-  const { callsign } = useSession();
+  const { callsign, voice } = useSession();
   const { fix } = useLocation();
   const { active, lastDestination } = useNavigation();
   const { data, places } = useSearch();
@@ -103,7 +133,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   // When to share, kept on the phone.
   const [policy, setPolicyState] = useState<SharePolicy>(() => {
     const p = store.getSetting("teamShare");
-    return p === "navigating" || p === "arrived" ? p : "always";
+    return p === "navigating" || p === "arrived" || p === "never" ? p : "always";
   });
   const [batterySaver, setBatterySaverState] = useState(() => store.getSetting("batterySaver") === "1");
   const [shareAtPolice, setShareAtPoliceState] = useState(() => store.getSetting("teamShareAtPolice") === "1");
@@ -153,6 +183,14 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [mapPoints, setMapPoints] = useState<GeoJSON.FeatureCollection>(NO_POINTS);
+  const [messages, setMessages] = useState<TeamMessage[]>([]);
+  const [contacts, setContacts] = useState<TeamContact[]>([]);
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
+  // Messages already announced, and cautions already warned of nearby (this launch).
+  const announced = useRef(new Set<string>());
+  const warned = useRef(new Set<string>());
+  // A share-and-refresh now (after sending), set by the polling effect.
+  const refreshNow = useRef<() => void>(() => {});
 
   // This phone's place in the team; made on joining, kept until leaving.
   const me = useRef({
@@ -165,10 +203,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   // Whether this team has been seen, so a 404 after that means it ended.
   const seen = useRef(false);
   const track = useRef<TrackPoint[]>([]);
-  const latest = useRef({ fix, callsign, share: sharing.share, slow: batterySaver });
+  const latest = useRef({ fix, callsign, share: sharing.share, slow: batterySaver, voice });
   useEffect(() => {
-    latest.current = { fix, callsign, share: sharing.share, slow: batterySaver };
-  }, [fix, callsign, sharing.share, batterySaver]);
+    latest.current = { fix, callsign, share: sharing.share, slow: batterySaver, voice };
+  }, [fix, callsign, sharing.share, batterySaver, voice]);
 
   // Arriving at a police station: the drive there is forgotten, so following
   // it in can't lead a colleague to whoever is inside.
@@ -200,6 +238,11 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     track.current = [];
     setMembers([]);
     setMapPoints(NO_POINTS);
+    setMessages([]);
+    setContacts([]);
+    setDismissed(new Set());
+    announced.current = new Set();
+    warned.current = new Set();
     setExpiresAt(null);
     setStatus("connecting");
     setCode(normalised);
@@ -221,6 +264,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     track.current = [];
     setMembers([]);
     setMapPoints(NO_POINTS);
+    setMessages([]);
+    setDismissed(new Set());
     setExpiresAt(null);
     setStatus("off");
     setCode(null);
@@ -234,17 +279,19 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     // The last share sent, to send less often standing still (battery).
     let last: { at: number; lat: number; lng: number; hidden: boolean } | null = null;
     const tick = async () => {
-      const { fix: f, callsign: cs, share, slow } = latest.current;
+      const { fix: f, callsign: cs, share, slow, voice: speak } = latest.current;
       const now = Date.now();
       try {
-        if (f && !share) {
-          // Not sharing: say so once (taking this phone off colleagues' maps), then now and then to stay in the team.
+        if (!f || !share) {
+          // Not sharing (or no position, as on a desk computer): say so once,
+          // taking this phone off colleagues' maps, then now and then to stay
+          // in the team, so it can still send and receive messages.
           if (!last?.hidden || now - last.at >= STILL_SHARE_MS) {
             const hidden: Hidden = { v: 1, cs: cs || "No callsign", t: now, hidden: true };
             await putMember(teamId, me.current.memberId, me.current.token, seal(key, hidden, random), starter.current);
-            last = { at: now, lat: f.lat, lng: f.lng, hidden: true };
+            last = { at: now, lat: f?.lat ?? 0, lng: f?.lng ?? 0, hidden: true };
           }
-        } else if (f) {
+        } else {
           const still =
             last && !last.hidden && Math.hypot((f.lat - last.lat) * 111_320, (f.lng - last.lng) * 69_000) < STILL_M;
           const every = slow || still ? STILL_SHARE_MS : SHARE_EVERY_MS;
@@ -273,6 +320,26 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           .sort((a, b) => b.at - a.at);
         setMembers(list);
         setMapPoints(teamPoints(list, Date.now()));
+        setContacts(
+          team.members
+            .map((m) => {
+              const raw = open(key, m.blob) as { cs?: unknown } | null;
+              return raw && typeof raw.cs === "string"
+                ? { memberId: m.memberId, callsign: raw.cs.slice(0, 20), me: m.memberId === me.current.memberId }
+                : null;
+            })
+            .filter((c): c is TeamContact => c !== null),
+        );
+        const msgs = team.messages
+          .map((m) => toMessage(m, open(key, m.blob), me.current.memberId, Date.now()))
+          .filter((m): m is TeamMessage => m !== null)
+          .sort((a, b) => b.at - a.at);
+        // Said aloud as it arrives (newest only if several came at once);
+        // what was there when the team was joined is shown, not read out.
+        const fresh = msgs.filter((m) => !m.mine && !announced.current.has(m.id));
+        if (seen.current && speak && fresh[0]) say(spokenArrival(fresh[0]), fresh[0].kind === "caution" ? "urgent" : "normal");
+        msgs.forEach((m) => announced.current.add(m.id));
+        setMessages(msgs);
         seen.current = true;
         setStatus("live");
       } catch (err) {
@@ -286,12 +353,57 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       }
     };
     void tick();
+    refreshNow.current = () => void tick();
     const timer = setInterval(() => void tick(), SHARE_EVERY_MS);
     return () => {
       stopped = true;
       clearInterval(timer);
     };
   }, [code]);
+
+  // A colleague's caution nearby: said again (and shown again), once a launch.
+  useEffect(() => {
+    if (!fix) return;
+    const near = cautionsNear(messages, fix).filter((m) => !warned.current.has(m.id));
+    if (!near.length) return;
+    near.forEach((m) => warned.current.add(m.id));
+    if (voice) say(`Caution near here. ${near[0]!.text || near[0]!.place?.label || ""}`.trim(), "urgent");
+    setDismissed((d) => new Set([...d].filter((id) => !near.some((m) => m.id === id))));
+  }, [fix, messages, voice]);
+
+  const send = useCallback(
+    async ({ kind, to, text, place }: { kind: MessageKind; to: TeamContact | null; text: string; place?: MessagePlace }) => {
+      if (!code) throw new Error("Not in a team.");
+      const { teamId, key } = teamKeys(code);
+      const body: MessageBody = {
+        v: 1,
+        kind,
+        cs: latest.current.callsign || "No callsign",
+        to: to?.memberId ?? null,
+        ...(to ? { toCs: to.callsign } : {}),
+        text: text.trim().slice(0, MAX_TEXT),
+        ...(place ? { place } : {}),
+      };
+      await postMessage(teamId, me.current.memberId, me.current.token, seal(key, body, random), MESSAGE_KEEP_MS);
+      refreshNow.current();
+    },
+    [code],
+  );
+  const withdraw = useCallback(
+    async (id: string) => {
+      if (!code) return;
+      await deleteMessage(teamKeys(code).teamId, id, me.current.memberId, me.current.token);
+      setMessages((list) => list.filter((m) => m.id !== id));
+    },
+    [code],
+  );
+  const dismiss = useCallback((id: string) => setDismissed((d) => new Set(d).add(id)), []);
+  const unread = useMemo(() => messages.filter((m) => !m.mine && !dismissed.has(m.id)), [messages, dismissed]);
+  // Colleagues' cautions on the maps too, in amber.
+  const pointsWithCautions = useMemo(
+    () => ({ ...mapPoints, features: [...mapPoints.features, ...cautionPoints(messages)] }),
+    [mapPoints, messages],
+  );
 
   const value = useMemo(
     () => ({
@@ -306,17 +418,29 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       status,
       members,
       expiresAt,
-      mapPoints,
+      mapPoints: pointsWithCautions,
+      contacts,
+      messages,
+      unread,
+      send,
+      withdraw,
+      dismiss,
       create,
       join,
       leave,
     }),
     [
+      contacts,
+      pointsWithCautions,
+      messages,
+      unread,
+      send,
+      withdraw,
+      dismiss,
       code,
       status,
       members,
       expiresAt,
-      mapPoints,
       create,
       join,
       leave,
@@ -378,6 +502,17 @@ function teamPoints(members: TeamMember[], now: number): GeoJSON.FeatureCollecti
         },
       })),
   };
+}
+
+/** Cautions as amber points on the maps, labelled with their note. */
+function cautionPoints(messages: readonly TeamMessage[]): GeoJSON.Feature[] {
+  return messages
+    .filter((m) => m.kind === "caution" && m.place)
+    .map((m) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [m.place!.lng, m.place!.lat] },
+      properties: { id: `msg:${m.id}`, name: `⚠ ${(m.text || "Caution").slice(0, 28)}`, caution: true },
+    }));
 }
 
 /** Further off than this, a colleague's position is shown as rough. */

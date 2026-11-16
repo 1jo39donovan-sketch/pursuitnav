@@ -298,7 +298,8 @@ export function labelPaint(theme: "night" | "day"): SymbolLayerSpecification["pa
 // Colleagues: a green dot with their callsign beside it, never hidden by other labels.
 export const TEAM_COLOR = "#22c55e";
 export const TEAM_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
-  "circle-color": TEAM_COLOR,
+  // A team caution (a message with a place) is amber; colleagues are green.
+  "circle-color": ["case", ["boolean", ["get", "caution"], false], "#ffb627", TEAM_COLOR],
   "circle-radius": 9,
   "circle-stroke-color": "#ffffff",
   "circle-stroke-width": 2,

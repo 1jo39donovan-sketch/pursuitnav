@@ -10,6 +10,7 @@ import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import { formatDistance } from "../../format";
 import { useDrivingService } from "../../location/drivingService";
+import { TeamMessageCard } from "../../components/TeamMessageCard";
 import { usePrecise } from "../../location/precision";
 import { recentFixes, useLocation, type Fix } from "../../location/LocationProvider";
 import { notePursuit, pursuitOpened } from "../../navigation/timings";
@@ -291,6 +292,8 @@ export default function PursuitScreen() {
       {/* GPS warnings float over the map, never pushing the readouts about (PM, item 5). */}
       <View style={styles.gpsFloat} pointerEvents="box-none">
         <GpsStatus />
+        {/* A team message (a caution ahead, a place to go) over the map. */}
+        <TeamMessageCard />
       </View>
     </View>
   );
@@ -386,6 +389,6 @@ const baseStyles = StyleSheet.create({
   },
   noSignalTitle: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 16, letterSpacing: 1 },
   noSignalText: { flex: 1, color: colors.fg, fontFamily: fonts.body, fontSize: 13 },
-  gpsFloat: { position: "absolute", top: 8, left: 8, right: 64, zIndex: 5 },
+  gpsFloat: { position: "absolute", top: 8, left: 8, right: 64, zIndex: 5, gap: 8 },
   map: { flex: 1, minHeight: 140, borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth },
 });

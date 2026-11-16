@@ -22,7 +22,15 @@ import { PlacesError, type PlacesClient } from "./places.js";
 import { FollowWrongWayError, planFollow } from "./follow.js";
 import { NoSafeRouteError, planRoutes } from "./plan.js";
 import { pursuitInfo } from "./pursuit.js";
-import { MAX_BLOB_CHARS, NoSuchTeamError, TeamFullError, TeamStore, TeamTokenError } from "./teams.js";
+import {
+  MAX_BLOB_CHARS,
+  MAX_MESSAGE_CHARS,
+  MESSAGE_MAX_MS,
+  NoSuchTeamError,
+  TeamFullError,
+  TeamStore,
+  TeamTokenError,
+} from "./teams.js";
 import { APP_EVENTS, type UsageStore } from "./usage.js";
 import { ValhallaError, type Matcher, type Router } from "./valhalla.js";
 
@@ -614,6 +622,69 @@ export function buildApp(
         teams.remove(req.params.teamId, req.params.memberId, req.body.token);
         return { ok: true };
       } catch (err) {
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  // Team messages: sealed on the sender's phone, so the server can't read
+  // them; posted only by a member, withdrawn only by its sender, deleted
+  // after at most 12 hours. Nothing about them is logged.
+  app.post<{ Params: { teamId: string }; Body: { memberId: string; token: string; blob: string; keepMs?: number } }>(
+    "/v1/teams/:teamId/messages",
+    {
+      bodyLimit: MAX_MESSAGE_CHARS + 1000,
+      schema: {
+        params: { type: "object", required: ["teamId"], properties: { teamId } },
+        body: {
+          type: "object",
+          required: ["memberId", "token", "blob"],
+          additionalProperties: false,
+          properties: {
+            memberId: teamId,
+            token,
+            blob: { type: "string", minLength: 1, maxLength: MAX_MESSAGE_CHARS },
+            keepMs: { type: "integer", minimum: 60_000, maximum: MESSAGE_MAX_MS },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const b = req.body;
+        return teams.postMessage(req.params.teamId, b.memberId, b.token, b.blob, b.keepMs);
+      } catch (err) {
+        if (err instanceof NoSuchTeamError) return reply.code(404).send({ error: "no-team", message: err.message });
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-in-team", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  app.delete<{ Params: { teamId: string; messageId: string }; Body: { memberId: string; token: string } }>(
+    "/v1/teams/:teamId/messages/:messageId",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["teamId", "messageId"],
+          properties: { teamId, messageId: { type: "string", pattern: "^[0-9a-f]{24}$" } },
+        },
+        body: {
+          type: "object",
+          required: ["memberId", "token"],
+          additionalProperties: false,
+          properties: { memberId: teamId, token },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        teams.deleteMessage(req.params.teamId, req.params.messageId, req.body.memberId, req.body.token);
+        return { ok: true };
+      } catch (err) {
+        if (err instanceof NoSuchTeamError) return reply.code(404).send({ error: "no-team", message: err.message });
         if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
         throw err;
       }
