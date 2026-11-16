@@ -26,7 +26,8 @@ concurrency:
 
 jobs:
   shots:
-    runs-on: ubuntu-latest
+    # Playwright's browsers support Ubuntu 24.04, not yet the newer "latest".
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
