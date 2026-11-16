@@ -374,11 +374,14 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const send = useCallback(
     async ({ kind, to, text, place }: { kind: MessageKind; to: TeamContact | null; text: string; place?: MessagePlace }) => {
       if (!code) throw new Error("Not in a team.");
+      // Messages go out under the sender's own callsign: none, no message.
+      const cs = latest.current.callsign.trim();
+      if (!cs) throw new Error("Put your callsign in first, so the team knows who it's from.");
       const { teamId, key } = teamKeys(code);
       const body: MessageBody = {
         v: 1,
         kind,
-        cs: latest.current.callsign || "No callsign",
+        cs,
         to: to?.memberId ?? null,
         ...(to ? { toCs: to.callsign } : {}),
         text: text.trim().slice(0, MAX_TEXT),

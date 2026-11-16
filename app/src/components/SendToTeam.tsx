@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { MAX_TEXT, MESSAGE_KINDS, type MessageKind, type MessagePlace } from "../team/messages";
+import { useSession } from "../session/SessionProvider";
 import { useTeam, type TeamContact } from "../team/TeamProvider";
 import { colors, fonts } from "../theme";
 import { useColors, useTextStyles } from "../textSize";
@@ -13,14 +14,17 @@ export function SendToTeam({ place, onClose }: { place?: MessagePlace; onClose: 
   const styles = useTextStyles(baseStyles);
   const palette = useColors();
   const team = useTeam();
+  const { callsign, setCallsign } = useSession();
+  const hasCallsign = callsign.trim().length > 0;
   const kinds = MESSAGE_KINDS.filter((k) => (place ? k.needsPlace : !k.needsPlace));
   const [kind, setKind] = useState<MessageKind>(kinds[0]!.id);
   const [to, setTo] = useState<TeamContact | null>(null);
   const [text, setText] = useState("");
   const [state, setState] = useState<{ status: "idle" | "sending" | "sent" | "error"; error?: string }>({ status: "idle" });
-  const others = team.contacts.filter((m) => !m.me);
+  // Only colleagues with a callsign can be picked: "No callsign" says nothing about who it is.
+  const others = team.contacts.filter((m) => !m.me && m.callsign.trim() && m.callsign !== "No callsign");
   const needsText = kind !== "go";
-  const canSend = state.status !== "sending" && (!needsText || text.trim().length > 0);
+  const canSend = hasCallsign && state.status !== "sending" && (!needsText || text.trim().length > 0);
 
   const chip = (key: string, label: string, on: boolean, onPress: () => void) => (
     <Pressable
@@ -50,6 +54,24 @@ export function SendToTeam({ place, onClose }: { place?: MessagePlace; onClose: 
       <View style={styles.backdrop}>
         <ScrollView style={styles.sheet} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>Send to the team</Text>
+          {/* It goes out under your callsign, so you must have one. */}
+          {hasCallsign ? (
+            <Text style={styles.from}>From {callsign.trim()}</Text>
+          ) : (
+            <>
+              <Text style={styles.error}>Put your callsign in first: messages go out under it.</Text>
+              <TextInput
+                accessibilityLabel="Your callsign"
+                value={callsign}
+                onChangeText={setCallsign}
+                placeholder="Your callsign, e.g. NI-31"
+                placeholderTextColor={palette.muted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                style={[styles.input, styles.callsignInput]}
+              />
+            </>
+          )}
           {place && <Text style={styles.place}>{place.label}</Text>}
           <View style={styles.row}>{kinds.map((k) => chip(k.id, k.label, kind === k.id, () => setKind(k.id)))}</View>
           <Text style={styles.label}>To</Text>
@@ -98,6 +120,8 @@ const baseStyles = StyleSheet.create({
   content: { padding: 20, gap: 12 },
   title: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 22 },
   place: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 17 },
+  from: { color: colors.muted, fontFamily: fonts.bodySemiBold, fontSize: 15 },
+  callsignInput: { minHeight: 0, fontFamily: fonts.mono, fontSize: 20 },
   label: { color: colors.muted, fontFamily: fonts.displaySemiBold, fontSize: 13, letterSpacing: 1.2, textTransform: "uppercase" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
   chip: { borderColor: colors.line, borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
