@@ -6,6 +6,11 @@
 name: Store screenshots
 
 on:
+  # Also when the script or this file changes, so a new version runs straight away.
+  push:
+    paths:
+      - store/take-screenshots.mjs
+      - .github/workflows/store-screenshots.yml
   workflow_dispatch:
     inputs:
       url:
@@ -35,7 +40,7 @@ jobs:
       - name: Take the screenshots
         id: take
         continue-on-error: true
-        run: node store/take-screenshots.mjs "${{ inputs.url }}" store/screenshots
+        run: node store/take-screenshots.mjs "${{ inputs.url || 'https://bluerouteapp.com/app/' }}" store/screenshots
       - name: Strip the alpha channel (both stores refuse it) and check the sizes
         run: |
           sudo apt-get install -y -qq imagemagick >/dev/null
@@ -47,7 +52,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add store/screenshots
           git diff --cached --quiet && { echo "No changes."; exit 0; }
-          git commit -m "Store screenshots from ${{ inputs.url }}"
+          git commit -m "Store screenshots from ${{ inputs.url || 'https://bluerouteapp.com/app/' }}"
           git push
       - name: Fail if a shot failed
         if: steps.take.outcome == 'failure'
