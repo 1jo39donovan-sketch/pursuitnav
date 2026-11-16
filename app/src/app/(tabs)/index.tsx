@@ -7,6 +7,7 @@ import { API_URL, DEMO_MODE } from "../../config";
 
 import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
+import { useImageryOffered } from "../../components/imagery";
 import { looksOffered, MAP_LOOK_NAMES, type MapLook } from "../../components/mapLooks";
 import { OfflineMapSection } from "../../components/OfflineMapSection";
 import { FavouritesSection } from "../../components/FavouritesSection";
@@ -95,6 +96,7 @@ const LOOK_HINTS: Record<MapLook, string> = {
   clear: "High contrast: wider, brighter roads and bold names, for reading on the move.",
   plain: "Just the streets: no shop and business icons.",
   os: "Ordnance Survey's road map. Needs signal; very close in, it shows larger rather than sharper.",
+  satellite: "Aerial photos with the roads and street names over them. Needs signal; with none, just the roads.",
 };
 
 /** Instead of a crash: try again, with the rest of the app still there. */
@@ -123,6 +125,8 @@ export default function SessionScreen() {
     setShowPursuit,
     mapLook,
     setMapLook,
+    transport,
+    setTransport,
     largeText,
     setLargeText,
     mapTheme,
@@ -133,6 +137,7 @@ export default function SessionScreen() {
     learning,
     setLearning,
   } = useSession();
+  const imagery = useImageryOffered();
   // Offered only once the server takes it (switched on after the privacy steps).
   const [canLearn, setCanLearn] = useState(false);
   useEffect(() => {
@@ -473,7 +478,7 @@ export default function SessionScreen() {
             })}
           </View>
           <View style={styles.chips} accessibilityLabel="Map style">
-            {looksOffered().map((l) => {
+            {looksOffered(imagery).map((l) => {
               const on = mapLook === l;
               return (
                 <Pressable
@@ -490,6 +495,20 @@ export default function SessionScreen() {
             })}
           </View>
           <Text style={styles.placeMeta}>{LOOK_HINTS[mapLook]}</Text>
+          <View style={styles.toggleRow}>
+            <Text style={[styles.placeName, styles.placeText]} nativeID="transport-label">
+              Stations and lines
+            </Text>
+            <Switch
+              accessibilityLabelledBy="transport-label"
+              value={transport}
+              onValueChange={setTransport}
+              trackColor={{ false: palette.line, true: palette.amber }}
+            />
+          </View>
+          <Text style={styles.placeMeta}>
+            Tube, Overground, DLR, tram and rail lines with their stations, and bus stations, drawn clearly on every map.
+          </Text>
           <View style={styles.toggleRow}>
             <Text style={[styles.placeName, styles.placeText]} nativeID="large-text-label">
               Larger text

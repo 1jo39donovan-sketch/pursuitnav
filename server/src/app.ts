@@ -14,6 +14,7 @@ import type { LngLat } from "./geo.js";
 import type { NearestDoor, WhereIs } from "./nominatim.js";
 import { AbandonedError, planContext } from "./planContext.js";
 import { entranceFinder } from "./entrances.js";
+import { imageryRoutes } from "./imagery.js";
 import { osMapsRoutes } from "./osMaps.js";
 import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage, termsPage } from "./pages.js";
@@ -232,6 +233,7 @@ export function buildApp(
       addresses,
       learning: Boolean(learning),
       osMaps: Boolean(config.osMapsKey),
+      imagery: Boolean(config.imageryKey),
       ...(closures ? { closures: closures.summary().active } : {}),
       ...(config.version ? { version: config.version } : {}),
       ...(await dataRelease(config.placesFile).then((data) => (data ? { data } : {}))),
@@ -439,6 +441,7 @@ export function buildApp(
   );
   offlineMapRoutes(app, config.offlineMapDir);
   osMapsRoutes(app, config.osMapsKey, config.bounds, (req) => notSetUp.add(req));
+  imageryRoutes(app, config.imageryKey, config.bounds, (req) => notSetUp.add(req));
 
   // Follow-in: the way a colleague drove, from here. Their track comes from the
   // phone (decrypted there) and, like every request, isn't logged or kept.

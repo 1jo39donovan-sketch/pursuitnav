@@ -89,6 +89,8 @@ under “Usage counts” below.</p>
   <li><strong>Building entrances:</strong> the destination’s position, to find the ways into the building there.</li>
   <li><strong>OS road map</strong> (only if you pick that map style): which part of the map is being shown. The server
     fetches it from Ordnance Survey itself, so OS doesn’t see your phone.</li>
+  <li><strong>Satellite map</strong> (only if you pick that map style): which part of the map is being shown. The
+    server fetches the photos from Esri itself, so Esri doesn’t see your phone.</li>
   <li><strong>Follow in</strong> (team sessions): your position and the colleague’s recent track, to work out the way
     they drove.</li>
 </ul>

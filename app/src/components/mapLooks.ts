@@ -7,23 +7,41 @@
 // - OS: Ordnance Survey's road map over the top, through our server (the
 //   key stays there; free OpenData zooms only). With no signal, or past its
 //   last zoom, the standard map shows through underneath.
+// - Satellite: aerial photos with the roads and street names drawn over
+//   them, through our server (only offered once the server has a key).
+//   With no signal the photos are missing and the roads still show.
 import { useEffect, useState } from "react";
 import type { StyleSpecification } from "@maplibre/maplibre-react-native";
 
 import { API_URL } from "../config";
+import { withTransport } from "./mapTransport";
 import type { MapTheme } from "../session/SessionProvider";
 
-export type MapLook = "standard" | "clear" | "plain" | "os";
-export const MAP_LOOKS: MapLook[] = ["standard", "clear", "plain", "os"];
+export type MapLook = "standard" | "clear" | "plain" | "os" | "satellite";
+export const MAP_LOOKS: MapLook[] = ["standard", "clear", "plain", "os", "satellite"];
 export const MAP_LOOK_NAMES: Record<MapLook, string> = {
   standard: "Standard",
   clear: "Clear",
   plain: "Plain",
   os: "OS map",
+  satellite: "Satellite",
 };
 
-/** The OS road map is only offered with a server to fetch it through. */
-export const looksOffered = (): MapLook[] => MAP_LOOKS.filter((l) => l !== "os" || API_URL !== "");
+/**
+ * The OS road map is only offered with a server to fetch it through, and
+ * satellite only once that server has an imagery key.
+ */
+export const looksOffered = (imagery = false): MapLook[] =>
+  MAP_LOOKS.filter((l) => (l !== "os" && l !== "satellite") || (API_URL !== "" && (l === "os" || imagery)));
+
+/** The look to draw: satellite falls back to standard where it isn't offered. */
+export const lookToDraw = (look: MapLook, imagery: boolean): MapLook =>
+  look === "satellite" && (!imagery || API_URL === "") ? "standard" : look;
+
+export const IMAGERY_SOURCE = "satellite";
+const IMAGERY_MIN_ZOOM = 10;
+const IMAGERY_MAX_ZOOM = 19;
+export const IMAGERY_ATTRIBUTION = "Powered by Esri. Imagery: Esri, Maxar, Earthstar Geographics";
 
 export const OS_SOURCE = "os-road";
 // The server refuses closer zooms (OS Premium, charged); the map draws zoom 16 larger.
@@ -232,11 +250,53 @@ function osLayers(theme: MapTheme): { source: StyleSpecification["sources"][stri
   };
 }
 
+// Satellite: the photos straight over the background, the map's own fills
+// (land, parks, buildings, water) left out so the photos show, and the
+// roads and names kept, the names white on black to read over any photo.
+function satelliteStyle(style: StyleSpecification, theme: MapTheme): StyleSpecification {
+  const photos: Layer = {
+    id: IMAGERY_SOURCE,
+    type: "raster",
+    source: IMAGERY_SOURCE,
+    minzoom: IMAGERY_MIN_ZOOM,
+    paint: theme === "night" ? { "raster-brightness-max": 0.6 } : {},
+  };
+  const kept: Layer[] = [];
+  for (const l of style.layers) {
+    if (l.type === "fill" || l.type === "fill-extrusion") continue;
+    if (l.type === "line" && sourceLayer(l) === ROADS) {
+      kept.push({ ...l, paint: { ...l.paint, "line-opacity": 0.8 } } as Layer);
+    } else if (l.type === "symbol" && !/shield/.test(l.id)) {
+      kept.push({
+        ...l,
+        paint: { ...l.paint, "text-color": "#ffffff", "text-halo-color": "#000000", "text-halo-width": 1.8 },
+      } as Layer);
+    } else kept.push(l);
+  }
+  const under = kept.filter((l) => l.type === "background").length;
+  return {
+    ...style,
+    sources: {
+      ...style.sources,
+      [IMAGERY_SOURCE]: {
+        type: "raster",
+        tiles: [`${API_URL}/v1/imagery/{z}/{x}/{y}.jpg`],
+        tileSize: 256,
+        minzoom: IMAGERY_MIN_ZOOM,
+        maxzoom: IMAGERY_MAX_ZOOM,
+        attribution: IMAGERY_ATTRIBUTION,
+      },
+    },
+    layers: [...kept.slice(0, under), photos, ...kept.slice(under)],
+  };
+}
+
 /** The standard style changed to the look. Standard is returned as it is. */
 export function restyle(style: StyleSpecification, look: MapLook, theme: MapTheme): StyleSpecification {
   if (look === "standard") return style;
   if (look === "clear") return { ...style, layers: style.layers.map((l) => clearLayer(l, theme)) };
   if (look === "plain") return { ...style, layers: style.layers.filter((l) => !CLUTTER.has(sourceLayer(l) ?? "")) };
+  if (look === "satellite") return satelliteStyle(style, theme);
   const os = osLayers(theme);
   // Over all of the standard map, which shows only where the OS map has no tile.
   return { ...style, sources: { ...style.sources, [OS_SOURCE]: os.source }, layers: [...style.layers, os.layer] };
@@ -271,27 +331,30 @@ export function useMapStyle(
   day?: string,
   /** false: no house numbers (navigating: they crowded the road on 30 Oct). */
   houseNumbers = true,
+  /** Stations, lines and bus stations drawn clearly (Session). */
+  transport = false,
 ): string | StyleSpecification {
   const [made, setMade] = useState<{ key: string; style: StyleSpecification } | null>(null);
   const fromDay = theme === "night" && !!day;
   // Only the night map without its day source is drawn as it comes; day is always tuned.
-  const plain = look === "standard" && theme === "night" && !fromDay && houseNumbers;
+  const plain = look === "standard" && theme === "night" && !fromDay && houseNumbers && !transport;
   const source = fromDay ? day! : base;
-  const key = `${look}|${theme}|${source}|${houseNumbers}`;
+  const key = `${look}|${theme}|${source}|${houseNumbers}|${transport}`;
   useEffect(() => {
     if (plain) return;
     let live = true;
     styleJson(source)
       .then((s) => {
         const tuned = fromDay ? nightify(s) : theme === "day" ? dayify(s) : s;
-        const style = restyle(tuned, look, theme);
+        const looked = restyle(tuned, look, theme);
+        const style = transport ? withTransport(looked, theme) : looked;
         if (live) setMade({ key, style: houseNumbers ? style : withoutHouseNumbers(style) });
       })
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [source, look, theme, key, plain, fromDay, houseNumbers]);
+  }, [source, look, theme, key, plain, fromDay, houseNumbers, transport]);
   return !plain && made?.key === key ? made.style : base;
 }
 

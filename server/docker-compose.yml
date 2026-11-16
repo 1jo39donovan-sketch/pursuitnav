@@ -42,6 +42,8 @@ services:
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       # Free key from https://api-portal.tfl.gov.uk; live closures work without one but may be throttled.
       TFL_APP_KEY: ${TFL_APP_KEY:-}
+      # Optional ArcGIS Location Platform key: turns on the Satellite map style.
+      IMAGERY_KEY: ${IMAGERY_KEY:-}
       # 1 accepts opt-in learning uploads. Do the privacy steps in docs/ROADMAP.md first.
       LEARNING: ${LEARNING:-0}
       # The code version running (update.sh sets it), shown by GET /health.
