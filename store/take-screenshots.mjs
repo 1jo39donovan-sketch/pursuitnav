@@ -81,7 +81,8 @@ for (const device of DEVICES) {
 
   await shot(page, device, "3-routes", async () => {
     await search(page, "54 Caledonian Road");
-    await page.getByText(/54 Caledonian Road/).nth(1).click();
+    // The result row, not the search box (which holds the same words).
+    await page.getByText("54 Caledonian Road", exact()).last().click();
     await page.getByLabel("Go on the standard route").last().waitFor({ timeout: 30_000 });
   });
 
@@ -95,8 +96,12 @@ for (const device of DEVICES) {
   await page.waitForTimeout(1500);
 
   await shot(page, device, "5-pursuit", async () => {
+    // The demo drive, so Pursuit shows a moving car at a legal speed.
+    await tab(page, "Session");
+    await page.getByText("Testing", exact()).last().click();
+    await page.getByRole("switch", { name: "Demo drive" }).last().click();
     await tab(page, "Pursuit");
-    await page.waitForTimeout(6000);
+    await page.waitForTimeout(12_000);
   });
 
   await shot(page, device, "2-session", async () => {
@@ -134,7 +139,7 @@ for (const device of DEVICES) {
     await desk.waitForTimeout(18_000);
     await tab(desk, "Search");
     await search(desk, "Mayton Street");
-    await desk.getByText(/Mayton Street/).nth(1).click();
+    await desk.getByText("Mayton Street", exact()).last().click();
     await desk.getByText("Send this place to the team", exact()).last().click({ timeout: 30_000 });
     await desk.getByText("Caution here", exact()).last().click();
     await desk.getByText("NI-31", exact()).last().click();
