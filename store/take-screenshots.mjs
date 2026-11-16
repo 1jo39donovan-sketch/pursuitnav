@@ -100,7 +100,9 @@ for (const device of DEVICES) {
     // The demo drive, so Pursuit shows a moving car at a legal speed.
     await tab(page, "Session");
     await page.getByText("Testing", exact()).last().click();
-    await page.getByRole("switch", { name: "Demo drive" }).last().click();
+    // The switch's name isn't exposed on the web, so find it in the row with the words.
+    const row = page.locator("div", { has: page.getByText("Demo drive", exact()) });
+    await row.locator('[role="switch"], input[type="checkbox"]').last().click();
     await tab(page, "Pursuit");
     await page.waitForTimeout(12_000);
   });
