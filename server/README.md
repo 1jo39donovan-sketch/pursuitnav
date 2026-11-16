@@ -15,6 +15,8 @@ Each route has `durationS`, `distanceM`, `shape` (`[lng, lat]` points) and turn-
 
 `PUT /v1/teams/:teamId/members/:memberId` `{token, blob}`, `GET /v1/teams/:teamId`, `DELETE …/members/:memberId` `{token}`: team sessions. Blobs are sealed on the phones; the server keeps them in memory only, for at most a week.
 
+`POST /v1/teams/:teamId/messages` `{memberId, token, blob, keepMs?}` and `DELETE …/messages/:messageId` `{memberId, token}`: team messages (a place to go, a caution, a note). Sealed on the sender's device like member blobs; only a member can post, only the sender can withdraw; kept in memory for at most 12 hours (`keepMs` is capped) and returned to members in `GET /v1/teams/:teamId` as `messages`.
+
 Both route responses avoid roads TfL lists as fully closed (`src/closures.ts`) and say so in `closures: {active, updatedAt, ignored}`.
 
 `POST /v1/addresses` with `{"query": "Flat 3, 53 Caledonian Road"}` returns `{"addresses": [...]}`, each with `id`, `source`, `precision`, `label`, `postcode` (may be empty), `borough` and `lat`/`lng` (and `uprn` from OS Places). Free by default; see "Address search" below. Only London addresses are returned, and every `borough` is one of the app's borough names; the app sorts them into the officer's boroughs and the rest. With no provider set up it returns 503 `addresses-not-configured`, and 503 `addresses-unavailable` only if every provider failed; either way the app falls back to its offline road search.

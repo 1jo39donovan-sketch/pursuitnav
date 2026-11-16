@@ -5,7 +5,7 @@
 const MAKER = "OPSVALE";
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
 // Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
-const UPDATED = "5 November 2026";
+const UPDATED = "16 November 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -106,6 +106,16 @@ you’re within 150 m of where you navigated to. Battery saver shares only while
 standing still. At a police station (public locations from OpenStreetMap) you’re hidden from the team and your drive
 there isn’t kept, unless you turn on sharing there. When you’re not sharing, your position isn’t sent and you drop off
 the others’ maps and team list. Nothing is shared while BlueRoute isn’t open on screen.</p>
+
+<h2>Team messages (only in a team)</h2>
+<p>Anyone in a team can send a place to go, a caution or a short note to one callsign or to the whole team. A message
+is encrypted on the sender’s phone with the team key, like positions, so the server can’t read it. The server keeps the
+sealed message, the sender’s random member ID (not who they are) and when it was sent, in memory only, and deletes it
+within 12 hours, sooner if the sender withdraws it or the team ends. Phones show messages until then and don’t save
+them. Everyone with the team code can read every team message, whoever it’s addressed to. In a team you can also choose
+not to share your position at all (Never (desk)), for example in an office, and still send and receive messages.</p>
+<p>Senders decide what goes in a message. Don’t put anything in one that your service doesn’t allow on this app,
+including personal details about members of the public, unless your service has authorised you to.</p>
 
 <h2>Helping improve journey times (only if you turn it on)</h2>
 <p>Off unless you turn it on in the Session tab. While you navigate, the phone times each road it drives along and
@@ -261,11 +271,31 @@ don’t agree, don’t use it.</p>
     job, and only where your service’s policy allows it.</li>
 </ul>
 
-<h2>6. Your service’s rules</h2>
+<h2>6. Team messages</h2>
+<ul>
+  <li>In a team, anyone can send a place to go, a caution or a note to one callsign or to the whole team.</li>
+  <li><strong>You alone are responsible for what you send.</strong> Only send information your service allows to be
+    shared on a personal device and on an app it hasn’t approved. Don’t send names, dates of birth, intelligence,
+    results from police or other official systems, or anything your service treats as sensitive, unless your service
+    has authorised you to.</li>
+  <li>Team messages are not an emergency, command or officer-safety system. They can arrive late, out of order or not
+    at all, and only reach a phone while BlueRoute is open. Never rely on them for anything urgent: use your radio and
+    your control room.</li>
+  <li>Everyone with the team code can read every team message, whoever it’s addressed to. Share the code only with
+    colleagues on the job.</li>
+  <li>Callsigns are typed in by each person and aren’t checked: anyone with the team code can send under any callsign.
+    If a message matters, confirm it over your radio or with your control room before acting on it.</li>
+  <li>OPSVALE can’t read team messages, and doesn’t check, approve, keep or answer for what’s in them. A message that
+    breaks these terms, your service’s rules or the law is the sender’s responsibility.</li>
+  <li>A message is deleted within 12 hours, sooner if the sender withdraws it or the team ends. Don’t rely on it being
+    there later: record what you need in your service’s own systems.</li>
+</ul>
+
+<h2>7. Your service’s rules</h2>
 <p>Using BlueRoute for work may be subject to your service’s approval, its policies on personal devices and apps, and
 its rules on outside business interests. Checking and following those is your responsibility.</p>
 
-<h2>7. Liability</h2>
+<h2>8. Liability</h2>
 <ul>
   <li>To the fullest extent the law allows, BlueRoute and the people who make it are not liable for any loss, damage,
     injury, delay, penalty, claim or cost arising from using, or not being able to use, BlueRoute or anything it shows,
@@ -276,15 +306,15 @@ its rules on outside business interests. Checking and following those is your re
     or for anything else that the law does not allow to be excluded or limited, or affects your statutory rights.</li>
 </ul>
 
-<h2>8. Using BlueRoute properly</h2>
+<h2>9. Using BlueRoute properly</h2>
 <p>Don’t misuse BlueRoute: don’t use it to break the law, to impersonate an emergency service, to interfere with the
 service or its server, or to collect other people’s information. We may stop providing BlueRoute to anyone who does.</p>
 
-<h2>9. Other services</h2>
+<h2>10. Other services</h2>
 <p>Map data © OpenStreetMap contributors, and data from Ordnance Survey, TfL and others, each under their own terms.
 “Open in Google Maps” and “Open in Waze” hand over to those apps, whose own terms apply.</p>
 
-<h2>10. Changes and law</h2>
+<h2>11. Changes and law</h2>
 <ul>
   <li>These terms may change. The date above changes when they do, and using BlueRoute after a change means you accept
     the new terms.</li>

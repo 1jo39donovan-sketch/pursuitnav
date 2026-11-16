@@ -10,6 +10,8 @@ import { useLocation } from "../location/LocationProvider";
 import { accuracyText, roughFix, useTeam } from "../team/TeamProvider";
 import { SHARE_POLICIES } from "../team/sharePolicy";
 import { useFollowIn } from "../team/useFollowIn";
+import { SendToTeam } from "./SendToTeam";
+import { routeToMessage } from "../team/routeToMessage";
 import { colors, fonts } from "../theme";
 import { Button } from "./Button";
 import { useTextStyles, useColors } from "../textSize";
@@ -164,6 +166,7 @@ export function TeamSection() {
       </View>
 
       <ShareSettings />
+      <TeamMessages />
       {copied === "copied" && <Text style={styles.meta}>Copied. Paste it in a message to your colleagues.</Text>}
       {copied === "failed" && <Text style={styles.error}>Couldn’t copy: press and hold the code to select it.</Text>}
       {others.length === 0 ? (
@@ -203,6 +206,53 @@ export function TeamSection() {
         Follow in drives you to the nearest point of the way they came, then along it. It may use bus lanes or ignore
         turn bans as they did; each one is listed. It won’t follow them the wrong way down a one-way street.
       </Text>
+    </View>
+  );
+}
+
+/** Team messages on this phone, with Send a note, Route here and Withdraw. */
+function TeamMessages() {
+  const styles = useTextStyles(baseStyles);
+  const team = useTeam();
+  const now = useNow();
+  const [composing, setComposing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <View style={styles.settings}>
+      <Text style={styles.label}>Team messages</Text>
+      {team.messages.length === 0 ? (
+        <Text style={styles.meta}>
+          None. Send a place to go or a caution from the map or Search (Send to team), or a note here.
+        </Text>
+      ) : (
+        team.messages.map((m) => (
+          <View key={m.id} style={styles.member}>
+            <View style={styles.memberText}>
+              <Text style={styles.callsign}>
+                {m.kind === "go" ? "Go here" : m.kind === "caution" ? "⚠ Caution" : "Note"}
+                {m.place ? `: ${m.place.label}` : ""}
+              </Text>
+              {m.text ? <Text style={styles.meta}>{m.text}</Text> : null}
+              <Text style={styles.small}>
+                {m.mine ? `You, to ${m.toCs ?? "everyone"}` : `From ${m.cs}${m.to ? " to you" : ""}`} · {ago(now - m.at)} ·
+                deleted in {Math.max(1, Math.round((m.expiresAt - now) / 3600_000))} h
+              </Text>
+            </View>
+            {m.mine ? (
+              <Button
+                label="Withdraw"
+                variant="danger"
+                onPress={() => void team.withdraw(m.id).catch((e: Error) => setError(e.message))}
+              />
+            ) : m.place && m.kind === "go" ? (
+              <Button label="Route here" variant="primary" onPress={() => routeToMessage(m)} />
+            ) : null}
+          </View>
+        ))
+      )}
+      {error && <Text style={styles.error}>{error}</Text>}
+      <Button label="Send a note" onPress={() => setComposing(true)} />
+      {composing && <SendToTeam onClose={() => setComposing(false)} />}
     </View>
   );
 }

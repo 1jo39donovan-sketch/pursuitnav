@@ -6,6 +6,11 @@
 // here. The server holds only sealed blobs, in memory, under a team ID that is
 // a hash of the code: it can't read them, and a restart forgets them all.
 // Teams last a week; a member who stops sharing drops off after a day.
+//
+// Team messages (an address to go to, a caution, a note) are sealed the same
+// way. Only a member of the team can post one, only its sender can withdraw
+// it, and each is deleted after its time is up: 12 hours at most, whatever
+// the phone asks for.
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const TEAM_DAYS = 7;
@@ -14,6 +19,23 @@ const MAX_TEAMS = 20_000;
 const MAX_MEMBERS = 50;
 /** Largest sealed blob a member may store (a track of a few hundred points fits easily). */
 export const MAX_BLOB_CHARS = 32_000;
+
+/** The longest a team message is kept, whatever the sender asks. */
+export const MESSAGE_MAX_MS = 12 * 3600_000;
+/** Largest sealed message (a note of a few hundred characters and a place fit easily). */
+export const MAX_MESSAGE_CHARS = 4_000;
+/** Messages kept per team at once; the oldest goes first. */
+const MAX_MESSAGES = 100;
+
+export interface MessageView {
+  id: string;
+  /** The member who sent it (their phone's random ID, not who they are). */
+  from: string;
+  blob: string;
+  /** Server time it arrived, and when it's deleted, ms since 1970. */
+  at: number;
+  expiresAt: number;
+}
 
 export interface MemberView {
   memberId: string;
@@ -31,6 +53,7 @@ interface Member {
 interface Team {
   expiresAt: number;
   members: Map<string, Member>;
+  messages: MessageView[];
 }
 
 export class TeamFullError extends Error {}
@@ -58,7 +81,7 @@ export class TeamStore {
     if (!team || team.expiresAt < this.now()) {
       if (!create) throw new NoSuchTeamError("No such team, or it has ended.");
       if (this.teams.size >= MAX_TEAMS) throw new TeamFullError("Too many teams right now.");
-      team = { expiresAt: this.now() + TEAM_DAYS * 24 * 3600_000, members: new Map() };
+      team = { expiresAt: this.now() + TEAM_DAYS * 24 * 3600_000, members: new Map(), messages: [] };
       this.teams.set(teamId, team);
     }
     const existing = team.members.get(memberId);
@@ -72,16 +95,61 @@ export class TeamStore {
     return { expiresAt: team.expiresAt };
   }
 
-  get(teamId: string): { expiresAt: number; members: MemberView[] } {
+  get(teamId: string): { expiresAt: number; members: MemberView[]; messages: MessageView[] } {
     this.sweep();
-    const team = this.teams.get(teamId);
-    if (!team || team.expiresAt < this.now()) throw new NoSuchTeamError("No such team, or it has ended.");
+    const team = this.live(teamId);
+    const now = this.now();
+    team.messages = team.messages.filter((m) => m.expiresAt > now);
     return {
       expiresAt: team.expiresAt,
       members: [...team.members]
-        .filter(([, m]) => this.now() - m.updatedAt <= MEMBER_STALE_MS)
+        .filter(([, m]) => now - m.updatedAt <= MEMBER_STALE_MS)
         .map(([memberId, m]) => ({ memberId, blob: m.blob, updatedAt: m.updatedAt })),
+      messages: [...team.messages],
     };
+  }
+
+  /**
+   * Posts a sealed message from a member (checked by their token). Kept for
+   * `keepMs`, never more than MESSAGE_MAX_MS, and never past the team's end.
+   */
+  postMessage(teamId: string, memberId: string, token: string, blob: string, keepMs = MESSAGE_MAX_MS): MessageView {
+    this.sweep();
+    const team = this.live(teamId);
+    this.checkToken(team, memberId, token);
+    const now = this.now();
+    const keep = Math.max(60_000, Math.min(MESSAGE_MAX_MS, Number.isFinite(keepMs) ? keepMs : MESSAGE_MAX_MS));
+    const message: MessageView = {
+      id: randomBytes(12).toString("hex"),
+      from: memberId,
+      blob,
+      at: now,
+      expiresAt: Math.min(now + keep, team.expiresAt),
+    };
+    team.messages = [...team.messages.filter((m) => m.expiresAt > now), message].slice(-MAX_MESSAGES);
+    return message;
+  }
+
+  /** Withdraws a message: only its sender can. */
+  deleteMessage(teamId: string, messageId: string, memberId: string, token: string) {
+    const team = this.live(teamId);
+    this.checkToken(team, memberId, token);
+    const m = team.messages.find((x) => x.id === messageId);
+    if (!m) return;
+    if (m.from !== memberId) throw new TeamTokenError("Not your message.");
+    team.messages = team.messages.filter((x) => x.id !== messageId);
+  }
+
+  private live(teamId: string): Team {
+    const team = this.teams.get(teamId);
+    if (!team || team.expiresAt < this.now()) throw new NoSuchTeamError("No such team, or it has ended.");
+    return team;
+  }
+
+  /** Only someone in the team (holding their member token) may post or withdraw. */
+  private checkToken(team: Team, memberId: string, token: string) {
+    const m = team.members.get(memberId);
+    if (!m || !timingSafeEqual(m.tokenHash, hash(token))) throw new TeamTokenError("Not in this team.");
   }
 
   /** Leaves the team: the member's entry is deleted. */
@@ -102,6 +170,7 @@ export class TeamStore {
         continue;
       }
       for (const [mid, m] of team.members) if (now - m.updatedAt > MEMBER_STALE_MS) team.members.delete(mid);
+      team.messages = team.messages.filter((m) => m.expiresAt > now);
     }
   }
 }

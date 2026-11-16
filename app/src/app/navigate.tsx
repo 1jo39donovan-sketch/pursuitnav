@@ -73,6 +73,8 @@ import { loadNotes, noteNear } from "../search/blockNotes";
 import { useTextStyles } from "../textSize";
 import type { ErrorBoundaryProps } from "expo-router";
 import { ScreenError } from "../components/ScreenError";
+import { TeamMessageCard } from "../components/TeamMessageCard";
+import { routeToMessage } from "../team/routeToMessage";
 
 const DEMO_GRACE_MS = 5000;
 const ARRIVAL_GRACE_MS = 10_000;
@@ -732,6 +734,15 @@ export default function NavigateScreen() {
   const gpsFloat = (
     <View style={[styles.gpsFloat, { top: landscape ? 8 : turnHeight }]} pointerEvents="box-none">
       <GpsStatus onRoute />
+      {/* A team message mid-route: Route here ends this route and plans the new one. */}
+      <TeamMessageCard
+        onRoute={(m) => {
+          recorder.end("new-destination");
+          stop("new-destination");
+          if (router.canGoBack()) router.back();
+          routeToMessage(m);
+        }}
+      />
     </View>
   );
 
@@ -1035,7 +1046,7 @@ const baseStyles = StyleSheet.create({
   focusTipText: { flex: 1, color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   focusTipOk: { minWidth: 48, minHeight: 40, alignItems: "center", justifyContent: "center" },
   focusTipOkText: { color: colors.blue, fontFamily: fonts.bodySemiBold, fontSize: 16 },
-  gpsFloat: { position: "absolute", left: 8, right: 64 },
+  gpsFloat: { position: "absolute", left: 8, right: 64, gap: 8 },
   bottom: {
     paddingHorizontal: 12,
     paddingTop: 8,

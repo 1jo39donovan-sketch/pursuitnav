@@ -8,12 +8,17 @@
 // background location, so a locked phone or another app in front shares
 // nothing (it fails closed). Colleagues see the last share age out.
 
-export type SharePolicy = "always" | "navigating" | "arrived";
+export type SharePolicy = "always" | "navigating" | "arrived" | "never";
 
 export const SHARE_POLICIES: { id: SharePolicy; label: string; hint: string }[] = [
   { id: "always", label: "Always", hint: "Whenever BlueRoute is open." },
   { id: "navigating", label: "Navigating", hint: "Only while you're navigating to a job." },
   { id: "arrived", label: "On scene", hint: "Only once you're within 150 m of where you navigated to." },
+  {
+    id: "never",
+    label: "Never (desk)",
+    hint: "Your position isn't shared: for someone in the office. You still see the team and can send messages.",
+  },
 ];
 
 /** Within this of the place navigated to counts as on scene. */
@@ -68,6 +73,7 @@ export interface ShareInputs {
 /** Whether to share now, and the reason to show the crew. */
 export function shareDecision(i: ShareInputs): { share: boolean; why: string } {
   if (i.atPolice && !i.shareAtPolice) return { share: false, why: "Not sharing: you're at a police station" };
+  if (i.policy === "never") return { share: false, why: "Not sharing your position (desk): you can still send messages" };
   const policy = i.batterySaver ? "navigating" : i.policy;
   if (policy === "always") return { share: true, why: "Sharing while BlueRoute is open" };
   if (policy === "navigating") {

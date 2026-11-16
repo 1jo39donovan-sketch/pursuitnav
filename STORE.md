@@ -151,7 +151,7 @@ pursuit,bus lane,bus gate,borough,postcode,address,officer,operator,callsign,sat
 > Built for the operator in the passenger seat: speed, the road's speed limit (or "—" when it isn't known, never a guess), road name, heading, borough, next junction and the area you're heading towards, with a heading-up map. Updates every second and keeps the screen awake.
 >
 > TEAM SESSIONS (OPTIONAL)
-> Share a code with your team and see each other on the map while the app is open. Positions are end-to-end encrypted: the server can't read them and forgets them within a week. It doesn't replace your radio or any force system.
+> Share a code with your team and see each other on the map while the app is open. Send a colleague a place to go, a caution or a short note, from a phone or from the office on the browser version. Positions and messages are end-to-end encrypted: the server can't read them, deletes messages within 12 hours and forgets the team within a week. It doesn't replace your radio or any force system.
 >
 > LOG
 > Every search and route you pick is kept on your phone until you clear it.
@@ -183,7 +183,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 > Location is used only while the app is in use (When In Use permission). Turn-by-turn guidance and the pursuit screen need the current position; on Android they keep going with the screen locked, with a notification showing, until you finish. Nothing is tracked when the app is closed.
 >
 > DATA
-> No accounts, ads or third-party analytics. Route and search requests are processed and not kept. Each request carries a random install ID and the app version, used only to count daily totals; the install ID can be reset, or switched off in Session > Privacy and data ("Count my usage"). Team sessions are optional, need a shared team code, and are end-to-end encrypted; the server deletes them within a week.
+> No accounts, ads or third-party analytics. Route and search requests are processed and not kept. Each request carries a random install ID and the app version, used only to count daily totals; the install ID can be reset, or switched off in Session > Privacy and data ("Count my usage"). Team sessions (positions and team messages) are optional, need a shared team code, and are end-to-end encrypted; the server deletes messages within 12 hours and teams within a week.
 >
 > INDEPENDENCE
 > BlueRoute is independent. It is not made, approved or endorsed by any police force or other public service, and is not affiliated with one. Police stations are shown by their own name only.
@@ -195,7 +195,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 
 **Apple**
 
-- **Age rating** (questionnaire): answer **None / No** to every question, including unrestricted web access, user-generated content and messaging (team sessions only share a position and callsign with people who have the code; there's no chat). Result: 4+.
+- **Age rating** (questionnaire): answer **None / No** to every question except messaging. Team messages (16 Nov 2026) let people who share a team code send each other short notes and places, so answer **Yes** to "messaging and chat" (and user-generated content if the form asks it separately). Unrestricted web access: **No**. Check the result Apple shows; it may move above 4+, which is fine for an 18+ audience.
 - **Encryption** (export compliance): already answered in the app (`ITSAppUsesNonExemptEncryption: false`), so App Store Connect won't ask. The app uses HTTPS and, for team sessions, standard published ciphers to protect users' own data; nothing proprietary. If Apple does ask, say it uses only standard encryption and no proprietary algorithms.
 - **Content rights**: "Does your app contain, show, or access third-party content?" **Yes**, and confirm you have the rights: OpenStreetMap (ODbL), Ordnance Survey OpenData (Open Government Licence) and TfL open data (credited in the app).
 - **Advertising identifier (IDFA)**: **No**.
@@ -203,7 +203,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 **Google**
 
 - **Ads**: No. **Target audience**: 18 and over only. **News app**: No. **Government app**: No (it's independent). **Financial features**: None. **Health**: None. **COVID-19**: not a contact tracing or status app.
-- **Content rating** (IARC questionnaire): category **All Other App Types**. Answer **No** to every question except one: "Does the app share the user's current physical location with other users?" is **Yes**, because team sessions do when the user opts in. That adds a "Shares location" note but doesn't change the age. Result: Everyone / PEGI 3.
+- **Content rating** (IARC questionnaire): category **All Other App Types**. Answer **No** to every question except one: "Does the app share the user's current physical location with other users?" is **Yes**, because team sessions do when the user opts in, and "Can users interact or exchange content?" is **Yes**, because of team messages. That adds "Shares location" and "Users interact" notes. Check the age it gives.
 - **Permissions**: no background location ("all the time") permission, so no location declaration form. The app does use a **foreground service of type location** (`FOREGROUND_SERVICE_LOCATION`), so Play Console's **App content → Foreground service permissions** form needs filling in: type **Location**, use **Navigation**, "Keeps turn-by-turn directions, spoken directions and the pursuit screen's live speed going while the screen is locked or another app is open. It starts only when the user starts navigating or opens Pursuit, shows a notification throughout, and stops when they finish." Play asks for a short video of it: start a route, lock the screen, show the notification and the directions still being spoken. Exact alarms: not used.
 
 ### Screenshots
@@ -238,6 +238,7 @@ What leaves the phone, checked against the code on 25 October 2026:
 | Random install ID, app version, counts of routes, sessions, timeouts | BlueRoute server | Daily totals; salted hashes deleted when the day or week ends | **Collected** (Device ID, Product interaction, Diagnostics), not linked |
 | Expo's update check: runtime version, platform, random update ID | Expo (works for us) | Expo's own terms | **Collected** (Device ID), not linked |
 | Team sessions: callsign, position, track | Other team members, through the server | Sealed, in memory, up to a week | Not collected: end-to-end encrypted, the server can't read it |
+| Team messages: a place, a caution, a note | Other team members, through the server | Sealed, in memory, 12 hours at most | Not collected: end-to-end encrypted, the server can't read it |
 | Learning: per-road timings | BlueRoute server | Totals per road | **Not yet**: switched off on the server (`LEARNING` not set). See below |
 | Report a problem | The user's own mail app | | Not collected by the app: the user sends the email |
 | Log, callsign, boroughs, notes, favourites, field-test trips | Phone only | | Not collected |

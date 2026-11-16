@@ -40,6 +40,9 @@ import { planIsStale } from "../../navigation/routeChoice";
 import type { SearchResult } from "../../search/engine";
 import { destinationNote } from "../../search/destinationNote";
 import { jobSearches, looksLikeJob } from "../../search/jobText";
+import { SendToTeam } from "../../components/SendToTeam";
+import { TeamMessageCard } from "../../components/TeamMessageCard";
+import type { MessagePlace } from "../../team/messages";
 import { mergeAddresses } from "../../search/merge";
 import { DEFAULT_MARKER_GROUPS, GROUP_COLOR, MARKER_GROUPS } from "../../search/placeGroups";
 import type { PlaceGroup } from "../../search/places";
@@ -98,7 +101,9 @@ export default function SearchScreen() {
   // Height of the floating search box (and any notes under it), from the top of the screen.
   const [topSpace, setTopSpace] = useState(insets.top + 72);
   const { boroughs, policeRoutes, vehicle, roads, mapView } = useSession();
-  const { mapPoints: teamMap, members: teamMembers } = useTeam();
+  const { mapPoints: teamMap, members: teamMembers, code: teamCode } = useTeam();
+  // "Send to team": a place picked on the map, or the destination chosen.
+  const [sending, setSending] = useState<MessagePlace | null>(null);
   const { data, search, places, blockLabels, area: searchArea } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
@@ -667,6 +672,19 @@ export default function SearchScreen() {
             }
             away={fix ? formatDistance(distanceM(fix, { lat: tapped.point[1], lng: tapped.point[0] })) : undefined}
             onClose={() => setTapped(null)}
+            other={
+              teamCode && tapped.marker.name !== FINDING
+                ? {
+                    label: "Send to team",
+                    onPress: () =>
+                      setSending({
+                        lat: tapped.point[1],
+                        lng: tapped.point[0],
+                        label: [tapped.marker.name, tapped.marker.address].filter(Boolean).join(", "),
+                      }),
+                  }
+                : undefined
+            }
             onRoute={() => {
               noteTap();
               const { marker, point, exact } = tapped;
@@ -881,6 +899,20 @@ export default function SearchScreen() {
             <Text style={styles.areaPromptButton}>Pick area</Text>
           </Pressable>
         )}
+        {/* A message from the team: where to go, a caution, a note. */}
+        <TeamMessageCard />
+        {/* In a team with a destination chosen: send it, e.g. from the office to a crew. */}
+        {teamCode && destination && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() =>
+              setSending({ lat: destination.point[1], lng: destination.point[0], label: destination.title ?? "Destination" })
+            }
+            style={({ pressed }) => [styles.sendTeam, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.sendTeamText}>Send this place to the team</Text>
+          </Pressable>
+        )}
         {lookupNote && <Text style={styles.dataNote}>{lookupNote}</Text>}
         {placesNote && <Text style={styles.dataNote}>{placesNote}</Text>}
         {!destination && <FlaggedRoutes />}
@@ -955,6 +987,7 @@ export default function SearchScreen() {
           bottomInset={8}
         />
       )}
+      {sending && <SendToTeam place={sending} onClose={() => setSending(null)} />}
     </View>
   );
 }
@@ -1009,6 +1042,17 @@ const baseStyles = StyleSheet.create({
   },
   areaPromptText: { flex: 1, color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 20 },
   areaPromptButton: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 16 },
+  sendTeam: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: colors.panel,
+    borderColor: colors.blue,
+    borderWidth: 1,
+  },
+  sendTeamText: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 15 },
   job: {
     gap: 8,
     backgroundColor: colors.panel,
