@@ -101,8 +101,14 @@ for (const device of DEVICES) {
     await tab(page, "Session");
     await page.getByText("Testing", exact()).last().click();
     // The switch's name isn't exposed on the web, so find it in the row with the words.
-    const row = page.locator("div", { has: page.getByText("Demo drive", exact()) });
-    await row.locator('[role="switch"], input[type="checkbox"]').last().click();
+    // The nearest box round the label that holds a switch is the row.
+    await page
+      .locator("#demo-drive-label")
+      .last()
+      .locator('xpath=ancestor::div[.//*[@role="switch" or @type="checkbox"]][1]')
+      .locator('[role="switch"], input[type="checkbox"]')
+      .first()
+      .click();
     await tab(page, "Pursuit");
     await page.waitForTimeout(12_000);
   });
