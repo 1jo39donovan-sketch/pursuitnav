@@ -91,8 +91,9 @@ for (const device of DEVICES) {
     await page.waitForTimeout(5000);
   });
   // End the route: one tap arms END, the second ends it.
-  await page.getByText("END", exact()).last().click().catch(() => {});
-  await page.getByText("TAP TO END", exact()).last().click().catch(() => {});
+  // (Shown in capitals, but the words underneath are "End", so go by the label.)
+  await page.getByLabel("End navigation", exact()).last().click();
+  await page.getByLabel("Tap again to end navigation", exact()).last().click();
   await page.waitForTimeout(1500);
 
   await shot(page, device, "5-pursuit", async () => {
