@@ -93,6 +93,15 @@ const NEAR_ROAD_KM = 0.6;
 const ON_ROAD_BONUS = 15;
 const NEAR_ROAD_BONUS = 5;
 const OFFICE_PENALTY = 12;
+/**
+ * Between equally good matches: a road before a business (officers search
+ * roads far more often), and the officer's own boroughs before those just
+ * over the boundary. Smaller than a step in match quality (90 → 80), so a
+ * much better match still wins ("Salt" the shop over "Salterton Road").
+ */
+const BUSINESS_PENALTY = 5;
+const BUSINESS_GROUPS = new Set<PlaceGroup | undefined>(["food", "shop", "services", "stay", "other"]);
+const OWN_BOROUGH_BONUS = 4;
 
 /** The parts of the query that aren't the road or place itself. */
 interface Prefix {
@@ -360,9 +369,11 @@ export class SearchIndex {
     const hits = [...this.collect(raw, area), ...listed.inArea];
     const limit = parseQuery(raw).outwardCode || types.length ? MAX_LIST_RESULTS : MAX_RESULTS;
 
+    const rank = (h: SearchResult) =>
+      h.score - (h.kind === "poi" && BUSINESS_GROUPS.has(h.placeGroup) ? BUSINESS_PENALTY : 0) + (area.has(h.borough) ? OWN_BOROUGH_BONUS : 0);
     const seen = new Set<string>();
     const unique = hits
-      .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
+      .sort((a, b) => rank(b) - rank(a) || a.label.localeCompare(b.label))
       .filter((h) => {
         const k = h.kind === "poi" ? h.key : `${h.label}|${h.borough}`;
         if (seen.has(k)) return false;
