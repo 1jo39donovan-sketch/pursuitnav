@@ -11,7 +11,11 @@ if (!key) {
 const region: [number, number, number, number] = [-0.8, 50.8, 1.6, 52.2];
 const feed = new HighwaysFeed(key, region, undefined, undefined, (s) => console.log("feed answered:", s));
 // Now, and later tonight (most motorway closures are overnight).
+// National Highways allows 10 requests a minute; one read is about 5. Space them out.
+const pause = () => new Promise((r) => setTimeout(r, 70_000));
+await pause();
 for (const hours of [0, 3, 6]) {
+  if (hours) await pause();
   const at = new Date(Date.now() + hours * 3600_000);
   await feed.refresh(at);
   const list = feed.current(at);

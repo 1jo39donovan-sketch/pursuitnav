@@ -16,7 +16,7 @@ permissions:
 jobs:
   sample:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       KEY: ${{ secrets.NATIONAL_HIGHWAYS_KEY }}
     steps:
@@ -33,6 +33,7 @@ jobs:
           npx tsx scripts/highways-check.ts
       - name: Fetch planned and unplanned closures and describe them
         run: |
+          sleep 70  # the parser's reads above, within the 10-a-minute limit
           [ -n "$KEY" ] || { echo "No NATIONAL_HIGHWAYS_KEY secret yet."; exit 1; }
           now=$(date -u +%Y-%m-%dT%H:%M:%S)
           later=$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%S)
