@@ -9,6 +9,7 @@
 import type { Borough } from "../search/boroughs";
 import type { PointOfInterest } from "../search/places";
 import { normalise } from "../search/text";
+import { policeSite } from "./policeSites";
 
 export interface CustodySuite {
   name: string;
@@ -94,12 +95,14 @@ export function custodyStation(suite: CustodySuite, places: readonly PointOfInte
   const words = normalise(suite.match).split(" ");
   const not = suite.not ? normalise(suite.not) : null;
   const found = places.filter((p) => {
-    if (p.type !== "Police station" || p.borough !== suite.borough) return false;
+    if (p.type !== "Police station" || p.borough !== suite.borough || policeSite(p.name) === "not-police") return false;
     const name = ` ${normalise(p.name)} `;
     return words.every((w) => name.includes(` ${w} `)) && !(not && name.includes(` ${not} `));
   });
-  // More than one (an old and a new building, say): the plainest name.
-  return found.sort((a, b) => a.name.length - b.name.length)[0] ?? null;
+  // More than one (an old and a new building, say): one named for its custody
+  // ("Croydon Custody Centre"), else the plainest name.
+  const custody = (p: PointOfInterest) => (/custody/i.test(p.name) ? 0 : 1);
+  return found.sort((a, b) => custody(a) - custody(b) || a.name.length - b.name.length)[0] ?? null;
 }
 
 /** Custody suites in these boroughs: 24/7 first, then contingency. */

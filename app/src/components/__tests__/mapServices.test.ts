@@ -50,6 +50,17 @@ describe("services on the map", () => {
     expect(c.notes).toBe("Kent Fire and Rescue Service");
   });
 
+  it("leaves out what isn't police, and marks bases with no counter", () => {
+    const f = servicePoints([
+      poi("Former smallest police station of England", "Police station", "Westminster"),
+      poi("National Crime Agency", "Police station", "Lambeth"),
+      poi("Quicksilver Patrol Base", "Police station", "Haringey"),
+    ]).features.map((x) => x.properties!);
+    expect(f.map((x) => x.name)).toEqual(["Quicksilver Patrol Base"]);
+    expect(f[0]).toMatchObject({ type: "Police base" });
+    expect(f[0]!.notes).toContain("no public front counter");
+  });
+
   it("draws them on top in the style's font, and replaces rather than stacks", () => {
     const style = {
       version: 8,

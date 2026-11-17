@@ -6,6 +6,7 @@ import type { StyleSpecification } from "@maplibre/maplibre-react-native";
 
 import { CUSTODY_SUITES, custodyStation, type CustodySuite } from "../area/custody";
 import { regionOf, type Borough } from "../search/boroughs";
+import { policeSite } from "../area/policeSites";
 import type { PointOfInterest } from "../search/places";
 import type { MapTheme } from "../session/SessionProvider";
 
@@ -78,6 +79,7 @@ function describe(kind: ServiceKind, p: PointOfInterest, suite: CustodySuite | n
         : `Contingency custody suite (${AGENCY_NAME[suite.agency]}): opened when others are full`,
     );
   } else if (kind === "police") {
+    if (policeSite(p.name) === "base") lines.push("Police base: no public front counter.");
     lines.push("No custody suite here.");
   }
   if (kind === "ae") lines.push("Emergency department (A&E).");
@@ -87,7 +89,7 @@ function describe(kind: ServiceKind, p: PointOfInterest, suite: CustodySuite | n
   }
   const type =
     kind === "custody" || kind === "police"
-      ? `${btp ? "BTP station" : "Police station"}${suite ? " · custody" : ""}`
+      ? `${btp ? "BTP station" : !suite && policeSite(p.name) === "base" ? "Police base" : "Police station"}${suite ? " · custody" : ""}`
       : SERVICE_LABEL[kind];
   return { type, notes: lines.join("\n") };
 }
@@ -127,6 +129,8 @@ export function servicePoints(pois: readonly PointOfInterest[]): GeoJSON.Feature
   const hasAe = (p: PointOfInterest) => entrances.some((e) => metresApart(e, p) <= AE_ENTRANCE_M);
   const services = pois
     .filter((p) => KIND_OF_TYPE[p.type] || (p.type === "Hospital" && hasAe(p)))
+    // A former station, another agency or an office isn't somewhere to send anyone.
+    .filter((p) => p.type !== "Police station" || policeSite(p.name) !== "not-police")
     .map((p) => (p.type === "Hospital" ? { ...p, type: "Hospital with A&E" } : p));
   const suiteOf = new Map<PointOfInterest, CustodySuite>();
   for (const suite of CUSTODY_SUITES) {
