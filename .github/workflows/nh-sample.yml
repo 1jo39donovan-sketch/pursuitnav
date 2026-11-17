@@ -1,0 +1,71 @@
+# National Highways sample: fetches the Road and Lane Closures API once,
+# planned and unplanned, and prints the response's structure and a few
+# records, so the closures parser is written against real data. Needs the
+# repository secret NATIONAL_HIGHWAYS_KEY (a free key from
+# developer.data.nationalhighways.co.uk, product "Road and Lane Closures").
+# GitHub hides the key in the log; it is only ever sent in the header.
+# Run from the Actions tab.
+name: National Highways sample
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sample:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      KEY: ${{ secrets.NATIONAL_HIGHWAYS_KEY }}
+    steps:
+      - name: Fetch planned and unplanned closures and describe them
+        run: |
+          [ -n "$KEY" ] || { echo "No NATIONAL_HIGHWAYS_KEY secret yet."; exit 1; }
+          now=$(date -u +%Y-%m-%dT%H:%M:%S)
+          later=$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%S)
+          before=$(date -u -d '-6 hours' +%Y-%m-%dT%H:%M:%S)
+          for kind in planned unplanned; do
+            if [ "$kind" = planned ]; then from=$now; to=$later; else from=$before; to=$now; fi
+            echo "=================== $kind ($from to $to)"
+            curl -sS -D headers.txt -o "$kind.json" -w "HTTP %{http_code}, %{size_download} bytes\n" \
+              -H "Ocp-Apim-Subscription-Key: $KEY" \
+              -H "X-Response-MediaType: application/json" \
+              -H "X-Data-Format: DATEXII" \
+              "https://api.data.nationalhighways.co.uk/roads/v2.0/closures?closureType=$kind&startDateTime=$from&endDateTime=$to"
+            grep -i -E "^(content-type|x-next)" headers.txt || true
+            python3 - "$kind.json" <<'PY'
+          import json, sys
+          try:
+              data = json.load(open(sys.argv[1]))
+          except Exception as e:
+              print("not JSON:", e); print(open(sys.argv[1]).read()[:2000]); sys.exit(0)
+          def shape(x, depth=0, path="$"):
+              # Every path to a value, once, with an example: the structure, not the whole feed.
+              seen = {}
+              def walk(v, p):
+                  if isinstance(v, dict):
+                      for k, w in v.items(): walk(w, f"{p}.{k}")
+                  elif isinstance(v, list):
+                      for w in v[:3]: walk(w, f"{p}[]")
+                  else:
+                      seen.setdefault(p, repr(v)[:80])
+              walk(x, path)
+              return seen
+          paths = shape(data)
+          print(len(paths), "distinct paths")
+          for p, ex in list(paths.items())[:400]:
+              print(f"{p} = {ex}")
+          # Two whole records, to see how one hangs together.
+          def records(v):
+              if isinstance(v, list): return v
+              if isinstance(v, dict):
+                  for w in v.values():
+                      r = records(w)
+                      if r: return r
+              return []
+          for r in records(data)[:2]:
+              print("--- record"); print(json.dumps(r, indent=1)[:6000])
+          PY
+          done
