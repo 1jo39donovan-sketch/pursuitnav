@@ -193,7 +193,15 @@ IGNORE = {
         "public_bookcase", "bicycle_repair_station", "compressed_air", "water_point",
         "give_box", "photo_booth", "ticket_validator", "smoking_area", "dog_toilet",
     )
-} | {("shop", "vacant"), ("office", "vacant"), ("building", "yes")}
+} | {("shop", "vacant"), ("office", "vacant")}
+
+# Named buildings of any other kind (most often building=yes): council blocks
+# and named houses that crews are sent to ("Birchmore House"). Not these,
+# whose names are of what's in or on them, if anything.
+NOT_A_BUILDING_PLACE = {
+    "roof", "garage", "garages", "shed", "construction", "ruins", "hut", "service",
+    "kiosk", "toilets", "transformer_tower", "bridge", "carport", "greenhouse",
+}
 
 # Order in which keys decide a feature's type (amenity=cafe beats building=yes).
 KEY_ORDER = [
@@ -230,4 +238,7 @@ def classify(tags) -> tuple[str, str] | None:
             return TYPES[(key, value)]
         if key in OPEN_KEYS:
             return value.replace("_", " ").replace(";", ", ").capitalize(), OPEN_KEYS[key]
+    building = tags.get("building")
+    if building and building not in NOT_A_BUILDING_PLACE:
+        return "Building", "housing"
     return None

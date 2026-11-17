@@ -38,7 +38,7 @@ def write_fixture(path):
     node(LAT - 32 * D, LNG, amenity="cafe", name="Costa")  # unlisted shop type, pipe in name
     closed_way(1, LAT + 2 * D, LNG, leisure="park", name="Highbury Fields")
     closed_way(2, LAT + 4 * D, LNG, building="apartments", name="Smith House")
-    closed_way(3, LAT + 6 * D, LNG, building="yes", name="Unnamed-type Building")  # building=yes: left out
+    closed_way(3, LAT + 6 * D, LNG, building="yes", name="Birchmore House")  # building=yes: a named block
     # A station drawn twice: node and area. Keep one.
     node(LAT - 2 * D, LNG, railway="station", name="Highbury & Islington")
     closed_way(4, LAT - 2 * D, LNG, public_transport="station", name="Highbury & Islington")
@@ -57,6 +57,9 @@ def write_fixture(path):
     w.add_way(osmium.osm.mutable.Way(id=7, nodes=path, version=1, tags={"highway": "footway", "name": "Back Path"}))
     node(LAT - 60 * D, LNG, amenity="cafe", name="Costa Holloway", **{"addr:postcode": "N7 6PA"})
     node(LAT - 90 * D, LNG, amenity="cafe", name="Far Cafe")  # 1 km from any road here: no street
+    # Named only in its address, as many council blocks are.
+    closed_way(8, LAT + 12 * D, LNG, building="residential", **{"addr:housename": "Quadrant House", "addr:street": "Highbury Quadrant"})
+    closed_way(9, LAT + 14 * D, LNG, building="roof", name="Esso canopy")  # a roof: left out
     w.close()
 
 
@@ -83,6 +86,12 @@ def test_named_places_with_types_and_groups(places):
     assert places["Highbury Fields"][2:4] == ["Park", "leisure"]
     assert places["Smith House"][2:4] == ["Block of flats", "housing"]
     assert places["Highbury Grove School"][2:4] == ["School", "education"]
+
+
+def test_named_blocks_from_building_yes_and_house_names(places):
+    assert places["Birchmore House"][2:4] == ["Building", "housing"]
+    assert places["Quadrant House"][2:4] == ["Block of flats", "housing"]
+    assert places["Quadrant House"][7].startswith("Highbury Quadrant")
 
 
 def test_borough_and_point(places):
@@ -113,7 +122,7 @@ def test_unlisted_types_are_named_from_the_tag(places):
 
 
 def test_leaves_out_clutter_unnamed_and_outside_london(places):
-    for name in ("Memorial bench", "Somewhere Else Cafe", "Unnamed-type Building"):
+    for name in ("Memorial bench", "Somewhere Else Cafe", "Esso canopy"):
         assert name not in places
     assert "" not in places
 
