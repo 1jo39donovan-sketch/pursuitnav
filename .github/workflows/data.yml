@@ -115,6 +115,7 @@ jobs:
           assert all(n), 'a region has no rows'
           "
           done
+          echo "lines: $(sudo zcat data/places-next/lines.txt.gz 2>/dev/null | tail -n +2 | cut -d'|' -f1 | sort -u | wc -l) lines, $(sudo zcat data/places-next/lines.txt.gz 2>/dev/null | tail -n +2 | wc -l) stretches"
 
       - name: Publish
         if: github.ref == 'refs/heads/main'

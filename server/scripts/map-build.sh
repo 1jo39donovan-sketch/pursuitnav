@@ -87,4 +87,9 @@ docker compose run --rm --entrypoint python places extract_roads.py \
   /data/osm/region.osm.pbf /data/places-next/roads.txt.gz </dev/null
 docker compose run --rm --entrypoint python places extract_entrances.py \
   /data/osm/region.osm.pbf /data/places-next/entrances.txt.gz </dev/null
+# Tube, Overground, DLR and tram lines in their colours: nice to have, so a
+# failure here doesn't stop the map (the app draws the lines from the tiles).
+docker compose run --rm --entrypoint python places extract_lines.py \
+  /data/osm/region.osm.pbf /data/places-next/lines.txt.gz </dev/null ||
+  say "couldn't extract the transport lines; the app draws them without their colours"
 say "map built"
