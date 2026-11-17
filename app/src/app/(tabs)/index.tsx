@@ -663,8 +663,8 @@ export default function SessionScreen() {
           contributors (places and map).
         </Text>
         <Text style={styles.attribution}>
-          Road closures: Powered by TfL Open Data. Powered by National Highways' Transport Data Feeds. Satellite
-          imagery: Esri, Maxar, Earthstar Geographics.
+          {"Road closures: Powered by TfL Open Data. Powered by National Highways' Transport Data Feeds. "}
+          Satellite imagery: Esri, Maxar, Earthstar Geographics.
         </Text>
       </Section>
     </ScrollView>
