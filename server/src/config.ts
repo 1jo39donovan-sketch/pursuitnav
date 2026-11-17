@@ -34,6 +34,8 @@ export interface ServerConfig {
   tflClosures?: boolean;
   /** TfL API key: without one the feed still works but may be throttled. */
   tflAppKey?: string;
+  /** National Highways' Road and Lane Closures key: closures on motorways and major A-roads (Kent, Essex and London's). */
+  highwaysKey?: string;
   /**
    * Accept opt-in learning uploads (LEARNING=1). Off until the privacy steps in
    * docs/ROADMAP.md are done; the app only offers the switch when it's on.
@@ -103,6 +105,7 @@ export function loadConfig(): ServerConfig {
     contactEmail: process.env.CONTACT_EMAIL || undefined,
     tflClosures: process.env.TFL_CLOSURES !== "0",
     tflAppKey: process.env.TFL_APP_KEY || undefined,
+    highwaysKey: process.env.NATIONAL_HIGHWAYS_KEY || undefined,
     learning: process.env.LEARNING === "1",
     learnedDir: process.env.LEARNED_DIR ?? "/data/learned",
     usageDb: process.env.USAGE_DB ?? "/data/usage/usage.sqlite",
