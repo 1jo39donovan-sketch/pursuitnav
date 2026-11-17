@@ -16,7 +16,7 @@ const exact = () => ({ exact: true });
 const SPOTS = [
   ["highbury-islington", { latitude: 51.5462, longitude: -0.1040 }, 3],
   ["kings-cross", { latitude: 51.5308, longitude: -0.1238 }, 2],
-  ["holloway-police", { latitude: 51.5530, longitude: -0.1155 }, 3],
+  ["islington-police", { latitude: 51.5337, longitude: -0.1100 }, 3],
   ["whittington-ae", { latitude: 51.5658, longitude: -0.1383 }, 3],
   ["stratford", { latitude: 51.5416, longitude: -0.0035 }, 2],
 ];

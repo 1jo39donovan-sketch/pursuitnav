@@ -12,7 +12,7 @@ import postcodesAsset from "../../assets/data/postcodes.dat";
 import roadsAsset from "../../assets/data/roads.dat";
 import { nearBoroughs } from "../area/area";
 import { namedPoints } from "../components/mapShared";
-import { SERVICE_TYPES, servicePoints } from "../components/mapServices";
+import { SERVICE_SOURCE_TYPES, servicePoints } from "../components/mapServices";
 import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import type { SavedPlace } from "../storage/types";
@@ -171,7 +171,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const services = useMemo(
     () =>
       data.status === "ready" && places.status === "ready"
-        ? servicePoints(data.index.pointsOfInterestOfType(SERVICE_TYPES))
+        ? servicePoints(data.index.pointsOfInterestOfType(SERVICE_SOURCE_TYPES))
         : null,
     [data, places],
   );

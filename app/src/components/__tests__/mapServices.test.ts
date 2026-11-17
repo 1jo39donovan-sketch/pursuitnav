@@ -13,7 +13,7 @@ describe("services on the map", () => {
     poi(`${suite.match} Police Station`, "Police station", suite.borough),
     poi("Holloway Police Station", "Police station", "Islington"),
     poi("Islington Fire Station", "Fire station", "Islington"),
-    poi("The Whittington Hospital", "Hospital with A&E", "Islington"),
+    poi("Royal Free Hospital", "Hospital with A&E", "Camden"),
     poi("Coffee Corner", "Coffee shop", "Islington"),
   ];
 
@@ -23,8 +23,16 @@ describe("services on the map", () => {
       [`${suite.match} Police Station`, "custody", "C"],
       ["Holloway Police Station", "police", "P"],
       ["Islington Fire Station", "fire", "F"],
-      ["The Whittington Hospital", "ae", "A&E"],
+      ["Royal Free Hospital", "ae", "A&E"],
     ]);
+  });
+
+  it("counts a hospital with an A&E entrance beside it as A&E (the Whittington)", () => {
+    const hospital = poi("The Whittington Hospital", "Hospital", "Islington", -0.1383, 51.5658);
+    const entrance = poi("A&E entrance", "A&E entrance", "Islington", -0.1378, 51.5662);
+    const faraway = poi("A Clinic Hospital", "Hospital", "Islington", -0.10, 51.53);
+    const f = servicePoints([hospital, entrance, faraway]).features.map((x) => [x.properties!.name, x.properties!.kind]);
+    expect(f).toEqual([["The Whittington Hospital", "ae"]]);
   });
 
   it("draws them on top in the style's font, and replaces rather than stacks", () => {
