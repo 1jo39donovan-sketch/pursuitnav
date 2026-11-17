@@ -11,6 +11,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { DEMO_MODE, MAP_STYLES, region } from "../config";
 import { useImageryOffered } from "./imagery";
 import { useTransportLines } from "./transportLines";
+import { SERVICES_BADGE_LAYER } from "./mapServices";
 import { useSearch } from "../search/SearchProvider";
 import { lookToDraw, useMapStyle } from "./mapLooks";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
@@ -378,6 +379,18 @@ export function LiveMap({
     m.on("click", (e) => {
       if (Date.now() - longAt < 800) return;
       if (m.getLayer("places-dot") && m.queryRenderedFeatures(e.point, { layers: ["places-dot"] }).length) return;
+      // A police, fire or A&E badge: its card, with who runs it and custody.
+      const badgeBox: [[number, number], [number, number]] = [
+        [e.point.x - 12, e.point.y - 12],
+        [e.point.x + 12, e.point.y + 12],
+      ];
+      const badge = m.getLayer(SERVICES_BADGE_LAYER)
+        ? m.queryRenderedFeatures(badgeBox, { layers: [SERVICES_BADGE_LAYER] })[0]
+        : undefined;
+      if (badge?.geometry.type === "Point" && badge.properties && markerPress.current) {
+        markerPress.current(badge.properties as MarkerProperties, badge.geometry.coordinates as [number, number]);
+        return;
+      }
       // A colleague's dot (a finger's width around it) opens their card instead.
       const near: [[number, number], [number, number]] = [
         [e.point.x - 14, e.point.y - 14],

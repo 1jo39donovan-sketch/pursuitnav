@@ -99,20 +99,36 @@ export function withTransport(
   const busStations = ["all", ["==", ["get", "class"], "bus"], ["==", ["get", "subclass"], "bus_station"]];
   const busStops = ["all", ["==", ["get", "class"], "bus"], ["==", ["get", "subclass"], "bus_stop"]];
 
+  // Above ground: a slim line with a halo. Underground: thin, dashed and faint,
+  // so a Tube line under a street doesn't look like part of the road (17 Nov:
+  // the Northern line drawn over Tottenham Court Road).
+  const surfaceWidth = ["interpolate", ["linear"], ["zoom"], 11, 0.9, 14, 1.6, 17, 3] as never;
+  const surfaceHalo = ["interpolate", ["linear"], ["zoom"], 11, 2, 14, 3.2, 17, 5.5] as never;
+  const tunnelWidth = ["interpolate", ["linear"], ["zoom"], 11, 0.6, 14, 1, 17, 1.8] as never;
+  const tunnelDash = [2, 2] as never;
+  const tileTunnel = ["==", ["get", "brunnel"], "tunnel"];
+  const surface = (f: unknown) => ["all", f, ["!", tileTunnel]] as never;
+  const underground = (f: unknown) => ["all", f, tileTunnel] as never;
+
   const railLayers: Layer[] = [
+    {
+      id: `${TRANSPORT_PREFIX}lines-tunnel`,
+      type: "line",
+      source,
+      "source-layer": "transportation",
+      minzoom: 12,
+      filter: underground(railLines),
+      paint: { "line-color": lineColour as never, "line-opacity": 0.35, "line-width": tunnelWidth, "line-dasharray": tunnelDash },
+    },
     {
       id: `${TRANSPORT_PREFIX}lines-casing`,
       type: "line",
       source,
       "source-layer": "transportation",
       minzoom: 11,
-      filter: railLines as never,
+      filter: surface(railLines),
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": halo,
-        "line-opacity": ["case", ["==", ["get", "brunnel"], "tunnel"], 0.35, 0.8] as never,
-        "line-width": ["interpolate", ["linear"], ["zoom"], 11, 2.4, 14, 4.5, 17, 8] as never,
-      },
+      paint: { "line-color": halo, "line-opacity": 0.7, "line-width": surfaceHalo },
     },
     {
       id: `${TRANSPORT_PREFIX}lines`,
@@ -120,14 +136,9 @@ export function withTransport(
       source,
       "source-layer": "transportation",
       minzoom: 11,
-      filter: railLines as never,
+      filter: surface(railLines),
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: {
-        "line-color": lineColour as never,
-        // Lines underground drawn fainter: the roads above them matter more.
-        "line-opacity": ["case", ["==", ["get", "brunnel"], "tunnel"], 0.45, 0.95] as never,
-        "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.2, 14, 2.4, 17, 4.5] as never,
-      },
+      paint: { "line-color": lineColour as never, "line-opacity": 0.85, "line-width": surfaceWidth },
     },
   ];
 
@@ -135,29 +146,35 @@ export function withTransport(
   const coloured: Layer[] = lines
     ? [
         {
+          id: `${TRANSPORT_PREFIX}tfl-tunnel`,
+          type: "line",
+          source: LINES_SOURCE,
+          minzoom: 12,
+          filter: ["==", ["get", "tunnel"], true] as never,
+          paint: {
+            "line-color": ["get", "colour"] as never,
+            "line-opacity": 0.4,
+            "line-width": tunnelWidth,
+            "line-dasharray": tunnelDash,
+          },
+        },
+        {
           id: `${TRANSPORT_PREFIX}tfl-casing`,
           type: "line",
           source: LINES_SOURCE,
           minzoom: 10,
+          filter: ["!=", ["get", "tunnel"], true] as never,
           layout: { "line-cap": "round", "line-join": "round" },
-          paint: {
-            "line-color": halo,
-            "line-opacity": ["case", ["get", "tunnel"], 0.4, 0.85] as never,
-            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 2.6, 14, 5, 17, 9] as never,
-          },
+          paint: { "line-color": halo, "line-opacity": 0.7, "line-width": surfaceHalo },
         },
         {
           id: `${TRANSPORT_PREFIX}tfl-lines`,
           type: "line",
           source: LINES_SOURCE,
           minzoom: 10,
+          filter: ["!=", ["get", "tunnel"], true] as never,
           layout: { "line-cap": "round", "line-join": "round" },
-          paint: {
-            "line-color": ["get", "colour"] as never,
-            // Underground stretches fainter: the roads above them matter more.
-            "line-opacity": ["case", ["get", "tunnel"], 0.5, 1] as never,
-            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.4, 14, 2.8, 17, 5] as never,
-          },
+          paint: { "line-color": ["get", "colour"] as never, "line-opacity": 0.9, "line-width": surfaceWidth },
         },
       ]
     : [];

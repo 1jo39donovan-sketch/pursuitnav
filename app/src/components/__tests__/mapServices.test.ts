@@ -35,6 +35,21 @@ describe("services on the map", () => {
     expect(f).toEqual([["The Whittington Hospital", "ae"]]);
   });
 
+  it("says who runs it and about custody, for the card a tap opens", () => {
+    const btp = poi("British Transport Police", "Police station", "Camden");
+    const brewery = poi("Brewery Road BTP Police Station", "Police station", "Islington");
+    const fire = poi("Margate Fire Station", "Fire station", "Thanet");
+    const [a, b, c] = servicePoints([btp, brewery, fire]).features.map((f) => f.properties!);
+    expect(a).toMatchObject({ type: "BTP station", borough: "Camden" });
+    expect(a.notes).toContain("British Transport Police");
+    expect(a.notes).toContain("No custody suite here.");
+    // Brewery Lane is BTP's 24/7 suite (London's list).
+    expect(b.type).toBe("BTP station · custody");
+    expect(b.notes).toContain("24/7 custody suite (British Transport Police)");
+    expect(c).toMatchObject({ type: "Fire station" });
+    expect(c.notes).toBe("Kent Fire and Rescue Service");
+  });
+
   it("draws them on top in the style's font, and replaces rather than stacks", () => {
     const style = {
       version: 8,
