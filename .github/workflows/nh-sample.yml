@@ -20,6 +20,17 @@ jobs:
     env:
       KEY: ${{ secrets.NATIONAL_HIGHWAYS_KEY }}
     steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: The server's own parser on the live feed
+        working-directory: server
+        env:
+          NATIONAL_HIGHWAYS_KEY: ${{ secrets.NATIONAL_HIGHWAYS_KEY }}
+        run: |
+          npm ci --no-audit --no-fund >/dev/null
+          npx tsx scripts/highways-check.ts
       - name: Fetch planned and unplanned closures and describe them
         run: |
           [ -n "$KEY" ] || { echo "No NATIONAL_HIGHWAYS_KEY secret yet."; exit 1; }
