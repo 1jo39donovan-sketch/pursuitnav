@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { combinedFeed, HighwaysFeed, inForce, parseHighwaysClosures } from "../../src/highwaysClosures.js";
+import { combinedFeed, HighwaysFeed, inForce, parseHighwaysClosures, thinned } from "../../src/highwaysClosures.js";
 
 const REGION: [number, number, number, number] = [-0.8, 50.8, 1.6, 52.2];
 const NOW = new Date("2026-11-17T22:00:00Z");
@@ -99,6 +99,14 @@ describe("National Highways closures", () => {
     expect(nh.current(NOW)).toHaveLength(2);
     // An hour without a good read: none (they may have reopened).
     expect(nh.current(new Date(NOW.getTime() + 2 * 3600_000))).toEqual([]);
+  });
+
+  it("thins a finely drawn line to a box every ~30 m", () => {
+    const fine = Array.from({ length: 101 }, (_, i) => [0.5 + i * 0.00005, 51.3] as [number, number]); // ~3.5 m apart, ~350 m
+    const t = thinned(fine);
+    expect(t.length).toBeLessThan(15);
+    expect(t[0]).toEqual(fine[0]);
+    expect(t.at(-1)).toEqual(fine.at(-1));
   });
 
   it("joins with TfL's closures for routing", () => {

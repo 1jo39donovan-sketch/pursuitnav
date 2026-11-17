@@ -62,6 +62,21 @@ const NEAR_END_M = 300;
 // Valhalla's limits on avoid areas are raised to suit (scripts/build-map.sh);
 // this keeps a very bad day in London within them.
 const MAX_RINGS = 600;
+// Only closures within this of the journey are sent to the router: the
+// National Highways feed covers far more than London, and the limit above
+// is for the closures that matter.
+const NEAR_TRIP_M = 20_000;
+
+/** Whether any of the rings is within `m` of the box round the journey's two ends. */
+function nearTrip(rings: LngLat[][], a: LngLat, b: LngLat, m: number): boolean {
+  const padLat = m / 111_320;
+  const padLng = m / (111_320 * Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180));
+  const west = Math.min(a[0], b[0]) - padLng;
+  const east = Math.max(a[0], b[0]) + padLng;
+  const south = Math.min(a[1], b[1]) - padLat;
+  const north = Math.max(a[1], b[1]) + padLat;
+  return rings.some((r) => r.some(([x, y]) => x >= west && x <= east && y >= south && y <= north));
+}
 
 /** Closures in TfL's /Road/all/Disruption response. Tolerant of missing fields. */
 export function parseDisruptions(json: unknown, now = new Date()): Closure[] {
@@ -372,6 +387,7 @@ export function avoidingClosures(
   async function avoidClosures(req: RouteRequest): Promise<ClosureAwareRoute> {
     const rings = feed
       .current()
+      .filter((c) => nearTrip(c.rings, req.from.point, req.to.point, NEAR_TRIP_M))
       .filter((c) => !c.rings.some((r) => nearEnds(req, r)))
       .flatMap((c) => c.rings)
       .slice(0, MAX_RINGS);

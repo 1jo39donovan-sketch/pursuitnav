@@ -18,7 +18,7 @@
 //     .locationReference … supplementaryPositionalDescription.locationDescription
 // Paging: the next page's URL is in the x-next header.
 import { boxesAlong, joinLines, type Closure, type ClosureSummary, type Delay } from "./closures.js";
-import type { LngLat } from "./geo.js";
+import { distanceM, type LngLat } from "./geo.js";
 
 const BASE = "https://api.data.nationalhighways.co.uk/roads/v2.0/closures";
 // A "planned" closure counts only inside a window this short: a scheme of
@@ -27,6 +27,21 @@ const PLANNED_MAX_MS = 24 * 60 * 60_000;
 // The feed is paged; a bad day shouldn't run away with requests (10 a minute allowed).
 const MAX_PAGES = 8;
 const STALE_MS = 60 * 60_000;
+// The feed draws closures in fine detail (one A259 closure was 457 points);
+// a box every ~30 m covers the road just as well and keeps within the
+// router's limit on avoid areas.
+const THIN_M = 30;
+
+/** The line with points at least THIN_M apart (always its ends). */
+export function thinned(line: LngLat[]): LngLat[] {
+  if (line.length <= 2) return line;
+  const out: LngLat[] = [line[0]!];
+  for (let i = 1; i < line.length - 1; i++) {
+    if (distanceM(out[out.length - 1]!, line[i]!) >= THIN_M) out.push(line[i]!);
+  }
+  out.push(line[line.length - 1]!);
+  return out;
+}
 
 type Json = Record<string, unknown>;
 const obj = (v: unknown): Json => (v && typeof v === "object" && !Array.isArray(v) ? (v as Json) : {});
@@ -108,7 +123,7 @@ export function parseHighwaysClosures(
       if (str(obj(r.roadOrCarriagewayOrLaneManagementType).value) !== "carriagewayClosures") continue;
       if (!inForce(r, now)) continue;
       const lines = linesIn(r.locationReference).filter((l) => l.some((p) => inside(p, bounds)));
-      const rings = joinLines(lines).flatMap(boxesAlong);
+      const rings = joinLines(lines).map(thinned).flatMap(boxesAlong);
       if (!rings.length) continue;
       closures.push({
         id: `nh:${str(r.idG) ?? str(obj(sit).idG) ?? "?"}`,

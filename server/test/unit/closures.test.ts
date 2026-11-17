@@ -148,6 +148,18 @@ describe("avoidingClosures", () => {
     expect(seen[0]!.avoidAreas).toHaveLength(1);
   });
 
+  it("leaves out closures far from the journey (the motorway feed covers much more)", async () => {
+    const seen: RouteRequest[] = [];
+    const inner: Router = { route: async (r) => (seen.push(r), route), traceEdges: async () => [] };
+    // A trip in Kent, 50 km from the closure in central London.
+    await avoidingClosures(inner, feed).route({
+      costing: {} as never,
+      from: { point: [0.52, 51.27] },
+      to: { point: [0.55, 51.28] },
+    });
+    expect(seen[0]!.avoidAreas).toBeUndefined();
+  });
+
   it("leaves out a closure right by the destination", async () => {
     const seen: RouteRequest[] = [];
     const inner: Router = { route: async (r) => (seen.push(r), route), traceEdges: async () => [] };
