@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import type { StyleSpecification } from "@maplibre/maplibre-react-native";
 
 import { API_URL } from "../config";
+import { withServices } from "./mapServices";
 import { withTransport } from "./mapTransport";
 import type { TransportLines } from "./transportLinesData";
 import type { MapTheme } from "../session/SessionProvider";
@@ -336,13 +337,15 @@ export function useMapStyle(
   transport = false,
   /** With transport: the lines in their own colours, once the phone has them. */
   lines: TransportLines | null = null,
+  /** Police stations, custody, fire, ambulance, A&E… (mapServices.ts), or null for none. */
+  services: GeoJSON.FeatureCollection | null = null,
 ): string | StyleSpecification {
   const [made, setMade] = useState<{ key: string; style: StyleSpecification } | null>(null);
   const fromDay = theme === "night" && !!day;
   // Only the night map without its day source is drawn as it comes; day is always tuned.
-  const plain = look === "standard" && theme === "night" && !fromDay && houseNumbers && !transport;
+  const plain = look === "standard" && theme === "night" && !fromDay && houseNumbers && !transport && !services;
   const source = fromDay ? day! : base;
-  const key = `${look}|${theme}|${source}|${houseNumbers}|${transport}|${lines?.version ?? ""}`;
+  const key = `${look}|${theme}|${source}|${houseNumbers}|${transport}|${lines?.version ?? ""}|${services?.features.length ?? 0}`;
   useEffect(() => {
     if (plain) return;
     let live = true;
@@ -350,14 +353,15 @@ export function useMapStyle(
       .then((s) => {
         const tuned = fromDay ? nightify(s) : theme === "day" ? dayify(s) : s;
         const looked = restyle(tuned, look, theme);
-        const style = transport ? withTransport(looked, theme, lines?.geojson) : looked;
+        const transported = transport ? withTransport(looked, theme, lines?.geojson) : looked;
+        const style = services ? withServices(transported, theme, services) : transported;
         if (live) setMade({ key, style: houseNumbers ? style : withoutHouseNumbers(style) });
       })
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [source, look, theme, key, plain, fromDay, houseNumbers, transport, lines]);
+  }, [source, look, theme, key, plain, fromDay, houseNumbers, transport, lines, services]);
   return !plain && made?.key === key ? made.style : base;
 }
 

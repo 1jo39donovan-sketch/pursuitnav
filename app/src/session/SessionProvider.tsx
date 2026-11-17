@@ -40,6 +40,9 @@ interface Session {
   /** Stations, rail and tube lines and bus stations drawn clearly on every map (on unless turned off). */
   transport: boolean;
   setTransport: (on: boolean) => void;
+  /** Police stations, custody, fire, ambulance, A&E, courts and prisons on every map (on unless turned off). */
+  services: boolean;
+  setServices: (on: boolean) => void;
   /** How the navigation and pursuit maps turn: north up, direction of travel up, or tilted 3D. */
   mapView: MapView;
   setMapView: (v: MapView) => void;
@@ -176,6 +179,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [transportSetting, setTransportSetting] = useSetting<"1" | "0">("transport", ["1", "0"], "1");
   const transport = transportSetting === "1";
   const setTransport = useCallback((on: boolean) => setTransportSetting(on ? "1" : "0"), [setTransportSetting]);
+  const [servicesSetting, setServicesSetting] = useSetting<"1" | "0">("services", ["1", "0"], "1");
+  const services = servicesSetting === "1";
+  const setServices = useCallback((on: boolean) => setServicesSetting(on ? "1" : "0"), [setServicesSetting]);
   const setShowPursuit = useCallback((on: boolean) => setPursuitSetting(on ? "1" : "0"), [setPursuitSetting]);
   // Sends road times that have waited long enough: at launch, then every half hour.
   useEffect(() => {
@@ -245,6 +251,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapLook,
       transport,
       setTransport,
+      services,
+      setServices,
       mapView,
       setMapView,
       voice,
@@ -285,6 +293,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapLook,
       transport,
       setTransport,
+      services,
+      setServices,
       mapView,
       setMapView,
       voice,
