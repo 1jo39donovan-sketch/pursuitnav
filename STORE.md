@@ -96,7 +96,7 @@ Most changes don't need this: with `EXPO_TOKEN` set, changes to the app's code r
 
 ## Store listing (ready to paste)
 
-Updated 16 November 2026 for the Kent and Essex pilots and the features since (team messages, paste the job, screen-locked directions on Android, day and night by the sun). Based on the Launch Manager's redraft of 3 November (patrol and route-planning framing, no "emergency", "999", force names or test wording), with one change OPSVALE made: **blue light stays on by default**, and one switch on Session turns it off. The privacy policy, support page and terms are live at `https://bluerouteapp.com/privacy`, `/support` and `/terms` (the same pages are on `https://api.bluerouteapp.com`).
+Updated 17 November 2026 for the Kent and Essex pilots and the features since (team messages, paste the job, screen-locked directions on Android, day and night by the sun, and the map: Tube lines, police, custody and A&E, satellite). Based on the Launch Manager's redraft of 3 November (patrol and route-planning framing, no "emergency", "999", force names or test wording), with one change OPSVALE made: **blue light stays on by default**, and one switch on Session turns it off. The privacy policy, support page and terms are live at `https://bluerouteapp.com/privacy`, `/support` and `/terms` (the same pages are on `https://api.bluerouteapp.com`).
 
 **Before pasting, check these are in the build you submit** (all in the 4 November store-ready changes): the field-test wording gone from the terms, the Testing tools hidden (store builds show only Demo drive), police stations by their own name only, and the usage-data switch-off.
 
@@ -130,24 +130,27 @@ pursuit,bus lane,bus gate,borough,postcode,address,officer,callsign,satnav,route
 
 (165 characters.)
 
-**Description** (both stores, 4,000 max; 3,806):
+**Description** (both stores, 4,000 max; 3,966):
 
 > BlueRoute is patrol and route-planning navigation for police officers in London, Kent and Essex, built around the way jobs come in rather than as a general-purpose sat nav. It's made for the operator in the passenger seat: big text, few taps, spoken directions.
 >
 > SEARCH THE WAY CONTROL GIVES IT
-> Type what the control room says: a road, a house number and road, a flat, a postcode, an outward code like N7, or an estate or block by name. Or paste the whole job: BlueRoute picks out the address and offers it in one tap. Streets and postcodes come from OS Open Names; house numbers come from OpenStreetMap (London only for now), so not every door is there yet. Misspellings are forgiven. Pick the areas you're working at the start of a shift and their results come first, so you get the right Church Street first time. Road and postcode search work with no signal; routes need a connection.
+> Type what the control room says: a road, a house number and road, a flat, a postcode, an outward code like N7, or an estate or block by name. Or paste the whole job: BlueRoute picks out the address and offers it in one tap. House numbers are London only for now, and not every door is there yet. Misspellings are forgiven. Pick the areas you're working at the start of a shift and their results come first, so you get the right Church Street first time. Road and postcode search work with no signal; routes need a connection.
 >
 > PLACES
-> Shops, cafés, takeaways, pubs, schools, parks, stations, hospitals with A&E and more, by name (with the road: "Tesco Holloway Road") or by kind ("coffee shops", "schools") in your areas.
+> Shops, cafés, pubs, schools, parks, stations, blocks of flats and more, by name (with the road: "Tesco Holloway Road") or by kind ("coffee shops", "schools") in your areas.
+>
+> THE MAP
+> Tube, Overground, Elizabeth line, DLR and tram lines in their colours with their stations, bus stations, and police stations (custody suites marked), fire, ambulance, A&E and courts: tap one for who runs it. Day, night, OS and satellite views.
 >
 > ROUTES SIZED TO YOUR VEHICLE
-> Choose car, SUV, van or carrier, and routes avoid bridges, narrow roads and weight limits it can't take, private roads and locked gates, and roads TfL lists as fully closed (checked every 5 minutes). Journey times count from where you are now.
+> Choose car, SUV, van or carrier, and routes avoid bridges, narrow roads and weight limits it can't take, private roads, locked gates and roads TfL lists as closed (checked every 5 minutes). Journey times count from where you are now.
 >
 > A ROUTE FOR AUTHORISED VEHICLES
 > For drivers authorised to use them, a second route that can use bus lanes and gates where permitted is offered beside the standard route when it's quicker. It's on unless you switch it off on Session, and the standard route is always there to pick. The route card shows the restrictions it found. Road signs and your force's driving policy always come first, and the app never switches your route on its own.
 >
 > TURN-BY-TURN
-> Large, glanceable directions with spoken instructions, called earlier at higher speeds, and automatic re-routing, in portrait or landscape. Day and night maps switch at sunrise and sunset. On Android, directions keep going with the screen locked. Or hand over to Google Maps or Waze.
+> Large, glanceable directions, spoken earlier at higher speeds, with automatic re-routing, in portrait or landscape. Day and night maps switch at sunrise and sunset. On Android, directions carry on with the screen locked. Or hand over to Google Maps or Waze.
 >
 > PURSUIT SCREEN
 > Built for the operator: speed, the road's speed limit (or "—" when it isn't known, never a guess), road name, heading, area, next junction and where you're heading towards, with a heading-up map. Updates every second and keeps the screen awake.
@@ -159,7 +162,7 @@ pursuit,bus lane,bus gate,borough,postcode,address,officer,callsign,satnav,route
 > Every search and route you pick is kept on your phone until you clear it.
 >
 > PRIVATE BY DESIGN
-> No accounts, adverts, tracking or third-party analytics. Your callsign, settings and log stay on your phone. The server works out routes and searches without keeping them, and counts usage only as daily totals, using a random install ID you can reset or switch off.
+> No accounts, adverts, tracking or third-party analytics. Your callsign, settings and log stay on your phone. The server keeps no routes or searches, and counts usage only as daily totals, with a random install ID you can reset or switch off.
 >
 > GOOD TO KNOW
 > - Covers Greater London, Kent and Essex.
@@ -167,7 +170,7 @@ pursuit,bus lane,bus gate,borough,postcode,address,officer,callsign,satnav,route
 > - BlueRoute is an aid. Set it up before you move off, or let the passenger operate it; don't handle the phone while driving.
 > - BlueRoute is an OPSVALE product. It is independent: not made, approved or endorsed by any police force or other public service, and not affiliated with one.
 >
-> Map and place data © OpenStreetMap contributors. Contains OS data © Crown copyright and database right. Powered by TfL Open Data.
+> Map and place data © OpenStreetMap contributors. Contains OS data © Crown copyright and database right. Powered by TfL Open Data. Satellite imagery: Esri, Maxar, Earthstar Geographics.
 
 ### Notes for the reviewers (Apple "App Review Information"; Google "App access")
 
