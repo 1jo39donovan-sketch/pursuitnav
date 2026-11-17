@@ -37,10 +37,11 @@ jobs:
       - name: Print small copies
         if: always()
         run: |
-          sudo apt-get install -y -qq imagemagick >/dev/null
+          sudo apt-get install -y -qq imagemagick >/dev/null 2>&1 || true
+          set +e
           for f in map-check/*.png; do
             echo "=== IMAGE $(basename "$f" .png)"
-            convert "$f" -resize 600x -quality 70 jpg:- | base64 -w 0
+            convert "$f" -resize 600x -quality 70 jpg:- | base64
             echo
             echo "=== END"
           done
