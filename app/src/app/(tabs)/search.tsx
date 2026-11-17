@@ -20,7 +20,7 @@ import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import { ROUTE_ALT, type MapRoute, type MarkerProperties } from "../../components/mapShared";
-import { SERVICE_SOURCE_TYPES } from "../../components/mapServices";
+import { badgeKey } from "../../components/mapServices";
 import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
@@ -105,7 +105,7 @@ export default function SearchScreen() {
   const { mapPoints: teamMap, members: teamMembers, code: teamCode } = useTeam();
   // "Send to team": a place picked on the map, or the destination chosen.
   const [sending, setSending] = useState<MessagePlace | null>(null);
-  const { data, search, places, blockLabels, area: searchArea } = useSearch();
+  const { data, search, places, blockLabels, services, area: searchArea } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
   const [query, setQuery] = useState("");
@@ -457,10 +457,13 @@ export default function SearchScreen() {
   // Place markers for the chosen kinds of place, across the selected boroughs.
   const markers = useMemo<GeoJSON.FeatureCollection | null>(() => {
     if (data.status !== "ready" || places.status !== "ready" || !markerGroups.length) return null;
-    // Police stations, A&E and the like have their own badges when those are on: not a dot over them.
+    // Places drawn as badges (police stations, A&E…) when those are on: not a dot over them as well.
+    const badged = new Set(
+      servicesOn ? (services?.features ?? []).map((f) => badgeKey(f.properties?.name, f.geometry)) : [],
+    );
     const pois = data.index
       .pointsOfInterestIn(area, new Set(markerGroups))
-      .filter((p) => !servicesOn || !SERVICE_SOURCE_TYPES.has(p.type));
+      .filter((p) => !badged.has(badgeKey(p.name, { type: "Point", coordinates: [p.lng, p.lat] })));
     return {
       type: "FeatureCollection",
       features: pois.map((p) => ({
@@ -475,7 +478,7 @@ export default function SearchScreen() {
         } satisfies MarkerProperties,
       })),
     };
-  }, [data, places, area, markerGroups, servicesOn]);
+  }, [data, places, area, markerGroups, servicesOn, services]);
 
   // Blue-light routes only for someone who has said they drive for an emergency service.
   const shown = useMemo<PlanState | null>(
