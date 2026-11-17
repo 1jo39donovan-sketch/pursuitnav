@@ -70,3 +70,17 @@ describe("favourites", () => {
     expect(parseFavourites('[{"name":"x","lat":1,"lng":2},{"bad":true}]')).toHaveLength(1);
   });
 });
+
+describe("custody outside London", () => {
+  it("knows Kent's and Essex's suites, matched to their police stations", async () => {
+    const { CUSTODY_SUITES, custodyStation } = await import("../../area/custody");
+    const margate = CUSTODY_SUITES.find((c) => c.name === "Margate")!;
+    const grays = CUSTODY_SUITES.find((c) => c.name === "Grays")!;
+    expect([margate.borough, grays.borough]).toEqual(["Thanet", "Thurrock"]);
+    const station = poi("Margate Police Station", "Police station", "Thanet", 51.385, 1.381);
+    expect(custodyStation(margate, [station])).toBe(station);
+    // Not a building in the wrong district.
+    expect(custodyStation(grays, [poi("Grays Inn Road Police Office", "Police station", "Camden", 51.52, -0.12)])).toBeNull();
+  });
+});
+

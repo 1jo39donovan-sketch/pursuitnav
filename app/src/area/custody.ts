@@ -1,5 +1,8 @@
-// London's custody suites, from the Independent Custody Visitors' public list
-// (24/7 suites and contingency suites, Met, BTP and Border Force). Each is
+// Custody suites. London's from the Independent Custody Visitors' public list
+// (24/7 suites and contingency suites, Met, BTP and Border Force). Kent's six
+// after Maidstone closed on 15 October 2025 (the Kent PCC's count; names from
+// the Legal Aid Agency's closure notice and defence guides). Essex's seven
+// from Essex Police's FOI list and HMICFRS's 2024 inspection. Each is
 // found on the map among OpenStreetMap's police stations in its borough by
 // the words in `match`; one that isn't mapped as a police station is searched
 // for by name instead, so the app never guesses a building.
@@ -12,7 +15,7 @@ export interface CustodySuite {
   /** Where the building is (not always the borough whose panel lists it). */
   borough: Borough;
   kind: "24/7" | "contingency";
-  agency: "MPS" | "BTP" | "UKBF";
+  agency: "MPS" | "BTP" | "UKBF" | "Kent" | "Essex";
   /** Words a police station's name must contain to be this suite. */
   match: string;
   /** …and must not contain (to tell Wembley from Wembley Park). */
@@ -69,6 +72,21 @@ export const CUSTODY_SUITES: CustodySuite[] = [
   s("Charing Cross", "Westminster", "24/7", "MPS", "charing cross"),
   s("West End Central", "Westminster", "contingency", "MPS", "west end central"),
   s("Ebury Bridge", "Westminster", "contingency", "BTP", "ebury"),
+  // Kent
+  s("Medway", "Medway", "24/7", "Kent", "medway"),
+  s("North Kent", "Gravesham", "24/7", "Kent", "north kent", "North Kent police station Northfleet"),
+  s("Canterbury", "Canterbury", "24/7", "Kent", "canterbury"),
+  s("Tonbridge", "Tonbridge and Malling", "24/7", "Kent", "tonbridge"),
+  s("Folkestone", "Folkestone and Hythe", "24/7", "Kent", "folkestone"),
+  s("Margate", "Thanet", "24/7", "Kent", "margate"),
+  // Essex
+  s("Basildon", "Basildon", "24/7", "Essex", "basildon"),
+  s("Chelmsford", "Chelmsford", "24/7", "Essex", "chelmsford"),
+  s("Clacton", "Tendring", "24/7", "Essex", "clacton"),
+  s("Colchester", "Colchester", "24/7", "Essex", "colchester"),
+  s("Grays", "Thurrock", "24/7", "Essex", "grays"),
+  s("Harlow", "Harlow", "24/7", "Essex", "harlow"),
+  s("Southend", "Southend-on-Sea", "24/7", "Essex", "southend"),
 ];
 
 /** The police station on the map that is this suite, or null if none clearly is. */
