@@ -6,7 +6,7 @@ import type { StyleSpecification } from "@maplibre/maplibre-react-native";
 
 import { CUSTODY_SUITES, custodyStation, type CustodySuite } from "../area/custody";
 import { regionOf, type Borough } from "../search/boroughs";
-import { policeSite } from "../area/policeSites";
+import { ambulanceSite, fireSite, policeSite, type ServiceSite } from "../area/serviceSites";
 import type { PointOfInterest } from "../search/places";
 import type { MapTheme } from "../session/SessionProvider";
 
@@ -46,8 +46,17 @@ const AGENCY_NAME: Record<CustodySuite["agency"], string> = {
   Essex: "Essex Police",
 };
 
+/** A fire or ambulance station's own kind (police have policeSite). */
+function siteOf(p: PointOfInterest): ServiceSite {
+  if (p.type === "Fire station") return fireSite(p.name);
+  if (p.type === "Ambulance station") return ambulanceSite(p.name);
+  return { site: "service" };
+}
+
 /** Who runs it, from its name and area (OSM rarely says). */
 function operatorOf(kind: ServiceKind, name: string, borough: string): string | null {
+  const other = kind === "fire" ? fireSite(name) : kind === "ambulance" ? ambulanceSite(name) : null;
+  if (other?.site === "other") return other.operator;
   const region = regionOf(borough as Borough)?.id ?? "london";
   if (kind === "police" || kind === "custody") {
     if (/british transport police|\bbtp\b/i.test(name)) return "British Transport Police";
@@ -131,6 +140,7 @@ export function servicePoints(pois: readonly PointOfInterest[]): GeoJSON.Feature
     .filter((p) => KIND_OF_TYPE[p.type] || (p.type === "Hospital" && hasAe(p)))
     // A former station, another agency or an office isn't somewhere to send anyone.
     .filter((p) => p.type !== "Police station" || policeSite(p.name) !== "not-police")
+    .filter((p) => siteOf(p).site !== "none")
     .map((p) => (p.type === "Hospital" ? { ...p, type: "Hospital with A&E" } : p));
   const suiteOf = new Map<PointOfInterest, CustodySuite>();
   for (const suite of CUSTODY_SUITES) {

@@ -9,7 +9,7 @@
 import type { Borough } from "../search/boroughs";
 import type { PointOfInterest } from "../search/places";
 import { normalise } from "../search/text";
-import { policeSite } from "./policeSites";
+import { policeSite } from "./serviceSites";
 
 export interface CustodySuite {
   name: string;
