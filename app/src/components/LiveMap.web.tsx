@@ -46,7 +46,9 @@ import {
   MARKER_MIN_ZOOM,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
-  pointGeoJSON,
+  destinationGeoJSON,
+  DESTINATION_NUMBER_LAYOUT,
+  DESTINATION_NUMBER_PAINT,
   pointsGeoJSON,
   RESTRICTION_CIRCLE_PAINT,
   RESTRICTION_LABEL_LAYOUT,
@@ -73,6 +75,8 @@ export function LiveMap({
   zoomControl = false,
   roadNames = false,
   houseNumbers = true,
+  doorNumbers = false,
+  destinationNumber = null,
   labels,
   team,
   vehicleArrow = false,
@@ -97,6 +101,7 @@ export function LiveMap({
   const { mapTheme, mapLook, transport } = useSession();
   // For layers re-added on each style load: the theme now, not when the map was made.
   const theme = useRef(mapTheme);
+  const doorsShown = useRef(doorNumbers);
   useEffect(() => {
     theme.current = mapTheme;
   }, [mapTheme]);
@@ -173,6 +178,16 @@ export function LiveMap({
     m.once("idle", foldCredit);
     if (!compact) m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "top-right");
     m.on("rotate", () => setBearing(m.getBearing()));
+    // Once per map, not on each style: they're kept through a change of
+    // style, and adding them again made one tap open a place's card twice.
+    m.on("click", "places-dot", (e) => {
+      const f = e.features?.[0];
+      if (f?.geometry.type === "Point") {
+        markerPress.current?.(f.properties as MarkerProperties, f.geometry.coordinates as [number, number]);
+      }
+    });
+    m.on("mouseenter", "places-dot", () => (m.getCanvas().style.cursor = "pointer"));
+    m.on("mouseleave", "places-dot", () => (m.getCanvas().style.cursor = ""));
     // On the first style and on each change of style (day/night), which
     // keeps the camera where it is but drops what was added to the map.
     m.on("style.load", () => {
@@ -189,14 +204,6 @@ export function LiveMap({
           paint: MARKER_LABEL_PAINT,
         });
       }
-      m.on("click", "places-dot", (e) => {
-        const f = e.features?.[0];
-        if (f?.geometry.type === "Point") {
-          markerPress.current?.(f.properties as MarkerProperties, f.geometry.coordinates as [number, number]);
-        }
-      });
-      m.on("mouseenter", "places-dot", () => (m.getCanvas().style.cursor = "pointer"));
-      m.on("mouseleave", "places-dot", () => (m.getCanvas().style.cursor = ""));
       m.addSource("routes", { type: "geojson", data: EMPTY });
       // A white edge, so the line stands out on the day map and the night one.
       m.addLayer({
@@ -223,14 +230,15 @@ export function LiveMap({
         paint: { "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] },
       });
       // House numbers close in, under the road names so a street name always wins the space.
-      if (houseNumbers && m.getSource(ROAD_NAME_SOURCE)) {
+      // With house numbers off (navigating) they're still added, hidden, for doorNumbers to show.
+      if (m.getSource(ROAD_NAME_SOURCE)) {
         m.addLayer({
           id: HOUSE_NUMBER_LAYER,
           type: "symbol",
           source: ROAD_NAME_SOURCE,
           "source-layer": HOUSE_NUMBER_SOURCE_LAYER,
           minzoom: HOUSE_NUMBER_MIN_ZOOM,
-          layout: houseNumberLayout,
+          layout: { ...houseNumberLayout, visibility: houseNumbers || doorsShown.current ? "visible" : "none" },
           paint: houseNumberPaint(theme.current),
         });
       }
@@ -290,6 +298,15 @@ export function LiveMap({
           "circle-stroke-width": 3,
         },
       });
+      if (!DEMO_MODE) {
+        m.addLayer({
+          id: "destination-number",
+          type: "symbol",
+          source: "destination",
+          layout: DESTINATION_NUMBER_LAYOUT,
+          paint: DESTINATION_NUMBER_PAINT,
+        });
+      }
       m.addSource("me", { type: "geojson", data: EMPTY });
       m.addLayer({
         id: "me-halo",
@@ -432,12 +449,20 @@ export function LiveMap({
     if (!m || !loaded) return;
     const set = (id: string, data: GeoJSON.GeoJSON) => (m.getSource(id) as maplibregl.GeoJSONSource | undefined)?.setData(data);
     set("routes", routesGeoJSON(routes));
-    set("destination", pointGeoJSON(destination));
+    set("destination", destinationGeoJSON(destination, destinationNumber));
     set("places", markers ?? EMPTY_COLLECTION);
     set("restrictions", pointsGeoJSON(restrictions));
     set("labels", labels ?? EMPTY_COLLECTION);
     set("team", team ?? EMPTY_COLLECTION);
-  }, [routes, destination, markers, restrictions, labels, team, loaded, styleVersion]);
+  }, [routes, destination, destinationNumber, markers, restrictions, labels, team, loaded, styleVersion]);
+
+  // Door numbers on and off in place: remaking the map would lose the camera.
+  useEffect(() => {
+    doorsShown.current = doorNumbers;
+    const m = map.current;
+    if (!m || !loaded || houseNumbers || !m.getLayer(HOUSE_NUMBER_LAYER)) return;
+    m.setLayoutProperty(HOUSE_NUMBER_LAYER, "visibility", doorNumbers ? "visible" : "none");
+  }, [doorNumbers, houseNumbers, loaded, styleVersion]);
 
   // The credit's corner sits above a sheet over the bottom of the map.
   useEffect(() => {

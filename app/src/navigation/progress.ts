@@ -6,6 +6,11 @@ type LngLat = [number, number];
 
 /** Distance from the route beyond which a fix counts as off route. */
 export const OFF_ROUTE_M = 40;
+/**
+ * However poor the GPS, this far off counts as off route: a loose fix widens
+ * the margin, but past ~70 m the car is on another street (PM review, P2).
+ */
+export const OFF_ROUTE_CAP_M = 70;
 /** Consecutive off-route fixes (about a second each) before re-routing. */
 export const OFF_ROUTE_FIXES = 4;
 /** Within this of the end, the officer has arrived. */
@@ -192,13 +197,14 @@ export function offRouteCount(
   nearTurnM = Infinity,
 ): number {
   const acc = accuracy ?? 0;
+  const loose = (m: number) => Math.min(m, OFF_ROUTE_CAP_M);
   if (nearTurnM <= AT_TURN_M) {
-    if (offRouteBy > Math.max(WELL_PAST_TURN_M, acc * 1.5)) return Math.max(previous + 2, OFF_ROUTE_FIXES);
-    if (offRouteBy > Math.max(PAST_TURN_M, acc * 1.2)) return previous + 2;
+    if (offRouteBy > Math.max(WELL_PAST_TURN_M, loose(acc * 1.5))) return Math.max(previous + 2, OFF_ROUTE_FIXES);
+    if (offRouteBy > Math.max(PAST_TURN_M, loose(acc * 1.2))) return previous + 2;
   }
-  const wrongWay = headingOff != null && headingOff > WRONG_WAY_DEG && offRouteBy > Math.max(WRONG_WAY_M, acc);
+  const wrongWay = headingOff != null && headingOff > WRONG_WAY_DEG && offRouteBy > Math.max(WRONG_WAY_M, loose(acc));
   if (wrongWay) return previous + 2;
-  const limit = Math.max(OFF_ROUTE_M, acc * 1.5);
+  const limit = Math.max(OFF_ROUTE_M, loose(acc * 1.5));
   return offRouteBy > limit ? previous + 1 : 0;
 }
 

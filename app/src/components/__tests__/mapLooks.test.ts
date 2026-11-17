@@ -130,3 +130,15 @@ describe("satellite", () => {
     expect(lookToDraw("clear", false)).toBe("clear");
   });
 });
+
+describe("destination door number", () => {
+  it("reads the door number from the start of an address", async () => {
+    const { doorNumberOf } = await import("../mapShared");
+    expect(doorNumberOf("54 Caledonian Road")).toBe("54");
+    expect(doorNumberOf("Flat 3, 54 Caledonian Rd")).toBe("54");
+    expect(doorNumberOf("12A High Street")).toBe("12A");
+    expect(doorNumberOf("Bemerton Estate")).toBeNull();
+    expect(doorNumberOf("N7 8LA")).toBeNull();
+    expect(doorNumberOf(null)).toBeNull();
+  });
+});

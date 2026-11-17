@@ -49,7 +49,9 @@ import {
   MARKER_MIN_ZOOM,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
-  pointGeoJSON,
+  destinationGeoJSON,
+  DESTINATION_NUMBER_LAYOUT,
+  DESTINATION_NUMBER_PAINT,
   pointsGeoJSON,
   RESTRICTION_CIRCLE_PAINT,
   RESTRICTION_LABEL_LAYOUT,
@@ -77,6 +79,8 @@ export function LiveMap({
   zoomControl = false,
   roadNames = false,
   houseNumbers = true,
+  doorNumbers = false,
+  destinationNumber = null,
   labels,
   team,
   vehicleArrow = false,
@@ -272,7 +276,7 @@ export function LiveMap({
           />
         </GeoJSONSource>
         {/* Under the road names, so a street name always wins the space. */}
-        {houseNumbers && (
+        {(houseNumbers || doorNumbers) && (
           <Layer
             type="symbol"
             id={HOUSE_NUMBER_LAYER}
@@ -320,7 +324,7 @@ export function LiveMap({
             paint={RESTRICTION_LABEL_PAINT}
           />
         </GeoJSONSource>
-        <GeoJSONSource id="destination" data={pointGeoJSON(destination)}>
+        <GeoJSONSource id="destination" data={destinationGeoJSON(destination, destinationNumber)}>
           <Layer
             type="circle"
             id="destination-dot"
@@ -331,6 +335,7 @@ export function LiveMap({
               "circle-stroke-width": 3,
             }}
           />
+          <Layer type="symbol" id="destination-number" layout={DESTINATION_NUMBER_LAYOUT} paint={DESTINATION_NUMBER_PAINT} />
         </GeoJSONSource>
         {puck && (
           <GeoJSONSource id="me" data={puck}>

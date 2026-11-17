@@ -75,6 +75,8 @@ import type { ErrorBoundaryProps } from "expo-router";
 import { ScreenError } from "../components/ScreenError";
 import { TeamMessageCard } from "../components/TeamMessageCard";
 import { routeToMessage } from "../team/routeToMessage";
+import { useStopped } from "../navigation/stopped";
+import { doorNumberOf } from "../components/mapShared";
 
 const DEMO_GRACE_MS = 5000;
 const ARRIVAL_GRACE_MS = 10_000;
@@ -159,6 +161,8 @@ export default function NavigateScreen() {
   // the patrol, not the route the car is about to be put on: not used.
   const [openedAt] = useState(() => Date.now());
   const fix = simulated && lastFix && lastFix.timestamp < openedAt ? null : lastFix;
+  // Stopped: door numbers on the map, to find the door (they crowd the road while moving).
+  const stopped = useStopped(fix);
   const { blockLabels } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes, mapLook } = useSession();
   const { mapPoints: teamMap } = useTeam();
@@ -782,6 +786,8 @@ export default function NavigateScreen() {
               autoZoom
               roadNames
               houseNumbers={false}
+              doorNumbers={stopped}
+              destinationNumber={doorNumberOf(active.destination.title)}
               vehicleArrow
               followZoom={16.5}
               routes={routes}
@@ -809,6 +815,8 @@ export default function NavigateScreen() {
               autoZoom
               roadNames
               houseNumbers={false}
+              doorNumbers={stopped}
+              destinationNumber={doorNumberOf(active.destination.title)}
               vehicleArrow
               followZoom={16.5}
               routes={routes}
