@@ -84,3 +84,14 @@ describe("custody outside London", () => {
   });
 });
 
+describe("nearest police station", () => {
+  it("is a station with a front counter, not a ward office nearer by", async () => {
+    const { quickPlaces } = await import("../quickPlaces");
+    const here = { lat: 51.5532, lng: -0.1154 };
+    const office = poi("Metropolitan Police ward office", "Police station", "Islington", 51.5533, -0.1155);
+    const station = poi("Holloway Police Station", "Police station", "Islington", 51.556, -0.12);
+    const q = quickPlaces("police", here, [office, station]);
+    expect(q.find((x) => /police station/i.test(x.label))?.place.name).toMatch(/Holloway/);
+  });
+});
+
