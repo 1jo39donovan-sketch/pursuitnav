@@ -116,7 +116,14 @@ for (const device of DEVICES) {
 
   await shot(page, device, "2-session", async () => {
     await tab(page, "Session");
-    await page.mouse.wheel(0, -5000);
+    // Testing shut (the store build has no test tools), and back to the top: the shift.
+    if (await page.getByText(/^Simulates a drive/).last().isVisible().catch(() => false)) {
+      await page.getByRole("button", { name: /^Testing:/ }).last().click();
+    }
+    await page.evaluate(() => {
+      for (const el of document.querySelectorAll("*")) if (el.scrollTop > 0) el.scrollTop = 0;
+      window.scrollTo(0, 0);
+    });
   });
 
   await shot(page, device, "6-log", async () => {

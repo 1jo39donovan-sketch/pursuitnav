@@ -233,7 +233,7 @@ export function buildApp(
       addresses,
       learning: Boolean(learning),
       osMaps: Boolean(config.osMapsKey),
-      imagery: Boolean(config.imageryKey),
+      imagery: config.imagery !== false,
       ...(closures ? { closures: closures.summary().active } : {}),
       ...(config.version ? { version: config.version } : {}),
       ...(await dataRelease(config.placesFile).then((data) => (data ? { data } : {}))),
@@ -441,7 +441,7 @@ export function buildApp(
   );
   offlineMapRoutes(app, config.offlineMapDir);
   osMapsRoutes(app, config.osMapsKey, config.bounds, (req) => notSetUp.add(req));
-  imageryRoutes(app, config.imageryKey, config.bounds, (req) => notSetUp.add(req));
+  imageryRoutes(app, config.imagery !== false, config.imageryKey, config.bounds, (req) => notSetUp.add(req));
 
   // Follow-in: the way a colleague drove, from here. Their track comes from the
   // phone (decrypted there) and, like every request, isn't logged or kept.

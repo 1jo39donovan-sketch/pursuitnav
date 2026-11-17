@@ -24,7 +24,7 @@ describe("GET /health", () => {
       addresses: { osNames: false, nominatim: false, osPlaces: false },
       learning: false,
       osMaps: false,
-      imagery: false,
+      imagery: true,
     });
   });
 
