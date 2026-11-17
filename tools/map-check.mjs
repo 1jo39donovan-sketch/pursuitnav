@@ -51,8 +51,11 @@ async function setUp(browser, where) {
 async function shoot(page, name, zoomTaps) {
   await page.getByText("Search", exact()).last().click();
   await page.waitForTimeout(3000);
+  // The Search map has no + button: zoom with the wheel over its middle.
+  const box = page.viewportSize();
+  await page.mouse.move(box.width / 2, box.height / 2);
   for (let i = 0; i < zoomTaps; i++) {
-    await page.getByLabel("Zoom in").last().click();
+    await page.mouse.wheel(0, -500);
     await page.waitForTimeout(700);
   }
   // Tiles, the places file and the lines file in.
@@ -63,8 +66,11 @@ async function shoot(page, name, zoomTaps) {
 
 const browser = await chromium.launch();
 for (const [name, where, taps] of SPOTS) {
+  let page;
   try {
-    const { ctx, page } = await setUp(browser, where);
+    const made = await setUp(browser, where);
+    page = made.page;
+    const ctx = made.ctx;
     await shoot(page, name, taps);
     if (name === "highbury-islington") {
       // The satellite look, chosen on Session.
@@ -76,6 +82,7 @@ for (const [name, where, taps] of SPOTS) {
     await ctx.close();
   } catch (e) {
     failed++;
+    await page?.screenshot({ path: `${out}/debug-${name}.png` }).catch(() => {});
     console.log(`FAIL ${name}: ${e.message.split("\n").slice(0, 3).join(" | ")}`);
   }
 }
