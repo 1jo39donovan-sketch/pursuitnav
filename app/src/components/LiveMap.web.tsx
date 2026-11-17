@@ -10,6 +10,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DEMO_MODE, MAP_STYLES, region } from "../config";
 import { useImageryOffered } from "./imagery";
+import { useTransportLines } from "./transportLines";
 import { lookToDraw, useMapStyle } from "./mapLooks";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
@@ -150,7 +151,8 @@ export function LiveMap({
   // Opens where the vehicle is, so a new screen doesn't fly in from the middle of London.
   const startAt = useRef({ fix, zoom });
   const imagery = useImageryOffered();
-  const looked = useMapStyle(MAP_STYLES[mapTheme], lookToDraw(mapLook, imagery), mapTheme, MAP_STYLES.day, houseNumbers, transport);
+  const lines = useTransportLines(transport);
+  const looked = useMapStyle(MAP_STYLES[mapTheme], lookToDraw(mapLook, imagery), mapTheme, MAP_STYLES.day, houseNumbers, transport, lines);
   const style = DEMO_MODE ? demoMapStyle : looked;
   const firstStyle = useRef(style);
 

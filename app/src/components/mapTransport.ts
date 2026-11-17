@@ -51,8 +51,18 @@ function labelFont(style: StyleSpecification): string[] {
 // The style's own station and bus icons, hidden where ours are drawn.
 const THEIR_STATIONS = /transit|railway|station|bus/;
 
-/** The style with transport drawn on top, or as it was if it has no vector tiles. */
-export function withTransport(style: StyleSpecification, theme: MapTheme): StyleSpecification {
+export const LINES_SOURCE = `${TRANSPORT_PREFIX}tfl`;
+
+/**
+ * The style with transport drawn on top, or as it was if it has no vector
+ * tiles. With `lines` (the weekly build's), each Tube, Overground, Elizabeth
+ * line, DLR and tram line is drawn in its own colour over the tiles' lines.
+ */
+export function withTransport(
+  style: StyleSpecification,
+  theme: MapTheme,
+  lines?: GeoJSON.FeatureCollection | null,
+): StyleSpecification {
   const source = tilesSource(style);
   if (!source) return style;
   const night = theme === "night";
@@ -89,7 +99,7 @@ export function withTransport(style: StyleSpecification, theme: MapTheme): Style
   const busStations = ["all", ["==", ["get", "class"], "bus"], ["==", ["get", "subclass"], "bus_station"]];
   const busStops = ["all", ["==", ["get", "class"], "bus"], ["==", ["get", "subclass"], "bus_stop"]];
 
-  const lines: Layer[] = [
+  const railLayers: Layer[] = [
     {
       id: `${TRANSPORT_PREFIX}lines-casing`,
       type: "line",
@@ -120,6 +130,37 @@ export function withTransport(style: StyleSpecification, theme: MapTheme): Style
       },
     },
   ];
+
+  // The lines in their own colours, over the tiles' (which still show where these have no data).
+  const coloured: Layer[] = lines
+    ? [
+        {
+          id: `${TRANSPORT_PREFIX}tfl-casing`,
+          type: "line",
+          source: LINES_SOURCE,
+          minzoom: 10,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": halo,
+            "line-opacity": ["case", ["get", "tunnel"], 0.4, 0.85] as never,
+            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 2.6, 14, 5, 17, 9] as never,
+          },
+        },
+        {
+          id: `${TRANSPORT_PREFIX}tfl-lines`,
+          type: "line",
+          source: LINES_SOURCE,
+          minzoom: 10,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": ["get", "colour"] as never,
+            // Underground stretches fainter: the roads above them matter more.
+            "line-opacity": ["case", ["get", "tunnel"], 0.5, 1] as never,
+            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.4, 14, 2.8, 17, 5] as never,
+          },
+        },
+      ]
+    : [];
 
   const points: Layer[] = [
     {
@@ -213,5 +254,8 @@ export function withTransport(style: StyleSpecification, theme: MapTheme): Style
   // Lines under the labels (street names stay readable); stations on top of everything.
   const firstLabel = kept.findIndex((l) => l.type === "symbol");
   const at = firstLabel === -1 ? kept.length : firstLabel;
-  return { ...style, layers: [...kept.slice(0, at), ...lines, ...kept.slice(at), ...points] };
+  const sources = lines
+    ? { ...style.sources, [LINES_SOURCE]: { type: "geojson" as const, data: lines } }
+    : style.sources;
+  return { ...style, sources, layers: [...kept.slice(0, at), ...railLayers, ...coloured, ...kept.slice(at), ...points] };
 }

@@ -22,6 +22,8 @@ export interface ServerConfig {
   placesFile: string;
   /** Gzipped named-roads file written by places/extract_roads.py. */
   roadsFile?: string;
+  /** Tube, Overground, DLR and tram lines with their colours (extract_lines.py). */
+  linesFile?: string;
   /** Gzipped entrances file written by places/extract_entrances.py. */
   entrancesFile?: string;
   /** The offline map for phones (scripts/offline-map.sh): manifest.json and its files. */
@@ -95,6 +97,7 @@ export function loadConfig(): ServerConfig {
     nominatimUrl: process.env.NOMINATIM_URL || undefined,
     placesFile: process.env.PLACES_FILE ?? "/data/places/places.txt.gz",
     roadsFile: process.env.ROADS_FILE ?? "/data/places/roads.txt.gz",
+    linesFile: process.env.LINES_FILE ?? "/data/places/lines.txt.gz",
     entrancesFile: process.env.ENTRANCES_FILE ?? "/data/places/entrances.txt.gz",
     offlineMapDir: process.env.OFFLINE_MAP_DIR ?? "/data/places/offline",
     contactEmail: process.env.CONTACT_EMAIL || undefined,

@@ -48,3 +48,35 @@ describe("transport on the map", () => {
     expect(withTransport(raster, "night")).toBe(raster);
   });
 });
+
+describe("lines in their own colours", () => {
+  const FILE = `#blueroute-lines v1 2026-11-17 3
+Victoria line|#0098d4|subway|1|-12000,5155000 -11000,5156000
+DLR|#00a4a7|light_rail|0|-2000,5151000 -1000,5151500
+Broken|blue|subway|0|-1,1 -2,2
+`;
+
+  it("reads the weekly file as GeoJSON, skipping bad rows", async () => {
+    const { parseLines } = await import("../transportLinesData");
+    const lines = parseLines(FILE)!;
+    expect(lines.version).toBe("2026-11-17");
+    expect(lines.geojson.features).toHaveLength(2);
+    expect(lines.geojson.features[0]).toMatchObject({
+      geometry: { coordinates: [[-0.12, 51.55], [-0.11, 51.56]] },
+      properties: { name: "Victoria line", colour: "#0098d4", tunnel: true },
+    });
+    expect(parseLines("#blueroute-places v1 x 0\n")).toBeNull();
+  });
+
+  it("draws them over the tiles' lines and under the labels", async () => {
+    const { parseLines } = await import("../transportLinesData");
+    const { LINES_SOURCE } = await import("../mapTransport");
+    const s = withTransport(style, "night", parseLines(FILE)!.geojson);
+    const list = ids(s);
+    expect(s.sources[LINES_SOURCE]).toBeDefined();
+    const coloured = list.indexOf(`${TRANSPORT_PREFIX}tfl-lines`);
+    expect(coloured).toBeGreaterThan(list.indexOf(`${TRANSPORT_PREFIX}lines`));
+    expect(coloured).toBeLessThan(list.indexOf("road_label"));
+    expect(ids(withTransport(style, "night"))).not.toContain(`${TRANSPORT_PREFIX}tfl-lines`);
+  });
+});

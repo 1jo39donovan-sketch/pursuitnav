@@ -6,7 +6,7 @@ import { serverRequest } from "../api/http";
 import { API_URL } from "../config";
 import { store } from "../storage/store";
 
-export type DataKind = "places" | "roads";
+export type DataKind = "places" | "roads" | "lines";
 
 const CHECK_EVERY_MS = 12 * 60 * 60 * 1000;
 const cached = (kind: DataKind) => new File(Paths.document, `${kind}.txt`);

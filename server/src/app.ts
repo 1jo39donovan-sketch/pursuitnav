@@ -419,6 +419,7 @@ export function buildApp(
     };
   app.get("/v1/places-data", dataFile(config.placesFile, "places-not-ready", "Place data"));
   app.get("/v1/roads-data", dataFile(config.roadsFile, "roads-not-ready", "The road list"));
+  app.get("/v1/lines-data", dataFile(config.linesFile, "lines-not-ready", "The transport lines"));
 
   // The ways into buildings by a door the crew picked (OpenStreetMap
   // entrances): the route can end at the right one. Like every request, the
