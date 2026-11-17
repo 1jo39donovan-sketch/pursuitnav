@@ -172,7 +172,8 @@ export default function NavigateScreen() {
   // A small phone held upright: a tighter turn card, so the map keeps half the screen.
   const compact = !landscape && height < 760;
   // Too narrow for the route badge beside the arrival time: it goes under the road.
-  const narrow = width < 400;
+  // Sideways, the panel is the side column (42% of the width), not the whole screen.
+  const narrow = (width > height ? width * 0.42 : width) < 400;
 
   const prepared = useMemo(() => (active ? prepare(active.route) : null), [active]);
   // Whether the last new route came from a quiet refresh (no "Re-routing", no "New route").
@@ -641,7 +642,9 @@ export default function NavigateScreen() {
   // Two rows, so nothing has to squeeze: arrival time and road, then the buttons.
   const etaPanel = (
     <View style={[styles.bottom, { paddingBottom: insets.bottom + 10 }]}>
-      {card?.next && !card.arrived && !showOff && repeatTurn(justStarted, card.distanceToNextM) && (
+      {/* Near the thumb in portrait; sideways the turn card is just above it, so it's left out
+          (on a small phone on its side it pushed the turn itself out of sight, 17 Nov). */}
+      {!landscape && card?.next && !card.arrived && !showOff && repeatTurn(justStarted, card.distanceToNextM) && (
         <View style={styles.repeat} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Text style={styles.repeatArrow}>{maneuverArrow(card.next.type)}</Text>
           <Text style={styles.repeatDistance}>
@@ -653,7 +656,8 @@ export default function NavigateScreen() {
           {!voiceOn && <Text style={styles.repeatMuted}>Voice off</Text>}
         </View>
       )}
-      {focusTip && (
+      {/* The one-off tip waits for portrait: sideways there's no room for it. */}
+      {focusTip && !landscape && (
         <View style={styles.focusTip}>
           <Text style={styles.focusTipText}>
             {Platform.OS === "android"
