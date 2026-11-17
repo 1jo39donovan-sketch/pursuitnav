@@ -235,6 +235,8 @@ export function buildApp(
       osMaps: Boolean(config.osMapsKey),
       imagery: config.imagery !== false,
       ...(closures ? { closures: closures.summary().active } : {}),
+      // Which feeds are being read (TfL, National Highways): null if one hasn't answered in the last hour.
+      ...(closures?.summary().sources ? { closureSources: closures.summary().sources } : {}),
       ...(config.version ? { version: config.version } : {}),
       ...(await dataRelease(config.placesFile).then((data) => (data ? { data } : {}))),
     };

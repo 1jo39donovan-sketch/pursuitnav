@@ -42,7 +42,7 @@ jobs:
           NAMES: ${{ inputs.names || 'Squires Court;Quadrant House' }}
           DOMAIN: ${{ vars.SERVER_DOMAIN }}
         run: |
-          curl -fsS "https://$DOMAIN/health" | python3 -c "import json,sys; h=json.load(sys.stdin); print('server data:', h.get('data'), '· version', h.get('version'))" || true
+          curl -fsS "https://$DOMAIN/health" | python3 -c "import json,sys; h=json.load(sys.stdin); print('server data:', h.get('data'), '· version', h.get('version'), '· closures avoided now:', h.get('closures'), h.get('closureSources'))" || true
           curl -fsS --compressed "https://$DOMAIN/v1/places-data" -o places.txt || true
           head -1 places.txt || true
           IFS=';' read -ra list <<< "$NAMES"

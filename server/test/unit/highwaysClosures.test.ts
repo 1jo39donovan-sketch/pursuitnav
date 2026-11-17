@@ -114,7 +114,7 @@ describe("National Highways closures", () => {
     const nh = { current: () => [{ id: "nh:1", street: "M20", rings: [] }], summary: () => ({ active: 1, updatedAt: "2026-11-17T21:58:00Z" }) };
     const both = combinedFeed(tfl, nh);
     expect(both.current().map((c) => c.id)).toEqual(["tfl:1", "nh:1"]);
-    expect(both.summary()).toEqual({ active: 2, updatedAt: "2026-11-17T21:58:00Z" });
+    expect(both.summary()).toEqual({ active: 2, updatedAt: "2026-11-17T21:58:00Z", sources: { tfl: 1, highways: 1 } });
     expect(combinedFeed(undefined, nh).current()).toHaveLength(1);
   });
 });
