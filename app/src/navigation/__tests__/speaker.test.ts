@@ -28,6 +28,15 @@ describe("choosing a voice", () => {
     expect(ranked.map((v) => v.name)).toEqual(["Malcolm (Premium)", "Serena (Enhanced)", "Daniel"]);
   });
 
+  it("defaults to Chrome's Google UK English Male over the female voice", () => {
+    const ranked = rankVoices([
+      { identifier: "Google UK English Female", name: "Google UK English Female", language: "en-GB" },
+      { identifier: "Google UK English Male", name: "Google UK English Male", language: "en-GB" },
+      { identifier: "Daniel", name: "Daniel", language: "en-GB" },
+    ]);
+    expect(ranked.map((v) => v.name)).toEqual(["Google UK English Male", "Google UK English Female", "Daniel"]);
+  });
+
   it("falls back to other English when the phone has no British voice", () => {
     expect(rankVoices([{ identifier: "x", name: "Samantha", language: "en-US" }]).map((v) => v.name)).toEqual([
       "Samantha",

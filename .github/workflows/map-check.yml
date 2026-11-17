@@ -1,0 +1,53 @@
+# Map check: photographs the live web app's map close in at a few known
+# places (stations and lines, police and A&E badges, the satellite look),
+# kept as a download on the run (Artifacts), not committed. Run from the
+# Actions tab after a change to what the map draws goes live.
+name: Map check
+
+on:
+  push:
+    paths:
+      - tools/map-check.mjs
+      - .github/workflows/map-check.yml
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Web app to photograph
+        default: https://bluerouteapp.com/app/
+
+permissions:
+  contents: read
+
+jobs:
+  shots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install a browser
+        run: |
+          npm install --no-save --no-package-lock playwright@1.57.0
+          npx playwright install --with-deps chromium
+      - name: Photograph the map
+        run: node tools/map-check.mjs "${{ inputs.url || 'https://bluerouteapp.com/app/' }}" map-check
+      # Small copies in the log too, for reading where artifacts can't be downloaded.
+      - name: Print small copies
+        if: always()
+        run: |
+          sudo apt-get install -y -qq imagemagick >/dev/null 2>&1 || true
+          set +e
+          for f in map-check/*.png; do
+            echo "=== IMAGE $(basename "$f" .png)"
+            convert "$f" -resize 600x -quality 70 jpg:- | base64
+            echo
+            echo "=== END"
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: map-check
+          path: map-check
+          retention-days: 14

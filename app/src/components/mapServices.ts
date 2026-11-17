@@ -36,10 +36,24 @@ const SERVICES_PREFIX = "br-services-";
 
 /** The place types drawn as services. */
 export const SERVICE_TYPES: ReadonlySet<string> = new Set(Object.keys(KIND_OF_TYPE));
+/**
+ * Also read, to find A&E: OSM often marks a hospital's A&E entrance but not
+ * the hospital (the Whittington, 17 Nov 2026). A hospital with one within
+ * AE_ENTRANCE_M counts as A&E; the entrances aren't drawn themselves.
+ */
+export const SERVICE_SOURCE_TYPES: ReadonlySet<string> = new Set([...SERVICE_TYPES, "Hospital", "A&E entrance"]);
+const AE_ENTRANCE_M = 400;
+
+const metresApart = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
+  Math.hypot((a.lat - b.lat) * 111_320, (a.lng - b.lng) * 111_320 * Math.cos((a.lat * Math.PI) / 180));
 
 /** The services among the places, as GeoJSON points with their kind; custody suites' stations as custody. */
 export function servicePoints(pois: readonly PointOfInterest[]): GeoJSON.FeatureCollection {
-  const services = pois.filter((p) => KIND_OF_TYPE[p.type]);
+  const entrances = pois.filter((p) => p.type === "A&E entrance");
+  const hasAe = (p: PointOfInterest) => entrances.some((e) => metresApart(e, p) <= AE_ENTRANCE_M);
+  const services = pois
+    .filter((p) => KIND_OF_TYPE[p.type] || (p.type === "Hospital" && hasAe(p)))
+    .map((p) => (p.type === "Hospital" ? { ...p, type: "Hospital with A&E" } : p));
   const custody = new Set<PointOfInterest>();
   for (const suite of CUSTODY_SUITES) {
     const station = custodyStation(suite, services);
