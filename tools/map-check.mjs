@@ -22,9 +22,9 @@ const SPOTS = [
 ];
 let failed = 0;
 
-async function setUp(browser, where) {
+async function setUp(browser, where, viewport = { width: 440, height: 956 }) {
   const ctx = await browser.newContext({
-    viewport: { width: 440, height: 956 },
+    viewport,
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
@@ -86,6 +86,34 @@ for (const [name, where, taps] of SPOTS) {
     console.log(`FAIL ${name}: ${e.message.split("\n").slice(0, 3).join(" | ")}`);
   }
 }
+// Navigation with the phone on its side (PM round 4: the turn list was
+// clipped): a large iPhone and a small Android, on a route from Holloway.
+const HOLLOWAY = { latitude: 51.5532, longitude: -0.1154 };
+for (const [name, viewport] of [
+  ["navigate-landscape-iphone", { width: 956, height: 440 }],
+  ["navigate-landscape-android", { width: 720, height: 360 }],
+]) {
+  let page;
+  try {
+    const made = await setUp(browser, HOLLOWAY, viewport);
+    page = made.page;
+    await page.getByText("Search", exact()).last().click();
+    const box = page.getByLabel("Address from the control room").last();
+    await box.fill("54 Caledonian Road");
+    await page.waitForTimeout(2500);
+    await page.getByText("54 Caledonian Road", exact()).last().click();
+    await page.getByLabel("Go on the standard route").last().click({ timeout: 30_000 });
+    await page.waitForTimeout(8000);
+    await page.screenshot({ path: `${out}/${name}.png` });
+    console.log(`ok   ${name}`);
+    await made.ctx.close();
+  } catch (e) {
+    failed++;
+    await page?.screenshot({ path: `${out}/debug-${name}.png` }).catch(() => {});
+    console.log(`FAIL ${name}: ${e.message.split("\n").slice(0, 3).join(" | ")}`);
+  }
+}
+
 await browser.close();
 if (failed) {
   console.log(`${failed} spot(s) failed`);
