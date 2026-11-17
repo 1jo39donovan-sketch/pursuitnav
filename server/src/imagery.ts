@@ -1,8 +1,10 @@
 // Satellite imagery for the app's "Satellite" map style (roads and street
-// names drawn over it), through the server so the provider key never ships
-// in the app. Esri World Imagery, from an ArcGIS Location Platform key (free
-// up to 2 million tiles a month). Only tiles over the region are fetched, so
-// the key can't be used for the rest of the world. Like every request, a tile
+// names drawn over it), through the server so Esri never sees the phone and
+// a key never ships in the app. Esri World Imagery: from its public service
+// with no key, or, once IMAGERY_KEY is set, an ArcGIS Location Platform key
+// (free up to 2 million tiles a month; Esri's terms expect an account for
+// use in an app, so set one before the stores). IMAGERY=0 turns it off.
+// Only tiles over the region are fetched. Like every request, a tile
 // request (which says roughly where the officer is looking) isn't logged or
 // kept beyond a small in-memory cache.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -13,7 +15,15 @@ export const IMAGERY_MIN_ZOOM = 10;
 export const IMAGERY_MAX_ZOOM = 19;
 export const IMAGERY_ATTRIBUTION = "Powered by Esri. Imagery: Esri, Maxar, Earthstar Geographics and the GIS User Community";
 
-const ESRI_TILE_URL = "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile";
+const ESRI_KEYED_URL = "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile";
+const ESRI_PUBLIC_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile";
+
+/** Where a tile comes from: with the key if there is one, else Esri's public service. Esri's path is z/y/x. */
+export function imageryUrl(key: string | undefined, z: number, x: number, y: number): string {
+  return key
+    ? `${ESRI_KEYED_URL}/${z}/${y}/${x}?token=${encodeURIComponent(key)}`
+    : `${ESRI_PUBLIC_URL}/${z}/${y}/${x}`;
+}
 // About 40 KB a tile.
 const CACHE_TILES = 400;
 const DAY_S = 86_400;
@@ -27,6 +37,8 @@ export function imageryAllowed(bounds: [number, number, number, number], z: numb
 
 export function imageryRoutes(
   app: FastifyInstance,
+  /** false: turned off (IMAGERY=0). */
+  enabled: boolean,
   key: string | undefined,
   bounds: [number, number, number, number],
   notSetUp: (req: FastifyRequest) => void = () => {},
@@ -38,7 +50,7 @@ export function imageryRoutes(
     reply.header("content-type", t.type).header("cache-control", `public, max-age=${7 * DAY_S}`).send(t.body);
 
   app.get<{ Params: { z: string; x: string; y: string } }>("/v1/imagery/:z/:x/:y.jpg", async (req, reply) => {
-    if (!key) {
+    if (!enabled) {
       notSetUp(req);
       return reply.code(503).send({ error: "imagery-not-configured" });
     }
@@ -51,8 +63,7 @@ export function imageryRoutes(
       cache.set(id, hit);
       return send(reply, hit);
     }
-    // Esri's tile path is z/y/x.
-    const res = await fetchTile(`${ESRI_TILE_URL}/${z}/${y}/${x}?token=${encodeURIComponent(key)}`, {
+    const res = await fetchTile(imageryUrl(key, z, x, y), {
       signal: AbortSignal.timeout(8000),
     }).catch(() => null);
     if (!res?.ok) {

@@ -41,7 +41,9 @@ export interface ServerConfig {
   learnedDir?: string;
   /** OS Maps API key for the OS road map (OpenData zooms only); defaults to the OS Names key. */
   osMapsKey?: string;
-  /** ArcGIS Location Platform key for satellite imagery (the Satellite map style). */
+  /** The Satellite map style (on unless IMAGERY=0). */
+  imagery?: boolean;
+  /** ArcGIS Location Platform key for the satellite photos; without one, Esri's public service. */
   imageryKey?: string;
   /** SQLite file for usage counts (daily totals, hashed install IDs for 30 days). */
   usageDb?: string;
@@ -88,6 +90,7 @@ export function loadConfig(): ServerConfig {
     osNamesKey: process.env.OS_NAMES_KEY || undefined,
     // The same OS Data Hub project key works once OS Maps API is added to the project.
     osMapsKey: process.env.OS_MAPS_KEY || process.env.OS_NAMES_KEY || undefined,
+    imagery: process.env.IMAGERY !== "0",
     imageryKey: process.env.IMAGERY_KEY || undefined,
     nominatimUrl: process.env.NOMINATIM_URL || undefined,
     placesFile: process.env.PLACES_FILE ?? "/data/places/places.txt.gz",

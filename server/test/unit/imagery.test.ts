@@ -22,7 +22,7 @@ describe("satellite imagery tiles", () => {
       return new Response(new Uint8Array([255, 216, 255]), { status: 200, headers: { "content-type": "image/jpeg" } });
     }) as unknown as typeof fetch;
     const app = Fastify();
-    imageryRoutes(app, "secret-key", LONDON, undefined, fake);
+    imageryRoutes(app, true, "secret-key", LONDON, undefined, fake);
     const a = await app.inject("/v1/imagery/16/32744/21793.jpg");
     expect(a.statusCode).toBe(200);
     expect(a.headers["content-type"]).toBe("image/jpeg");
@@ -33,13 +33,24 @@ describe("satellite imagery tiles", () => {
     ]);
   });
 
+  it("uses Esri's public service when there's no key", async () => {
+    const urls: string[] = [];
+    const app = Fastify();
+    imageryRoutes(app, true, undefined, LONDON, undefined, (async (url: string) => {
+      urls.push(url);
+      return new Response(new Uint8Array([255, 216]), { status: 200 });
+    }) as unknown as typeof fetch);
+    expect((await app.inject("/v1/imagery/16/32744/21793.jpg")).statusCode).toBe(200);
+    expect(urls).toEqual(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/16/21793/32744"]);
+  });
+
   it("says when it isn't set up, or the key is refused", async () => {
     const off = Fastify();
-    imageryRoutes(off, undefined, LONDON);
+    imageryRoutes(off, false, undefined, LONDON);
     expect((await off.inject("/v1/imagery/16/32744/21793.jpg")).statusCode).toBe(503);
     let notSetUp = 0;
     const refused = Fastify();
-    imageryRoutes(refused, "k", LONDON, () => notSetUp++, (async () => new Response("", { status: 403 })) as unknown as typeof fetch);
+    imageryRoutes(refused, true, "k", LONDON, () => notSetUp++, (async () => new Response("", { status: 403 })) as unknown as typeof fetch);
     expect((await refused.inject("/v1/imagery/16/32744/21793.jpg")).statusCode).toBe(503);
     expect(notSetUp).toBe(1);
   });

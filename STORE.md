@@ -314,6 +314,7 @@ Everything here must be done before **Submit for Review** on either store. Statu
 | 10 | Paste the listing, reviewer notes, age rating, data safety and privacy answers above | Josh | Ready |
 | 11 | Play Console: the foreground-service declaration (wording above) with the video from 3 | Josh | Ready once 3 is done |
 | 12 | Optional: a solicitor's read of the terms and privacy policy, especially section 6 (team messages) | Josh | Your call |
+| 13 | Satellite map: open a free ArcGIS Location Platform account, make an API key with basemap access, and add it as the GitHub secret `IMAGERY_KEY` (and to the live server). Until then the Satellite style uses Esri's public service, which Esri's terms expect an account for in an app | Josh | Open |
 
 ## Launch plan
 
