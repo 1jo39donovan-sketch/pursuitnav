@@ -130,7 +130,7 @@ pursuit,bus lane,bus gate,borough,postcode,address,officer,callsign,satnav,route
 
 (165 characters.)
 
-**Description** (both stores, 4,000 max; 3,992):
+**Description** (both stores, 4,000 max; 3,978):
 
 > BlueRoute is patrol and route-planning navigation for police officers in London, Kent and Essex, built around the way jobs come in rather than as a general-purpose sat nav. It's made for the operator in the passenger seat: big text, few taps, spoken directions.
 >
@@ -170,7 +170,7 @@ pursuit,bus lane,bus gate,borough,postcode,address,officer,callsign,satnav,route
 > - BlueRoute is an aid. Set it up before you move off, or let the passenger operate it; don't handle the phone while driving.
 > - BlueRoute is an OPSVALE product. It is independent: not made, approved or endorsed by any police force or other public service, and not affiliated with one.
 >
-> Map and place data © OpenStreetMap contributors. Contains OS data © Crown copyright and database right. Powered by TfL Open Data. Contains National Highways information (Open Government Licence). Satellite imagery: Esri, Maxar, Earthstar Geographics.
+> Map and place data © OpenStreetMap contributors. Contains OS data © Crown copyright and database right. Powered by TfL Open Data. Powered by National Highways' Transport Data Feeds. Satellite imagery: Esri, Maxar, Earthstar Geographics.
 
 ### Notes for the reviewers (Apple "App Review Information"; Google "App access")
 
@@ -208,7 +208,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 
 - **Age rating** (questionnaire): answer **None / No** to every question except messaging. Team messages (16 Nov 2026) let people who share a team code send each other short notes and places, so answer **Yes** to "messaging and chat" (and user-generated content if the form asks it separately). Unrestricted web access: **No**. Check the result Apple shows; it may move above 4+, which is fine for an 18+ audience.
 - **Encryption** (export compliance): already answered in the app (`ITSAppUsesNonExemptEncryption: false`), so App Store Connect won't ask. The app uses HTTPS and, for team sessions, standard published ciphers to protect users' own data; nothing proprietary. If Apple does ask, say it uses only standard encryption and no proprietary algorithms.
-- **Content rights**: "Does your app contain, show, or access third-party content?" **Yes**, and confirm you have the rights: OpenStreetMap (ODbL), Ordnance Survey OpenData (Open Government Licence) TfL open data and National Highways open data (credited in the app).
+- **Content rights**: "Does your app contain, show, or access third-party content?" **Yes**, and confirm you have the rights: OpenStreetMap (ODbL), Ordnance Survey OpenData (Open Government Licence) TfL open data and National Highways' Transport Data Feeds (their terms, based on OGL v2.0; credited in the app).
 - **Advertising identifier (IDFA)**: **No**.
 
 **Google**
