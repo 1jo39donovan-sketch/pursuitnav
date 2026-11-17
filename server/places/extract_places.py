@@ -93,7 +93,7 @@ def address_of(tags) -> str:
 def other_names(tags, name: str) -> str:
     seen = {name.lower()}
     out = []
-    for key in ("alt_name", "old_name", "short_name", "brand", "official_name"):
+    for key in ("alt_name", "old_name", "short_name", "brand", "official_name", "addr:housename"):
         for v in clean(tags.get(key)).split(";"):
             v = v.strip()
             if v and v.lower() not in seen:
@@ -145,7 +145,12 @@ class PlaceCollector(osmium.SimpleHandler):
         if not kind:
             return
         # A&E entrances are rarely named in OSM, but crews need them most.
-        name = clean(tags.get("name")) or (kind[0] if kind[0] == "A&E entrance" else "")
+        name = (
+            clean(tags.get("name"))
+            # Blocks are often named only in their address ("Smith House").
+            or (clean(tags.get("addr:housename")) if "building" in tags else "")
+            or (kind[0] if kind[0] == "A&E entrance" else "")
+        )
         if not name:
             return
         borough = self.boroughs.index_of(lng, lat)
@@ -156,11 +161,11 @@ class PlaceCollector(osmium.SimpleHandler):
         )
 
     def node(self, n):
-        if "name" in n.tags or n.tags.get("emergency") == "emergency_ward_entrance":
+        if "name" in n.tags or ("building" in n.tags and "addr:housename" in n.tags) or n.tags.get("emergency") == "emergency_ward_entrance":
             self.add(n.tags, n.location.lon, n.location.lat)
 
     def area(self, a):
-        if "name" not in a.tags:
+        if "name" not in a.tags and not ("building" in a.tags and "addr:housename" in a.tags):
             return
         try:
             polys = []

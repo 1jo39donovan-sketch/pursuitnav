@@ -369,7 +369,7 @@ export default function SearchScreen() {
         title: r.label,
         note,
         road: r.precision === "road" ? r.road : undefined,
-        findEntrance: r.precision === "door" || r.placeType === "Block of flats",
+        findEntrance: r.precision === "door" || r.placeType === "Block of flats" || r.placeType === "Building",
       },
       query,
       r.borough,
