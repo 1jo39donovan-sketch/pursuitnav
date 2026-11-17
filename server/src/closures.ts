@@ -49,6 +49,8 @@ export interface ClosureSummary {
   active: number;
   /** When the feed was last read successfully (ISO time); undefined if never. */
   updatedAt?: string;
+  /** With more than one feed: each one's count ("tfl", "highways"), null if it hasn't been read in the last hour. */
+  sources?: Record<string, number | null>;
 }
 
 // Half the width of the box along a closed street. Narrow enough to stay off

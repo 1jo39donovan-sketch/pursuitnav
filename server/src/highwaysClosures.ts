@@ -234,7 +234,15 @@ export function combinedFeed(
     summary: (now = new Date()): ClosureSummary => {
       const parts = feeds.map((f) => f.summary(now));
       const times = parts.map((p) => p.updatedAt).filter((x): x is string => !!x).sort();
-      return { active: parts.reduce((n, p) => n + p.active, 0), ...(times[0] ? { updatedAt: times[0] } : {}) };
+      const read = (f?: { summary(now?: Date): ClosureSummary }) => {
+        const s = f?.summary(now);
+        return s?.updatedAt ? s.active : null;
+      };
+      return {
+        active: parts.reduce((n, p) => n + p.active, 0),
+        ...(times[0] ? { updatedAt: times[0] } : {}),
+        sources: { ...(tfl ? { tfl: read(tfl) } : {}), ...(highways ? { highways: read(highways) } : {}) },
+      };
     },
   };
 }
