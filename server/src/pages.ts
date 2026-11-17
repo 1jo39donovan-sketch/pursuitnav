@@ -316,7 +316,7 @@ its rules on outside business interests. Checking and following those is your re
 service or its server, or to collect other people’s information. We may stop providing BlueRoute to anyone who does.</p>
 
 <h2>10. Other services</h2>
-<p>Map data © OpenStreetMap contributors, and data from Ordnance Survey, TfL, National Highways and others, each under their own terms.
+<p>Map data © OpenStreetMap contributors, and data from Ordnance Survey, TfL, National Highways and others, each under their own terms. Powered by TfL Open Data. Powered by National Highways' Transport Data Feeds.
 “Open in Google Maps” and “Open in Waze” hand over to those apps, whose own terms apply.</p>
 
 <h2>11. Changes and law</h2>

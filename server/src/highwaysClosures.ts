@@ -9,6 +9,15 @@
 // Nothing about officers or their routes is sent: the feed is fetched the
 // same way whoever is driving.
 //
+// Terms (developer.data.nationalhighways.co.uk/terms, based on OGL v2.0 with
+// their amendments, checked by the PM 17 Nov 2026): commercial use allowed
+// (19c); credit exactly "Powered by National Highways' Transport Data Feeds"
+// (20a; in the app's credits, store listing and site pages), no logo without
+// their branding guidelines (20b); access can be cut off for abuse (17) and
+// scraping or data mining needs a separate licence (21e). So: one modest poll
+// every 5 minutes (about 5 requests: the planned pages and the unplanned one),
+// and if access stops, routes carry on with TfL's closures only.
+//
 // The feed is DATEX II v3.4 as JSON (read from a real response, 17 Nov 2026):
 //   D2Payload.situation[].situationRecord[].sitRoadOrCarriagewayOrLaneManagement
 //     .roadOrCarriagewayOrLaneManagementType.value  "carriagewayClosures" | "laneClosures" | "other"
