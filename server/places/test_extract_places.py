@@ -177,3 +177,11 @@ def test_kent_districts_and_medway_are_found():
     assert at(0.9025, 51.8892) == "Colchester"
     assert at(0.7105, 51.5376) == "Southend-on-Sea"
     assert finder.index_of(0.27, 51.0) is None  # East Sussex
+
+
+def test_towns_and_villages_are_areas():
+    from categories import classify
+    assert classify({"place": "town", "name": "Gravesend"}) == ("Town", "area")
+    assert classify({"place": "village", "name": "Lenham"}) == ("Village", "area")
+    assert classify({"place": "city", "name": "Chelmsford"}) == ("City", "area")
+    assert classify({"place": "hamlet", "name": "Somewhere"}) is None
