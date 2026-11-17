@@ -47,6 +47,21 @@ jobs:
             echo "--- $n"
             grep -i -- "^$n|" places.txt | head -5 || echo "(not in the places file)"
           done
+      - name: Are these places in the newest published data (what the server takes next)?
+        env:
+          NAMES: ${{ inputs.names || 'Squires Court;Quadrant House' }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release list -R "$GITHUB_REPOSITORY" --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("data-"))][0].tagName')
+          echo "newest data release: $tag"
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" -p 'places.tar.zst*' -D rel
+          cat rel/places.tar.zst* | tar --zstd -xO ./places.txt.gz | gunzip > newest.txt
+          head -1 newest.txt
+          IFS=';' read -ra list <<< "$NAMES"
+          for n in "${list[@]}"; do
+            echo "--- $n"
+            grep -i -- "^$n|" newest.txt | head -5 || echo "(not in the newest places file)"
+          done
       - name: Photograph the map
         run: node tools/map-check.mjs "${{ inputs.url || 'https://bluerouteapp.com/app/' }}" map-check
       # Small copies in the log too, for reading where artifacts can't be downloaded.
