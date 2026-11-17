@@ -132,6 +132,17 @@ for (const [name, viewport] of [
       await page.getByText("☾ Night", exact()).last().click();
       await shoot(page, name, 2);
     } else {
+      // The demo drive, so the speed, road and heading have values to fit.
+      await page.getByText("Session", exact()).last().click();
+      const blurb = page.getByText(/^Simulates a drive/).last();
+      if (!(await blurb.isVisible().catch(() => false))) {
+        await page.getByRole("button", { name: /^Testing:/ }).last().click();
+      }
+      await blurb
+        .locator('xpath=ancestor::div[.//*[@role="switch"]][1]')
+        .locator('[role="switch"]')
+        .first()
+        .click();
       await page.getByText("Pursuit", exact()).last().click();
       await page.waitForTimeout(10_000);
       await page.screenshot({ path: `${out}/${name}.png` });
