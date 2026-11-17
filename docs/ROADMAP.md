@@ -67,7 +67,8 @@ Kent's 12 districts and Medway are added on the current server, as a first step 
 - **Routing and places:** the weekly build downloads Geofabrik's Kent extract (about 54 MB) beside London's (about 130 MB), and merges the two, so routes cross the border.
 - **Areas:** Kent's districts are picked on Session like boroughs, under their own "Kent" heading with North, East and West Kent as big areas. The boundaries are the ONS December 2024 district boundaries (Open Government Licence).
 - **Search:** roads, postcodes and named places from OS Names and OpenStreetMap. House numbers stay London only: the house-number database is the heavy part (3.6 GB for London), and Kent's would not fit beside it on a 4 GB server.
-- **Not yet in Kent:** TfL closures (TfL covers London only), custody suites, and the offline road list bundled in the app (Kent's roads come from the server's road list instead, kept on the phone once downloaded).
+- **Custody suites:** Kent's six (Medway, North Kent, Canterbury, Tonbridge, Folkestone, Margate) and Essex's seven (Basildon, Chelmsford, Clacton, Colchester, Grays, Harlow, Southend), added November 2026.
+- **Not yet in Kent:** TfL closures (TfL covers London only), and the offline road list bundled in the app (Kent's roads come from the server's road list instead, kept on the phone once downloaded).
 
 ### Essex pilot (November 2026)
 
