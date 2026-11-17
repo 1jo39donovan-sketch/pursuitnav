@@ -47,6 +47,12 @@ const AE_ENTRANCE_M = 400;
 const metresApart = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
   Math.hypot((a.lat - b.lat) * 111_320, (a.lng - b.lng) * 111_320 * Math.cos((a.lat * Math.PI) / 180));
 
+/** Which place a badge is: its name and point, to leave it out of other markers. */
+export function badgeKey(name: unknown, geometry: GeoJSON.Geometry): string {
+  const [lng, lat] = geometry.type === "Point" ? geometry.coordinates : [NaN, NaN];
+  return `${String(name)}|${lng?.toFixed(5)}|${lat?.toFixed(5)}`;
+}
+
 /** The services among the places, as GeoJSON points with their kind; custody suites' stations as custody. */
 export function servicePoints(pois: readonly PointOfInterest[]): GeoJSON.FeatureCollection {
   const entrances = pois.filter((p) => p.type === "A&E entrance");
