@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { policeSite } from "../policeSites";
+import { policeSite } from "../serviceSites";
 
 describe("what a mapped police station is", () => {
   it("knows stations", () => {
@@ -42,5 +42,24 @@ describe("what a mapped police station is", () => {
     ]) {
       expect(policeSite(n)).toBe("not-police");
     }
+  });
+});
+
+describe("fire and ambulance stations", () => {
+  it("tells the brigade's and the NHS's own from the rest", async () => {
+    const { fireSite, ambulanceSite } = await import("../serviceSites");
+    expect(fireSite("Islington Fire Station").site).toBe("service");
+    expect(fireSite("Station E11 Dovercourt").site).toBe("service");
+    expect(fireSite("The Old Firestation").site).toBe("none");
+    expect(fireSite("RAF Northolt Fire Station")).toEqual({ site: "other", operator: "RAF fire service" });
+    expect(fireSite("Heathrow Airport Fire Service - Station 2 'Fire East'").site).toBe("other");
+    expect(fireSite("LCY Airfield Fire Station").site).toBe("other");
+    expect(fireSite("FEMC Fire Station").site).toBe("other");
+    expect(ambulanceSite("Camden Ambulance Station").site).toBe("service");
+    expect(ambulanceSite("LAS HART Base East").site).toBe("service");
+    expect(ambulanceSite("St John's Amulance").site).toBe("other");
+    expect(ambulanceSite("St John Ambulance Walthamstow Headquarters").site).toBe("other");
+    expect(ambulanceSite("A&E department").site).toBe("none");
+    expect(ambulanceSite("Vehicle Logistics Centre").site).toBe("none");
   });
 });

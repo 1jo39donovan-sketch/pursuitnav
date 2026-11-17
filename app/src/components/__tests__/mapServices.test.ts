@@ -61,6 +61,17 @@ describe("services on the map", () => {
     expect(f[0]!.notes).toContain("no public front counter");
   });
 
+  it("says when a station isn't the brigade's or the NHS's, and leaves out former ones", () => {
+    const f = servicePoints([
+      poi("RAF Northolt Fire Station", "Fire station", "Hillingdon"),
+      poi("The Old Firestation", "Fire station", "Dover"),
+      poi("St John Ambulance", "Ambulance station", "Westminster"),
+    ]).features.map((x) => x.properties!);
+    expect(f.map((x) => x.name)).toEqual(["RAF Northolt Fire Station", "St John Ambulance"]);
+    expect(f[0]!.notes).toBe("RAF fire service");
+    expect(f[1]!.notes).toMatch(/volunteer first-aid charity/);
+  });
+
   it("draws them on top in the style's font, and replaces rather than stacks", () => {
     const style = {
       version: 8,
