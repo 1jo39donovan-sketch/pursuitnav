@@ -164,6 +164,10 @@ TYPES = {
     ("building", "flats"): ("Block of flats", "housing"),
     ("building", "dormitory"): ("Student halls", "housing"),
     # Areas
+    # Towns and villages: the areas "Generally towards" names in Kent and Essex.
+    ("place", "city"): ("City", "area"),
+    ("place", "town"): ("Town", "area"),
+    ("place", "village"): ("Village", "area"),
     ("place", "suburb"): ("Area", "area"),
     ("place", "neighbourhood"): ("Neighbourhood", "area"),
     ("place", "quarter"): ("Area", "area"),

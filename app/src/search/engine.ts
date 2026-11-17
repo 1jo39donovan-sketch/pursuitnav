@@ -93,6 +93,9 @@ const NEAR_ROAD_KM = 0.6;
 const ON_ROAD_BONUS = 15;
 const NEAR_ROAD_BONUS = 5;
 const OFFICE_PENALTY = 12;
+// Areas "Generally towards" can name; towns and villages are looked for further ahead.
+const TOWN_TYPES = new Set(["City", "Town", "Village"]);
+const AREA_TYPES = new Set(["Area", "Neighbourhood", ...TOWN_TYPES]);
 /**
  * Between equally good matches: a road before a business (officers search
  * roads far more often), and the officer's own boroughs before those just
@@ -288,10 +291,16 @@ export class SearchIndex {
    * Stockwell), then neighbourhoods as "minor". Localities and squares are left
    * out: OSM calls a cricket ground's gates and a block's courtyard localities.
    */
-  namedAreas(): { name: string; lat: number; lng: number; minor: boolean }[] {
+  namedAreas(): { name: string; lat: number; lng: number; minor: boolean; town: boolean }[] {
     return this.pois
-      .filter((p) => p.item.group === "area" && (p.item.type === "Area" || p.item.type === "Neighbourhood"))
-      .map(({ item }) => ({ name: item.name, lat: item.lat, lng: item.lng, minor: item.type !== "Area" }));
+      .filter((p) => p.item.group === "area" && AREA_TYPES.has(p.item.type))
+      .map(({ item }) => ({
+        name: item.name,
+        lat: item.lat,
+        lng: item.lng,
+        minor: item.type === "Neighbourhood",
+        town: TOWN_TYPES.has(item.type),
+      }));
   }
 
   get pointOfInterestCount(): number {
