@@ -130,7 +130,7 @@ pursuit,bus lane,bus gate,borough,postcode,address,officer,callsign,satnav,route
 
 (165 characters.)
 
-**Description** (both stores, 4,000 max; 3,966):
+**Description** (both stores, 4,000 max; 3,992):
 
 > BlueRoute is patrol and route-planning navigation for police officers in London, Kent and Essex, built around the way jobs come in rather than as a general-purpose sat nav. It's made for the operator in the passenger seat: big text, few taps, spoken directions.
 >
@@ -141,10 +141,10 @@ pursuit,bus lane,bus gate,borough,postcode,address,officer,callsign,satnav,route
 > Shops, cafés, pubs, schools, parks, stations, blocks of flats and more, by name (with the road: "Tesco Holloway Road") or by kind ("coffee shops", "schools") in your areas.
 >
 > THE MAP
-> Tube, Overground, Elizabeth line, DLR and tram lines in their colours with their stations, bus stations, and police stations (custody suites marked), fire, ambulance, A&E and courts: tap one for who runs it. Day, night, OS and satellite views.
+> Tube, Overground, DLR and tram lines in their colours with their stations, bus stations, and police stations (custody suites marked), fire, ambulance, A&E and courts: tap one for who runs it.
 >
 > ROUTES SIZED TO YOUR VEHICLE
-> Choose car, SUV, van or carrier, and routes avoid bridges, narrow roads and weight limits it can't take, private roads, locked gates and roads TfL lists as closed (checked every 5 minutes). Journey times count from where you are now.
+> Choose car, SUV, van or carrier, and routes avoid bridges, narrow roads and weight limits it can't take, private roads, locked gates, and closures listed by TfL and National Highways (every 5 minutes). Journey times count from where you are now.
 >
 > A ROUTE FOR AUTHORISED VEHICLES
 > For drivers authorised to use them, a second route that can use bus lanes and gates where permitted is offered beside the standard route when it's quicker. It's on unless you switch it off on Session, and the standard route is always there to pick. The route card shows the restrictions it found. Road signs and your force's driving policy always come first, and the app never switches your route on its own.
@@ -170,7 +170,7 @@ pursuit,bus lane,bus gate,borough,postcode,address,officer,callsign,satnav,route
 > - BlueRoute is an aid. Set it up before you move off, or let the passenger operate it; don't handle the phone while driving.
 > - BlueRoute is an OPSVALE product. It is independent: not made, approved or endorsed by any police force or other public service, and not affiliated with one.
 >
-> Map and place data © OpenStreetMap contributors. Contains OS data © Crown copyright and database right. Powered by TfL Open Data. Satellite imagery: Esri, Maxar, Earthstar Geographics.
+> Map and place data © OpenStreetMap contributors. Contains OS data © Crown copyright and database right. Powered by TfL Open Data. Contains National Highways information (Open Government Licence). Satellite imagery: Esri, Maxar, Earthstar Geographics.
 
 ### Notes for the reviewers (Apple "App Review Information"; Google "App access")
 
@@ -188,7 +188,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 > On the Session tab, open Team and tap "Start a team". With one device you can try "Send a note" (a callsign is needed to send); it appears in the list there. With a second device, join with the team code: positions show on the map, and a note or a place sent to that device's callsign pops up as a card. Messages are end-to-end encrypted with the team code, and the server deletes them within 12 hours.
 >
 > THE TWO ROUTES
-> Every search shows the standard route, which follows normal road rules and is sized to the chosen vehicle (bridge height, width and weight), avoiding roads TfL lists as closed. For authorised drivers, a second route labelled "Blue light", which can use bus lanes and gates where permitted, is shown beside it when it's quicker, with the restrictions it uses listed. It is on by default because the app is for police drivers; the first launch asks the user to accept terms saying it is only for drivers authorised to use it, and one switch on the Session tab ("Blue-light routes") turns it off, after which only standard routes are offered. The standard route can always be chosen, and the app never swaps routes on its own while driving.
+> Every search shows the standard route, which follows normal road rules and is sized to the chosen vehicle (bridge height, width and weight), avoiding roads TfL or National Highways list as closed. For authorised drivers, a second route labelled "Blue light", which can use bus lanes and gates where permitted, is shown beside it when it's quicker, with the restrictions it uses listed. It is on by default because the app is for police drivers; the first launch asks the user to accept terms saying it is only for drivers authorised to use it, and one switch on the Session tab ("Blue-light routes") turns it off, after which only standard routes are offered. The standard route can always be chosen, and the app never swaps routes on its own while driving.
 >
 > LOCATION
 > Location is used only while the app is in use (When In Use permission). Turn-by-turn guidance and the pursuit screen need the current position; on Android they keep going with the screen locked, with a notification showing, until you finish. Nothing is tracked when the app is closed.
@@ -208,7 +208,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 
 - **Age rating** (questionnaire): answer **None / No** to every question except messaging. Team messages (16 Nov 2026) let people who share a team code send each other short notes and places, so answer **Yes** to "messaging and chat" (and user-generated content if the form asks it separately). Unrestricted web access: **No**. Check the result Apple shows; it may move above 4+, which is fine for an 18+ audience.
 - **Encryption** (export compliance): already answered in the app (`ITSAppUsesNonExemptEncryption: false`), so App Store Connect won't ask. The app uses HTTPS and, for team sessions, standard published ciphers to protect users' own data; nothing proprietary. If Apple does ask, say it uses only standard encryption and no proprietary algorithms.
-- **Content rights**: "Does your app contain, show, or access third-party content?" **Yes**, and confirm you have the rights: OpenStreetMap (ODbL), Ordnance Survey OpenData (Open Government Licence) and TfL open data (credited in the app).
+- **Content rights**: "Does your app contain, show, or access third-party content?" **Yes**, and confirm you have the rights: OpenStreetMap (ODbL), Ordnance Survey OpenData (Open Government Licence) TfL open data and National Highways open data (credited in the app).
 - **Advertising identifier (IDFA)**: **No**.
 
 **Google**

@@ -158,6 +158,8 @@ BlueRoute in your service, we use your message only to reply.</p>
     downloaded whole from the BlueRoute server, so they say nothing about where you are.</li>
   <li><strong>TfL</strong>: the server reads TfL’s public road closures feed to route around closed roads. Nothing
     about you or your journeys is sent to TfL.</li>
+  <li><strong>National Highways</strong>: the server reads its public closures feed for motorways and major A-roads
+    (Kent, Essex and London’s), the same way. Nothing about you or your journeys is sent to National Highways.</li>
   <li><strong>Ordnance Survey</strong> receives address searches from the server, through its OS Names API (and OS
     Places, only if the server is set up with it): not your position or anything about you. House-number search runs
     on the BlueRoute server itself.</li>
@@ -204,8 +206,9 @@ and what happened, but please don’t send real addresses from jobs.</p>
   <li><strong>Team sessions?</strong> Start a team in the Session tab and share the code. You see each other only while
     BlueRoute is open on both phones, and it needs signal. It doesn’t replace your radio or any force system, and it’s
     for you to check it fits your force’s policy.</li>
-  <li><strong>Road closures?</strong> Routes avoid roads TfL lists as fully closed, updated every 5 minutes. Lane
-    closures, and incidents TfL hasn’t listed yet, aren’t included.</li>
+  <li><strong>Road closures?</strong> Routes avoid roads TfL lists as fully closed, and motorways and major A-roads
+    National Highways lists as closed (Kent and Essex too), updated every 5 minutes. Lane closures, closures on
+    council roads outside London, and incidents not listed yet aren’t included.</li>
   <li><strong>Where is my log?</strong> On your phone only: open it from the Session tab. It’s never cleared unless you clear it.</li>
 </ul>
 
@@ -313,7 +316,7 @@ its rules on outside business interests. Checking and following those is your re
 service or its server, or to collect other people’s information. We may stop providing BlueRoute to anyone who does.</p>
 
 <h2>10. Other services</h2>
-<p>Map data © OpenStreetMap contributors, and data from Ordnance Survey, TfL and others, each under their own terms.
+<p>Map data © OpenStreetMap contributors, and data from Ordnance Survey, TfL, National Highways and others, each under their own terms.
 “Open in Google Maps” and “Open in Waze” hand over to those apps, whose own terms apply.</p>
 
 <h2>11. Changes and law</h2>
