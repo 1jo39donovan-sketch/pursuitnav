@@ -10,7 +10,11 @@ if (!key) {
 }
 const region: [number, number, number, number] = [-0.8, 50.8, 1.6, 52.2];
 const feed = new HighwaysFeed(key, region, undefined, undefined, (s) => console.log("feed answered:", s));
-await feed.refresh();
-const now = feed.current();
-console.log(`${now.length} carriageway closure(s) in force now in London, Kent and Essex:`);
-for (const c of now) console.log(`- ${c.street || "(no description)"} · ${c.rings.length} box(es) · ${c.id}`);
+// Now, and later tonight (most motorway closures are overnight).
+for (const hours of [0, 3, 6]) {
+  const at = new Date(Date.now() + hours * 3600_000);
+  await feed.refresh(at);
+  const list = feed.current(at);
+  console.log(`${list.length} carriageway closure(s) in force at ${at.toISOString().slice(0, 16)}Z in London, Kent and Essex:`);
+  for (const c of list.slice(0, 25)) console.log(`- ${c.street || "(no description)"} · ${c.rings.length} box(es) · ${c.id}`);
+}
