@@ -213,3 +213,30 @@ describe("police stations by their own name (store review: no force names)", () 
     expect(stationName("Metropolitan Police Sports Club", "Sports centre")).toBe("Metropolitan Police Sports Club");
   });
 });
+
+describe("roads before businesses, own borough first", () => {
+  // "salt" with Islington picked (17 Nov 2026): a hairdresser
+  // just over the line in Hackney came above Salterton Road, Islington.
+  const SALT = `#blueroute-places v1 2026-11-17 2
+Salt Salon||Hairdresser|shop|11|5156200|-7600|3 Gillett Street, N16 8JH
+Salt the Radish||Coffee shop|food|11|5156000|-9800|Blackstock Road
+`;
+  let salt: SearchIndex;
+  beforeAll(async () => {
+    salt = new SearchIndex(
+      parseRoads(readFileSync(join(dataDir, "roads.dat"), "utf8")),
+      parsePostcodes(readFileSync(join(dataDir, "postcodes.dat"), "utf8")),
+    );
+    await salt.setPointsOfInterest(parsePlacesFile(SALT).places);
+  });
+
+  it("puts Salterton Road (Islington) above Hackney businesses that match as well", () => {
+    const near = { has: (b: Borough) => b === "Islington", near: () => true };
+    const labels = salt.search("salt", near).inArea.map((r) => r.label);
+    expect(labels[0]).toBe("Salterton Road");
+  });
+
+  it("still puts a much better business match first", () => {
+    expect(top("Coffee Corner")).toMatchObject({ label: "Coffee Corner" });
+  });
+});
