@@ -24,6 +24,8 @@ function scoreOf(v: { identifier: string; name: string; quality?: string; langua
   if (/enhanced/.test(id) || v.quality === "Enhanced") s += 30;
   // Android's Google voices (and Chrome's "Google UK English") sound far better than the old engines.
   if (/google/.test(id)) s += 20;
+  // The default where there is a choice (17 Nov 2026): Chrome's male British Google voice over its female one.
+  if (/google uk english male/.test(id)) s += 3;
   if (/network/.test(id)) s -= 5; // needs signal
   // Apple's novelty voices aren't for directions.
   if (
