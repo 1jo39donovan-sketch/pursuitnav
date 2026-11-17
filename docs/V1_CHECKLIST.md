@@ -85,5 +85,5 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The **i
 
 - Day/Night button "sticky": closed. The PM re-tested on 26 October with a recording: one tap per change, no lag, no snap-back. The button shows the mode you'll switch *to*.
 - Small Android phones (360 × 720): times on the route cards were cut off, the turn card took half the screen and END didn't work on a page opened from its address. Fixed 26 October.
-- Landscape turn list clipped on a phone (PM, round 4): to check on the drive.
+- Landscape turn list clipped on a phone (PM, round 4): closed 17 November. The Map check workflow photographed it on a small Android sideways (only the distance showed); fixed in #98 and re-checked on the live app: the turn, the "Then" line, the next turn and the arrival time all show.
 - Street-level live traffic (TomTom or HERE): a later decision, as CLAUDE.md says.
