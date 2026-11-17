@@ -114,6 +114,48 @@ for (const [name, viewport] of [
   }
 }
 
+// Pursuit with the phone on its side (the spec: portrait and landscape), and
+// the map in night colours, for the stations, lines and badges.
+for (const [name, viewport] of [
+  ["pursuit-landscape-iphone", { width: 956, height: 440 }],
+  ["pursuit-landscape-android", { width: 720, height: 360 }],
+  ["stratford-night", { width: 440, height: 956 }],
+]) {
+  let page;
+  try {
+    const where = name.startsWith("stratford") ? { latitude: 51.5416, longitude: -0.0035 } : HOLLOWAY;
+    const made = await setUp(browser, where, viewport);
+    page = made.page;
+    if (name.endsWith("night")) {
+      await page.getByText("Session", exact()).last().click();
+      await page.getByRole("button", { name: /^Map and voice:/ }).last().click();
+      await page.getByText("☾ Night", exact()).last().click();
+      await shoot(page, name, 2);
+    } else {
+      // The demo drive, so the speed, road and heading have values to fit.
+      await page.getByText("Session", exact()).last().click();
+      const blurb = page.getByText(/^Simulates a drive/).last();
+      if (!(await blurb.isVisible().catch(() => false))) {
+        await page.getByRole("button", { name: /^Testing:/ }).last().click();
+      }
+      await blurb
+        .locator('xpath=ancestor::div[.//*[@role="switch"]][1]')
+        .locator('[role="switch"]')
+        .first()
+        .click();
+      await page.getByText("Pursuit", exact()).last().click();
+      await page.waitForTimeout(10_000);
+      await page.screenshot({ path: `${out}/${name}.png` });
+      console.log(`ok   ${name}`);
+    }
+    await made.ctx.close();
+  } catch (e) {
+    failed++;
+    await page?.screenshot({ path: `${out}/debug-${name}.png` }).catch(() => {});
+    console.log(`FAIL ${name}: ${e.message.split("\n").slice(0, 3).join(" | ")}`);
+  }
+}
+
 await browser.close();
 if (failed) {
   console.log(`${failed} spot(s) failed`);

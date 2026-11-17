@@ -14,6 +14,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MAP_STYLES, region } from "../config";
 import { useImageryOffered } from "./imagery";
 import { useTransportLines } from "./transportLines";
+import { SERVICES_BADGE_LAYER } from "./mapServices";
 import { useSearch } from "../search/SearchProvider";
 import { lookToDraw, useMapStyle } from "./mapLooks";
 import { useOfflineMap } from "../offline/OfflineMapProvider";
@@ -207,8 +208,24 @@ export function LiveMap({
           const tappedAt = Date.now();
           const { point } = e.nativeEvent;
           const r = HOUSE_NUMBER_TAP_PX;
-          setTimeout(() => {
-            if (markerPressedAt.current >= tappedAt - 50 || !onPress) return;
+          setTimeout(async () => {
+            if (markerPressedAt.current >= tappedAt - 50) return;
+            // A police, fire or A&E badge (drawn in the style): its card, with who runs it and custody.
+            const badge = await mapRef.current
+              ?.queryRenderedFeatures(
+                [
+                  [point[0] - 14, point[1] - 14],
+                  [point[0] + 14, point[1] + 14],
+                ],
+                { layers: [SERVICES_BADGE_LAYER] },
+              )
+              .then((fs) => fs[0])
+              .catch(() => undefined);
+            if (badge?.geometry.type === "Point" && badge.properties && onMarkerPress) {
+              onMarkerPress(badge.properties as MarkerProperties, badge.geometry.coordinates as LngLat);
+              return;
+            }
+            if (!onPress) return;
             // The house number drawn nearest the tap: the one the crew can see they tapped.
             void (mapRef.current
               ?.queryRenderedFeatures(

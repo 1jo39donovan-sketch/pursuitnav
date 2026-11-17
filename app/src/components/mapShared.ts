@@ -22,6 +22,8 @@ export interface MarkerProperties {
   address: string;
   borough: string;
   color: string;
+  /** More to say, a line each (who runs it, custody…): police, fire, A&E badges. */
+  notes?: string;
 }
 
 export interface LiveMapProps {

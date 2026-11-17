@@ -4,7 +4,8 @@
 // beside it closer in. From the places file on the phone, so offline too.
 import type { StyleSpecification } from "@maplibre/maplibre-react-native";
 
-import { CUSTODY_SUITES, custodyStation } from "../area/custody";
+import { CUSTODY_SUITES, custodyStation, type CustodySuite } from "../area/custody";
+import { regionOf, type Borough } from "../search/boroughs";
 import type { PointOfInterest } from "../search/places";
 import type { MapTheme } from "../session/SessionProvider";
 
@@ -33,6 +34,73 @@ export const SERVICE_STYLE: Record<ServiceKind, { letter: string; colour: string
 
 export const SERVICES_SOURCE = "br-services";
 const SERVICES_PREFIX = "br-services-";
+/** The badge layer, for finding which badge a tap was on. */
+export const SERVICES_BADGE_LAYER = `${SERVICES_PREFIX}badge`;
+
+const AGENCY_NAME: Record<CustodySuite["agency"], string> = {
+  MPS: "Metropolitan Police",
+  BTP: "British Transport Police",
+  UKBF: "Border Force",
+  Kent: "Kent Police",
+  Essex: "Essex Police",
+};
+
+/** Who runs it, from its name and area (OSM rarely says). */
+function operatorOf(kind: ServiceKind, name: string, borough: string): string | null {
+  const region = regionOf(borough as Borough)?.id ?? "london";
+  if (kind === "police" || kind === "custody") {
+    if (/british transport police|\bbtp\b/i.test(name)) return "British Transport Police";
+    if (borough === "City of London" || /city of london police/i.test(name)) return "City of London Police";
+    return region === "kent" ? "Kent Police" : region === "essex" ? "Essex Police" : "Metropolitan Police";
+  }
+  if (kind === "fire")
+    return region === "kent" ? "Kent Fire and Rescue Service" : region === "essex" ? "Essex County Fire and Rescue Service" : "London Fire Brigade";
+  if (kind === "ambulance")
+    return region === "kent"
+      ? "South East Coast Ambulance Service"
+      : region === "essex"
+        ? "East of England Ambulance Service"
+        : "London Ambulance Service";
+  return null;
+}
+
+/** What a crew needs to know about it, for the card a tap on its badge opens. */
+function describe(kind: ServiceKind, p: PointOfInterest, suite: CustodySuite | null): { type: string; notes: string } {
+  const operator = operatorOf(kind, p.name, p.borough);
+  const btp = operator === "British Transport Police";
+  const lines: string[] = [];
+  if (operator) lines.push(operator);
+  if (btp) lines.push("Railway police: the rail, Tube, DLR and tram network.");
+  if (suite) {
+    lines.push(
+      suite.kind === "24/7"
+        ? `24/7 custody suite (${AGENCY_NAME[suite.agency]})`
+        : `Contingency custody suite (${AGENCY_NAME[suite.agency]}): opened when others are full`,
+    );
+  } else if (kind === "police") {
+    lines.push("No custody suite here.");
+  }
+  if (kind === "ae") lines.push("Emergency department (A&E).");
+  if (kind === "court") {
+    if (/crown/i.test(p.name)) lines.push("Crown Court");
+    else if (/magistrates/i.test(p.name)) lines.push("Magistrates' court");
+  }
+  const type =
+    kind === "custody" || kind === "police"
+      ? `${btp ? "BTP station" : "Police station"}${suite ? " · custody" : ""}`
+      : SERVICE_LABEL[kind];
+  return { type, notes: lines.join("\n") };
+}
+
+const SERVICE_LABEL: Record<ServiceKind, string> = {
+  police: "Police station",
+  custody: "Police station · custody",
+  fire: "Fire station",
+  ambulance: "Ambulance station",
+  ae: "Hospital with A&E",
+  court: "Court",
+  prison: "Prison",
+};
 
 /** The place types drawn as services. */
 export const SERVICE_TYPES: ReadonlySet<string> = new Set(Object.keys(KIND_OF_TYPE));
@@ -60,19 +128,32 @@ export function servicePoints(pois: readonly PointOfInterest[]): GeoJSON.Feature
   const services = pois
     .filter((p) => KIND_OF_TYPE[p.type] || (p.type === "Hospital" && hasAe(p)))
     .map((p) => (p.type === "Hospital" ? { ...p, type: "Hospital with A&E" } : p));
-  const custody = new Set<PointOfInterest>();
+  const suiteOf = new Map<PointOfInterest, CustodySuite>();
   for (const suite of CUSTODY_SUITES) {
     const station = custodyStation(suite, services);
-    if (station) custody.add(station);
+    if (station && !suiteOf.has(station)) suiteOf.set(station, suite);
   }
   return {
     type: "FeatureCollection",
     features: services.map((p) => {
-      const kind: ServiceKind = custody.has(p) ? "custody" : KIND_OF_TYPE[p.type]!;
+      const suite = suiteOf.get(p) ?? null;
+      const kind: ServiceKind = suite ? "custody" : KIND_OF_TYPE[p.type]!;
+      const { type, notes } = describe(kind, p, suite);
       return {
         type: "Feature",
         geometry: { type: "Point", coordinates: [p.lng, p.lat] },
-        properties: { name: p.name, kind, letter: SERVICE_STYLE[kind].letter, colour: SERVICE_STYLE[kind].colour },
+        properties: {
+          name: p.name,
+          kind,
+          letter: SERVICE_STYLE[kind].letter,
+          colour: SERVICE_STYLE[kind].colour,
+          // As a place marker's, so a tap opens the same card, with more to say.
+          type,
+          address: p.address,
+          borough: p.borough,
+          color: SERVICE_STYLE[kind].colour,
+          notes,
+        },
       };
     }),
   };
@@ -101,7 +182,7 @@ export function withServices(
   const font = boldFont(style);
   const layers: Layer[] = [
     {
-      id: `${SERVICES_PREFIX}badge`,
+      id: SERVICES_BADGE_LAYER,
       type: "circle",
       source: SERVICES_SOURCE,
       minzoom: 11,
