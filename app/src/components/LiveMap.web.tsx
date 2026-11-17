@@ -11,6 +11,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { DEMO_MODE, MAP_STYLES, region } from "../config";
 import { useImageryOffered } from "./imagery";
 import { useTransportLines } from "./transportLines";
+import { useSearch } from "../search/SearchProvider";
 import { lookToDraw, useMapStyle } from "./mapLooks";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
@@ -99,7 +100,8 @@ export function LiveMap({
 }: LiveMapProps) {
   const styles = useThemed(baseStyles);
   const { fix, facing } = useLocation();
-  const { mapTheme, mapLook, transport } = useSession();
+  const { mapTheme, mapLook, transport, services: servicesOn } = useSession();
+  const { services } = useSearch();
   // For layers re-added on each style load: the theme now, not when the map was made.
   const theme = useRef(mapTheme);
   const doorsShown = useRef(doorNumbers);
@@ -152,7 +154,7 @@ export function LiveMap({
   const startAt = useRef({ fix, zoom });
   const imagery = useImageryOffered();
   const lines = useTransportLines(transport);
-  const looked = useMapStyle(MAP_STYLES[mapTheme], lookToDraw(mapLook, imagery), mapTheme, MAP_STYLES.day, houseNumbers, transport, lines);
+  const looked = useMapStyle(MAP_STYLES[mapTheme], lookToDraw(mapLook, imagery), mapTheme, MAP_STYLES.day, houseNumbers, transport, lines, servicesOn ? services : null);
   const style = DEMO_MODE ? demoMapStyle : looked;
   const firstStyle = useRef(style);
 

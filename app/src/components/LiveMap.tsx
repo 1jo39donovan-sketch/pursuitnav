@@ -14,6 +14,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MAP_STYLES, region } from "../config";
 import { useImageryOffered } from "./imagery";
 import { useTransportLines } from "./transportLines";
+import { useSearch } from "../search/SearchProvider";
 import { lookToDraw, useMapStyle } from "./mapLooks";
 import { useOfflineMap } from "../offline/OfflineMapProvider";
 import { useLocation } from "../location/LocationProvider";
@@ -103,7 +104,8 @@ export function LiveMap({
 }: LiveMapProps) {
   const styles = useThemed(baseStyles);
   const { fix, facing } = useLocation();
-  const { mapTheme, mapLook, transport } = useSession();
+  const { mapTheme, mapLook, transport, services: servicesOn } = useSession();
+  const { services } = useSearch();
   // The map kept on the phone, once downloaded: draws with no signal.
   const offlineStyles = useOfflineMap().styles;
   const imagery = useImageryOffered();
@@ -116,6 +118,7 @@ export function LiveMap({
     houseNumbers,
     transport,
     lines,
+    servicesOn ? services : null,
   );
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.

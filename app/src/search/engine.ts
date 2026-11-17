@@ -180,6 +180,11 @@ export class SearchIndex {
   }
 
   /** Named places in the given boroughs and groups, for map markers. */
+  /** Places of these types anywhere in the region (police stations, A&E…). */
+  pointsOfInterestOfType(types: ReadonlySet<string>): PointOfInterest[] {
+    return this.pois.filter((p) => types.has(p.item.type)).map((p) => p.item);
+  }
+
   pointsOfInterestIn(boroughs: ReadonlySet<Borough>, groups: ReadonlySet<PlaceGroup>): PointOfInterest[] {
     if (!boroughs.size || !groups.size) return [];
     return this.pois.filter((p) => boroughs.has(p.item.borough) && groups.has(p.item.group)).map((p) => p.item);

@@ -127,6 +127,8 @@ export default function SessionScreen() {
     setMapLook,
     transport,
     setTransport,
+    services: servicesOn,
+    setServices,
     largeText,
     setLargeText,
     mapTheme,
@@ -508,6 +510,20 @@ export default function SessionScreen() {
           </View>
           <Text style={styles.placeMeta}>
             Tube, Overground, DLR, tram and rail lines with their stations, and bus stations, drawn clearly on every map.
+          </Text>
+          <View style={styles.toggleRow}>
+            <Text style={[styles.placeName, styles.placeText]} nativeID="services-label">
+              Police, fire, ambulance and A&E
+            </Text>
+            <Switch
+              accessibilityLabelledBy="services-label"
+              value={servicesOn}
+              onValueChange={setServices}
+              trackColor={{ false: palette.line, true: palette.amber }}
+            />
+          </View>
+          <Text style={styles.placeMeta}>
+            Police stations (C for custody), fire and ambulance stations, A&E, courts and prisons, on every map.
           </Text>
           <View style={styles.toggleRow}>
             <Text style={[styles.placeName, styles.placeText]} nativeID="large-text-label">
