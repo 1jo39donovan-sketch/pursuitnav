@@ -662,6 +662,10 @@ export default function SessionScreen() {
           database right; National Statistics data © Crown copyright and database right. Map data © OpenStreetMap
           contributors (places and map).
         </Text>
+        <Text style={styles.attribution}>
+          Road closures: Powered by TfL Open Data; contains National Highways information licensed under the Open
+          Government Licence v3.0. Satellite imagery: Esri, Maxar, Earthstar Geographics.
+        </Text>
       </Section>
     </ScrollView>
   );

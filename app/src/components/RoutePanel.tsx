@@ -555,11 +555,11 @@ function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
   if (closures.ignored) {
     return (
       <Text style={[styles.closures, styles.closuresWarn]}>
-        ⚠ No way round a TfL road closure: this route may go through one.
+        ⚠ No way round a road closure: this route may go through one.
       </Text>
     );
   }
-  if (!closures.updatedAt) return <Text style={styles.closures}>Live TfL closures unavailable right now.</Text>;
+  if (!closures.updatedAt) return <Text style={styles.closures}>Live road closures unavailable right now.</Text>;
   return null;
 }
 
