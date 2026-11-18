@@ -7,6 +7,8 @@ the tag value ("shop=bookmaker" -> "Bookmaker"); IGNORE lists the ones that
 are clutter rather than places.
 """
 
+import re
+
 # Groups the app can browse by. Keep in step with app/src/search/places.ts.
 GROUPS = {
     "food": "Food and drink",
@@ -199,6 +201,17 @@ IGNORE = {
     )
 } | {("shop", "vacant"), ("office", "vacant")}
 
+HOME_BUILDINGS = {
+    "residential", "house", "detached", "semidetached_house", "terrace", "bungalow", "cottage",
+    "houseboat", "static_caravan", "flats", "maisonette",
+}
+BLOCK_NAME = re.compile(
+    r"\b(house|houses|court|lodge|point|tower|towers|mansions?|buildings|apartments|flats|block|estate|heights|"
+    r"gardens|place|row|close|terrace|wharf|quay|mews|walk|villas?|cottages?|hall|halls|residences?)\b",
+    re.I,
+)
+STATION_NAME = re.compile(r"\b(station|underground|railway)\b", re.I)
+
 # Named buildings of any other kind (most often building=yes): council blocks
 # and named houses that crews are sent to ("Birchmore House"). Not these,
 # whose names are of what's in or on them, if anything.
@@ -244,5 +257,15 @@ def classify(tags) -> tuple[str, str] | None:
             return value.replace("_", " ").replace(";", ", ").capitalize(), OPEN_KEYS[key]
     building = tags.get("building")
     if building and building not in NOT_A_BUILDING_PLACE:
-        return "Building", "housing"
+        name = tags.get("name") or tags.get("addr:housename") or ""
+        # A station's building isn't a block, whatever it's tagged.
+        if STATION_NAME.search(name):
+            return None
+        # Tagged as homes: a block or a named house, whatever its name.
+        if building in HOME_BUILDINGS:
+            return "Building", "housing"
+        # building=yes (no kind given): a block only if its name sounds like one
+        # ("Squires Court", "Block A"), not "Google" or "The Granary" (17 Nov map check).
+        if building == "yes" and BLOCK_NAME.search(name):
+            return "Building", "housing"
     return None

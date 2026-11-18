@@ -185,3 +185,15 @@ def test_towns_and_villages_are_areas():
     assert classify({"place": "village", "name": "Lenham"}) == ("Village", "area")
     assert classify({"place": "city", "name": "Chelmsford"}) == ("City", "area")
     assert classify({"place": "hamlet", "name": "Somewhere"}) is None
+
+
+def test_only_home_like_named_buildings_are_blocks():
+    from categories import classify
+    assert classify({"building": "yes", "name": "Squires Court"}) == ("Building", "housing")
+    assert classify({"building": "yes", "name": "Block A"}) == ("Building", "housing")
+    assert classify({"building": "house", "name": "Rose Cottage"}) == ("Building", "housing")
+    # Offices, sheds and stations aren't blocks (17 Nov map check: "Google", station buildings).
+    assert classify({"building": "yes", "name": "Google"}) is None
+    assert classify({"building": "yes", "name": "The Granary"}) is None
+    assert classify({"building": "yes", "name": "London King's Cross Railway Station"}) is None
+    assert classify({"building": "office", "name": "Legacy Tower"}) is None
