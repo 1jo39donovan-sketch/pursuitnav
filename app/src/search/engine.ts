@@ -254,9 +254,28 @@ export class SearchIndex {
     return best;
   }
 
-  /** Every named block and estate, for labelling the maps at street zoom. */
+  /**
+   * Every named block and estate, for labelling the maps at street zoom. Not
+   * a "block" that shares its name with a place drawn otherwise within
+   * 150 m (a police station, prison or station building mapped as a building
+   * too: "British Transport Police", "HM Prison Pentonville", 18 Nov).
+   */
   allHousing(): PointOfInterest[] {
-    return this.pois.filter((p) => p.item.group === "housing").map((p) => p.item);
+    const others = new Map<string, PointOfInterest[]>();
+    for (const { item, norms } of this.pois) {
+      if (item.group === "housing" || !norms[0]) continue;
+      const list = others.get(norms[0]) ?? [];
+      list.push(item);
+      others.set(norms[0], list);
+    }
+    return this.pois
+      .filter(
+        (p) =>
+          p.item.group === "housing" &&
+          !(others.get(p.norms[0] ?? "") ?? []).some((o) => distanceKm(o, p.item) <= 0.15) &&
+          !/\b(station|police|prison)\b/i.test(p.item.name),
+      )
+      .map((p) => p.item);
   }
 
   /** Named blocks and estates within `metres` of a point, nearest first (for map labels). */
