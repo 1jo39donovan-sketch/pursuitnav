@@ -216,6 +216,18 @@ describe("unmapped house numbers", () => {
     expect(at?.lng).toBeCloseTo(-0.117, 5);
   });
 
+  it("looks up to 12 numbers away: 54 Caledonian Road between 50 and 62 (18 Nov)", () => {
+    const at = estimateDoor(54, [
+      { number: 50, lat: 51.5321737, lng: -0.1201935 },
+      { number: 62, lat: 51.532385, lng: -0.1198963 },
+    ]);
+    expect(at?.between).toEqual([50, 62]);
+    expect(at?.lat).toBeCloseTo(51.53224, 4);
+    // One side only, 4 away: next to it; 6 away: too far to say.
+    expect(estimateDoor(54, [{ number: 50, lat: 51.53, lng: -0.12 }])).toMatchObject({ nextTo: 50 });
+    expect(estimateDoor(54, [{ number: 60, lat: 51.53, lng: -0.12 }])).toBeNull();
+  });
+
   it("uses next door alone only when that's all there is, and never doors far apart", () => {
     expect(estimateDoor(54, [{ number: 56, lat: 51.544, lng: -0.117 }])).toMatchObject({ nextTo: 56, between: null });
     expect(estimateDoor(54, [{ number: 60, lat: 51.544, lng: -0.117 }])).toBeNull();
