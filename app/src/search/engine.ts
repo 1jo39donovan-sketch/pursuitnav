@@ -604,7 +604,8 @@ export class SearchIndex {
     return {
       key: `road:${r.name}|${r.borough}|${label}`,
       label,
-      detail: `${r.borough} · ${r.outcodes.join(" ")}`,
+      // A number typed but only the road known: say the pin is the road, not the door.
+      detail: `${r.borough} · ${r.outcodes.join(" ")}${prefix.number ? " · estimated: road, not door" : ""}`,
       borough: r.borough,
       lat: r.lat,
       lng: r.lng,
