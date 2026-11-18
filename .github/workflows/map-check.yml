@@ -17,6 +17,9 @@ on:
       names:
         description: Places to look for in the server's places file (;-separated)
         default: Squires Court;Quadrant House
+      address:
+        description: A test address to look up on the server (never a real call)
+        default: 54 Caledonian Road
       types:
         description: Kinds of place to list in full from the newest data (;-separated)
         default: Hospital with A&E;Hospital;A&E entrance
@@ -41,10 +44,19 @@ jobs:
         env:
           NAMES: ${{ inputs.names || 'Squires Court;Quadrant House' }}
           DOMAIN: ${{ vars.SERVER_DOMAIN }}
+          ADDRESS: ${{ inputs.address || '54 Caledonian Road' }}
         run: |
           curl -fsS "https://$DOMAIN/health" | python3 -c "import json,sys; h=json.load(sys.stdin); print('server data:', h.get('data'), '· version', h.get('version'), '· closures avoided now:', h.get('closures'), h.get('closureSources'), '· addresses:', h.get('addresses'))" || true
           curl -fsS --compressed "https://$DOMAIN/v1/places-data" -o places.txt || true
           head -1 places.txt || true
+          echo "--- address search: $ADDRESS"
+          curl -fsS -X POST -H 'content-type: application/json' \
+            --data "$(python3 -c 'import json,os; print(json.dumps({"query": os.environ["ADDRESS"]}))')" \
+            "https://$DOMAIN/v1/addresses" | python3 -c "
+          import json, sys
+          for a in json.load(sys.stdin).get('addresses', [])[:8]:
+              print({k: a.get(k) for k in ('label', 'title', 'name', 'precision', 'source', 'lat', 'lng', 'borough')})
+          " || echo "(address search failed)"
           IFS=';' read -ra list <<< "$NAMES"
           for n in "${list[@]}"; do
             echo "--- $n"
