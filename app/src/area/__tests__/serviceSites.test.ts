@@ -63,3 +63,14 @@ describe("fire and ambulance stations", () => {
     expect(ambulanceSite("Vehicle Logistics Centre").site).toBe("none");
   });
 });
+
+describe("stations offered as nearest (18 Nov desk test)", () => {
+  it("leaves out ward bases", async () => {
+    const { offeredStation } = await import("../serviceSites");
+    expect(offeredStation({ type: "Police station", name: "Clerkenwell and Bunhill Wards Police Station" })).toBe(false);
+    expect(offeredStation({ type: "Police station", name: "Camden Town with Primrose Hill Ward" })).toBe(false);
+    expect(offeredStation({ type: "Police station", name: "Holborn Police Station" })).toBe(true);
+    expect(offeredStation({ type: "Fire station", name: "RAF Northolt Fire Station" })).toBe(false);
+    expect(offeredStation({ type: "Hospital", name: "Anything" })).toBe(true);
+  });
+});

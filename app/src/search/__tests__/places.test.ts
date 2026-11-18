@@ -240,3 +240,22 @@ Salt the Radish||Coffee shop|food|11|5156000|-9800|Blackstock Road
     expect(top("Coffee Corner")).toMatchObject({ label: "Coffee Corner" });
   });
 });
+
+describe("block labels on the map", () => {
+  // Borough 18 Islington. A prison and a BTP office mapped as buildings too (18 Nov desk test).
+  const MIXED = `#blueroute-places v1 2026-11-18 5
+Smith House||Block of flats|housing|18|5155200|-11300|
+HM Prison Pentonville||Prison|emergency|18|5154500|-11700|
+HM Prison Pentonville||Building|housing|18|5154510|-11705|
+Caledonian Road & Barnsbury Railway Station||Building|housing|18|5154300|-11600|
+British Transport Police||Building|housing|18|5153000|-12000|
+`;
+  it("leaves out anything drawn as a badge or station", async () => {
+    const idx = new SearchIndex(
+      parseRoads(readFileSync(join(dataDir, "roads.dat"), "utf8")),
+      parsePostcodes(readFileSync(join(dataDir, "postcodes.dat"), "utf8")),
+    );
+    await idx.setPointsOfInterest(parsePlacesFile(MIXED).places);
+    expect(idx.allHousing().map((p) => p.name)).toEqual(["Smith House"]);
+  });
+});

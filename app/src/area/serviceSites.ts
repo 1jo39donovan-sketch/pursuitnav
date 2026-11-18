@@ -43,3 +43,15 @@ export function ambulanceSite(name: string): ServiceSite {
   if (/st\.? john'?s? am(b)?ulance/i.test(name)) return { site: "other", operator: "St John Ambulance: a volunteer first-aid charity, not the NHS ambulance service" };
   return { site: "service" };
 }
+
+/**
+ * Whether a police, fire or ambulance station is one to offer as "nearest" or
+ * in a station list: a police station with a front counter, the brigade's or
+ * the NHS service's own. Other kinds of place pass unchanged.
+ */
+export function offeredStation(p: { type: string; name: string }): boolean {
+  if (p.type === "Police station") return policeSite(p.name) === "station";
+  if (p.type === "Fire station") return fireSite(p.name).site === "service";
+  if (p.type === "Ambulance station") return ambulanceSite(p.name).site === "service";
+  return true;
+}
