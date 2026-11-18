@@ -12,6 +12,7 @@ import postcodesAsset from "../../assets/data/postcodes.dat";
 import roadsAsset from "../../assets/data/roads.dat";
 import { nearBoroughs } from "../area/area";
 import { namedPoints } from "../components/mapShared";
+import { withAeCorrections } from "../area/emergencyDepartments";
 import { SERVICE_SOURCE_TYPES, servicePoints } from "../components/mapServices";
 import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
@@ -118,7 +119,8 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       if (!text || cancelled) return;
       try {
         const file = parsePlacesFile(text);
-        await data.index.setPointsOfInterest(file.places);
+        // OpenStreetMap's A&E marks corrected where the audit found them wrong (area/emergencyDepartments.ts).
+        await data.index.setPointsOfInterest(withAeCorrections(file.places));
         if (!cancelled) setPlaces({ status: "ready", count: file.places.length, builtOn: file.builtOn });
       } catch {
         // A bad file is ignored; search carries on with roads and addresses.

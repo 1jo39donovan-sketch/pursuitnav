@@ -10,6 +10,14 @@ Audit of the 17 November 2026 data (data-20261117-1417), run with the **Map
 check** workflow (Actions tab, Run workflow; the `types` box lists every place
 of a kind). 41 hospitals were marked A&E.
 
+## Corrected in the app
+
+Since 18 November the app corrects all of the below itself when it loads the
+places (`app/src/area/emergencyDepartments.ts`), so Nearest A&E and the map
+are right now. Fixing OpenStreetMap is still worth doing: other apps use it,
+and once it's fixed the app's entry does nothing and can be removed. The list
+needs checking by an officer or paramedic before launch.
+
 ## Missing: real emergency departments not marked as A&E
 
 Fix in OpenStreetMap: select the hospital's grounds (the outline, not one

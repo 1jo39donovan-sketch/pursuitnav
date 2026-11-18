@@ -19,6 +19,8 @@ const KIND_OF_TYPE: Record<string, ServiceKind> = {
   "Fire station": "fire",
   "Ambulance station": "ambulance",
   "Hospital with A&E": "ae",
+  "Eye A&E": "ae",
+  "Children's A&E": "ae",
   Court: "court",
   Prison: "prison",
 };
@@ -91,7 +93,15 @@ function describe(kind: ServiceKind, p: PointOfInterest, suite: CustodySuite | n
     if (policeSite(p.name) === "base") lines.push("Police base: no public front counter.");
     lines.push("No custody suite here.");
   }
-  if (kind === "ae") lines.push("Emergency department (A&E).");
+  if (kind === "ae") {
+    lines.push(
+      p.type === "Eye A&E"
+        ? "Eye emergencies only: not a general A&E."
+        : p.type === "Children's A&E"
+          ? "Children's emergencies only: not a general A&E."
+          : "Emergency department (A&E).",
+    );
+  }
   if (kind === "court") {
     if (/crown/i.test(p.name)) lines.push("Crown Court");
     else if (/magistrates/i.test(p.name)) lines.push("Magistrates' court");
@@ -99,7 +109,9 @@ function describe(kind: ServiceKind, p: PointOfInterest, suite: CustodySuite | n
   const type =
     kind === "custody" || kind === "police"
       ? `${btp ? "BTP station" : !suite && policeSite(p.name) === "base" ? "Police base" : "Police station"}${suite ? " · custody" : ""}`
-      : SERVICE_LABEL[kind];
+      : kind === "ae"
+        ? p.type
+        : SERVICE_LABEL[kind];
   return { type, notes: lines.join("\n") };
 }
 
