@@ -95,7 +95,12 @@ export interface NamedArea {
   lng: number;
   /** A neighbourhood rather than a well-known area: named only when no area is ahead. */
   minor?: boolean;
+  /** A town, city or village: named up to TOWN_MAX_M ahead (Kent and Essex, where they're further apart). */
+  town?: boolean;
 }
+
+const AREA_MAX_M = 3000;
+const TOWN_MAX_M = 6000;
 
 // Look 0.5–2 km ahead: far enough to be useful to relay, close enough to be soon.
 const AHEAD_STEPS_M = [500, 1000, 1500, 2000];
@@ -122,11 +127,13 @@ export function generallyTowards(
   let best: { name: string; score: number } | null = null;
   for (const a of areas) {
     const d = distance(origin, a);
-    if (d < 400 || d > 3000) continue;
+    if (d < 400 || d > (a.town ? TOWN_MAX_M : AREA_MAX_M)) continue;
     const off = Math.abs(((bearing(origin, a) - heading + 540) % 360) - 180);
     if (off > AREA_CONE_DEG) continue;
     // Prefer areas nearer the line of travel, then nearer 1.5 km; a well-known area over a neighbourhood.
-    const score = off * 40 + Math.abs(d - 1500) + (a.minor ? 1500 : 0);
+    // A town further out counts as if at 3 km at most, so a near suburb still wins in London.
+    const dist = a.town ? Math.min(Math.abs(d - 1500), AREA_MAX_M - 1500) : Math.abs(d - 1500);
+    const score = off * 40 + dist + (a.minor ? 1500 : 0);
     if (!best || score < best.score) best = { name: a.name, score };
   }
   return best?.name ?? null;

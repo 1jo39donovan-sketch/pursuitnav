@@ -20,6 +20,7 @@ import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import { ROUTE_ALT, type MapRoute, type MarkerProperties } from "../../components/mapShared";
+import { badgeKey } from "../../components/mapServices";
 import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
@@ -40,6 +41,9 @@ import { planIsStale } from "../../navigation/routeChoice";
 import type { SearchResult } from "../../search/engine";
 import { destinationNote } from "../../search/destinationNote";
 import { jobSearches, looksLikeJob } from "../../search/jobText";
+import { SendToTeam } from "../../components/SendToTeam";
+import { TeamMessageCard } from "../../components/TeamMessageCard";
+import type { MessagePlace } from "../../team/messages";
 import { mergeAddresses } from "../../search/merge";
 import { DEFAULT_MARKER_GROUPS, GROUP_COLOR, MARKER_GROUPS } from "../../search/placeGroups";
 import type { PlaceGroup } from "../../search/places";
@@ -97,9 +101,11 @@ export default function SearchScreen() {
   const sideways = screenW > screenH && screenH < 560;
   // Height of the floating search box (and any notes under it), from the top of the screen.
   const [topSpace, setTopSpace] = useState(insets.top + 72);
-  const { boroughs, policeRoutes, vehicle, roads, mapView } = useSession();
-  const { mapPoints: teamMap, members: teamMembers } = useTeam();
-  const { data, search, places, blockLabels, area: searchArea } = useSearch();
+  const { boroughs, policeRoutes, vehicle, roads, mapView, services: servicesOn } = useSession();
+  const { mapPoints: teamMap, members: teamMembers, code: teamCode } = useTeam();
+  // "Send to team": a place picked on the map, or the destination chosen.
+  const [sending, setSending] = useState<MessagePlace | null>(null);
+  const { data, search, places, blockLabels, services, area: searchArea } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
   const [query, setQuery] = useState("");
@@ -122,7 +128,9 @@ export default function SearchScreen() {
 
   // Searching 40,000 roads on every keystroke can lag a little; let typing win.
   const deferredQuery = useDeferredValue(query);
-  const showResults = query.trim().length >= 2 && !destination;
+  // A pasted job shows its address parts ("From the job"), not a search of
+  // the whole text, which matched nonsense miles away (16 Nov screenshots).
+  const showResults = query.trim().length >= 2 && !destination && jobFound.length === 0;
   const lookup = useAddressLookup(query, showResults);
   const area = useMemo(() => new Set(boroughs), [boroughs]);
   const results = useMemo(() => {
@@ -362,7 +370,7 @@ export default function SearchScreen() {
         title: r.label,
         note,
         road: r.precision === "road" ? r.road : undefined,
-        findEntrance: r.precision === "door" || r.placeType === "Block of flats",
+        findEntrance: r.precision === "door" || r.placeType === "Block of flats" || r.placeType === "Building",
       },
       query,
       r.borough,
@@ -449,7 +457,13 @@ export default function SearchScreen() {
   // Place markers for the chosen kinds of place, across the selected boroughs.
   const markers = useMemo<GeoJSON.FeatureCollection | null>(() => {
     if (data.status !== "ready" || places.status !== "ready" || !markerGroups.length) return null;
-    const pois = data.index.pointsOfInterestIn(area, new Set(markerGroups));
+    // Places drawn as badges (police stations, A&E…) when those are on: not a dot over them as well.
+    const badged = new Set(
+      servicesOn ? (services?.features ?? []).map((f) => badgeKey(f.properties?.name, f.geometry)) : [],
+    );
+    const pois = data.index
+      .pointsOfInterestIn(area, new Set(markerGroups))
+      .filter((p) => !badged.has(badgeKey(p.name, { type: "Point", coordinates: [p.lng, p.lat] })));
     return {
       type: "FeatureCollection",
       features: pois.map((p) => ({
@@ -464,7 +478,7 @@ export default function SearchScreen() {
         } satisfies MarkerProperties,
       })),
     };
-  }, [data, places, area, markerGroups]);
+  }, [data, places, area, markerGroups, servicesOn, services]);
 
   // Blue-light routes only for someone who has said they drive for an emergency service.
   const shown = useMemo<PlanState | null>(
@@ -650,6 +664,27 @@ export default function SearchScreen() {
             />
           </View>
         )}
+        {navigation.resumable && !navigation.active && !destination && !showResults && !tapped && (
+          // Closed or reloaded mid-route: the route back in one tap, never restarted silently.
+          <View style={styles.resumeCard}>
+            <Text style={styles.resumeNote}>The app was closed during a route.</Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.resumeButton}
+              onPress={() => {
+                navigation.resume();
+                router.push("/navigate");
+              }}
+            >
+              <Text style={styles.resumeText} numberOfLines={2}>
+                Resume route to {navigation.resumable.destination.title}
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={navigation.dismissResume} hitSlop={12}>
+              <Text style={styles.resumeNote}>Not now</Text>
+            </Pressable>
+          </View>
+        )}
         {tapped && !destination && !showResults && (
           <MarkerCard
             marker={tapped.marker}
@@ -667,6 +702,19 @@ export default function SearchScreen() {
             }
             away={fix ? formatDistance(distanceM(fix, { lat: tapped.point[1], lng: tapped.point[0] })) : undefined}
             onClose={() => setTapped(null)}
+            other={
+              teamCode && tapped.marker.name !== FINDING
+                ? {
+                    label: "Send to team",
+                    onPress: () =>
+                      setSending({
+                        lat: tapped.point[1],
+                        lng: tapped.point[0],
+                        label: [tapped.marker.name, tapped.marker.address].filter(Boolean).join(", "),
+                      }),
+                  }
+                : undefined
+            }
             onRoute={() => {
               noteTap();
               const { marker, point, exact } = tapped;
@@ -881,6 +929,20 @@ export default function SearchScreen() {
             <Text style={styles.areaPromptButton}>Pick area</Text>
           </Pressable>
         )}
+        {/* A message from the team: where to go, a caution, a note. */}
+        <TeamMessageCard />
+        {/* In a team with a destination chosen: send it, e.g. from the office to a crew. */}
+        {teamCode && destination && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() =>
+              setSending({ lat: destination.point[1], lng: destination.point[0], label: destination.title ?? "Destination" })
+            }
+            style={({ pressed }) => [styles.sendTeam, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.sendTeamText}>Send this place to the team</Text>
+          </Pressable>
+        )}
         {lookupNote && <Text style={styles.dataNote}>{lookupNote}</Text>}
         {placesNote && <Text style={styles.dataNote}>{placesNote}</Text>}
         {!destination && <FlaggedRoutes />}
@@ -955,6 +1017,7 @@ export default function SearchScreen() {
           bottomInset={8}
         />
       )}
+      {sending && <SendToTeam place={sending} onClose={() => setSending(null)} />}
     </View>
   );
 }
@@ -969,6 +1032,30 @@ function offered(r: Route | PoliceRoute) {
 }
 
 const baseStyles = StyleSheet.create({
+  resumeCard: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    backgroundColor: colors.panel,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    alignItems: "center",
+  },
+  resumeNote: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, textAlign: "center" },
+  resumeButton: {
+    backgroundColor: colors.amber,
+    borderRadius: 10,
+    minHeight: 60,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "stretch",
+  },
+  resumeText: { color: "#1a1200", fontFamily: fonts.displayBold, fontSize: 19, textAlign: "center" },
   screen: { flex: 1, backgroundColor: colors.bg },
   // The search box floats over the map, as a rounded bar with a shadow.
   floating: { position: "absolute", left: 10, right: 10, gap: 6 },
@@ -1009,6 +1096,17 @@ const baseStyles = StyleSheet.create({
   },
   areaPromptText: { flex: 1, color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 20 },
   areaPromptButton: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 16 },
+  sendTeam: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: colors.panel,
+    borderColor: colors.blue,
+    borderWidth: 1,
+  },
+  sendTeamText: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 15 },
   job: {
     gap: 8,
     backgroundColor: colors.panel,

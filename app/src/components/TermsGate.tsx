@@ -12,7 +12,7 @@ import { colors, fonts } from "../theme";
 import { useThemed } from "../textSize";
 
 /** The terms' date (server/src/pages.ts, UPDATED): a new date asks again. */
-export const TERMS_VERSION = "5 November 2026";
+export const TERMS_VERSION = "16 November 2026";
 const KEY = "termsAccepted";
 
 const POINTS = [
@@ -20,6 +20,7 @@ const POINTS = [
   "You and the driver alone are responsible for how the vehicle is driven, for obeying the law and your service’s policies, and for everyone’s safety. The driver must not use the app while driving.",
   "Blue-light routes are only for drivers legally entitled to use them, on an authorised call. Whether a route or manoeuvre is lawful and safe is your decision.",
   "Addresses, routes, speed limits, closures and everything else in the app can be wrong or out of date. Confirm the address with control, and follow the road, not the app.",
+  "Team messages: you alone are responsible for what you send. Only send what your service allows on this app. Everyone with the team code can read them, and they're not for anything urgent: use your radio.",
 ];
 
 export function TermsGate() {

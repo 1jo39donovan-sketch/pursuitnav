@@ -25,6 +25,7 @@ import type { ServiceType } from "../vehicles";
 import { useThemed, useColors } from "../textSize";
 import type { ErrorBoundaryProps } from "expo-router";
 import { ScreenError } from "../components/ScreenError";
+import { offeredStation } from "../area/serviceSites";
 
 /** The stations each service wants listed, by OpenStreetMap place type. */
 const STATIONS: Record<ServiceType, { types: string[]; label: string }> = {
@@ -91,7 +92,8 @@ export default function AreaScreen() {
     const taken = new Set(custody.flatMap((c) => (c.place ? [c.place] : [])));
     return {
       custody,
-      stations: all.filter((p) => stationKind.types.includes(p.type) && !taken.has(p)),
+      // Stations with a front counter only (ward bases stay on the map, with their card).
+      stations: all.filter((p) => stationKind.types.includes(p.type) && !taken.has(p) && offeredStation(p)),
       aes: all.filter(isAE),
     };
   }, [data, bcu, places.status, police, stationKind]); // eslint-disable-line react-hooks/exhaustive-deps

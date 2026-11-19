@@ -99,3 +99,46 @@ describe("the day map, tuned for daylight", () => {
     }
   });
 });
+
+describe("satellite", () => {
+  it("puts the photos over the background, drops the fills, keeps roads and names", async () => {
+    const { restyle: re, IMAGERY_SOURCE } = await import("../mapLooks");
+    const withFill = {
+      ...(style as object),
+      layers: [
+        ...(style as unknown as { layers: unknown[] }).layers.slice(0, 1),
+        { id: "park", type: "fill", source: "openmaptiles", "source-layer": "park", paint: {} },
+        ...(style as unknown as { layers: unknown[] }).layers.slice(1),
+      ],
+    } as never;
+    const s = re(withFill, "satellite", "day");
+    const ids = s.layers.map((l) => l.id);
+    expect(ids.slice(0, 2)).toEqual(["background", IMAGERY_SOURCE]);
+    expect(ids).not.toContain("park");
+    expect(ids).toContain("road_primary");
+    expect((s.sources[IMAGERY_SOURCE] as { tiles: string[] }).tiles[0]).toBe("https://api.example/v1/imagery/{z}/{x}/{y}.jpg");
+    const label = s.layers.find((l) => l.id === "road_label") as unknown as Painted;
+    expect(label.paint["text-color"]).toBe("#ffffff");
+  });
+
+  it("is offered only when the server has imagery, and falls back to standard", async () => {
+    const { looksOffered, lookToDraw } = await import("../mapLooks");
+    expect(looksOffered(false)).not.toContain("satellite");
+    expect(looksOffered(true)).toContain("satellite");
+    expect(lookToDraw("satellite", false)).toBe("standard");
+    expect(lookToDraw("satellite", true)).toBe("satellite");
+    expect(lookToDraw("clear", false)).toBe("clear");
+  });
+});
+
+describe("destination door number", () => {
+  it("reads the door number from the start of an address", async () => {
+    const { doorNumberOf } = await import("../mapShared");
+    expect(doorNumberOf("54 Caledonian Road")).toBe("54");
+    expect(doorNumberOf("Flat 3, 54 Caledonian Rd")).toBe("54");
+    expect(doorNumberOf("12A High Street")).toBe("12A");
+    expect(doorNumberOf("Bemerton Estate")).toBeNull();
+    expect(doorNumberOf("N7 8LA")).toBeNull();
+    expect(doorNumberOf(null)).toBeNull();
+  });
+});

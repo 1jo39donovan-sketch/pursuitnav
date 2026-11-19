@@ -45,6 +45,14 @@ export function MarkerCard({ marker, away, onRoute, onClose, lines, other, favou
       </View>
       <Text style={styles.name}>{marker.name}</Text>
       <Text style={styles.detail}>{[marker.address, marker.borough].filter(Boolean).join(" · ")}</Text>
+      {marker.notes
+        ?.split("\n")
+        .filter(Boolean)
+        .map((n) => (
+          <Text key={n} style={styles.detail}>
+            {n}
+          </Text>
+        ))}
       {lines?.map((l) => (
         <Text key={l.text} style={[styles.detail, l.warn && styles.warn]}>
           {l.text}

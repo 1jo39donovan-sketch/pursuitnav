@@ -73,6 +73,10 @@ import { loadNotes, noteNear } from "../search/blockNotes";
 import { useTextStyles } from "../textSize";
 import type { ErrorBoundaryProps } from "expo-router";
 import { ScreenError } from "../components/ScreenError";
+import { TeamMessageCard } from "../components/TeamMessageCard";
+import { routeToMessage } from "../team/routeToMessage";
+import { useStopped } from "../navigation/stopped";
+import { doorNumberOf } from "../components/mapShared";
 
 const DEMO_GRACE_MS = 5000;
 const ARRIVAL_GRACE_MS = 10_000;
@@ -144,7 +148,7 @@ export default function NavigateScreen() {
       deactivateKeepAwake("navigate").catch(() => {});
     };
   }, []);
-  const { active, replan, rerouteNow, stop } = useNavigation();
+  const { active, replan, rerouteNow, stop, resumable, resume, dismissResume } = useNavigation();
   // Usage counts: one navigation session per time this screen opens.
   useEffect(() => recordEvent("navigation"), []);
   // The turn card is on screen from the first render: GO took this long (Session → Testing).
@@ -157,6 +161,8 @@ export default function NavigateScreen() {
   // the patrol, not the route the car is about to be put on: not used.
   const [openedAt] = useState(() => Date.now());
   const fix = simulated && lastFix && lastFix.timestamp < openedAt ? null : lastFix;
+  // Stopped: door numbers on the map, to find the door (they crowd the road while moving).
+  const stopped = useStopped(fix);
   const { blockLabels } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes, mapLook } = useSession();
   const { mapPoints: teamMap } = useTeam();
@@ -166,7 +172,8 @@ export default function NavigateScreen() {
   // A small phone held upright: a tighter turn card, so the map keeps half the screen.
   const compact = !landscape && height < 760;
   // Too narrow for the route badge beside the arrival time: it goes under the road.
-  const narrow = width < 400;
+  // Sideways, the panel is the side column (42% of the width), not the whole screen.
+  const narrow = (width > height ? width * 0.42 : width) < 400;
 
   const prepared = useMemo(() => (active ? prepare(active.route) : null), [active]);
   // Whether the last new route came from a quiet refresh (no "Re-routing", no "New route").
@@ -519,7 +526,21 @@ export default function NavigateScreen() {
   if (!active || !prepared) {
     return (
       <View style={[styles.screen, styles.empty]}>
-        <Text style={styles.emptyText}>No route chosen.</Text>
+        {resumable && !active ? (
+          <>
+            <Text style={styles.emptyText}>The app was closed during a route.</Text>
+            <Pressable accessibilityRole="button" onPress={resume} style={styles.resumeButton}>
+              <Text style={styles.resumeText} numberOfLines={2}>
+                Resume route to {resumable.destination.title}
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={dismissResume} hitSlop={12}>
+              <Text style={styles.emptyText}>Not now</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Text style={styles.emptyText}>No route chosen.</Text>
+        )}
         <Pressable
           accessibilityRole="button"
           onPress={() => (router.canGoBack() ? router.back() : router.replace("/search"))}
@@ -635,7 +656,9 @@ export default function NavigateScreen() {
   // Two rows, so nothing has to squeeze: arrival time and road, then the buttons.
   const etaPanel = (
     <View style={[styles.bottom, { paddingBottom: insets.bottom + 10 }]}>
-      {card?.next && !card.arrived && !showOff && repeatTurn(justStarted, card.distanceToNextM) && (
+      {/* Near the thumb in portrait; sideways the turn card is just above it, so it's left out
+          (on a small phone on its side it pushed the turn itself out of sight, 17 Nov). */}
+      {!landscape && card?.next && !card.arrived && !showOff && repeatTurn(justStarted, card.distanceToNextM) && (
         <View style={styles.repeat} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Text style={styles.repeatArrow}>{maneuverArrow(card.next.type)}</Text>
           <Text style={styles.repeatDistance}>
@@ -647,7 +670,8 @@ export default function NavigateScreen() {
           {!voiceOn && <Text style={styles.repeatMuted}>Voice off</Text>}
         </View>
       )}
-      {focusTip && (
+      {/* The one-off tip waits for portrait: sideways there's no room for it. */}
+      {focusTip && !landscape && (
         <View style={styles.focusTip}>
           <Text style={styles.focusTipText}>
             {Platform.OS === "android"
@@ -732,6 +756,15 @@ export default function NavigateScreen() {
   const gpsFloat = (
     <View style={[styles.gpsFloat, { top: landscape ? 8 : turnHeight }]} pointerEvents="box-none">
       <GpsStatus onRoute />
+      {/* A team message mid-route: Route here ends this route and plans the new one. */}
+      <TeamMessageCard
+        onRoute={(m) => {
+          recorder.end("new-destination");
+          stop("new-destination");
+          if (router.canGoBack()) router.back();
+          routeToMessage(m);
+        }}
+      />
     </View>
   );
 
@@ -771,6 +804,8 @@ export default function NavigateScreen() {
               autoZoom
               roadNames
               houseNumbers={false}
+              doorNumbers={stopped}
+              destinationNumber={doorNumberOf(active.destination.title)}
               vehicleArrow
               followZoom={16.5}
               routes={routes}
@@ -798,6 +833,8 @@ export default function NavigateScreen() {
               autoZoom
               roadNames
               houseNumbers={false}
+              doorNumbers={stopped}
+              destinationNumber={doorNumberOf(active.destination.title)}
               vehicleArrow
               followZoom={16.5}
               routes={routes}
@@ -971,7 +1008,18 @@ const baseStyles = StyleSheet.create({
   blockNote: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 16, lineHeight: 21 },
   screen: { flex: 1, backgroundColor: colors.bg },
   empty: { alignItems: "center", justifyContent: "center", gap: 16 },
-  emptyText: { color: colors.muted, fontFamily: fonts.body, fontSize: 16 },
+  emptyText: { color: colors.muted, fontFamily: fonts.body, fontSize: 16, textAlign: "center" },
+  resumeButton: {
+    backgroundColor: colors.amber,
+    borderRadius: 10,
+    minHeight: 64,
+    paddingHorizontal: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "stretch",
+    marginHorizontal: 24,
+  },
+  resumeText: { color: "#1a1200", fontFamily: fonts.displayBold, fontSize: 20, textAlign: "center" },
   row: { flex: 1, flexDirection: "row" },
   landscapeSide: { width: "42%", borderRightColor: colors.line, borderRightWidth: StyleSheet.hairlineWidth },
   map: { flex: 1 },
@@ -1035,7 +1083,7 @@ const baseStyles = StyleSheet.create({
   focusTipText: { flex: 1, color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
   focusTipOk: { minWidth: 48, minHeight: 40, alignItems: "center", justifyContent: "center" },
   focusTipOkText: { color: colors.blue, fontFamily: fonts.bodySemiBold, fontSize: 16 },
-  gpsFloat: { position: "absolute", left: 8, right: 64 },
+  gpsFloat: { position: "absolute", left: 8, right: 64, gap: 8 },
   bottom: {
     paddingHorizontal: 12,
     paddingTop: 8,

@@ -6,6 +6,7 @@ Patrol and pursuit navigation for Met Police officers. An OPSVALE product. `CLAU
 - `server/`: Valhalla routing for London, the API, the places extractor, and Docker setup for one VPS. See `server/README.md`.
 - `DEPLOY.md`: one-off setup; then GitHub rents and sets up the server and builds the Android app.
 - `FIELD-TEST.md`: the checklist for testing in a car.
+- `tools/map-check.mjs` (GitHub Actions → **Map check**): photographs the live web app's map at known places, navigation and Pursuit sideways, and the map at night, and reports which data the server is on and whether named places are in it (type them in when you run it).
 
 ## Usage data
 

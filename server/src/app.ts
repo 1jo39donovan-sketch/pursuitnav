@@ -14,6 +14,7 @@ import type { LngLat } from "./geo.js";
 import type { NearestDoor, WhereIs } from "./nominatim.js";
 import { AbandonedError, planContext } from "./planContext.js";
 import { entranceFinder } from "./entrances.js";
+import { imageryRoutes } from "./imagery.js";
 import { osMapsRoutes } from "./osMaps.js";
 import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage, termsPage } from "./pages.js";
@@ -22,7 +23,15 @@ import { PlacesError, type PlacesClient } from "./places.js";
 import { FollowWrongWayError, planFollow } from "./follow.js";
 import { NoSafeRouteError, planRoutes } from "./plan.js";
 import { pursuitInfo } from "./pursuit.js";
-import { MAX_BLOB_CHARS, NoSuchTeamError, TeamFullError, TeamStore, TeamTokenError } from "./teams.js";
+import {
+  MAX_BLOB_CHARS,
+  MAX_MESSAGE_CHARS,
+  MESSAGE_MAX_MS,
+  NoSuchTeamError,
+  TeamFullError,
+  TeamStore,
+  TeamTokenError,
+} from "./teams.js";
 import { APP_EVENTS, type UsageStore } from "./usage.js";
 import { ValhallaError, type Matcher, type Router } from "./valhalla.js";
 
@@ -224,7 +233,10 @@ export function buildApp(
       addresses,
       learning: Boolean(learning),
       osMaps: Boolean(config.osMapsKey),
+      imagery: config.imagery !== false,
       ...(closures ? { closures: closures.summary().active } : {}),
+      // Which feeds are being read (TfL, National Highways): null if one hasn't answered in the last hour.
+      ...(closures?.summary().sources ? { closureSources: closures.summary().sources } : {}),
       ...(config.version ? { version: config.version } : {}),
       ...(await dataRelease(config.placesFile).then((data) => (data ? { data } : {}))),
     };
@@ -409,6 +421,7 @@ export function buildApp(
     };
   app.get("/v1/places-data", dataFile(config.placesFile, "places-not-ready", "Place data"));
   app.get("/v1/roads-data", dataFile(config.roadsFile, "roads-not-ready", "The road list"));
+  app.get("/v1/lines-data", dataFile(config.linesFile, "lines-not-ready", "The transport lines"));
 
   // The ways into buildings by a door the crew picked (OpenStreetMap
   // entrances): the route can end at the right one. Like every request, the
@@ -431,6 +444,7 @@ export function buildApp(
   );
   offlineMapRoutes(app, config.offlineMapDir);
   osMapsRoutes(app, config.osMapsKey, config.bounds, (req) => notSetUp.add(req));
+  imageryRoutes(app, config.imagery !== false, config.imageryKey, config.bounds, (req) => notSetUp.add(req));
 
   // Follow-in: the way a colleague drove, from here. Their track comes from the
   // phone (decrypted there) and, like every request, isn't logged or kept.
@@ -614,6 +628,69 @@ export function buildApp(
         teams.remove(req.params.teamId, req.params.memberId, req.body.token);
         return { ok: true };
       } catch (err) {
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  // Team messages: sealed on the sender's phone, so the server can't read
+  // them; posted only by a member, withdrawn only by its sender, deleted
+  // after at most 12 hours. Nothing about them is logged.
+  app.post<{ Params: { teamId: string }; Body: { memberId: string; token: string; blob: string; keepMs?: number } }>(
+    "/v1/teams/:teamId/messages",
+    {
+      bodyLimit: MAX_MESSAGE_CHARS + 1000,
+      schema: {
+        params: { type: "object", required: ["teamId"], properties: { teamId } },
+        body: {
+          type: "object",
+          required: ["memberId", "token", "blob"],
+          additionalProperties: false,
+          properties: {
+            memberId: teamId,
+            token,
+            blob: { type: "string", minLength: 1, maxLength: MAX_MESSAGE_CHARS },
+            keepMs: { type: "integer", minimum: 60_000, maximum: MESSAGE_MAX_MS },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const b = req.body;
+        return teams.postMessage(req.params.teamId, b.memberId, b.token, b.blob, b.keepMs);
+      } catch (err) {
+        if (err instanceof NoSuchTeamError) return reply.code(404).send({ error: "no-team", message: err.message });
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-in-team", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  app.delete<{ Params: { teamId: string; messageId: string }; Body: { memberId: string; token: string } }>(
+    "/v1/teams/:teamId/messages/:messageId",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["teamId", "messageId"],
+          properties: { teamId, messageId: { type: "string", pattern: "^[0-9a-f]{24}$" } },
+        },
+        body: {
+          type: "object",
+          required: ["memberId", "token"],
+          additionalProperties: false,
+          properties: { memberId: teamId, token },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        teams.deleteMessage(req.params.teamId, req.params.messageId, req.body.memberId, req.body.token);
+        return { ok: true };
+      } catch (err) {
+        if (err instanceof NoSuchTeamError) return reply.code(404).send({ error: "no-team", message: err.message });
         if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
         throw err;
       }

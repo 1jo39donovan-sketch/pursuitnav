@@ -20,6 +20,9 @@ import {
   rerouteFailure,
 } from "../reroute";
 
+// The provider keeps the route on the phone (resume.ts); not needed here.
+vi.mock("../../storage/store", () => ({ store: { getSetting: () => null, setSetting: () => {} } }));
+
 vi.mock("../../config", () => ({ API_URL: "https://server.test", DEMO_MODE: false }));
 
 describe("off-route panel", () => {

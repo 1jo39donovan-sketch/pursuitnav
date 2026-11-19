@@ -1,0 +1,60 @@
+# Store screenshots (STORE.md → Screenshots): opens the live web app in
+# iPhone 6.9" and Android phone sized windows, takes the eight shots at the
+# stores' pixel sizes with no alpha channel, and commits them to
+# store/screenshots/ on the branch it's run on. Run it from the Actions tab
+# (Run workflow, pick the branch) after a visible change goes live.
+name: Store screenshots
+
+on:
+  # Also when the script or this file changes, so a new version runs straight away.
+  push:
+    paths:
+      - store/take-screenshots.mjs
+      - .github/workflows/store-screenshots.yml
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Web app to photograph
+        default: https://bluerouteapp.com/app/
+
+permissions:
+  contents: write
+
+concurrency:
+  group: store-screenshots
+  cancel-in-progress: false
+
+jobs:
+  shots:
+    # Playwright's browsers support Ubuntu 24.04, not yet the newer "latest".
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install a browser
+        run: |
+          npm install --no-save --no-package-lock playwright@1.57.0
+          npx playwright install --with-deps chromium
+      - name: Take the screenshots
+        id: take
+        continue-on-error: true
+        run: node store/take-screenshots.mjs "${{ inputs.url || 'https://bluerouteapp.com/app/' }}" store/screenshots
+      - name: Strip the alpha channel (both stores refuse it) and check the sizes
+        run: |
+          sudo apt-get install -y -qq imagemagick >/dev/null
+          cd store/screenshots
+          for f in *.png; do mogrify -alpha off -strip "$f"; echo "$f $(identify -format '%wx%h' "$f")"; done
+      - name: Commit them to this branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add store/screenshots
+          git diff --cached --quiet && { echo "No changes."; exit 0; }
+          git commit -m "Store screenshots from ${{ inputs.url || 'https://bluerouteapp.com/app/' }}"
+          git push
+      - name: Fail if a shot failed
+        if: steps.take.outcome == 'failure'
+        run: exit 1

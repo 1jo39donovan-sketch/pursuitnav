@@ -1,3 +1,4 @@
+import { launchedOnSession } from "../../navigation/launch";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
@@ -7,6 +8,7 @@ import { API_URL, DEMO_MODE } from "../../config";
 
 import { BoroughPicker } from "../../components/BoroughPicker";
 import { Button } from "../../components/Button";
+import { useImageryOffered } from "../../components/imagery";
 import { looksOffered, MAP_LOOK_NAMES, type MapLook } from "../../components/mapLooks";
 import { OfflineMapSection } from "../../components/OfflineMapSection";
 import { FavouritesSection } from "../../components/FavouritesSection";
@@ -95,6 +97,7 @@ const LOOK_HINTS: Record<MapLook, string> = {
   clear: "High contrast: wider, brighter roads and bold names, for reading on the move.",
   plain: "Just the streets: no shop and business icons.",
   os: "Ordnance Survey's road map. Needs signal; very close in, it shows larger rather than sharper.",
+  satellite: "Aerial photos with the roads and street names over them. Needs signal; with none, just the roads.",
 };
 
 /** Instead of a crash: try again, with the rest of the app still there. */
@@ -123,6 +126,10 @@ export default function SessionScreen() {
     setShowPursuit,
     mapLook,
     setMapLook,
+    transport,
+    setTransport,
+    services: servicesOn,
+    setServices,
     largeText,
     setLargeText,
     mapTheme,
@@ -133,6 +140,7 @@ export default function SessionScreen() {
     learning,
     setLearning,
   } = useSession();
+  const imagery = useImageryOffered();
   // Offered only once the server takes it (switched on after the privacy steps).
   const [canLearn, setCanLearn] = useState(false);
   useEffect(() => {
@@ -141,7 +149,8 @@ export default function SessionScreen() {
   useEffect(() => {
     if (openedThisLaunch) return;
     openedThisLaunch = true;
-    if (callsign && boroughs.length > 0) router.navigate("/search");
+    // Only when the app opened here: not on a first visit after reopening on another tab.
+    if (callsign && boroughs.length > 0 && launchedOnSession()) router.navigate("/search");
     // Only on launch: later edits to the session shouldn't jump screens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -473,7 +482,7 @@ export default function SessionScreen() {
             })}
           </View>
           <View style={styles.chips} accessibilityLabel="Map style">
-            {looksOffered().map((l) => {
+            {looksOffered(imagery).map((l) => {
               const on = mapLook === l;
               return (
                 <Pressable
@@ -490,6 +499,34 @@ export default function SessionScreen() {
             })}
           </View>
           <Text style={styles.placeMeta}>{LOOK_HINTS[mapLook]}</Text>
+          <View style={styles.toggleRow}>
+            <Text style={[styles.placeName, styles.placeText]} nativeID="transport-label">
+              Stations and lines
+            </Text>
+            <Switch
+              accessibilityLabelledBy="transport-label"
+              value={transport}
+              onValueChange={setTransport}
+              trackColor={{ false: palette.line, true: palette.amber }}
+            />
+          </View>
+          <Text style={styles.placeMeta}>
+            Tube, Overground, DLR, tram and rail lines with their stations, and bus stations, drawn clearly on every map.
+          </Text>
+          <View style={styles.toggleRow}>
+            <Text style={[styles.placeName, styles.placeText]} nativeID="services-label">
+              Police, fire, ambulance and A&E
+            </Text>
+            <Switch
+              accessibilityLabelledBy="services-label"
+              value={servicesOn}
+              onValueChange={setServices}
+              trackColor={{ false: palette.line, true: palette.amber }}
+            />
+          </View>
+          <Text style={styles.placeMeta}>
+            Police stations (C for custody), fire and ambulance stations, A&E, courts and prisons, on every map.
+          </Text>
           <View style={styles.toggleRow}>
             <Text style={[styles.placeName, styles.placeText]} nativeID="large-text-label">
               Larger text
@@ -626,6 +663,10 @@ export default function SessionScreen() {
           Search data: contains OS data © Crown copyright and database right; Royal Mail data © Royal Mail copyright and
           database right; National Statistics data © Crown copyright and database right. Map data © OpenStreetMap
           contributors (places and map).
+        </Text>
+        <Text style={styles.attribution}>
+          {"Road closures: Powered by TfL Open Data. Powered by National Highways' Transport Data Feeds. "}
+          Satellite imagery: Esri, Maxar, Earthstar Geographics.
         </Text>
       </Section>
     </ScrollView>

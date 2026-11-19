@@ -1,10 +1,14 @@
-import { Tabs } from "expo-router";
+import { Tabs, usePathname } from "expo-router";
+
+import { noteFirstScreen } from "../../navigation/launch";
 
 import { Header } from "../../components/Header";
 import { TabBar } from "../../components/TabBar";
 import { useColors } from "../../textSize";
 
 export default function TabLayout() {
+  // Which tab this launch opened on (Session's jump to Search depends on it).
+  noteFirstScreen(usePathname());
   const palette = useColors();
   return (
     <Tabs
