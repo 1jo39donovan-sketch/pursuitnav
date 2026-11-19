@@ -36,7 +36,11 @@ export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: n
     trace.length >= 2 ? matcher.matchRoad(trace) : Promise.resolve(null),
     dir !== undefined ? matcher.locate(here, dir) : Promise.resolve([] as LocatedEdge[]),
   ]);
-  const current = pickEdge(ahead, matched?.names, dir);
+  // Asked with the car's direction, Valhalla can return nothing by a bend or
+  // a side road (Holloway Road, 19 Nov): then no junction was ever looked
+  // for. Ask again without it, and take the edge running the car's way.
+  const located = ahead.some((e) => e.car) || dir === undefined ? ahead : await matcher.locate(here);
+  const current = pickEdge(located, matched?.names, dir);
 
   const names = matched?.names ?? current?.names ?? [];
   const limitKph = matched ? matched.speedLimitKph : current?.speedLimitKph;
@@ -71,7 +75,10 @@ export function roadLabel(names: readonly string[]): string | null {
 
 /** The edge the car is on: running its way, preferably on the matched road. */
 function pickEdge(edges: LocatedEdge[], names: string[] | undefined, dir?: number): LocatedEdge | undefined {
-  const drivable = edges.filter((e) => e.car && e.shape.length >= 2);
+  // Never one running against the car (the other carriageway, or the way back).
+  const drivable = edges.filter(
+    (e) => e.car && e.shape.length >= 2 && (dir === undefined || Math.abs(turnAngle(dir, e.heading)) < 90),
+  );
   const ranked = drivable.sort(
     (a, b) =>
       Number(!!names && sameRoad(b.names, names)) - Number(!!names && sameRoad(a.names, names)) ||
