@@ -51,9 +51,9 @@ jobs:
           head -1 places.txt || true
           # Pursuit: three short drives (fixed test points, not anyone's position).
           for drive in \
-            "Holloway Road SE|51.5586,-0.1209 51.5578,-0.1198 51.5570,-0.1187" \
+            "Holloway Road SE (demo drive)|51.5556,-0.1165 51.5550,-0.1157 51.5544,-0.1149" \
             "Caledonian Road S|51.5480,-0.1185 51.5465,-0.1182 51.5450,-0.1179" \
-            "Upper Street S|51.5440,-0.1030 51.5425,-0.1035 51.5410,-0.1040"; do
+            "Upper Street S (demo drive)|51.5410,-0.1028 51.5400,-0.1029 51.5390,-0.1030"; do
             label=${drive%%|*}; pts=${drive#*|}
             body=$(python3 -c "import json,sys; print(json.dumps({'points': [{'lat': float(a), 'lng': float(b)} for a, b in (p.split(',') for p in sys.argv[1].split())]}))" "$pts")
             echo "--- pursuit: $label"
