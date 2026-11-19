@@ -23,7 +23,15 @@ export const LONDON: RegionConfig = {
   offlineZooms: [10, 16],
 };
 
-export const region = LONDON;
+// London plus the Kent and Essex pilots, on one server.
+export const LONDON_KENT_ESSEX: RegionConfig = {
+  ...LONDON,
+  id: "london-kent-essex",
+  name: "London, Kent and Essex",
+  maxBounds: [-0.8, 50.8, 1.6, 52.2],
+};
+
+export const region = LONDON_KENT_ESSEX;
 
 // Free vector tiles from OpenFreeMap (OpenStreetMap data). Swap for a
 // self-hosted Protomaps extract later without touching the map component.

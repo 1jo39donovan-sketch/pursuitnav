@@ -76,6 +76,15 @@ describe("named places", () => {
     expect(hit.lat).toBeCloseTo(51.538, 3);
   });
 
+  it("finds a business named with its road and no comma (30 Oct browser test)", () => {
+    for (const q of ["Costa Coffee Upper Street", "Costa Upper Street", "costa coffee upper st"]) {
+      const hit = top(q)!;
+      expect(hit.label, q).toBe("Costa");
+      expect(hit.lat, q).toBeCloseTo(51.538, 3);
+    }
+    expect(top("Coffee Corner Holloway Road")?.label).toBe("Coffee Corner");
+  });
+
   it("finds a named block, and still offers the road", () => {
     const labels = index.search("Smith House, Holloway Road", ISLINGTON).inArea.map((r) => r.label);
     expect(labels[0]).toBe("Smith House");
@@ -164,5 +173,89 @@ describe("a name with the kind of place after it", () => {
 
   it("still lists a kind on its own", () => {
     expect(index.search("hospitals", ISLINGTON).inArea.map((r) => r.label)).toContain("The Whittington Hospital");
+  });
+});
+
+describe("a brand and a road (30 Oct browser test)", () => {
+  // Holloway Road's one mapped point (N7) is at 51.55707, -0.11849.
+  const BRANDS = `#blueroute-places v1 2026-10-31 4
+Costa||Coffee shop|food|18|5156200|-11900|35 Junction Road, N19 5QU
+Costa||Coffee shop|food|18|5154200|-10600|Holloway Road, N7 6PA
+Tesco||Office|services|18|5155800|-11800|Holloway Road
+Tesco Express|Tesco|Convenience store|shop|18|5156900|-12500|Holloway Road, N19 4QZ
+`;
+  let brands: SearchIndex;
+  beforeAll(async () => {
+    brands = new SearchIndex(
+      parseRoads(readFileSync(join(dataDir, "roads.dat"), "utf8")),
+      parsePostcodes(readFileSync(join(dataDir, "postcodes.dat"), "utf8")),
+    );
+    await brands.setPointsOfInterest(parsePlacesFile(BRANDS).places);
+  });
+  const first = (q: string) => brands.search(q, ISLINGTON).inArea[0];
+
+  it("puts the branch on the road named first, not one merely near its mapped point", () => {
+    expect(first("Costa Coffee Holloway Road")?.detail).toContain("Holloway Road, N7 6PA");
+    expect(first("Costa, Holloway Road")?.detail).toContain("Holloway Road, N7 6PA");
+  });
+
+  it("puts a brand's shop before its office", () => {
+    expect(first("Tesco Holloway Road")?.placeType).toBe("Convenience store");
+  });
+});
+
+describe("police stations by their own name (store review: no force names)", () => {
+  it("drops the force's name from a police station, and leaves other places alone", async () => {
+    const { stationName } = await import("../places");
+    expect(stationName("Metropolitan Police Coldharbour Ward Office", "Police station")).toBe("Coldharbour Ward Office");
+    expect(stationName("City of London Police - Bishopsgate", "Police station")).toBe("Bishopsgate");
+    expect(stationName("Holloway Police Station", "Police station")).toBe("Holloway Police Station");
+    expect(stationName("Metropolitan Police Sports Club", "Sports centre")).toBe("Metropolitan Police Sports Club");
+  });
+});
+
+describe("roads before businesses, own borough first", () => {
+  // "salt" with Islington picked (17 Nov 2026): a hairdresser
+  // just over the line in Hackney came above Salterton Road, Islington.
+  const SALT = `#blueroute-places v1 2026-11-17 2
+Salt Salon||Hairdresser|shop|11|5156200|-7600|3 Gillett Street, N16 8JH
+Salt the Radish||Coffee shop|food|11|5156000|-9800|Blackstock Road
+`;
+  let salt: SearchIndex;
+  beforeAll(async () => {
+    salt = new SearchIndex(
+      parseRoads(readFileSync(join(dataDir, "roads.dat"), "utf8")),
+      parsePostcodes(readFileSync(join(dataDir, "postcodes.dat"), "utf8")),
+    );
+    await salt.setPointsOfInterest(parsePlacesFile(SALT).places);
+  });
+
+  it("puts Salterton Road (Islington) above Hackney businesses that match as well", () => {
+    const near = { has: (b: Borough) => b === "Islington", near: () => true };
+    const labels = salt.search("salt", near).inArea.map((r) => r.label);
+    expect(labels[0]).toBe("Salterton Road");
+  });
+
+  it("still puts a much better business match first", () => {
+    expect(top("Coffee Corner")).toMatchObject({ label: "Coffee Corner" });
+  });
+});
+
+describe("block labels on the map", () => {
+  // Borough 18 Islington. A prison and a BTP office mapped as buildings too (18 Nov desk test).
+  const MIXED = `#blueroute-places v1 2026-11-18 5
+Smith House||Block of flats|housing|18|5155200|-11300|
+HM Prison Pentonville||Prison|emergency|18|5154500|-11700|
+HM Prison Pentonville||Building|housing|18|5154510|-11705|
+Caledonian Road & Barnsbury Railway Station||Building|housing|18|5154300|-11600|
+British Transport Police||Building|housing|18|5153000|-12000|
+`;
+  it("leaves out anything drawn as a badge or station", async () => {
+    const idx = new SearchIndex(
+      parseRoads(readFileSync(join(dataDir, "roads.dat"), "utf8")),
+      parsePostcodes(readFileSync(join(dataDir, "postcodes.dat"), "utf8")),
+    );
+    await idx.setPointsOfInterest(parsePlacesFile(MIXED).places);
+    expect(idx.allHousing().map((p) => p.name)).toEqual(["Smith House"]);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { nightify, restyle, scaleWidth } from "../mapLooks";
+import { dayify, nightify, restyle, scaleWidth } from "../mapLooks";
 
 // Hoisted above the imports by vitest.
 vi.mock("../../config", () => ({ API_URL: "https://api.example" }));
@@ -73,5 +73,72 @@ describe("map looks", () => {
     expect((n.layers[0] as unknown as Painted).paint["background-color"]).toBe("#0f1520");
     expect((n.layers[2] as unknown as Painted).paint["line-color"]).toBe("#06090f");
     expect((n.layers[4] as unknown as Painted).paint["text-color"]).toBe("#c4ccda");
+  });
+});
+
+describe("the day map, tuned for daylight", () => {
+  type L = { id: string; paint?: Record<string, unknown> };
+  const day = dayify(style) as unknown as { layers: L[] };
+  const layer = (id: string) => day.layers.find((l) => l.id === id)!;
+
+  it("has a warm background that doesn't glare", () => {
+    expect(layer("background").paint!["background-color"]).toBe("#e9e6e1");
+  });
+
+  it("draws road edges darker and 1.4 times wider", () => {
+    const casing = layer("road_minor_casing").paint!;
+    expect(casing["line-color"]).toBe("#6b6b6b");
+    expect(casing["line-width"]).toEqual({ stops: [[12, 1.4], [18, 6 * 1.4]] });
+    // The road itself keeps its own colour and width.
+    expect(layer("road_primary").paint!["line-color"]).toBe("#333");
+  });
+
+  it("writes labels near-black on a 2 px white halo", () => {
+    for (const id of ["poi", "road_label"]) {
+      expect(layer(id).paint).toMatchObject({ "text-color": "#111111", "text-halo-color": "#ffffff", "text-halo-width": 2 });
+    }
+  });
+});
+
+describe("satellite", () => {
+  it("puts the photos over the background, drops the fills, keeps roads and names", async () => {
+    const { restyle: re, IMAGERY_SOURCE } = await import("../mapLooks");
+    const withFill = {
+      ...(style as object),
+      layers: [
+        ...(style as unknown as { layers: unknown[] }).layers.slice(0, 1),
+        { id: "park", type: "fill", source: "openmaptiles", "source-layer": "park", paint: {} },
+        ...(style as unknown as { layers: unknown[] }).layers.slice(1),
+      ],
+    } as never;
+    const s = re(withFill, "satellite", "day");
+    const ids = s.layers.map((l) => l.id);
+    expect(ids.slice(0, 2)).toEqual(["background", IMAGERY_SOURCE]);
+    expect(ids).not.toContain("park");
+    expect(ids).toContain("road_primary");
+    expect((s.sources[IMAGERY_SOURCE] as { tiles: string[] }).tiles[0]).toBe("https://api.example/v1/imagery/{z}/{x}/{y}.jpg");
+    const label = s.layers.find((l) => l.id === "road_label") as unknown as Painted;
+    expect(label.paint["text-color"]).toBe("#ffffff");
+  });
+
+  it("is offered only when the server has imagery, and falls back to standard", async () => {
+    const { looksOffered, lookToDraw } = await import("../mapLooks");
+    expect(looksOffered(false)).not.toContain("satellite");
+    expect(looksOffered(true)).toContain("satellite");
+    expect(lookToDraw("satellite", false)).toBe("standard");
+    expect(lookToDraw("satellite", true)).toBe("satellite");
+    expect(lookToDraw("clear", false)).toBe("clear");
+  });
+});
+
+describe("destination door number", () => {
+  it("reads the door number from the start of an address", async () => {
+    const { doorNumberOf } = await import("../mapShared");
+    expect(doorNumberOf("54 Caledonian Road")).toBe("54");
+    expect(doorNumberOf("Flat 3, 54 Caledonian Rd")).toBe("54");
+    expect(doorNumberOf("12A High Street")).toBe("12A");
+    expect(doorNumberOf("Bemerton Estate")).toBeNull();
+    expect(doorNumberOf("N7 8LA")).toBeNull();
+    expect(doorNumberOf(null)).toBeNull();
   });
 });

@@ -4,10 +4,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { useThemed } from "../textSize";
 
 // Text-only tabs with an amber bar over the active one, as in the prototype.
 // Big targets: the operator is tapping this in a moving car.
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();
   // Pursuit can be hidden in Session (crews who never pursue).
   const { showPursuit } = useSession();
@@ -48,7 +50,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   bar: {
     flexDirection: "row",
     backgroundColor: colors.panel,

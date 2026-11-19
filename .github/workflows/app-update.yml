@@ -93,8 +93,13 @@ jobs:
         run: |
           sha=$(git rev-parse --short HEAD)
           msg="$sha $(git log -1 --format=%s)"
-          npx --yes eas-cli@latest update --channel production --environment production \
-            --platform all --message "${msg:0:200}" --non-interactive
+          export EXPO_PUBLIC_BUILD_ID="$sha $(date -u +'%d %b %Y')"
+          # Test APKs and the web take "production"; App Store and Play builds take "store"
+          # (app/src/build.ts), so a store build can hide the test tools.
+          for channel in production store; do
+            npx --yes eas-cli@latest update --channel "$channel" --environment production \
+              --platform all --message "${msg:0:200}" --non-interactive
+          done
 
       - name: Summary
         if: steps.settings.outputs.skip != 'true'

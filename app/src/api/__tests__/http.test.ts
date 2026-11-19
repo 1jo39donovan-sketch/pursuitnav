@@ -71,6 +71,7 @@ describe("serverRequest", () => {
       ok: true,
       status: 200,
       body: { a: 1 },
+      serverTiming: null,
     });
     await expect(serverJson("https://x", {}, { fetchFn: answers({ error: "no-route" }, 422) })).resolves.toMatchObject({
       ok: false,

@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import type { PoliceRoute, Route, RoutePlan } from "../api/routes";
+import { store } from "../storage/store";
 import type { ReplanStage } from "./reroute";
+import { clearResumable, loadResumable, saveResumable, type ResumableRoute } from "./resume";
 
 /** follow: the way a colleague drove in (team sessions). */
 export type RouteKind = "standard" | "police" | "follow";
@@ -28,6 +30,8 @@ interface NavigationContextValue {
   active: ActiveNavigation | null;
   /** The last time navigation ended, and why. */
   ended: { at: number; reason: EndReason } | null;
+  /** Where the crew last navigated to (kept after navigation ends): "on scene" for team sharing. */
+  lastDestination: ActiveNavigation["destination"] | null;
   start: (
     kind: RouteKind,
     plan: RoutePlan,
@@ -44,6 +48,12 @@ interface NavigationContextValue {
   /** Re-route from here now, switching to another kind of route if given. */
   rerouteNow: (kind?: "standard" | "police") => void;
   stop: (reason?: EndReason) => void;
+  /** A route that was being driven when the app was closed or reloaded: offered, never restarted silently. */
+  resumable: ResumableRoute | null;
+  /** Picks that route up again, re-routing from here at once. */
+  resume: () => void;
+  /** Not wanted: stop offering it. */
+  dismissResume: () => void;
 }
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
@@ -73,6 +83,8 @@ export function chooseRoute(
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<ActiveNavigation | null>(null);
   const [ended, setEnded] = useState<{ at: number; reason: EndReason } | null>(null);
+  const [lastDestination, setLastDestination] = useState<ActiveNavigation["destination"] | null>(null);
+  const [resumable, setResumable] = useState<ResumableRoute | null>(() => loadResumable(store));
 
   const start = useCallback(
     (
@@ -88,6 +100,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       const note = follow
         ? `Following ${follow.callsign}’s way in. ${n ? `Uses ${n} restriction${n === 1 ? "" : "s"} (R on the map).` : "No restrictions found on it."}`
         : chosen.note;
+      setLastDestination(destination);
+      setResumable(null);
+      saveResumable(store, { kind, plan, destination, ...(follow ? { follow } : {}), at: Date.now() });
       setActive({
         kind,
         destination,
@@ -125,13 +140,26 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const stop = useCallback((reason: EndReason = "end") => {
+    clearResumable(store);
+    setResumable(null);
     setActive(null);
     setEnded({ at: Date.now(), reason });
   }, []);
 
+  const resume = useCallback(() => {
+    if (!resumable) return;
+    // From here, not from where it was planned: re-route straight away.
+    start(resumable.kind, resumable.plan, resumable.destination, resumable.follow, true);
+  }, [resumable, start]);
+
+  const dismissResume = useCallback(() => {
+    clearResumable(store);
+    setResumable(null);
+  }, []);
+
   const value = useMemo(
-    () => ({ active, ended, start, replan, rerouteNow, stop }),
-    [active, ended, start, replan, rerouteNow, stop],
+    () => ({ active, ended, lastDestination, start, replan, rerouteNow, stop, resumable, resume, dismissResume }),
+    [active, ended, lastDestination, start, replan, rerouteNow, stop, resumable, resume, dismissResume],
   );
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
 }

@@ -3,6 +3,26 @@ import { describe, expect, it } from "vitest";
 import { boroughAt, cardinal, generallyTowards, nearBoroughs, projectAhead } from "../area";
 
 describe("boroughAt", () => {
+  it("knows Kent's districts and Medway", () => {
+    expect(boroughAt(51.2798, 1.0828)).toBe("Canterbury"); // the cathedral
+    expect(boroughAt(51.272, 0.529)).toBe("Maidstone"); // town centre
+    expect(boroughAt(51.3887, 0.5054)).toBe("Medway"); // Rochester
+    expect(boroughAt(51.4436, 0.2185)).toBe("Dartford"); // Bluewater
+    expect(boroughAt(51.1306, 1.3124)).toBe("Dover"); // the docks road
+  });
+
+  it("knows Essex's districts, Southend and Thurrock", () => {
+    expect(boroughAt(51.8892, 0.9025)).toBe("Colchester"); // town centre
+    expect(boroughAt(51.7356, 0.4685)).toBe("Chelmsford");
+    expect(boroughAt(51.5376, 0.7105)).toBe("Southend-on-Sea");
+    expect(boroughAt(51.4872, 0.3256)).toBe("Thurrock"); // Lakeside
+  });
+
+  it("says when a road leaves Kent", () => {
+    // East Sussex border south of Tunbridge Wells, heading south.
+    expect(generallyTowards(51.12, 0.27, 180)).toBe("Leaving Kent");
+  });
+
   it("names the borough at well-known spots", () => {
     expect(boroughAt(51.5466, -0.1035)).toBe("Islington"); // Highbury Corner
     expect(boroughAt(51.4613, -0.1156)).toBe("Lambeth"); // Brixton
@@ -42,6 +62,35 @@ describe("generallyTowards", () => {
         { name: "Ahead", ...ahead },
       ]),
     ).toBe("Ahead");
+  });
+
+  it("names a well-known area over a closer, better-lined-up neighbourhood", () => {
+    const at = { lat: 51.372, lng: -0.1 };
+    const gate = projectAhead(at.lat, at.lng, 0, 1500);
+    const area = projectAhead(at.lat, at.lng, 15, 2000);
+    expect(
+      generallyTowards(at.lat, at.lng, 0, [
+        { name: "Some Gate", ...gate, minor: true },
+        { name: "Brixton", ...area },
+      ]),
+    ).toBe("Brixton");
+  });
+
+  it("names a town further ahead in the country (Kent and Essex), but a near suburb first", () => {
+    // Mid-Kent, inside one district, heading east: a village 4.5 km ahead.
+    const at = { lat: 51.27, lng: 0.6 };
+    const town = projectAhead(at.lat, at.lng, 90, 4500);
+    expect(generallyTowards(at.lat, at.lng, 90, [{ name: "Lenham", ...town, town: true }])).toBe("Lenham");
+    // An area as far out isn't named: in London they're close together.
+    expect(generallyTowards(at.lat, at.lng, 90, [{ name: "Far Area", ...town }])).toBeNull();
+    // With a suburb 1.5 km ahead too, the suburb wins.
+    const near = projectAhead(at.lat, at.lng, 90, 1500);
+    expect(
+      generallyTowards(at.lat, at.lng, 90, [
+        { name: "Lenham", ...town, town: true },
+        { name: "Near Suburb", ...near },
+      ]),
+    ).toBe("Near Suburb");
   });
 
   it("says so when there's nothing to name", () => {

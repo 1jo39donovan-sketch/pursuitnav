@@ -9,15 +9,21 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DEMO_MODE, MAP_STYLES, region } from "../config";
-import { useMapStyle } from "./mapLooks";
+import { useImageryOffered } from "./imagery";
+import { useTransportLines } from "./transportLines";
+import { SERVICES_BADGE_LAYER } from "./mapServices";
+import { useSearch } from "../search/SearchProvider";
+import { lookToDraw, useMapStyle } from "./mapLooks";
 import { demoBoroughLabels, demoMapStyle } from "../demo/demoMapStyle";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { glider, type Pose } from "./glide";
 import {
   ARROW_LAYOUT,
   boundsOf,
   cameraFor,
+  easeBearing,
   LABEL_LAYOUT,
   labelPaint,
   TEAM_CIRCLE_PAINT,
@@ -43,7 +49,9 @@ import {
   MARKER_MIN_ZOOM,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
-  pointGeoJSON,
+  destinationGeoJSON,
+  DESTINATION_NUMBER_LAYOUT,
+  DESTINATION_NUMBER_PAINT,
   pointsGeoJSON,
   RESTRICTION_CIRCLE_PAINT,
   RESTRICTION_LABEL_LAYOUT,
@@ -57,6 +65,7 @@ import {
   vehicleFeature,
 } from "./mapShared";
 import { MapButtons } from "./MapButtons";
+import { useThemed } from "../textSize";
 
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -68,6 +77,9 @@ export function LiveMap({
   autoZoom = false,
   zoomControl = false,
   roadNames = false,
+  houseNumbers = true,
+  doorNumbers = false,
+  destinationNumber = null,
   labels,
   team,
   vehicleArrow = false,
@@ -84,11 +96,16 @@ export function LiveMap({
   fitTo,
   markers,
   onMarkerPress,
+  onTeamPress,
+  snapTo,
 }: LiveMapProps) {
+  const styles = useThemed(baseStyles);
   const { fix, facing } = useLocation();
-  const { mapTheme, mapLook } = useSession();
+  const { mapTheme, mapLook, transport, services: servicesOn } = useSession();
+  const { services } = useSearch();
   // For layers re-added on each style load: the theme now, not when the map was made.
   const theme = useRef(mapTheme);
+  const doorsShown = useRef(doorNumbers);
   useEffect(() => {
     theme.current = mapTheme;
   }, [mapTheme]);
@@ -110,11 +127,13 @@ export function LiveMap({
   const longPress = useRef(onLongPress);
   const tap = useRef(onPress);
   const markerPress = useRef(onMarkerPress);
+  const teamPress = useRef(onTeamPress);
   useEffect(() => {
     longPress.current = onLongPress;
     tap.current = onPress;
     markerPress.current = onMarkerPress;
-  }, [onLongPress, onPress, onMarkerPress]);
+    teamPress.current = onTeamPress;
+  }, [onLongPress, onPress, onMarkerPress, onTeamPress]);
 
   // New points to show: stop following so the camera can frame them.
   const [lastFitTo, setLastFitTo] = useState(fitTo);
@@ -134,7 +153,9 @@ export function LiveMap({
   const [styleVersion, setStyleVersion] = useState(0);
   // Opens where the vehicle is, so a new screen doesn't fly in from the middle of London.
   const startAt = useRef({ fix, zoom });
-  const looked = useMapStyle(MAP_STYLES[mapTheme], mapLook, mapTheme, MAP_STYLES.day);
+  const imagery = useImageryOffered();
+  const lines = useTransportLines(transport);
+  const looked = useMapStyle(MAP_STYLES[mapTheme], lookToDraw(mapLook, imagery), mapTheme, MAP_STYLES.day, houseNumbers, transport, lines, servicesOn ? services : null);
   const style = DEMO_MODE ? demoMapStyle : looked;
   const firstStyle = useRef(style);
 
@@ -162,6 +183,16 @@ export function LiveMap({
     m.once("idle", foldCredit);
     if (!compact) m.addControl(new maplibregl.NavigationControl({ showZoom: false }), "top-right");
     m.on("rotate", () => setBearing(m.getBearing()));
+    // Once per map, not on each style: they're kept through a change of
+    // style, and adding them again made one tap open a place's card twice.
+    m.on("click", "places-dot", (e) => {
+      const f = e.features?.[0];
+      if (f?.geometry.type === "Point") {
+        markerPress.current?.(f.properties as MarkerProperties, f.geometry.coordinates as [number, number]);
+      }
+    });
+    m.on("mouseenter", "places-dot", () => (m.getCanvas().style.cursor = "pointer"));
+    m.on("mouseleave", "places-dot", () => (m.getCanvas().style.cursor = ""));
     // On the first style and on each change of style (day/night), which
     // keeps the camera where it is but drops what was added to the map.
     m.on("style.load", () => {
@@ -178,14 +209,6 @@ export function LiveMap({
           paint: MARKER_LABEL_PAINT,
         });
       }
-      m.on("click", "places-dot", (e) => {
-        const f = e.features?.[0];
-        if (f?.geometry.type === "Point") {
-          markerPress.current?.(f.properties as MarkerProperties, f.geometry.coordinates as [number, number]);
-        }
-      });
-      m.on("mouseenter", "places-dot", () => (m.getCanvas().style.cursor = "pointer"));
-      m.on("mouseleave", "places-dot", () => (m.getCanvas().style.cursor = ""));
       m.addSource("routes", { type: "geojson", data: EMPTY });
       // A white edge, so the line stands out on the day map and the night one.
       m.addLayer({
@@ -212,6 +235,7 @@ export function LiveMap({
         paint: { "line-color": ["get", "color"], "line-width": 5, "line-dasharray": [1.5, 1] },
       });
       // House numbers close in, under the road names so a street name always wins the space.
+      // With house numbers off (navigating) they're still added, hidden, for doorNumbers to show.
       if (m.getSource(ROAD_NAME_SOURCE)) {
         m.addLayer({
           id: HOUSE_NUMBER_LAYER,
@@ -219,7 +243,7 @@ export function LiveMap({
           source: ROAD_NAME_SOURCE,
           "source-layer": HOUSE_NUMBER_SOURCE_LAYER,
           minzoom: HOUSE_NUMBER_MIN_ZOOM,
-          layout: houseNumberLayout,
+          layout: { ...houseNumberLayout, visibility: houseNumbers || doorsShown.current ? "visible" : "none" },
           paint: houseNumberPaint(theme.current),
         });
       }
@@ -279,6 +303,15 @@ export function LiveMap({
           "circle-stroke-width": 3,
         },
       });
+      if (!DEMO_MODE) {
+        m.addLayer({
+          id: "destination-number",
+          type: "symbol",
+          source: "destination",
+          layout: DESTINATION_NUMBER_LAYOUT,
+          paint: DESTINATION_NUMBER_PAINT,
+        });
+      }
       m.addSource("me", { type: "geojson", data: EMPTY });
       m.addLayer({
         id: "me-halo",
@@ -346,6 +379,28 @@ export function LiveMap({
     m.on("click", (e) => {
       if (Date.now() - longAt < 800) return;
       if (m.getLayer("places-dot") && m.queryRenderedFeatures(e.point, { layers: ["places-dot"] }).length) return;
+      // A police, fire or A&E badge: its card, with who runs it and custody.
+      const badgeBox: [[number, number], [number, number]] = [
+        [e.point.x - 12, e.point.y - 12],
+        [e.point.x + 12, e.point.y + 12],
+      ];
+      const badge = m.getLayer(SERVICES_BADGE_LAYER)
+        ? m.queryRenderedFeatures(badgeBox, { layers: [SERVICES_BADGE_LAYER] })[0]
+        : undefined;
+      if (badge?.geometry.type === "Point" && badge.properties && markerPress.current) {
+        markerPress.current(badge.properties as MarkerProperties, badge.geometry.coordinates as [number, number]);
+        return;
+      }
+      // A colleague's dot (a finger's width around it) opens their card instead.
+      const near: [[number, number], [number, number]] = [
+        [e.point.x - 14, e.point.y - 14],
+        [e.point.x + 14, e.point.y + 14],
+      ];
+      const mate = m.getLayer("team-dot") ? m.queryRenderedFeatures(near, { layers: ["team-dot"] })[0] : undefined;
+      if (mate && typeof mate.properties?.id === "string" && teamPress.current) {
+        teamPress.current(mate.properties.id);
+        return;
+      }
       const at: [number, number] = [e.lngLat.lng, e.lngLat.lat];
       const r = HOUSE_NUMBER_TAP_PX;
       const numbers = m.getLayer(HOUSE_NUMBER_LAYER)
@@ -369,7 +424,13 @@ export function LiveMap({
       m.on(cancel, () => clearTimeout(pressTimer));
     }
     map.current = m;
+    // The map's box can get its size after the map starts (Pursuit on its
+    // side): redraw at the new size, or it stays a blank background.
+    const box = container.current as unknown as HTMLElement | null;
+    const sized = typeof ResizeObserver !== "undefined" && box ? new ResizeObserver(() => m.resize()) : null;
+    if (sized && box) sized.observe(box);
     return () => {
+      sized?.disconnect();
       m.remove();
       map.current = null;
       // A new map (different style or view) has to load before it's drawn on.
@@ -377,7 +438,7 @@ export function LiveMap({
     };
     // Day/night, the view and the labels change the map in place (below):
     // making a new one would jump the camera back to the middle of London.
-  }, [compact, roadNames, vehicleArrow]);
+  }, [compact, roadNames, houseNumbers, vehicleArrow]);
 
   // Day or night: the new style, same camera.
   useEffect(() => {
@@ -405,12 +466,20 @@ export function LiveMap({
     if (!m || !loaded) return;
     const set = (id: string, data: GeoJSON.GeoJSON) => (m.getSource(id) as maplibregl.GeoJSONSource | undefined)?.setData(data);
     set("routes", routesGeoJSON(routes));
-    set("destination", pointGeoJSON(destination));
+    set("destination", destinationGeoJSON(destination, destinationNumber));
     set("places", markers ?? EMPTY_COLLECTION);
     set("restrictions", pointsGeoJSON(restrictions));
     set("labels", labels ?? EMPTY_COLLECTION);
     set("team", team ?? EMPTY_COLLECTION);
-  }, [routes, destination, markers, restrictions, labels, team, loaded, styleVersion]);
+  }, [routes, destination, destinationNumber, markers, restrictions, labels, team, loaded, styleVersion]);
+
+  // Door numbers on and off in place: remaking the map would lose the camera.
+  useEffect(() => {
+    doorsShown.current = doorNumbers;
+    const m = map.current;
+    if (!m || !loaded || houseNumbers || !m.getLayer(HOUSE_NUMBER_LAYER)) return;
+    m.setLayoutProperty(HOUSE_NUMBER_LAYER, "visibility", doorNumbers ? "visible" : "none");
+  }, [doorNumbers, houseNumbers, loaded, styleVersion]);
 
   // The credit's corner sits above a sheet over the bottom of the map.
   useEffect(() => {
@@ -430,31 +499,75 @@ export function LiveMap({
     return () => clearTimeout(timer);
   }, [fitTo, loaded, overlayTop, overlayBottom]);
 
+  // Where the vehicle is drawn: on the route while navigating (snapTo), else the GPS fix.
+  const target: Pose | null = snapTo ?? (fix ? { lng: fix.lng, lat: fix.lat, course: facing } : null);
+  // The camera settings now, for the glide's frames.
+  const cam = useRef({ following, zoom, view, lookAhead, rotates, overlayTop, overlayBottom });
+  useEffect(() => {
+    cam.current = { following, zoom, view, lookAhead, rotates, overlayTop, overlayBottom };
+  });
+  const paddingFor = (m: maplibregl.Map, c: typeof cam.current) => {
+    // Navigating with the map turned: the vehicle sits low on the screen,
+    // so most of what shows is the road ahead.
+    const ahead = c.lookAhead && c.rotates ? Math.round(m.getContainer().clientHeight * LOOK_AHEAD) : 0;
+    return { top: ahead + c.overlayTop / 2, bottom: c.overlayBottom / 2, left: 0, right: 0 };
+  };
+  // The vehicle glides from fix to fix, the map moving with it every frame, so
+  // the arrow stays still on screen and the streets slide past (not a jump a second).
+  const shown = useRef<Pose | null>(null);
+  const glide = useRef<ReturnType<typeof glider> | null>(null);
   useEffect(() => {
     const m = map.current;
-    if (!m || !loaded || !fix) return;
-    (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(fix.lng, fix.lat, facing));
-    if (following) {
-      // Navigating with the map turned: the vehicle sits low on the screen,
-      // so most of what shows is the road ahead.
-      const ahead = lookAhead && rotates ? Math.round(m.getContainer().clientHeight * LOOK_AHEAD) : 0;
-      m.easeTo({
-        center: [fix.lng, fix.lat],
-        zoom,
-        ...cameraFor(view, facing),
-        padding: { top: ahead + overlayTop / 2, bottom: overlayBottom / 2, left: 0, right: 0 },
-        duration: 800,
+    if (!m || !loaded) return;
+    const g = glider((p) => {
+      shown.current = p;
+      (m.getSource("me") as maplibregl.GeoJSONSource | undefined)?.setData(vehicleFeature(p.lng, p.lat, p.course));
+      const c = cam.current;
+      if (!c.following) return;
+      // Zoom eases towards the speed's zoom a little each frame, rather than
+      // stepping; the map's turn eases too, so a junction doesn't spin it.
+      const z = m.getZoom();
+      const want = cameraFor(c.view, p.course);
+      m.jumpTo({
+        center: [p.lng, p.lat],
+        zoom: Math.abs(c.zoom - z) < 0.01 ? c.zoom : z + (c.zoom - z) * 0.08,
+        pitch: want.pitch,
+        bearing: c.view === "north" ? 0 : easeBearing(m.getBearing(), want.bearing),
+        padding: paddingFor(m, c),
       });
-    }
-  }, [fix, facing, loaded, following, zoom, view, lookAhead, rotates, overlayTop, overlayBottom, styleVersion]);
+    });
+    glide.current = g;
+    if (shown.current) g.to(shown.current);
+    return () => g.stop();
+  }, [loaded, styleVersion]);
+  const tLng = target?.lng;
+  const tLat = target?.lat;
+  const tCourse = target?.course ?? null;
+  useEffect(() => {
+    if (tLng == null || tLat == null) return;
+    glide.current?.to({ lng: tLng, lat: tLat, course: tCourse });
+  }, [tLng, tLat, tCourse, loaded, styleVersion]);
+  // A change of view, zoom or following with no new fix (the car stopped): move the camera there.
+  useEffect(() => {
+    const m = map.current;
+    const p = shown.current;
+    if (!m || !loaded || !p || !following) return;
+    m.easeTo({
+      center: [p.lng, p.lat],
+      zoom,
+      ...cameraFor(view, p.course),
+      padding: paddingFor(m, cam.current),
+      duration: 600,
+    });
+  }, [following, zoom, view, lookAhead, rotates, overlayTop, overlayBottom, loaded]);
 
   return (
     <View style={styles.container}>
       {/* flex rather than absoluteFill: maplibre-gl's CSS sets position: relative on this element. */}
       <View ref={container} style={styles.map} />
       {mapFailed && (
-        // Below whatever floats over the top of the map (Search's box), not hidden under it.
-        <View style={[styles.failed, { top: 16 + overlayTop }]} pointerEvents="none">
+        // Low on the map, above what floats at the bottom: at the top it covered PLACES (30 Oct).
+        <View style={[styles.failed, { bottom: 16 + overlayBottom }]} pointerEvents="none">
           <Text style={styles.failedTitle}>Map couldn’t load</Text>
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>
@@ -482,7 +595,7 @@ export function LiveMap({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, overflow: "hidden" },
   map: { flex: 1 },
   recentre: {
@@ -498,8 +611,7 @@ const styles = StyleSheet.create({
   failed: {
     position: "absolute",
     left: 16,
-    right: 16,
-    top: 16,
+    right: 72,
     backgroundColor: colors.panel,
     borderColor: colors.amber,
     borderWidth: 1,

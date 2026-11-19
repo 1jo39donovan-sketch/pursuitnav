@@ -37,6 +37,17 @@ export function normaliseCode(typed: string): string | null {
   return s;
 }
 
+/** The team code in pasted text (a whole shared message, say); null if there isn't one. */
+export function codeIn(text: string): string | null {
+  const whole = normaliseCode(text);
+  if (whole) return whole;
+  for (const m of text.matchAll(/[0-9A-Za-z]{4}(?:[-\s]?[0-9A-Za-z]{4}){5}/g)) {
+    const code = normaliseCode(m[0]);
+    if (code) return code;
+  }
+  return null;
+}
+
 export interface TeamKeys {
   /** What the server files the team under. */
   teamId: string;

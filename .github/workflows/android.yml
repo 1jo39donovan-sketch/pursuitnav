@@ -74,6 +74,7 @@ jobs:
             echo "::warning::No SERVER_DOMAIN variable: the app is built without a server (search works, routing doesn't)."
           fi
           echo "EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL:-}" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_BUILD_ID=${GITHUB_SHA::7} $(date -u +'%d %b %Y')" >> "$GITHUB_ENV"
           CI=1 npx expo prebuild --platform android --no-install
           # The template's Gradle memory (512 MB Metaspace) runs out with
           # expo-updates' build plugin, and Gradle then hangs; the runner has 16 GB.

@@ -27,6 +27,26 @@ describe("fetchRoutes", () => {
     expect((err as Error).message).not.toMatch(/signal/i);
   });
 
+  it("asks for the standard route again once if the first ask gets no answer in 12 s", async () => {
+    vi.useFakeTimers();
+    let asks = 0;
+    vi.stubGlobal("fetch", () => {
+      asks++;
+      return asks === 1
+        ? new Promise(() => {})
+        : Promise.resolve(new Response(JSON.stringify({ standard: { durationS: 60 }, police: null }), { status: 200 }));
+    });
+    const { quick } = planRequests(from, to, {
+      vehicle: "car",
+      roads: "main",
+      blueLight: false,
+      signal: new AbortController().signal,
+    });
+    await vi.advanceTimersByTimeAsync(12_000);
+    await expect(quick).resolves.toMatchObject({ standard: { durationS: 60 } });
+    expect(asks).toBe(2);
+  });
+
   it("says no signal when the network fails", async () => {
     vi.stubGlobal("fetch", async () => {
       throw new TypeError("Network request failed");

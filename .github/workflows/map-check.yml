@@ -1,0 +1,137 @@
+# Map check: photographs the live web app's map close in at a few known
+# places (stations and lines, police and A&E badges, the satellite look),
+# kept as a download on the run (Artifacts), not committed. Run from the
+# Actions tab after a change to what the map draws goes live.
+name: Map check
+
+on:
+  push:
+    paths:
+      - tools/map-check.mjs
+      - .github/workflows/map-check.yml
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Web app to photograph
+        default: https://bluerouteapp.com/app/
+      names:
+        description: Places to look for in the server's places file (;-separated)
+        default: Squires Court;Quadrant House
+      address:
+        description: Test addresses to look up on the server, ;-separated (never a real call)
+        default: 54 Caledonian Road
+      types:
+        description: Kinds of place to list in full from the newest data (;-separated)
+        default: Hospital with A&E;Hospital;A&E entrance
+
+permissions:
+  contents: read
+
+jobs:
+  shots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install a browser
+        run: |
+          npm install --no-save --no-package-lock playwright@1.57.0
+          npx playwright install --with-deps chromium
+      - name: Is the server's data in step, and are these places in it?
+        env:
+          NAMES: ${{ inputs.names || 'Squires Court;Quadrant House' }}
+          DOMAIN: ${{ vars.SERVER_DOMAIN }}
+          ADDRESS: ${{ inputs.address || '54 Caledonian Road' }}
+        run: |
+          curl -fsS "https://$DOMAIN/health" | python3 -c "import json,sys; h=json.load(sys.stdin); print('server data:', h.get('data'), '· version', h.get('version'), '· closures avoided now:', h.get('closures'), h.get('closureSources'), '· addresses:', h.get('addresses'))" || true
+          curl -fsS --compressed "https://$DOMAIN/v1/places-data" -o places.txt || true
+          head -1 places.txt || true
+          # Pursuit: short drives (fixed test points, not anyone's position).
+          for drive in \
+            "Holloway Road SE (demo drive)|51.5556,-0.1165 51.5550,-0.1157 51.5544,-0.1149" \
+            "Caledonian Road S|51.5480,-0.1185 51.5465,-0.1182 51.5450,-0.1179" \
+            "Upper Street S (demo drive)|51.5410,-0.1028 51.5400,-0.1029 51.5390,-0.1030" \
+            "City Road SE, to Old Street Roundabout|51.52632,-0.08800 51.52620,-0.08780 51.52597,-0.08735" \
+            "Crowndale Road E, to Pancras Road|51.53560,-0.13330 51.53558,-0.13300 51.53551,-0.13245"; do
+            label=${drive%%|*}; pts=${drive#*|}
+            body=$(python3 -c "import json,sys; print(json.dumps({'points': [{'lat': float(a), 'lng': float(b)} for a, b in (p.split(',') for p in sys.argv[1].split())]}))" "$pts")
+            echo "--- pursuit: $label"
+            curl -fsS -X POST -H 'content-type: application/json' --data "$body" "https://$DOMAIN/v1/pursuit" | python3 -c "
+          import json, sys
+          r = json.load(sys.stdin)
+          print({k: r.get(k) for k in ('road', 'speedLimitMph', 'nextJunction')})
+          " || echo "(pursuit failed)"
+          done
+          IFS=';' read -ra addrs <<< "$ADDRESS"
+          for one in "${addrs[@]}"; do
+            echo "--- address search: $one"
+            ONE="$one" curl -fsS -X POST -H 'content-type: application/json' \
+              --data "$(ONE="$one" python3 -c 'import json,os; print(json.dumps({"query": os.environ["ONE"]}))')" \
+              "https://$DOMAIN/v1/addresses" | python3 -c "
+          import json, sys
+          for a in json.load(sys.stdin).get('addresses', [])[:3]:
+              print({k: a.get(k) for k in ('label', 'precision', 'source', 'lat', 'lng')})
+          " || echo "(address search failed)"
+          done
+          IFS=';' read -ra list <<< "$NAMES"
+          for n in "${list[@]}"; do
+            echo "--- $n"
+            grep -i -- "^$n|" places.txt | head -5 || echo "(not in the places file)"
+          done
+      - name: Are these places in the newest published data (what the server takes next)?
+        env:
+          NAMES: ${{ inputs.names || 'Squires Court;Quadrant House' }}
+          TYPES: ${{ inputs.types || 'Hospital with A&E;Hospital;A&E entrance' }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release list -R "$GITHUB_REPOSITORY" --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("data-"))][0].tagName')
+          echo "newest data release: $tag"
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" -p 'places.tar.zst*' -D rel
+          cat rel/places.tar.zst* | tar --zstd -xO ./places.txt.gz | gunzip > newest.txt
+          head -1 newest.txt
+          IFS=';' read -ra list <<< "$NAMES"
+          for n in "${list[@]}"; do
+            echo "--- $n"
+            grep -i -- "^$n|" newest.txt | head -5 || echo "(not in the newest places file)"
+          done
+          IFS=';' read -ra kinds <<< "${TYPES}"
+          for t in "${kinds[@]}"; do
+            echo "=== every '$t' (name | area | address)"
+            python3 - "$t" <<'PY'
+          import sys
+          kind = sys.argv[1]
+          areas = []
+          for line in open("newest.txt", encoding="utf-8"):
+              if line.startswith("#"):
+                  continue
+              f = line.rstrip("\n").split("|")
+              if len(f) > 7 and f[2] == kind:
+                  areas.append((int(f[4]), f[0], f[7], f[5], f[6]))
+          for a, name, addr, lat, lng in sorted(areas):
+              print(f"{name} | {a} | {addr} | {int(lat)/1e5:.5f},{int(lng)/1e5:.5f}")
+          print(len(areas), "in all")
+          PY
+          done
+      - name: Photograph the map
+        run: node tools/map-check.mjs "${{ inputs.url || 'https://bluerouteapp.com/app/' }}" map-check
+      # Small copies in the log too, for reading where artifacts can't be downloaded.
+      - name: Print small copies
+        if: always()
+        run: |
+          sudo apt-get install -y -qq imagemagick >/dev/null 2>&1 || true
+          set +e
+          for f in map-check/*.png; do
+            echo "=== IMAGE $(basename "$f" .png)"
+            convert "$f" -resize 600x -quality 70 jpg:- | base64
+            echo
+            echo "=== END"
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: map-check
+          path: map-check
+          retention-days: 14

@@ -1,8 +1,10 @@
-// Where the car is and where it's heading, in London terms: borough, and
-// the next borough or well-known area ahead. Works offline.
+// Where the car is and where it's heading, in local terms: borough (or
+// Kent or Essex district), and the next one or well-known area ahead. Works offline.
 import type { Borough } from "../search/boroughs";
-import { BOROUGHS } from "../search/boroughs";
-import boundaries from "./london-boroughs.json";
+import { BOROUGHS, regionOf } from "../search/boroughs";
+import essex from "./essex-districts.json";
+import kent from "./kent-districts.json";
+import london from "./london-boroughs.json";
 
 type Ring = [number, number][];
 
@@ -12,7 +14,9 @@ interface BoroughShape {
   polygons: Ring[][]; // each polygon: outer ring, then holes
 }
 
-const SHAPES: BoroughShape[] = (boundaries as GeoJSON.FeatureCollection).features.flatMap((f) => {
+const FEATURES = [london, kent, essex].flatMap((g) => (g as GeoJSON.FeatureCollection).features);
+
+const SHAPES: BoroughShape[] = FEATURES.flatMap((f) => {
   const name = String(f.properties?.name ?? "");
   if (!(BOROUGHS as readonly string[]).includes(name)) return [];
   const g = f.geometry;
@@ -38,7 +42,7 @@ function inRing(x: number, y: number, ring: Ring): boolean {
   return inside;
 }
 
-/** The London borough a point is in, or null outside London. */
+/** The London borough, or Kent or Essex district, a point is in; null outside them all. */
 export function boroughAt(lat: number, lng: number): Borough | null {
   for (const b of SHAPES) {
     const [w, s, e, n] = b.bbox;
@@ -89,7 +93,14 @@ export interface NamedArea {
   name: string;
   lat: number;
   lng: number;
+  /** A neighbourhood rather than a well-known area: named only when no area is ahead. */
+  minor?: boolean;
+  /** A town, city or village: named up to TOWN_MAX_M ahead (Kent and Essex, where they're further apart). */
+  town?: boolean;
 }
+
+const AREA_MAX_M = 3000;
+const TOWN_MAX_M = 6000;
 
 // Look 0.5–2 km ahead: far enough to be useful to relay, close enough to be soon.
 const AHEAD_STEPS_M = [500, 1000, 1500, 2000];
@@ -109,18 +120,20 @@ export function generallyTowards(
   for (const m of AHEAD_STEPS_M) {
     const p = projectAhead(lat, lng, heading, m);
     const b = boroughAt(p.lat, p.lng);
-    if (b !== here) return b ?? "Leaving London";
+    if (b !== here) return b ?? (here ? `Leaving ${regionOf(here).name}` : null);
   }
   // Same borough all the way: name the area ahead instead.
   const origin = { lat, lng };
   let best: { name: string; score: number } | null = null;
   for (const a of areas) {
     const d = distance(origin, a);
-    if (d < 400 || d > 3000) continue;
+    if (d < 400 || d > (a.town ? TOWN_MAX_M : AREA_MAX_M)) continue;
     const off = Math.abs(((bearing(origin, a) - heading + 540) % 360) - 180);
     if (off > AREA_CONE_DEG) continue;
-    // Prefer areas nearer the line of travel, then nearer 1.5 km.
-    const score = off * 40 + Math.abs(d - 1500);
+    // Prefer areas nearer the line of travel, then nearer 1.5 km; a well-known area over a neighbourhood.
+    // A town further out counts as if at 3 km at most, so a near suburb still wins in London.
+    const dist = a.town ? Math.min(Math.abs(d - 1500), AREA_MAX_M - 1500) : Math.abs(d - 1500);
+    const score = off * 40 + dist + (a.minor ? 1500 : 0);
     if (!best || score < best.score) best = { name: a.name, score };
   }
   return best?.name ?? null;

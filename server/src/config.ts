@@ -22,6 +22,8 @@ export interface ServerConfig {
   placesFile: string;
   /** Gzipped named-roads file written by places/extract_roads.py. */
   roadsFile?: string;
+  /** Tube, Overground, DLR and tram lines with their colours (extract_lines.py). */
+  linesFile?: string;
   /** Gzipped entrances file written by places/extract_entrances.py. */
   entrancesFile?: string;
   /** The offline map for phones (scripts/offline-map.sh): manifest.json and its files. */
@@ -32,6 +34,8 @@ export interface ServerConfig {
   tflClosures?: boolean;
   /** TfL API key: without one the feed still works but may be throttled. */
   tflAppKey?: string;
+  /** National Highways' Road and Lane Closures key: closures on motorways and major A-roads (Kent, Essex and London's). */
+  highwaysKey?: string;
   /**
    * Accept opt-in learning uploads (LEARNING=1). Off until the privacy steps in
    * docs/ROADMAP.md are done; the app only offers the switch when it's on.
@@ -41,16 +45,27 @@ export interface ServerConfig {
   learnedDir?: string;
   /** OS Maps API key for the OS road map (OpenData zooms only); defaults to the OS Names key. */
   osMapsKey?: string;
+  /** The Satellite map style (on unless IMAGERY=0). */
+  imagery?: boolean;
+  /** ArcGIS Location Platform key for the satellite photos; without one, Esri's public service. */
+  imageryKey?: string;
   /** SQLite file for usage counts (daily totals, hashed install IDs for 30 days). */
   usageDb?: string;
   /** Bearer token for GET /stats; the endpoint is off without one. */
   statsToken?: string;
   /** The code version running (a commit, set by scripts/update.sh), shown by GET /health. */
   version?: string;
+  /**
+   * Web pages allowed to call the API from a browser (the web app). The
+   * phone apps send no Origin, so this doesn't touch them. Default: ours.
+   */
+  corsOrigins?: string[];
+  /** Requests a minute from one address before 429; 0 turns the limit off. */
+  rateLimitPerMinute?: number;
 }
 
-// Greater London with a margin, matching the app's region config.
-const LONDON_BOUNDS: ServerConfig["bounds"] = [-0.8, 51.2, 0.6, 51.8];
+// Greater London, Kent and Essex with a margin, matching the app's region config.
+const DEFAULT_BOUNDS: ServerConfig["bounds"] = [-0.8, 50.8, 1.6, 52.2];
 
 function num(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -63,7 +78,7 @@ function num(name: string, fallback: number): number {
 export function loadConfig(): ServerConfig {
   const bounds = process.env.REGION_BOUNDS
     ? (process.env.REGION_BOUNDS.split(",").map(Number) as ServerConfig["bounds"])
-    : LONDON_BOUNDS;
+    : DEFAULT_BOUNDS;
   if (bounds.length !== 4 || bounds.some((n) => !Number.isFinite(n))) {
     throw new Error("REGION_BOUNDS must be west,south,east,north");
   }
@@ -79,18 +94,24 @@ export function loadConfig(): ServerConfig {
     osNamesKey: process.env.OS_NAMES_KEY || undefined,
     // The same OS Data Hub project key works once OS Maps API is added to the project.
     osMapsKey: process.env.OS_MAPS_KEY || process.env.OS_NAMES_KEY || undefined,
+    imagery: process.env.IMAGERY !== "0",
+    imageryKey: process.env.IMAGERY_KEY || undefined,
     nominatimUrl: process.env.NOMINATIM_URL || undefined,
     placesFile: process.env.PLACES_FILE ?? "/data/places/places.txt.gz",
     roadsFile: process.env.ROADS_FILE ?? "/data/places/roads.txt.gz",
+    linesFile: process.env.LINES_FILE ?? "/data/places/lines.txt.gz",
     entrancesFile: process.env.ENTRANCES_FILE ?? "/data/places/entrances.txt.gz",
     offlineMapDir: process.env.OFFLINE_MAP_DIR ?? "/data/places/offline",
     contactEmail: process.env.CONTACT_EMAIL || undefined,
     tflClosures: process.env.TFL_CLOSURES !== "0",
     tflAppKey: process.env.TFL_APP_KEY || undefined,
+    highwaysKey: process.env.NATIONAL_HIGHWAYS_KEY || undefined,
     learning: process.env.LEARNING === "1",
     learnedDir: process.env.LEARNED_DIR ?? "/data/learned",
     usageDb: process.env.USAGE_DB ?? "/data/usage/usage.sqlite",
     statsToken: process.env.STATS_TOKEN || undefined,
     version: process.env.VERSION || undefined,
+    corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean) : undefined,
+    rateLimitPerMinute: process.env.RATE_LIMIT_PER_MINUTE ? Number(process.env.RATE_LIMIT_PER_MINUTE) : undefined,
   };
 }

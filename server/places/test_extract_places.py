@@ -38,7 +38,7 @@ def write_fixture(path):
     node(LAT - 32 * D, LNG, amenity="cafe", name="Costa")  # unlisted shop type, pipe in name
     closed_way(1, LAT + 2 * D, LNG, leisure="park", name="Highbury Fields")
     closed_way(2, LAT + 4 * D, LNG, building="apartments", name="Smith House")
-    closed_way(3, LAT + 6 * D, LNG, building="yes", name="Unnamed-type Building")  # building=yes: left out
+    closed_way(3, LAT + 6 * D, LNG, building="yes", name="Birchmore House")  # building=yes: a named block
     # A station drawn twice: node and area. Keep one.
     node(LAT - 2 * D, LNG, railway="station", name="Highbury & Islington")
     closed_way(4, LAT - 2 * D, LNG, public_transport="station", name="Highbury & Islington")
@@ -49,6 +49,17 @@ def write_fixture(path):
         id=1, members=[("w", 5, "outer")], version=1,
         tags={"type": "multipolygon", "amenity": "school", "name": "Highbury Grove School"},
     ))
+    # Holloway Road running east-west 20 m south of a Costa that has no address,
+    # and a footpath nearer still that isn't a road a shop fronts.
+    road = [node(LAT - 60 * D - 0.00018, LNG - 5 * D), node(LAT - 60 * D - 0.00018, LNG + 5 * D)]
+    w.add_way(osmium.osm.mutable.Way(id=6, nodes=road, version=1, tags={"highway": "primary", "name": "Holloway Road"}))
+    path = [node(LAT - 60 * D + 0.00005, LNG - D), node(LAT - 60 * D + 0.00005, LNG + D)]
+    w.add_way(osmium.osm.mutable.Way(id=7, nodes=path, version=1, tags={"highway": "footway", "name": "Back Path"}))
+    node(LAT - 60 * D, LNG, amenity="cafe", name="Costa Holloway", **{"addr:postcode": "N7 6PA"})
+    node(LAT - 90 * D, LNG, amenity="cafe", name="Far Cafe")  # 1 km from any road here: no street
+    # Named only in its address, as many council blocks are.
+    closed_way(8, LAT + 12 * D, LNG, building="residential", **{"addr:housename": "Quadrant House", "addr:street": "Highbury Quadrant"})
+    closed_way(9, LAT + 14 * D, LNG, building="roof", name="Esso canopy")  # a roof: left out
     w.close()
 
 
@@ -77,6 +88,12 @@ def test_named_places_with_types_and_groups(places):
     assert places["Highbury Grove School"][2:4] == ["School", "education"]
 
 
+def test_named_blocks_from_building_yes_and_house_names(places):
+    assert places["Birchmore House"][2:4] == ["Building", "housing"]
+    assert places["Quadrant House"][2:4] == ["Block of flats", "housing"]
+    assert places["Quadrant House"][7].startswith("Highbury Quadrant")
+
+
 def test_borough_and_point(places):
     row = places["Coffee Corner"]
     assert extract_places.BOROUGHS[int(row[4])] == "Islington"
@@ -86,6 +103,13 @@ def test_borough_and_point(places):
 def test_area_point_is_inside_the_area(places):
     lat, lng = int(places["Highbury Fields"][5]) / 1e5, int(places["Highbury Fields"][6]) / 1e5
     assert LAT + 2 * D <= lat <= LAT + 3 * D and LNG <= lng <= LNG + D
+
+
+def test_a_place_without_a_street_gets_the_road_it_fronts(places):
+    assert places["Costa Holloway"][7] == "Holloway Road, N7 6PA"
+    assert places["Far Cafe"][7] == ""
+    # A street from OSM itself is kept.
+    assert places["Coffee Corner"][7] == "12 Holloway Road, N7 8LA"
 
 
 def test_address_and_other_names(places):
@@ -98,7 +122,7 @@ def test_unlisted_types_are_named_from_the_tag(places):
 
 
 def test_leaves_out_clutter_unnamed_and_outside_london(places):
-    for name in ("Memorial bench", "Somewhere Else Cafe", "Unnamed-type Building"):
+    for name in ("Memorial bench", "Somewhere Else Cafe", "Esso canopy"):
         assert name not in places
     assert "" not in places
 
@@ -129,3 +153,47 @@ def test_a_mental_health_unit_is_not_an_ae():
 
 def test_an_unnamed_ae_entrance_is_kept(places):
     assert places["A&E entrance"][2] == "A&E entrance"
+
+
+def test_area_list_matches_the_app():
+    # The app reads area numbers from these files, so both lists must agree, in order.
+    import re
+    from pathlib import Path
+
+    app = (Path(__file__).parents[2] / "app/src/search/boroughs.ts").read_text()
+    names = []
+    for block in ("LONDON_BOROUGHS", "KENT_DISTRICTS", "ESSEX_DISTRICTS"):
+        body = app.split(f"export const {block} = [", 1)[1].split("]", 1)[0]
+        names += re.findall(r'"([^"]+)"', body)
+    assert names == extract_places.BOROUGHS
+
+
+def test_kent_districts_and_medway_are_found():
+    finder = extract_places.BoroughFinder(extract_places.BOUNDARIES)
+    at = lambda lng, lat: extract_places.BOROUGHS[finder.index_of(lng, lat)]
+    assert at(1.0828, 51.2798) == "Canterbury"
+    assert at(0.5054, 51.3887) == "Medway"
+    assert at(-0.1035, 51.5466) == "Islington"
+    assert at(0.9025, 51.8892) == "Colchester"
+    assert at(0.7105, 51.5376) == "Southend-on-Sea"
+    assert finder.index_of(0.27, 51.0) is None  # East Sussex
+
+
+def test_towns_and_villages_are_areas():
+    from categories import classify
+    assert classify({"place": "town", "name": "Gravesend"}) == ("Town", "area")
+    assert classify({"place": "village", "name": "Lenham"}) == ("Village", "area")
+    assert classify({"place": "city", "name": "Chelmsford"}) == ("City", "area")
+    assert classify({"place": "hamlet", "name": "Somewhere"}) is None
+
+
+def test_only_home_like_named_buildings_are_blocks():
+    from categories import classify
+    assert classify({"building": "yes", "name": "Squires Court"}) == ("Building", "housing")
+    assert classify({"building": "yes", "name": "Block A"}) == ("Building", "housing")
+    assert classify({"building": "house", "name": "Rose Cottage"}) == ("Building", "housing")
+    # Offices, sheds and stations aren't blocks (17 Nov map check: "Google", station buildings).
+    assert classify({"building": "yes", "name": "Google"}) is None
+    assert classify({"building": "yes", "name": "The Granary"}) is None
+    assert classify({"building": "yes", "name": "London King's Cross Railway Station"}) is None
+    assert classify({"building": "office", "name": "Legacy Tower"}) is None

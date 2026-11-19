@@ -1,0 +1,59 @@
+# Pursuit debug: runs the newest published routing map in a local Valhalla
+# and prints, step by step, what Pursuit sees on test drives (road, limit,
+# and the junction search), to find why "Approaching junction" can show "—".
+# Test points only. Run from the Actions tab.
+name: Pursuit debug
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - server/scripts/pursuit-debug.ts
+      - server/scripts/pursuit-survey.ts
+      - .github/workflows/pursuit-debug.yml
+
+permissions:
+  contents: read
+
+jobs:
+  debug:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: The newest routing map
+        run: |
+          tag=$(gh release list -R "$GITHUB_REPOSITORY" --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("data-"))][0].tagName')
+          echo "release $tag"
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" -p 'valhalla.tar.zst*' -D dl
+          mkdir -p valhalla && cat dl/valhalla.tar.zst* | tar --zstd -x -C valhalla
+          ls valhalla | head
+      - name: Valhalla
+        run: |
+          docker run -d --name valhalla -p 8002:8002 -v "$PWD/valhalla:/custom_files" \
+            -e use_tiles_ignore_pbf=True -e build_admins=False -e build_time_zones=False -e server_threads=2 \
+            ghcr.io/valhalla/valhalla-scripted:3.9.1
+          for i in $(seq 1 60); do curl -fsS localhost:8002/status >/dev/null 2>&1 && break; sleep 5; done
+          curl -fsS localhost:8002/status | head -c 300; echo
+      - name: What Pursuit sees
+        working-directory: server
+        run: |
+          npm ci --no-audit --no-fund >/dev/null
+          npx tsx scripts/pursuit-debug.ts '{
+            "Holloway Road SE (demo drive)": [[-0.1165,51.5556],[-0.1157,51.5550],[-0.1149,51.5544]],
+            "Caledonian Road S": [[-0.1185,51.5480],[-0.1182,51.5465],[-0.1179,51.5450]],
+            "Upper Street S": [[-0.1028,51.5410],[-0.1029,51.5400],[-0.1030,51.5390]],
+            "Seven Sisters Road NE": [[-0.1140,51.5560],[-0.1128,51.5566],[-0.1116,51.5572]],
+            "Essex Road N": [[-0.0950,51.5390],[-0.0945,51.5400],[-0.0940,51.5410]]
+          }'
+      - name: How often Pursuit knows road, limit and junction along real routes
+        working-directory: server
+        run: npx tsx scripts/pursuit-survey.ts
+      - name: Each survey miss, step by step
+        working-directory: server
+        run: npx tsx scripts/pursuit-debug.ts survey-misses.json

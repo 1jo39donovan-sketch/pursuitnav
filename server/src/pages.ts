@@ -1,9 +1,11 @@
 // The privacy policy and support pages the app stores ask for. Plain HTML,
 // served by the API so they live at the same address as the server.
 
+/** Who makes BlueRoute, as named on its pages. */
+const MAKER = "OPSVALE";
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
 // Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
-const UPDATED = "24 October 2026";
+const UPDATED = "16 November 2026";
 
 function escape(text: string): string {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -49,6 +51,7 @@ function page(title: string, body: string): string {
 <div class="brand">${LOGO}<span>Blue<b>Route</b></span></div>
 <h1>${title}</h1>
 ${body}
+<p class="muted">BlueRoute is an ${MAKER} product.</p>
 </main></body>
 </html>`;
 }
@@ -58,8 +61,8 @@ export function privacyPage(email?: string): string {
     "Privacy policy",
     `<p class="muted">BlueRoute · last updated ${UPDATED}</p>
 
-<p>BlueRoute is a navigation app for police, fire and ambulance crews. It’s an independent app, not a police force or emergency service
-system. It has no accounts and no third-party analytics. It counts how much it's used, in the way described
+<p>BlueRoute is a navigation app for police, fire and ambulance crews, made by ${MAKER}. It’s independent: not a police
+force or emergency service system. It has no accounts and no third-party analytics. It counts how much it's used, in the way described
 under “Usage counts” below.</p>
 
 <h2>Kept on your phone only</h2>
@@ -81,6 +84,13 @@ under “Usage counts” below.</p>
     in memory for up to 24 hours; they’re never written to disk or logged.</li>
   <li><strong>Pursuit mode:</strong> your last few positions and direction of travel, to find the road and its speed
     limit.</li>
+  <li><strong>Where am I</strong> and <strong>tapping a building on the map:</strong> that point, to find the nearest
+    address and postcode.</li>
+  <li><strong>Building entrances:</strong> the destination’s position, to find the ways into the building there.</li>
+  <li><strong>OS road map</strong> (only if you pick that map style): which part of the map is being shown. The server
+    fetches it from Ordnance Survey itself, so OS doesn’t see your phone.</li>
+  <li><strong>Satellite map</strong> (only if you pick that map style): which part of the map is being shown. The
+    server fetches the photos from Esri itself, so Esri doesn’t see your phone.</li>
   <li><strong>Follow in</strong> (team sessions): your position and the colleague’s recent track, to work out the way
     they drove.</li>
 </ul>
@@ -88,11 +98,26 @@ under “Usage counts” below.</p>
 has no database of users. Connections use HTTPS.</p>
 
 <h2>Team sessions (only if you start or join one)</h2>
-<p>In a team, while BlueRoute is open, your phone shares your callsign, position and the way you’ve driven in the last
-two hours with the others in the team, every 15 seconds. It’s encrypted on your phone with a key that’s part of the team
+<p>In a team, while BlueRoute is open, your phone shares your callsign, position (and how accurate it is) and the way you’ve
+driven in the last two hours with the others in the team, every 15 seconds. It’s encrypted on your phone with a key that’s part of the team
 code and is never sent to the server, so the server holds only data it can’t read. It keeps that in memory only (a
 restart forgets it), drops your entry when you leave or a day after you stop sharing, and ends the team after a week.
 Anyone you give the team code to can see your position, so share it only with colleagues on the job.</p>
+<p>You choose when it shares (Session → Team): always while BlueRoute is open, only while navigating, or only once
+you’re within 150 m of where you navigated to. Battery saver shares only while navigating, and less often when you’re
+standing still. At a police station (public locations from OpenStreetMap) you’re hidden from the team and your drive
+there isn’t kept, unless you turn on sharing there. When you’re not sharing, your position isn’t sent and you drop off
+the others’ maps and team list. Nothing is shared while BlueRoute isn’t open on screen.</p>
+
+<h2>Team messages (only in a team)</h2>
+<p>Anyone in a team can send a place to go, a caution or a short note to one callsign or to the whole team. A message
+is encrypted on the sender’s phone with the team key, like positions, so the server can’t read it. The server keeps the
+sealed message, the sender’s random member ID (not who they are) and when it was sent, in memory only, and deletes it
+within 12 hours, sooner if the sender withdraws it or the team ends. Phones show messages until then and don’t save
+them. Everyone with the team code can read every team message, whoever it’s addressed to. In a team you can also choose
+not to share your position at all (Never (desk)), for example in an office, and still send and receive messages.</p>
+<p>Senders decide what goes in a message. Don’t put anything in one that your service doesn’t allow on this app,
+including personal details about members of the public, unless your service has authorised you to.</p>
 
 <h2>Helping improve journey times (only if you turn it on)</h2>
 <p>Off unless you turn it on in the Session tab. While you navigate, the phone times each road it drives along and
@@ -105,7 +130,8 @@ Turning it off deletes anything not yet sent.</p>
 <h2>Usage counts</h2>
 <p>So we know how many crews use BlueRoute, every request to the server carries a random install ID, made on your
 phone the first time the app runs, and the app's version number. You can reset the ID in the Session tab, after which
-the app counts as a new install. The app also reports how many navigation and pursuit sessions were started and how
+the app counts as a new install, or switch usage counting off there (Privacy and data → Count my usage): then no
+install ID is sent and the app reports nothing, and the server only adds each route planned to its daily total. The app also reports how many navigation and pursuit sessions were started and how
 many requests got no answer in time, as plain numbers.</p>
 <p>The server keeps, for each day: how many different installs it heard from (and on which app versions), how many
 routes were planned, how many navigation and pursuit sessions were started, and how many requests timed out or
@@ -117,6 +143,9 @@ week ends. Nothing more than a week's worth is ever held. No positions, addresse
 searches, callsigns or IP addresses are kept with these counts, and no third-party analytics service is used.</p>
 
 <h2>Waitlist and emails to us</h2>
+<p><strong>Report a problem</strong> in the app opens an email in your own mail app, with the app version and a
+summary of the route (length, time, vehicle and how many restrictions it used; no addresses, positions or road names). You can read and change it before you
+send it, and nothing is sent unless you do.</p>
 <p>If you email us to join the waitlist, we use your email address (and the service or role, if you give it) only to
 tell you when BlueRoute is in the App Store and Google Play. It isn't used for marketing or anything else, isn't
 shared, and is deleted once we've told you, or sooner if you ask. If you email us for support or about using
@@ -125,9 +154,12 @@ BlueRoute in your service, we use your message only to reply.</p>
 <h2>Other services</h2>
 <ul>
   <li><strong>Map tiles</strong> come from OpenFreeMap. Like any website, it sees your phone’s IP address and which part
-    of the map is being shown.</li>
+    of the map is being shown. The offline map, and the places and roads lists used for search with no signal, are
+    downloaded whole from the BlueRoute server, so they say nothing about where you are.</li>
   <li><strong>TfL</strong>: the server reads TfL’s public road closures feed to route around closed roads. Nothing
     about you or your journeys is sent to TfL.</li>
+  <li><strong>National Highways</strong>: the server reads its public closures feed for motorways and major A-roads
+    (Kent, Essex and London’s), the same way. Nothing about you or your journeys is sent to National Highways.</li>
   <li><strong>Ordnance Survey</strong> receives address searches from the server, through its OS Names API (and OS
     Places, only if the server is set up with it): not your position or anything about you. House-number search runs
     on the BlueRoute server itself.</li>
@@ -140,7 +172,9 @@ BlueRoute in your service, we use your message only to reply.</p>
 
 <h2>Location permission</h2>
 <p>The app asks for your location only while you’re using it, to give journey times and directions from where you
-are. It doesn’t use location in the background.</p>
+are. On Android, while you navigate or have Pursuit open, it keeps directions and voice going if the screen locks or
+you switch app, and shows a “BlueRoute: directions on” notification while it does; that stops when you finish or close
+the app. It never asks for location “all the time”, and doesn’t use location at any other time.</p>
 
 <h2>Children</h2>
 <p>BlueRoute is meant for emergency-service crews and isn’t directed at children.</p>
@@ -156,7 +190,7 @@ export function supportPage(email?: string): string {
     "Support",
     `<p>BlueRoute gives emergency-service crews address and place search filtered to the area they're working, a standard
 route and (for emergency-service drivers) a faster blue-light route, sized to their vehicle, turn-by-turn navigation
-with spoken directions, and a pursuit screen. Maps and search cover London for now.</p>
+with spoken directions, and a pursuit screen. Maps and search cover London, Kent and Essex for now.</p>
 
 <h2>Getting help or reporting a problem</h2>
 <p>${contact(email).replace(/^./, (c) => c.toUpperCase())}. Say what you searched for or tapped, what you expected,
@@ -164,17 +198,18 @@ and what happened, but please don’t send real addresses from jobs.</p>
 
 <h2>Common questions</h2>
 <ul>
-  <li><strong>No blue-light route showing?</strong> Blue-light routes are off until you turn them on in the Session tab and
-    confirm you drive for the police, fire or ambulance service. Even then, one is only shown when it’s meaningfully faster.</li>
+  <li><strong>No blue-light route showing?</strong> Blue-light routes are on unless you’ve turned them off in the Session tab.
+    One is only shown when it’s meaningfully faster than the standard route.</li>
   <li><strong>Not in London?</strong> Turn on <em>Demo drive</em> in the Session tab to try the app with a simulated
     drive through London.</li>
   <li><strong>Search can’t find a block or estate?</strong> Save it in the Search tab with the road it’s on.</li>
   <li><strong>Team sessions?</strong> Start a team in the Session tab and share the code. You see each other only while
     BlueRoute is open on both phones, and it needs signal. It doesn’t replace your radio or any force system, and it’s
     for you to check it fits your force’s policy.</li>
-  <li><strong>Road closures?</strong> Routes avoid roads TfL lists as fully closed, updated every 5 minutes. Lane
-    closures, and incidents TfL hasn’t listed yet, aren’t included.</li>
-  <li><strong>Where is my log?</strong> On your phone only, in the Log tab. It’s never cleared unless you clear it.</li>
+  <li><strong>Road closures?</strong> Routes avoid roads TfL lists as fully closed, and motorways and major A-roads
+    National Highways lists as closed (Kent and Essex too), updated every 5 minutes. Lane closures, closures on
+    council roads outside London, and incidents not listed yet aren’t included.</li>
+  <li><strong>Where is my log?</strong> On your phone only: open it from the Session tab. It’s never cleared unless you clear it.</li>
 </ul>
 
 <p><a href="/terms">Terms of use</a> · <a href="/privacy">Privacy policy</a></p>`,
@@ -186,16 +221,16 @@ export function termsPage(email?: string): string {
     "Terms of use",
     `<p class="muted">BlueRoute · last updated ${UPDATED}</p>
 
-<p>These terms apply to anyone who uses the BlueRoute app or its website. By using BlueRoute you agree to them. If you
+<p>These terms are set by ${MAKER}, which makes BlueRoute, and apply to anyone who uses the BlueRoute app or its website. By using BlueRoute you agree to them. If you
 don’t agree, don’t use it.</p>
 
 <h2>1. What BlueRoute is, and isn’t</h2>
 <ul>
-  <li>BlueRoute is an independent navigation aid. It is not made, endorsed, supplied or approved by any police,
+  <li>BlueRoute is an independent navigation aid made by ${MAKER}. It is not made, endorsed, supplied or approved by any police,
     ambulance or fire service, and is not an official system of any of them.</li>
   <li>It is an aid only. It does not replace your training, your judgement, your control room, your radio, your
     service’s systems or your service’s policies.</li>
-  <li>It is still being field-tested and may change, stop working or be withdrawn at any time, without notice.</li>
+  <li>It may change, stop working or be withdrawn at any time, without notice.</li>
 </ul>
 
 <h2>2. You are responsible for how you drive</h2>
@@ -241,11 +276,31 @@ don’t agree, don’t use it.</p>
     job, and only where your service’s policy allows it.</li>
 </ul>
 
-<h2>6. Your service’s rules</h2>
+<h2>6. Team messages</h2>
+<ul>
+  <li>In a team, anyone can send a place to go, a caution or a note to one callsign or to the whole team.</li>
+  <li><strong>You alone are responsible for what you send.</strong> Only send information your service allows to be
+    shared on a personal device and on an app it hasn’t approved. Don’t send names, dates of birth, intelligence,
+    results from police or other official systems, or anything your service treats as sensitive, unless your service
+    has authorised you to.</li>
+  <li>Team messages are not an emergency, command or officer-safety system. They can arrive late, out of order or not
+    at all, and only reach a phone while BlueRoute is open. Never rely on them for anything urgent: use your radio and
+    your control room.</li>
+  <li>Everyone with the team code can read every team message, whoever it’s addressed to. Share the code only with
+    colleagues on the job.</li>
+  <li>Callsigns are typed in by each person and aren’t checked: anyone with the team code can send under any callsign.
+    If a message matters, confirm it over your radio or with your control room before acting on it.</li>
+  <li>OPSVALE can’t read team messages, and doesn’t check, approve, keep or answer for what’s in them. A message that
+    breaks these terms, your service’s rules or the law is the sender’s responsibility.</li>
+  <li>A message is deleted within 12 hours, sooner if the sender withdraws it or the team ends. Don’t rely on it being
+    there later: record what you need in your service’s own systems.</li>
+</ul>
+
+<h2>7. Your service’s rules</h2>
 <p>Using BlueRoute for work may be subject to your service’s approval, its policies on personal devices and apps, and
 its rules on outside business interests. Checking and following those is your responsibility.</p>
 
-<h2>7. Liability</h2>
+<h2>8. Liability</h2>
 <ul>
   <li>To the fullest extent the law allows, BlueRoute and the people who make it are not liable for any loss, damage,
     injury, delay, penalty, claim or cost arising from using, or not being able to use, BlueRoute or anything it shows,
@@ -256,15 +311,15 @@ its rules on outside business interests. Checking and following those is your re
     or for anything else that the law does not allow to be excluded or limited, or affects your statutory rights.</li>
 </ul>
 
-<h2>8. Using BlueRoute properly</h2>
+<h2>9. Using BlueRoute properly</h2>
 <p>Don’t misuse BlueRoute: don’t use it to break the law, to impersonate an emergency service, to interfere with the
 service or its server, or to collect other people’s information. We may stop providing BlueRoute to anyone who does.</p>
 
-<h2>9. Other services</h2>
-<p>Map data © OpenStreetMap contributors, and data from Ordnance Survey, TfL and others, each under their own terms.
+<h2>10. Other services</h2>
+<p>Map data © OpenStreetMap contributors, and data from Ordnance Survey, TfL, National Highways and others, each under their own terms. Powered by TfL Open Data. Powered by National Highways' Transport Data Feeds.
 “Open in Google Maps” and “Open in Waze” hand over to those apps, whose own terms apply.</p>
 
-<h2>10. Changes and law</h2>
+<h2>11. Changes and law</h2>
 <ul>
   <li>These terms may change. The date above changes when they do, and using BlueRoute after a change means you accept
     the new terms.</li>

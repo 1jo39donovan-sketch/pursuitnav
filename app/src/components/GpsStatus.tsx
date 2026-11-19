@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DEMO_MODE } from "../config";
-import { useLocation } from "../location/LocationProvider";
+import { gpsWarning, WARN_OVER_M, WARN_OVER_ON_ROUTE_M } from "../location/gpsWarning";
+import { recentFixes, useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { useThemed, useColors } from "../textSize";
 
 const WEB = Platform.OS === "web";
 // In a browser there's no Settings screen to open: say where to go instead,
@@ -28,11 +30,34 @@ export function webDeniedText(device: WebDevice): string {
       return "Location is blocked for this site. Click the icon left of the address → Site settings → Location → Allow. Then reload.";
   }
 }
+/** Further off than this, the phone is guessing from Wi-Fi or masts: usually Precise Location is off. */
+export const ROUGH_GPS_M = 1000;
+/** What to say about a rough position, and how to fix it, for where BlueRoute is running. */
+export function roughGpsText(accuracy: number, where: WebDevice | "app"): string {
+  const off = accuracy < 10_000 ? `±${(accuracy / 1000).toFixed(1)} km` : `±${Math.round(accuracy / 1000)} km`;
+  const start = `GPS ${off}: your position is only a rough guess.`;
+  switch (where) {
+    case "iphone":
+      return `${start} Settings → Privacy & Security → Location Services → Safari Websites → turn on Precise Location. Then reload.`;
+    case "android":
+      return `${start} Tap the icon left of the address → Permissions → Location → Use precise location. Then reload.`;
+    case "desktop":
+      return `${start} Computers without GPS place themselves by Wi-Fi. Use a phone for real routes.`;
+    case "app":
+      return `${start} Turn on Precise Location for BlueRoute in Settings.`;
+  }
+}
 const device = (): WebDevice => webDevice(typeof navigator === "undefined" ? "" : navigator.userAgent);
 const reload = () => window.location.reload();
 
-/** A line when the GPS position can't be trusted, with a fix if there is one. Nothing when it's good. */
-export function GpsStatus() {
+/**
+ * A line when the GPS position can't be trusted, with a fix if there is one.
+ * Nothing when it's good. A poor position is only flagged once it has stayed
+ * poor for a few seconds (over 100 m on a route, else 50 m), and the line
+ * goes again after a few good seconds.
+ */
+export function GpsStatus({ onRoute = false }: { onRoute?: boolean } = {}) {
+  const styles = useThemed(baseStyles);
   const { status, fix, requestPermission, simulated } = useLocation();
   const { setDemoDrive } = useSession();
   // In the browser (the test version) the blocked-location line can be put
@@ -120,7 +145,19 @@ export function GpsStatus() {
     );
   }
   // A good position needs no line on screen: the map's space is worth more.
-  if (fix.accuracy != null && fix.accuracy <= 50) return null;
+  // `fix` changing re-renders this, so the recent readings are current.
+  if (!gpsWarning(recentFixes(), onRoute ? WARN_OVER_ON_ROUTE_M : WARN_OVER_M)) return null;
+  if (fix.accuracy != null && fix.accuracy > ROUGH_GPS_M) {
+    return WEB ? (
+      <Banner tone="warn" text={roughGpsText(fix.accuracy, device())}>
+        {device() !== "desktop" && <Action label="Reload" onPress={reload} />}
+      </Banner>
+    ) : (
+      <Banner tone="warn" text={roughGpsText(fix.accuracy, "app")}>
+        <Action label="Settings" onPress={() => Linking.openSettings()} />
+      </Banner>
+    );
+  }
   const accuracy = fix.accuracy != null ? `±${Math.round(fix.accuracy)} m` : "accuracy unknown";
   return <Banner tone="warn" text={`GPS ${accuracy}: position may be off`} />;
 }
@@ -134,7 +171,9 @@ function Banner({
   text: string;
   children?: React.ReactNode;
 }) {
-  const color = tone === "ok" ? colors.ok : tone === "warn" ? colors.amber : colors.muted;
+  const palette = useColors();
+  const styles = useThemed(baseStyles);
+  const color = tone === "ok" ? palette.ok : tone === "warn" ? palette.amber : palette.muted;
   return (
     <View style={styles.banner}>
       <View style={styles.line}>
@@ -147,6 +186,7 @@ function Banner({
 }
 
 function Action({ label, onPress }: { label: string; onPress: () => void }) {
+  const styles = useThemed(baseStyles);
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.action}>
       <Text style={styles.actionText}>{label}</Text>
@@ -154,7 +194,7 @@ function Action({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   banner: {
     flexDirection: "row",
     // Long instructions take the line; the buttons go under them on a phone.

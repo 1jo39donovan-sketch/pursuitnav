@@ -6,6 +6,11 @@ type LngLat = [number, number];
 
 /** Distance from the route beyond which a fix counts as off route. */
 export const OFF_ROUTE_M = 40;
+/**
+ * However poor the GPS, this far off counts as off route: a loose fix widens
+ * the margin, but past ~70 m the car is on another street (PM review, P2).
+ */
+export const OFF_ROUTE_CAP_M = 70;
 /** Consecutive off-route fixes (about a second each) before re-routing. */
 export const OFF_ROUTE_FIXES = 4;
 /** Within this of the end, the officer has arrived. */
@@ -27,9 +32,14 @@ export interface Progress {
   /** The manoeuvre being driven now (its road), and the next one to make. */
   current: Maneuver;
   next: Maneuver | null;
-  /** The one after next, for "then …". */
+  /**
+   * The one after next, for the "Then" line: only when it comes soon after
+   * the next (THEN_WITHIN_M or THEN_WITHIN_S), else null.
+   */
   after: Maneuver | null;
   distanceToNextM: number;
+  /** Metres from the snapped position to the nearest turn (the next one, or the one just made). */
+  nearTurnM: number;
   remainingM: number;
   remainingS: number;
   arrived: boolean;
@@ -98,9 +108,15 @@ export function progressAt(
   let idx = 0;
   for (let i = 0; i < ms.length; i++) if (ms[i]!.beginShapeIndex <= segment) idx = i;
   const current = ms[idx]!;
-  const next = ms[idx + 1] ?? null;
-  const after = ms[idx + 2] ?? null;
+  const nextIdx = turnAfter(ms, idx);
+  const next = ms[nextIdx] ?? null;
+  const afterIdx = next ? turnAfter(ms, nextIdx) : -1;
   const nextAt = next ? cumulative[next.beginShapeIndex]! : total;
+  const soonAfter =
+    afterIdx >= 0 &&
+    (cumulative[ms[afterIdx]!.beginShapeIndex]! - nextAt <= THEN_WITHIN_M ||
+      ms.slice(nextIdx, afterIdx).reduce((t, m) => t + m.timeS, 0) <= THEN_WITHIN_S);
+  const after = soonAfter ? ms[afterIdx]! : null;
 
   // Time left: the rest of this manoeuvre pro rata, plus every later one.
   const curStart = cumulative[current.beginShapeIndex]!;
@@ -117,19 +133,84 @@ export function progressAt(
     next,
     after,
     distanceToNextM: Math.max(0, nextAt - along),
+    nearTurnM: Math.min(Math.max(0, nextAt - along), Math.max(0, along - curStart)),
     remainingM,
     remainingS,
     arrived: remainingM < ARRIVED_M,
   };
 }
 
+/** The "Then" line only when the turn after next is this close behind it. */
+export const THEN_WITHIN_M = 300;
+export const THEN_WITHIN_S = 20;
+
+/** Valhalla's "continue" and "stay straight": no turn to make. */
+const CARRY_ON = new Set([8, 22]);
+
+/**
+ * A step that just carries on along the same street ("Continue on Bedford
+ * Road"): nothing to do there, so it isn't shown or said as a turn.
+ */
+export function sameStreetStep(m: Maneuver, prev: Maneuver | undefined): boolean {
+  if (!prev || !CARRY_ON.has(m.type)) return false;
+  return !m.streetNames.length || m.streetNames.some((n) => prev.streetNames.includes(n));
+}
+
+/** Index of the first real turn after manoeuvre `i` (-1 if none). */
+function turnAfter(ms: readonly Maneuver[], i: number): number {
+  for (let j = i + 1; j < ms.length; j++) if (!sameStreetStep(ms[j]!, ms[j - 1])) return j;
+  return -1;
+}
+
 /**
  * Counts consecutive off-route fixes. GPS can be poor between tall
  * buildings, so the threshold widens with the fix's own stated accuracy.
  */
-export function offRouteCount(previous: number, offRouteBy: number, accuracy: number | null): number {
-  const limit = Math.max(OFF_ROUTE_M, (accuracy ?? 0) * 1.5);
+/** Off the line by this much and driving across the route's direction: a missed turn, counted double. */
+export const WRONG_WAY_M = 20;
+/** Degrees between the car's course and the route's direction that count as across it. */
+export const WRONG_WAY_DEG = 60;
+
+/** Snapped within this of a turn counts as at the turn. */
+export const AT_TURN_M = 12;
+/** Off the line at a turn by this much: driven past it (a London road is about 10 m wide). */
+export const PAST_TURN_M = 12;
+/** Off the line at a turn by this much: certainly past it, re-route at once. */
+export const WELL_PAST_TURN_M = 20;
+
+/**
+ * Off-route fixes so far. A car well off the line counts one a fix (4 to
+ * re-route, about 4 s). A missed turn shows sooner, because on the 30 Oct
+ * drives, crawling in traffic, "Now" stayed up 5–8 s past each turn:
+ * - snapped to a turn and 15 m off the line (driven on past it): two a fix,
+ *   and 20 m off re-routes at once;
+ * - a little off the line and driving across the route's direction: two a fix.
+ * `headingOff` is degrees between the car's course and the route's direction
+ * there (null when too slow to have a course); `nearTurnM` is how far the
+ * snapped position is from the nearest turn.
+ */
+export function offRouteCount(
+  previous: number,
+  offRouteBy: number,
+  accuracy: number | null,
+  headingOff: number | null = null,
+  nearTurnM = Infinity,
+): number {
+  const acc = accuracy ?? 0;
+  const loose = (m: number) => Math.min(m, OFF_ROUTE_CAP_M);
+  if (nearTurnM <= AT_TURN_M) {
+    if (offRouteBy > Math.max(WELL_PAST_TURN_M, loose(acc * 1.5))) return Math.max(previous + 2, OFF_ROUTE_FIXES);
+    if (offRouteBy > Math.max(PAST_TURN_M, loose(acc * 1.2))) return previous + 2;
+  }
+  const wrongWay = headingOff != null && headingOff > WRONG_WAY_DEG && offRouteBy > Math.max(WRONG_WAY_M, loose(acc));
+  if (wrongWay) return previous + 2;
+  const limit = Math.max(OFF_ROUTE_M, loose(acc * 1.5));
   return offRouteBy > limit ? previous + 1 : 0;
+}
+
+/** Degrees between two courses, 0 to 180. */
+export function courseDiff(a: number, b: number): number {
+  return Math.abs(((a - b + 540) % 360) - 180);
 }
 
 /** Arrow for a Valhalla maneuver type, for the big next-turn display. */
@@ -188,6 +269,69 @@ export function upcomingInstruction(m: Maneuver): string {
 }
 
 /**
+ * An instruction for reading at a glance: without the routing engine's
+ * trailing "Continue on A501." (or "Continue for 200 metres."), which pushed
+ * the turn itself out of the "Then" line.
+ */
+export function briefInstruction(text: string): string {
+  const brief = text
+    .replace(/\s+Continue (on|for|along)\b[^.]*\.?\s*$/i, "")
+    // "A203/South Lambeth Road": the name is what's on the street sign.
+    .replace(new RegExp(String.raw`\b${ROAD_REF}/(?=[A-Z][a-z])`, "g"), "")
+    .replace(new RegExp(String.raw`([a-z])/${ROAD_REF}\b`, "g"), "$1")
+    .trim();
+  return brief || text;
+}
+
+const ROAD_REF = String.raw`[ABM]\d{1,4}(?:\(M\))?`;
+
+/** The way to go, for a turn that stays on the road you're already on. */
+const VERB: Record<number, string> = {
+  9: "slight right",
+  10: "right",
+  11: "sharp right",
+  12: "U-turn",
+  13: "U-turn",
+  14: "sharp left",
+  15: "left",
+  16: "slight left",
+  23: "keep right",
+  24: "keep left",
+  18: "right",
+  19: "left",
+  20: "exit right",
+  21: "exit left",
+  22: "straight on",
+  8: "straight on",
+};
+
+const roadParts = (names: readonly string[]) => names.flatMap((n) => n.split("/").map((p) => p.trim())).filter(Boolean);
+
+/**
+ * The "Then" line: the road's name (its number if it has none), shown after
+ * the turn's arrow, so it fits on one line ("Then → Wandsworth Road") rather
+ * than "Then → Turn right onto Wandsworth Road/A30…". A turn that keeps you
+ * on the road the next turn puts you on says which way ("Then → right"), as
+ * the bare name would read as if nothing changes. The full instruction for
+ * an arrival or a turn with no road named.
+ */
+export function thenText(m: Maneuver, full: string, onRoad: readonly string[] = []): string {
+  if (m.type in ARRIVAL) {
+    // "Mayflower Road, on the right", not "Destination ahead on the right: Mayflo…" (9 Nov drive).
+    const place = full.includes(": ") ? full.slice(full.indexOf(": ") + 2).trim() : "";
+    const side = m.type === 5 ? "on the right" : m.type === 6 ? "on the left" : "";
+    if (place) return side ? `${place}, ${side}` : place;
+    return side ? `Destination, ${side}` : "Destination";
+  }
+  if (!m.streetNames.length) return briefInstruction(full);
+  const parts = roadParts(m.streetNames);
+  const here = new Set(roadParts(onRoad));
+  if (parts.some((p) => here.has(p)) && VERB[m.type]) return VERB[m.type]!;
+  const ref = new RegExp(`^${ROAD_REF}$`);
+  return parts.find((p) => !ref.test(p)) ?? parts[0] ?? briefInstruction(full);
+}
+
+/**
  * The turns after the next two (those are on screen already), with how far
  * each is from here: for reading ahead where there's room (landscape).
  */
@@ -197,8 +341,50 @@ export function comingUp(prepared: PreparedRoute, progress: Progress, count = 5)
   if (!from) return [];
   const start = ms.indexOf(from) + 1;
   if (start <= 0) return [];
-  return ms.slice(start, start + count).map((m) => ({
+  return ms
+    .slice(start)
+    .filter((m, k) => !sameStreetStep(m, ms[start + k - 1]))
+    .slice(0, count)
+    .map((m) => ({
     maneuver: m,
     inM: Math.max(0, (prepared.cumulative[m.beginShapeIndex] ?? 0) - progress.along),
   }));
+}
+
+/**
+ * The point `along` metres down the route, and which way the road runs there:
+ * where the vehicle is drawn while it's on the route, so the arrow sits on the
+ * road rather than wherever GPS drift puts it.
+ */
+export function pointAlong(prepared: PreparedRoute, along: number): { lng: number; lat: number; course: number } | null {
+  const { shape } = prepared.route;
+  const { cumulative } = prepared;
+  if (shape.length < 2) return null;
+  let i = 0;
+  while (i < shape.length - 2 && cumulative[i + 1]! < along) i++;
+  // Skip zero-length segments (repeated points), which have no direction.
+  let j = i;
+  while (j < shape.length - 2 && cumulative[j + 1]! - cumulative[j]! < 0.5) j++;
+  const [ax, ay] = shape[j] as LngLat;
+  const [bx, by] = shape[j + 1] as LngLat;
+  const len = cumulative[j + 1]! - cumulative[j]!;
+  const t = len > 0 ? Math.max(0, Math.min(1, (along - cumulative[j]!) / len)) : 0;
+  const cosLat = Math.cos((ay * Math.PI) / 180);
+  const course = ((Math.atan2((bx - ax) * cosLat, by - ay) * 180) / Math.PI + 360) % 360;
+  return { lng: ax + (bx - ax) * t, lat: ay + (by - ay) * t, course };
+}
+
+/** The next turn is repeated under the map for this long after GO, ms. */
+export const REPEAT_AFTER_GO_MS = 10_000;
+/** …and whenever the next turn is this close, metres. */
+export const REPEAT_WITHIN_M = 200;
+
+/**
+ * Whether the bottom panel repeats the next turn. A notification can cover
+ * the turn card at the top (3 Nov, 01:14–01:18): the turn is then still on
+ * screen at the bottom, at the two moments it matters most.
+ */
+export function repeatTurn(justStarted: boolean, distanceToNextM: number | null): boolean {
+  if (distanceToNextM == null) return false;
+  return justStarted || distanceToNextM <= REPEAT_WITHIN_M;
 }

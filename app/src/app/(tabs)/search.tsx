@@ -20,6 +20,7 @@ import { AddPlaceForm } from "../../components/AddPlaceForm";
 import { GpsStatus } from "../../components/GpsStatus";
 import { LiveMap } from "../../components/LiveMap";
 import { ROUTE_ALT, type MapRoute, type MarkerProperties } from "../../components/mapShared";
+import { badgeKey } from "../../components/mapServices";
 import { MarkerCard } from "../../components/MarkerCard";
 import { PlacesControl } from "../../components/PlacesControl";
 import { RoutePanel, type PlanState } from "../../components/RoutePanel";
@@ -39,24 +40,35 @@ import { useNavigation } from "../../navigation/NavigationProvider";
 import { planIsStale } from "../../navigation/routeChoice";
 import type { SearchResult } from "../../search/engine";
 import { destinationNote } from "../../search/destinationNote";
+import { jobSearches, looksLikeJob } from "../../search/jobText";
+import { SendToTeam } from "../../components/SendToTeam";
+import { TeamMessageCard } from "../../components/TeamMessageCard";
+import type { MessagePlace } from "../../team/messages";
 import { mergeAddresses } from "../../search/merge";
 import { DEFAULT_MARKER_GROUPS, GROUP_COLOR, MARKER_GROUPS } from "../../search/placeGroups";
 import type { PlaceGroup } from "../../search/places";
 import { useSearch } from "../../search/SearchProvider";
 import { useAddressLookup } from "../../search/useAddressLookup";
 import { useSession } from "../../session/SessionProvider";
-import { useTeam } from "../../team/TeamProvider";
+import { accuracyText, roughFix, useTeam } from "../../team/TeamProvider";
+import { useFollowIn } from "../../team/useFollowIn";
+import { FlaggedRoutes } from "../../components/FlaggedRoutes";
+import { ago, useNow } from "../../components/TeamSection";
+import { TEAM_COLOR } from "../../components/mapShared";
 import { store } from "../../storage/store";
 import { colors, fonts } from "../../theme";
 import { recordEvent } from "../../usage/usage";
-import { useTextStyles } from "../../textSize";
-import { loadFavourites, samePlace, saveFavourites, toggled, type Favourite } from "../../search/favourites";
+import { useTextStyles, useColors } from "../../textSize";
+import { samePlace, setFavourites, toggled, useFavourites, type Favourite } from "../../search/favourites";
 import { quickPlaces } from "../../search/quickPlaces";
+import { noteCards, noteEntrance, noteGo, noteTap, routeStarted } from "../../navigation/timings";
 import { fetchEntrances } from "../../api/entrances";
 import { fetchWhere } from "../../api/where";
 import { bestEntrance, entranceLabel, entrancesFor } from "../../search/entrances";
 import { loadNotes, noteNear, saveNotes, withNote, type BlockNote } from "../../search/blockNotes";
 import { BOROUGHS, type Borough } from "../../search/boroughs";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../../components/ScreenError";
 
 const FINDING = "Finding the address…";
 
@@ -74,7 +86,13 @@ interface Destination {
 
 // Type what the control room gave, pick the match, get both routes from
 // where the phone is now. A long press on the map also sets a destination.
+/** Instead of a crash: try again, with the rest of the app still there. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
+
 export default function SearchScreen() {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const { fix, simulated } = useLocation();
   const insets = useSafeAreaInsets();
@@ -83,12 +101,16 @@ export default function SearchScreen() {
   const sideways = screenW > screenH && screenH < 560;
   // Height of the floating search box (and any notes under it), from the top of the screen.
   const [topSpace, setTopSpace] = useState(insets.top + 72);
-  const { boroughs, policeRoutes, vehicle, roads, mapView } = useSession();
-  const { mapPoints: teamMap } = useTeam();
-  const { data, search, places, blockLabels, area: searchArea } = useSearch();
+  const { boroughs, policeRoutes, vehicle, roads, mapView, services: servicesOn } = useSession();
+  const { mapPoints: teamMap, members: teamMembers, code: teamCode } = useTeam();
+  // "Send to team": a place picked on the map, or the destination chosen.
+  const [sending, setSending] = useState<MessagePlace | null>(null);
+  const { data, search, places, blockLabels, services, area: searchArea } = useSearch();
   const navigation = useNavigation();
   const log = useLog();
   const [query, setQuery] = useState("");
+  // A pasted job ("Male outside Flat 3, Smith House, 54 Caledonian Road N7 8LA…"): its address parts.
+  const jobFound = useMemo(() => (looksLikeJob(query) ? jobSearches(query) : []), [query]);
   const input = useRef<TextInput>(null);
   const [showOutside, setShowOutside] = useState(false);
   const [destination, setDestination] = useState<Destination | null>(null);
@@ -106,7 +128,9 @@ export default function SearchScreen() {
 
   // Searching 40,000 roads on every keystroke can lag a little; let typing win.
   const deferredQuery = useDeferredValue(query);
-  const showResults = query.trim().length >= 2 && !destination;
+  // A pasted job shows its address parts ("From the job"), not a search of
+  // the whole text, which matched nonsense miles away (16 Nov screenshots).
+  const showResults = query.trim().length >= 2 && !destination && jobFound.length === 0;
   const lookup = useAddressLookup(query, showResults);
   const area = useMemo(() => new Set(boroughs), [boroughs]);
   const results = useMemo(() => {
@@ -131,21 +155,30 @@ export default function SearchScreen() {
         : "Shops, cafés and other places aren't on this phone yet. They download from the BlueRoute server."
       : null;
 
+  // Session → Testing shows how long the route cards took to appear.
+  useEffect(() => {
+    if (state?.status === "ready") noteCards();
+  }, [state?.status]);
+
   const entranceAsk = useRef(0);
   const routeTo = useCallback(
-    async (given: Destination) => {
+    async (given: Destination, opts: { quiet?: boolean } = {}) => {
       let dest = given;
       request.current?.abort();
       const ask = ++entranceAsk.current;
+      routeStarted();
       setDestination(dest);
       if (dest.findEntrance) {
         // The way in, not the middle of the building: asked for first (at most ~1 s).
-        setState({ status: "loading" });
+        setState({ status: "loading", quiet: opts.quiet });
         const [lng, lat] = dest.point;
         // Only entrances that can be this building's: a door address's own
         // number, else unnumbered ones close by (further for a whole block).
+        const askedAt = Date.now();
+        const found = await fetchEntrances(lat, lng);
+        noteEntrance(Date.now() - askedAt);
         const entrances = entrancesFor(
-          await fetchEntrances(lat, lng),
+          found,
           dest.title ?? "",
           dest.road || !/\d/.test(dest.title ?? "") ? 40 : 20,
         );
@@ -172,7 +205,7 @@ export default function SearchScreen() {
       if (pre && !ready) pre.controller.abort();
       const controller = ready?.controller ?? new AbortController();
       request.current = controller;
-      setState({ status: "loading" });
+      setState({ status: "loading", quiet: opts.quiet });
       const from = ready?.origin.from ?? routeOrigin(fix);
       const origin = ready?.origin ?? { madeAt: Date.now(), from };
       // The standard route comes back in a second or so; the blue-light one
@@ -196,29 +229,7 @@ export default function SearchScreen() {
         (err: unknown) => recorder.event({ type: "plan-failed", ms: recorder.sinceStart(), outcome: rerouteFailure(err) ?? "error" }),
       );
       let fullDone = false;
-      quick
-        .then((plan) => {
-          if (!controller.signal.aborted && !fullDone) setState({ status: "ready", plan, checking: !!full, origin });
-        })
-        .catch(() => {});
-      try {
-        if (!full) {
-          const plan = await quick;
-          if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
-          return;
-        }
-        const plan = await full;
-        fullDone = true;
-        if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
-      } catch (err) {
-        fullDone = true;
-        if (controller.signal.aborted) return;
-        // The blue-light check failed but the standard route may be fine.
-        const standard = await quick.catch(() => null);
-        if (standard) {
-          setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" }, origin });
-          return;
-        }
+      const failed = (err: unknown) => {
         if (err instanceof NoSignalRouteError) {
           setState({ status: "error", message: NO_SIGNAL_ROUTE_START, noSignal: true });
           return;
@@ -231,6 +242,38 @@ export default function SearchScreen() {
         }
         const message = err instanceof RouteError ? err.message : "Something went wrong working out routes.";
         setState({ status: "error", message });
+      };
+      quick.then(
+        (plan) => {
+          if (!controller.signal.aborted && !fullDone) setState({ status: "ready", plan, checking: !!full, origin });
+        },
+        (err: unknown) => {
+          // No standard route: say so now, not after the blue-light check gives up too.
+          if (controller.signal.aborted || fullDone || !full) return;
+          fullDone = true;
+          controller.abort();
+          failed(err);
+        },
+      );
+      try {
+        if (!full) {
+          const plan = await quick;
+          if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
+          return;
+        }
+        const plan = await full;
+        fullDone = true;
+        if (!controller.signal.aborted) setState({ status: "ready", plan, origin });
+      } catch (err) {
+        if (controller.signal.aborted || fullDone) return;
+        fullDone = true;
+        // The blue-light check failed but the standard route may be fine.
+        const standard = await quick.catch(() => null);
+        if (standard) {
+          setState({ status: "ready", plan: { ...standard, noPoliceReason: "check-failed" }, origin });
+          return;
+        }
+        failed(err);
       }
     },
     [fix, vehicle, policeRoutes, roads],
@@ -317,6 +360,7 @@ export default function SearchScreen() {
   }, [params.from, params.lat, params.lng, params.title]);
 
   const pick = (r: SearchResult) => {
+    noteTap();
     Keyboard.dismiss();
     setQuery(r.label);
     const note = destinationNote(r);
@@ -326,7 +370,7 @@ export default function SearchScreen() {
         title: r.label,
         note,
         road: r.precision === "road" ? r.road : undefined,
-        findEntrance: r.precision === "door" || r.placeType === "Block of flats",
+        findEntrance: r.precision === "door" || r.placeType === "Block of flats" || r.placeType === "Building",
       },
       query,
       r.borough,
@@ -391,7 +435,8 @@ export default function SearchScreen() {
 
   // Back from navigation: a plan from where the crew were before is never
   // offered again. After arriving, or "New destination", start clean (the map, no
-  // keyboard); after End, work the routes out again from here.
+  // keyboard); after End, work the routes out again from here, quietly: no
+  // "Working out the standard route…" flash (three trials running).
   const handledEnd = useRef(navigation.ended);
   useEffect(() => {
     const ended = navigation.ended;
@@ -399,7 +444,7 @@ export default function SearchScreen() {
     const t = setTimeout(() => {
       handledEnd.current = ended;
       if (ended.reason === "end" && destination) {
-        routeTo(destination);
+        routeTo(destination, { quiet: true });
         return;
       }
       clear();
@@ -412,7 +457,13 @@ export default function SearchScreen() {
   // Place markers for the chosen kinds of place, across the selected boroughs.
   const markers = useMemo<GeoJSON.FeatureCollection | null>(() => {
     if (data.status !== "ready" || places.status !== "ready" || !markerGroups.length) return null;
-    const pois = data.index.pointsOfInterestIn(area, new Set(markerGroups));
+    // Places drawn as badges (police stations, A&E…) when those are on: not a dot over them as well.
+    const badged = new Set(
+      servicesOn ? (services?.features ?? []).map((f) => badgeKey(f.properties?.name, f.geometry)) : [],
+    );
+    const pois = data.index
+      .pointsOfInterestIn(area, new Set(markerGroups))
+      .filter((p) => !badged.has(badgeKey(p.name, { type: "Point", coordinates: [p.lng, p.lat] })));
     return {
       type: "FeatureCollection",
       features: pois.map((p) => ({
@@ -427,7 +478,7 @@ export default function SearchScreen() {
         } satisfies MarkerProperties,
       })),
     };
-  }, [data, places, area, markerGroups]);
+  }, [data, places, area, markerGroups, servicesOn, services]);
 
   // Blue-light routes only for someone who has said they drive for an emergency service.
   const shown = useMemo<PlanState | null>(
@@ -471,7 +522,7 @@ export default function SearchScreen() {
 
   const dataNote =
     data.status === "loading"
-      ? "Loading London roads…"
+      ? "Loading roads…"
       : data.status === "error"
         ? `Search data didn't load: ${data.message}`
         : null;
@@ -527,12 +578,23 @@ export default function SearchScreen() {
     () => quickPlaces(service, roughLat != null && roughLng != null ? { lat: roughLat, lng: roughLng } : null, allPois),
     [service, roughLat, roughLng, allPois],
   );
-  const [favourites, setFavourites] = useState<Favourite[]>(() => loadFavourites());
+  const favourites = useFavourites();
+  // Starring says where the place has gone, so it doesn't look like nothing happened.
+  const [favNote, setFavNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!favNote) return;
+    const t = setTimeout(() => setFavNote(null), 3500);
+    return () => clearTimeout(t);
+  }, [favNote]);
   const [notes, setNotes] = useState<BlockNote[]>(() => loadNotes());
   const toggleFavourite = (f: Favourite) => {
     const next = toggled(favourites, f);
     setFavourites(next);
-    saveFavourites(next);
+    setFavNote(
+      next.length > favourites.length
+        ? `★ ${f.name} saved. Tap the search box, or Session → Favourites, to go there.`
+        : `Removed ${f.name} from favourites.`,
+    );
   };
   const entries = log.entries;
   const recent = useMemo(() => {
@@ -547,6 +609,12 @@ export default function SearchScreen() {
     }
     return out;
   }, [entries]);
+
+  // A colleague tapped on the map: their card, with when and how well they were last placed.
+  const [mateId, setMateId] = useState<string | null>(null);
+  const mate = mateId ? (teamMembers.find((m) => m.memberId === mateId) ?? null) : null;
+  const followIn = useFollowIn();
+  const now = useNow();
 
   return (
     <View style={styles.screen}>
@@ -567,7 +635,8 @@ export default function SearchScreen() {
           routes={routes}
           restrictions={restrictionPoints(plan?.police)}
           labels={blockLabels}
-          destination={destination?.point}
+          // A tapped point or place gets its pin straight away, before Route here.
+          destination={destination?.point ?? tapped?.point}
           onLongPress={(point) =>
             choose(
               { point, title: `Point on the map (${point[1].toFixed(5)}, ${point[0].toFixed(5)})` },
@@ -579,7 +648,12 @@ export default function SearchScreen() {
           // Not over the routes: the place chooser (the dots' key) is hidden then too.
           markers={showResults || destination ? null : markers}
           onMarkerPress={(marker, point) => setTapped({ marker, point })}
-          onPress={destination || showResults ? undefined : whatsHere}
+          onTeamPress={(id) => {
+            setTapped(null);
+            setMateId(id);
+          }}
+          // A tap elsewhere puts a colleague's card away first.
+          onPress={destination || showResults ? undefined : (p, n) => (mateId ? setMateId(null) : whatsHere(p, n))}
         />
         {!showResults && !destination && (
           <View style={[styles.belowBar, { top: topSpace - 4 }]} pointerEvents="box-none">
@@ -590,12 +664,59 @@ export default function SearchScreen() {
             />
           </View>
         )}
+        {navigation.resumable && !navigation.active && !destination && !showResults && !tapped && (
+          // Closed or reloaded mid-route: the route back in one tap, never restarted silently.
+          <View style={styles.resumeCard}>
+            <Text style={styles.resumeNote}>The app was closed during a route.</Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.resumeButton}
+              onPress={() => {
+                navigation.resume();
+                router.push("/navigate");
+              }}
+            >
+              <Text style={styles.resumeText} numberOfLines={2}>
+                Resume route to {navigation.resumable.destination.title}
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={navigation.dismissResume} hitSlop={12}>
+              <Text style={styles.resumeNote}>Not now</Text>
+            </Pressable>
+          </View>
+        )}
         {tapped && !destination && !showResults && (
           <MarkerCard
             marker={tapped.marker}
+            favourite={favourites.some((f) => samePlace(f, { lat: tapped.point[1], lng: tapped.point[0] }))}
+            onToggleFavourite={
+              tapped.marker.name === FINDING
+                ? undefined
+                : () =>
+                    toggleFavourite({
+                      name: tapped.marker.name,
+                      lat: tapped.point[1],
+                      lng: tapped.point[0],
+                      borough: tapped.marker.borough || null,
+                    })
+            }
             away={fix ? formatDistance(distanceM(fix, { lat: tapped.point[1], lng: tapped.point[0] })) : undefined}
             onClose={() => setTapped(null)}
+            other={
+              teamCode && tapped.marker.name !== FINDING
+                ? {
+                    label: "Send to team",
+                    onPress: () =>
+                      setSending({
+                        lat: tapped.point[1],
+                        lng: tapped.point[0],
+                        label: [tapped.marker.name, tapped.marker.address].filter(Boolean).join(", "),
+                      }),
+                  }
+                : undefined
+            }
             onRoute={() => {
+              noteTap();
               const { marker, point, exact } = tapped;
               setTapped(null);
               // Before the address is back, it's a point on the map.
@@ -605,6 +726,49 @@ export default function SearchScreen() {
               choose({ point, title, findEntrance: exact }, "", marker.borough);
             }}
           />
+        )}
+        {mate && !destination && !showResults && (
+          <MarkerCard
+            marker={{
+              name: mate.callsign,
+              type: "Team",
+              address: "",
+              borough: boroughAt(mate.lat, mate.lng) ?? "",
+              color: TEAM_COLOR,
+            }}
+            away={fix ? formatDistance(distanceM(fix, mate)) : undefined}
+            lines={[
+              {
+                text: `Updated ${ago(now - mate.at)} (${new Date(mate.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })})`,
+                warn: now - mate.at > 5 * 60_000,
+              },
+              mate.accuracy != null
+                ? {
+                    text: `GPS ${accuracyText(mate.accuracy)}${roughFix(mate.accuracy) ? ": their position may be well off" : ""}`,
+                    warn: roughFix(mate.accuracy),
+                  }
+                : { text: "GPS accuracy not shared (older app)" },
+              ...(followIn.error ? [{ text: followIn.error, warn: true }] : []),
+            ]}
+            onClose={() => setMateId(null)}
+            onRoute={() => {
+              noteTap();
+              setMateId(null);
+              const title = `${mate.callsign} (last seen ${new Date(mate.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })})`;
+              setQuery(title);
+              choose({ point: [mate.lng, mate.lat], title }, "", boroughAt(mate.lat, mate.lng));
+            }}
+            other={
+              mate.track.length >= 2
+                ? { label: "Follow in", onPress: () => void followIn.follow(mate), busy: followIn.following === mate.memberId }
+                : undefined
+            }
+          />
+        )}
+        {favNote && (
+          <View style={[styles.recent, styles.favNote, { top: topSpace + 6 }]} accessibilityRole="alert">
+            <Text style={styles.favNoteText}>{favNote}</Text>
+          </View>
         )}
         {typing && !destination && !showResults && !tapped && (quick.length > 0 || favourites.length > 0 || recent.length > 0) && (
           <View style={[styles.recent, { top: topSpace + 6 }]}>
@@ -711,7 +875,7 @@ export default function SearchScreen() {
               }
             }}
             placeholder="Address, postcode, or a place like Costa"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={palette.muted}
             autoCorrect={false}
             autoCapitalize="words"
             returnKeyType="search"
@@ -732,6 +896,26 @@ export default function SearchScreen() {
             </Pressable>
           )}
         </View>
+        {/* Pasted the job from the control room: the address parts in it, one tap each. */}
+        {!destination && jobFound.length > 0 && (
+          <View style={styles.job} accessibilityLabel="Addresses found in the job">
+            <Text style={styles.jobTitle}>From the job</Text>
+            {jobFound.map((q) => (
+              <Pressable
+                key={q}
+                accessibilityRole="button"
+                accessibilityLabel={`Search for ${q}`}
+                onPress={() => {
+                  setQuery(q);
+                  setShowOutside(false);
+                }}
+                style={({ pressed }) => [styles.jobChip, pressed && { opacity: 0.8 }]}
+              >
+                <Text style={styles.jobChipText}>{q}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         {dataNote && <Text style={styles.dataNote}>{dataNote}</Text>}
         {data.status === "ready" && boroughs.length === 0 && !destination && (
           // Before anything else: results are sorted by the area being worked.
@@ -745,8 +929,23 @@ export default function SearchScreen() {
             <Text style={styles.areaPromptButton}>Pick area</Text>
           </Pressable>
         )}
+        {/* A message from the team: where to go, a caution, a note. */}
+        <TeamMessageCard />
+        {/* In a team with a destination chosen: send it, e.g. from the office to a crew. */}
+        {teamCode && destination && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() =>
+              setSending({ lat: destination.point[1], lng: destination.point[0], label: destination.title ?? "Destination" })
+            }
+            style={({ pressed }) => [styles.sendTeam, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.sendTeamText}>Send this place to the team</Text>
+          </Pressable>
+        )}
         {lookupNote && <Text style={styles.dataNote}>{lookupNote}</Text>}
         {placesNote && <Text style={styles.dataNote}>{placesNote}</Text>}
+        {!destination && <FlaggedRoutes />}
         <GpsStatus />
 
       </View>
@@ -798,6 +997,7 @@ export default function SearchScreen() {
             // Not on a demo drive: navigating puts the demo car at the route's start anyway.
             const stale = !simulated && (!shown.origin || planIsStale(shown.origin, fix, Date.now()));
             recorder.event({ type: "go", kind, staleRefresh: stale });
+            noteGo();
             navigation.start(
               kind,
               shown.plan,
@@ -817,6 +1017,7 @@ export default function SearchScreen() {
           bottomInset={8}
         />
       )}
+      {sending && <SendToTeam place={sending} onClose={() => setSending(null)} />}
     </View>
   );
 }
@@ -831,6 +1032,30 @@ function offered(r: Route | PoliceRoute) {
 }
 
 const baseStyles = StyleSheet.create({
+  resumeCard: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    backgroundColor: colors.panel,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    alignItems: "center",
+  },
+  resumeNote: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, textAlign: "center" },
+  resumeButton: {
+    backgroundColor: colors.amber,
+    borderRadius: 10,
+    minHeight: 60,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "stretch",
+  },
+  resumeText: { color: "#1a1200", fontFamily: fonts.displayBold, fontSize: 19, textAlign: "center" },
   screen: { flex: 1, backgroundColor: colors.bg },
   // The search box floats over the map, as a rounded bar with a shadow.
   floating: { position: "absolute", left: 10, right: 10, gap: 6 },
@@ -871,6 +1096,36 @@ const baseStyles = StyleSheet.create({
   },
   areaPromptText: { flex: 1, color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 20 },
   areaPromptButton: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 16 },
+  sendTeam: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: colors.panel,
+    borderColor: colors.blue,
+    borderWidth: 1,
+  },
+  sendTeamText: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 15 },
+  job: {
+    gap: 8,
+    backgroundColor: colors.panel,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  jobTitle: { color: colors.muted, fontFamily: fonts.displaySemiBold, fontSize: 13, letterSpacing: 1.2, textTransform: "uppercase" },
+  jobChip: {
+    minHeight: 48,
+    justifyContent: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  jobChipText: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 16 },
   dataNote: {
     color: colors.fg,
     fontFamily: fonts.body,
@@ -898,6 +1153,8 @@ const baseStyles = StyleSheet.create({
     padding: 10,
   },
   hintText: { color: colors.muted, fontFamily: fonts.body, fontSize: 14, textAlign: "center" },
+  favNote: { zIndex: 5, borderColor: colors.amber },
+  favNoteText: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
   recent: {
     position: "absolute",
     left: 12,

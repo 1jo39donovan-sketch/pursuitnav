@@ -1,5 +1,6 @@
 // Client for the server's POST /v1/pursuit.
 import { API_URL } from "../config";
+import { notePursuitServer, serverDuration } from "../navigation/timings";
 import { isNoAnswer, isNoSignal, serverJson } from "./http";
 
 export interface PursuitInfo {
@@ -9,6 +10,8 @@ export interface PursuitInfo {
   nextJunction: { name: string; distanceM: number } | null;
   /** The mapped house number by the car ("123 Maida Vale"); null when none is close. Older servers leave it out. */
   near?: string | null;
+  /** The stretch of road the car is on, [lng, lat] in its direction: the arrow is drawn on it. Older servers leave it out. */
+  roadShape?: [number, number][] | null;
 }
 
 export type PursuitLookup =
@@ -33,6 +36,7 @@ export async function fetchPursuitInfo(
       body: JSON.stringify(heading === undefined ? { points } : { points, heading }),
       signal,
     });
+    notePursuitServer(serverDuration(res.serverTiming));
     return res.ok && res.body ? { status: "ok", info: res.body } : { status: "unavailable" };
   } catch (err) {
     if (isNoSignal(err)) return { status: "no-signal" };

@@ -1,10 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useColorScheme } from "react-native";
 
 import { BOROUGHS, type Borough } from "../search/boroughs";
 import { clearQueue, uploadDue } from "../learning/queue";
 import { MAP_LOOKS, type MapLook } from "../components/mapLooks";
 import { store } from "../storage/store";
+import { APPEARANCES, type Appearance } from "../theme";
 import { isService, isVehicle, vehiclesFor, type ServiceType, type VehicleType } from "../vehicles";
+import { region } from "../config";
+import { isDaylight } from "../sun";
 
 interface Session {
   callsign: string;
@@ -26,15 +30,27 @@ interface Session {
   /** What's being driven; routes avoid limits it can't take. */
   vehicle: VehicleType;
   setVehicle: (v: VehicleType) => void;
-  /** Night (dark) or day (light) map. */
+  /** The map's colours now: always the same as the screens' (one day/night state). */
   mapTheme: MapTheme;
+  /** The map's Day/Night button: switches the screens and the map together. */
   setMapTheme: (t: MapTheme) => void;
   /** Standard, high-contrast, plain or the OS road map. */
   mapLook: MapLook;
   setMapLook: (l: MapLook) => void;
+  /** Stations, rail and tube lines and bus stations drawn clearly on every map (on unless turned off). */
+  transport: boolean;
+  setTransport: (on: boolean) => void;
+  /** Police stations, custody, fire, ambulance, A&E, courts and prisons on every map (on unless turned off). */
+  services: boolean;
+  setServices: (on: boolean) => void;
   /** How the navigation and pursuit maps turn: north up, direction of travel up, or tilted 3D. */
   mapView: MapView;
   setMapView: (v: MapView) => void;
+  /** Day and night: by the sun (the default), following the phone, or chosen. */
+  appearance: Appearance;
+  setAppearance: (a: Appearance) => void;
+  /** The screens are dark now. */
+  dark: boolean;
   /** Larger text on Search, the route choice and navigation. */
   largeText: boolean;
   setLargeText: (on: boolean) => void;
@@ -55,6 +71,22 @@ interface Session {
 export type RoadChoice = "main" | "any";
 
 export type MapTheme = "night" | "day";
+/** Whether the sun is up over the covered area, checked each minute while `on`. */
+function useSunUp(on: boolean): boolean {
+  const [centreLng, centreLat] = region.defaultCentre;
+  const now = () => isDaylight(new Date(), centreLat, centreLng);
+  const [up, setUp] = useState(now);
+  useEffect(() => {
+    if (!on) return;
+    const tick = () => setUp(now());
+    tick();
+    const t = setInterval(tick, 60_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on]);
+  return up;
+}
+
 export type MapView = "north" | "heading" | "3d";
 export const MAP_VIEWS: MapView[] = ["3d", "heading", "north"];
 
@@ -116,13 +148,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return isService(saved) ? saved : null;
   });
 
-  const [mapTheme, setMapTheme] = useSetting<MapTheme>("mapTheme", ["night", "day"], "day");
   const [mapLook, setMapLook] = useSetting<MapLook>("mapLook", MAP_LOOKS, "standard");
   const [mapView, setMapView] = useSetting<MapView>("mapView", MAP_VIEWS, "3d");
   // "voice" was first stored by the navigation screen as "1"/"0".
   const [voiceSetting, setVoiceSetting] = useSetting<"1" | "0">("voice", ["1", "0"], "1");
   const voice = voiceSetting === "1";
   const [roads, setRoads] = useSetting<RoadChoice>("roads", ["main", "any"], "main");
+  // One day/night state for the map and the panels (PM, item 8): by the sun
+  // unless chosen. A new key, so everyone starts on Auto.
+  const [appearance, setAppearance] = useSetting<Appearance>("dayNight", APPEARANCES, "auto");
+  // Follows the phone from builds made after 4 Nov (app.json "automatic"); an
+  // older build always reports dark here, so "Match phone" means dark there.
+  const scheme = useColorScheme();
+  const sunUp = useSunUp(appearance === "auto");
+  const dark =
+    appearance === "dark" ||
+    (appearance === "system" && scheme !== "light") ||
+    (appearance === "auto" && !sunUp);
+  const mapTheme: MapTheme = dark ? "night" : "day";
+  // The map's button picks day or night for everything, until Auto is chosen again on Session.
+  const setMapTheme = useCallback((t: MapTheme) => setAppearance(t === "night" ? "dark" : "light"), [setAppearance]);
   const [largeSetting, setLargeSetting] = useSetting<"1" | "0">("largeText", ["1", "0"], "0");
   const largeText = largeSetting === "1";
   const setLargeText = useCallback((on: boolean) => setLargeSetting(on ? "1" : "0"), [setLargeSetting]);
@@ -131,6 +176,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const learning = learningSetting === "1";
   const [pursuitSetting, setPursuitSetting] = useSetting<"1" | "0">("showPursuit", ["1", "0"], "1");
   const showPursuit = pursuitSetting === "1";
+  const [transportSetting, setTransportSetting] = useSetting<"1" | "0">("transport", ["1", "0"], "1");
+  const transport = transportSetting === "1";
+  const setTransport = useCallback((on: boolean) => setTransportSetting(on ? "1" : "0"), [setTransportSetting]);
+  const [servicesSetting, setServicesSetting] = useSetting<"1" | "0">("services", ["1", "0"], "1");
+  const services = servicesSetting === "1";
+  const setServices = useCallback((on: boolean) => setServicesSetting(on ? "1" : "0"), [setServicesSetting]);
   const setShowPursuit = useCallback((on: boolean) => setPursuitSetting(on ? "1" : "0"), [setPursuitSetting]);
   // Sends road times that have waited long enough: at launch, then every half hour.
   useEffect(() => {
@@ -198,10 +249,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapTheme,
       mapLook,
       setMapLook,
+      transport,
+      setTransport,
+      services,
+      setServices,
       mapView,
       setMapView,
       voice,
       setVoice,
+      appearance,
+      setAppearance,
+      dark,
       largeText,
       setLargeText,
       roads,
@@ -233,10 +291,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMapTheme,
       mapLook,
       setMapLook,
+      transport,
+      setTransport,
+      services,
+      setServices,
       mapView,
       setMapView,
       voice,
       setVoice,
+      appearance,
+      setAppearance,
+      dark,
       largeText,
       setLargeText,
       roads,

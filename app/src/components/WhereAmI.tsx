@@ -11,6 +11,7 @@ import type { Fix } from "../location/LocationProvider";
 import { shareText, shouldLookUp, whereDetails } from "../location/whereDetails";
 import type { SearchIndex } from "../search/engine";
 import { colors, fonts } from "../theme";
+import { useThemed } from "../textSize";
 
 async function share(text: string): Promise<"shared" | "copied" | "failed"> {
   try {
@@ -41,6 +42,7 @@ export function WhereAmI({
   onClose: () => void;
   bottomInset: number;
 }) {
+  const styles = useThemed(baseStyles);
   // Follows the officer while open: grid reference, position and accuracy
   // on every fix; the address looked up again every 15 m or 20 s, keeping
   // the last one on screen meanwhile.
@@ -129,7 +131,7 @@ export function WhereAmI({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   panel: {
     position: "absolute",
     left: 0,

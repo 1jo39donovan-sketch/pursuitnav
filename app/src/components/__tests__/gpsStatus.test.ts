@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { webDeniedText, webDevice } from "../GpsStatus";
+import { roughGpsText, webDeniedText, webDevice } from "../GpsStatus";
 
 vi.mock("react-native", () => ({ Platform: { OS: "web" }, StyleSheet: { create: (s: unknown) => s }, Linking: {} }));
 vi.mock("../../location/LocationProvider", () => ({}));
@@ -18,5 +18,12 @@ describe("blocked location in a browser", () => {
     expect(webDeniedText("desktop")).toMatch(/Site settings/);
     expect(webDeniedText("desktop")).not.toMatch(/iPhone|Safari/);
     expect(webDeniedText("iphone")).toMatch(/Safari Websites/);
+  });
+
+  it("says how to turn on Precise Location when the position is a rough guess", () => {
+    expect(roughGpsText(13104, "iphone")).toMatch(/^GPS ±13 km/);
+    expect(roughGpsText(13104, "iphone")).toMatch(/Precise Location/);
+    expect(roughGpsText(2400, "android")).toMatch(/±2\.4 km.*precise location/);
+    expect(roughGpsText(2400, "app")).toMatch(/Settings/);
   });
 });

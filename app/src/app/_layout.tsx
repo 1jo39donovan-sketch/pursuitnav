@@ -12,14 +12,25 @@ import { TermsGate } from "../components/TermsGate";
 import { NavigationProvider } from "../navigation/NavigationProvider";
 import { OfflineMapProvider } from "../offline/OfflineMapProvider";
 import { SearchProvider } from "../search/SearchProvider";
-import { SessionProvider } from "../session/SessionProvider";
+import { SessionProvider, useSession } from "../session/SessionProvider";
+import { SetupFlow } from "../setup/SetupFlow";
 import { TeamProvider } from "../team/TeamProvider";
-import { colors } from "../theme";
 import { startUsage } from "../usage/usage";
+import { useColors } from "../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../components/ScreenError";
 
 SplashScreen.preventAutoHideAsync();
 // Every request to the server carries the install ID and app version (usage counts).
 startUsage();
+
+/**
+ * The last safety net: if the app's own start-up fails (settings, storage),
+ * a plain screen with Try again rather than a blank one.
+ */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
 
 export default function RootLayout() {
   // Fonts are bundled with the app, so this works with no signal.
@@ -44,37 +55,50 @@ export default function RootLayout() {
           <SearchProvider>
             <OfflineMapProvider>
               <LocationProvider>
-                <TeamProvider>
-                  <NavigationProvider>
-                    <StatusBar style="light" />
-                    <Stack
-                      screenOptions={{
-                        headerShown: false,
-                        contentStyle: { backgroundColor: colors.bg },
-                      }}
-                    >
-                      <Stack.Screen name="(tabs)" />
-                      {/* The search log, opened from Session. */}
-                      <Stack.Screen name="log" />
-                      <Stack.Screen name="area" />
-                      <Stack.Screen
-                        name="navigate"
-                        options={{
-                          gestureEnabled: false,
-                          animation: "slide_from_bottom",
-                        }}
-                      />
-                    </Stack>
+                <NavigationProvider>
+                  <TeamProvider>
+                    <AppStack />
                     <RecIndicator />
+                    {/* First launch: service, area, vehicle, callsign, blue light (under the terms). */}
+                    <SetupFlow />
                     {/* Over everything until the terms are agreed to. */}
                     <TermsGate />
-                  </NavigationProvider>
-                </TeamProvider>
+                  </TeamProvider>
+                </NavigationProvider>
               </LocationProvider>
             </OfflineMapProvider>
           </SearchProvider>
         </LogProvider>
       </SessionProvider>
     </SafeAreaProvider>
+  );
+}
+
+/** The screens, in the dark or light colours. */
+function AppStack() {
+  const palette = useColors();
+  const { dark } = useSession();
+  return (
+    <>
+      <StatusBar style={dark ? "light" : "dark"} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: palette.bg },
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        {/* The search log, opened from Session. */}
+        <Stack.Screen name="log" />
+        <Stack.Screen name="area" />
+        <Stack.Screen
+          name="navigate"
+          options={{
+            gestureEnabled: false,
+            animation: "slide_from_bottom",
+          }}
+        />
+      </Stack>
+    </>
   );
 }

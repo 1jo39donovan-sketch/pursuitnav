@@ -258,7 +258,7 @@ describe("CORS preflight", () => {
       method: "OPTIONS",
       url: "/v1/routes",
       headers: {
-        origin: "https://example.github.io",
+        origin: "https://bluerouteapp.com",
         "access-control-request-method": "POST",
         "access-control-request-headers": "content-type,x-install-id,x-app-version",
       },
@@ -266,5 +266,35 @@ describe("CORS preflight", () => {
     expect(res.statusCode).toBe(204);
     expect(Number(res.headers["access-control-max-age"])).toBeGreaterThanOrEqual(600);
     expect(String(res.headers["access-control-allow-headers"])).toContain("x-install-id");
+  });
+});
+
+describe("who may call the API", () => {
+  const make = (extra: Partial<ServerConfig> = {}) =>
+    buildApp({ bounds: [-1, 51, 1, 52], placesFile: "/nonexistent", ...extra } as unknown as ServerConfig, {
+      route: async () => ({}) as never,
+      traceEdges: async () => [],
+    });
+
+  it("lets our own web pages call from a browser, and no others", async () => {
+    const app = make();
+    const ask = (origin: string) =>
+      app.inject({ method: "GET", url: "/health", headers: { origin } }).then((r) => r.headers["access-control-allow-origin"]);
+    expect(await ask("https://bluerouteapp.com")).toBe("https://bluerouteapp.com");
+    expect(await ask("https://evil.example")).toBeUndefined();
+  });
+
+  it("leaves the phone apps alone: they send no Origin", async () => {
+    const res = await make().inject({ method: "GET", url: "/health" });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("slows down one address that floods it, but never /health", async () => {
+    const app = make({ rateLimitPerMinute: 3 });
+    const codes: number[] = [];
+    for (let i = 0; i < 5; i++) codes.push((await app.inject({ method: "GET", url: "/v1/places-data" })).statusCode);
+    expect(codes.slice(0, 3)).not.toContain(429);
+    expect(codes.at(-1)).toBe(429);
+    for (let i = 0; i < 5; i++) expect((await app.inject({ method: "GET", url: "/health" })).statusCode).toBe(200);
   });
 });

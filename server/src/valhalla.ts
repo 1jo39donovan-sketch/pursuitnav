@@ -6,6 +6,12 @@ export interface Waypoint {
   point: LngLat;
   /** Direction of travel at this point, degrees from north; snaps to roads going this way. */
   heading?: number;
+  /**
+   * Only snap to a road from which at least this many junctions can be
+   * reached: keeps a start off a small island of roads (inside a park or
+   * an estate) that leads nowhere. Valhalla's default is 50.
+   */
+  reachability?: number;
 }
 
 export interface Maneuver {
@@ -28,6 +34,19 @@ export interface Route {
    * itself along them for opt-in learning, so no GPS has to leave it.
    */
   ways?: RouteWay[];
+  /**
+   * Private gates or roads the route can't avoid: no other way in, so the
+   * crew may need a code or a key. Absent when there are none.
+   */
+  privateAccess?: PrivateAccess[];
+}
+
+export interface PrivateAccess {
+  kind: "private-gate" | "private-road";
+  /** E.g. "Private gate: Gated Mews". */
+  description: string;
+  location: { lat: number; lng: number };
+  streets: string[];
 }
 
 export interface RouteWay {
@@ -56,6 +75,8 @@ export interface TraceEdge {
   endShapeIndex: number;
   beginHeading: number;
   endHeading: number;
+  /** A gate, bollards or other barrier where the edge ends; absent from test doubles. */
+  endsAtBarrier?: boolean;
 }
 
 export class ValhallaError extends Error {
@@ -87,6 +108,11 @@ export interface SizeLimits {
   width?: number;
   length?: number;
   weight?: number;
+  /**
+   * A private road, or one signed for access only: Valhalla's
+   * "destination only". Fine to start or end on, never to cut through.
+   */
+  private?: boolean;
 }
 
 export interface Router {
@@ -97,6 +123,11 @@ export interface Router {
    * given names (any road if no names). Optional: test doubles leave it out.
    */
   sizeLimitsAt?(points: Array<{ point: LngLat; names: string[] }>): Promise<SizeLimits[]>;
+  /**
+   * For each point (a barrier on a route), whether it shuts cars out: a
+   * private or locked gate, or bollards. Optional: test doubles leave it out.
+   */
+  closedBarriersAt?(points: LngLat[]): Promise<boolean[]>;
   /** The route along a driven track, matched to the roads. Optional: test doubles leave it out. */
   traceRoute?(points: LngLat[], costing: Costing): Promise<Route>;
 }
@@ -124,15 +155,22 @@ export interface LocatedEdge {
   speedLimitKph?: number;
 }
 
+/** How widely to look: within radiusM, and public roads only (no service roads or driveways). */
+export interface LocateOptions {
+  radiusM?: number;
+  publicRoads?: boolean;
+}
+
 export interface Matcher {
   matchRoad(points: LngLat[]): Promise<MatchedRoad | null>;
-  locate(point: LngLat, heading?: number): Promise<LocatedEdge[]>;
+  locate(point: LngLat, heading?: number, options?: LocateOptions): Promise<LocatedEdge[]>;
 }
 
 const location = (w: Waypoint) => ({
   lat: w.point[1],
   lon: w.point[0],
   ...(w.heading !== undefined ? { heading: Math.round(w.heading), heading_tolerance: 45 } : {}),
+  ...(w.reachability !== undefined ? { minimum_reachability: w.reachability } : {}),
 });
 
 interface ValhallaRouteResponse {
@@ -161,10 +199,14 @@ interface ValhallaTraceResponse {
     end_shape_index: number;
     begin_heading: number;
     end_heading: number;
+    end_node?: { type?: string };
   }>;
 }
 
-const LIMIT_TYPES: Record<string, keyof SizeLimits> = {
+/** Valhalla's node types for something across the road. */
+const BARRIERS = new Set(["gate", "bollard", "sump_buster"]);
+
+const LIMIT_TYPES: Record<string, "height" | "width" | "length" | "weight"> = {
   max_height: "height",
   max_width: "width",
   max_length: "length",
@@ -172,6 +214,7 @@ const LIMIT_TYPES: Record<string, keyof SizeLimits> = {
 };
 
 interface ValhallaLocateResponse {
+  nodes?: Array<{ type?: string; private_access?: boolean; access?: { car?: boolean; bus?: boolean } }> | null;
   edges?: Array<{
     access_restrictions?: Array<{ type: string; value: number; car?: boolean; bus?: boolean; truck?: boolean }>;
     heading: number;
@@ -180,6 +223,7 @@ interface ValhallaLocateResponse {
     edge: {
       forward: boolean;
       access: { car: boolean };
+      destination_only?: boolean;
       classification: { use: string };
       geo_attributes: { length: number };
     };
@@ -315,9 +359,16 @@ export class ValhallaClient implements Router, Matcher {
   }
 
   /** Road edges at a point; with a heading, only those running that way. */
-  async locate(point: LngLat, heading?: number): Promise<LocatedEdge[]> {
+  async locate(point: LngLat, heading?: number, options: LocateOptions = {}): Promise<LocatedEdge[]> {
     const data = await this.post<ValhallaLocateResponse[]>("/locate", {
-      locations: [location({ point, heading })],
+      locations: [
+        {
+          ...location({ point, heading }),
+          ...(options.radiusM ? { radius: options.radiusM } : {}),
+          // Valhalla's lowest road class searched: residential leaves out service roads and driveways.
+          ...(options.publicRoads ? { search_filter: { min_road_class: "residential" } } : {}),
+        },
+      ],
       costing: "auto",
       costing_options: { auto: { ignore_oneways: true } },
       verbose: true,
@@ -354,6 +405,7 @@ export class ValhallaClient implements Router, Matcher {
         for (const edge of data[k]?.edges ?? []) {
           const names = edge.edge_info.names ?? [];
           if (p.names.length && !names.some((n) => p.names.includes(n))) continue;
+          if (edge.edge.destination_only) limits.private = true;
           for (const r of edge.access_restrictions ?? []) {
             const key = LIMIT_TYPES[r.type];
             if (!key || !(r.car || r.bus || r.truck) || !(r.value > 0)) continue;
@@ -361,6 +413,27 @@ export class ValhallaClient implements Router, Matcher {
           }
         }
         out.push(limits);
+      });
+    }
+    return out;
+  }
+
+  async closedBarriersAt(points: LngLat[]): Promise<boolean[]> {
+    const out: boolean[] = [];
+    for (let i = 0; i < points.length; i += 100) {
+      const batch = points.slice(i, i + 100);
+      const data = await this.post<ValhallaLocateResponse[]>("/locate", {
+        locations: batch.map((point) => location({ point })),
+        costing: "auto",
+        costing_options: { auto: { ignore_oneways: true, ignore_restrictions: true } },
+        verbose: true,
+      });
+      batch.forEach((_, k) => {
+        // Valhalla lets cars through a private gate for a time penalty, so
+        // it's found here and routed round. (The map build marks a locked
+        // gate private.) Bollards it already treats as closed.
+        const nodes = (data[k]?.nodes ?? []).filter((n) => n.type && BARRIERS.has(n.type));
+        out.push(nodes.some((n) => n.private_access || n.access?.car === false));
       });
     }
     return out;
@@ -381,6 +454,7 @@ export class ValhallaClient implements Router, Matcher {
           "edge.end_shape_index",
           "edge.begin_heading",
           "edge.end_heading",
+          "node.type",
         ],
         action: "include",
       },
@@ -395,6 +469,7 @@ export class ValhallaClient implements Router, Matcher {
       endShapeIndex: Math.min(e.end_shape_index, last),
       beginHeading: e.begin_heading,
       endHeading: e.end_heading,
+      endsAtBarrier: !!e.end_node?.type && BARRIERS.has(e.end_node.type),
     }));
   }
 }

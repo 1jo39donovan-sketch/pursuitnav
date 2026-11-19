@@ -110,8 +110,8 @@ const SYNONYMS: Record<string, string[]> = {
   bookies: ["Bookmaker"],
   "betting shop": ["Bookmaker"],
   estate: ["Housing estate"],
-  block: ["Block of flats"],
-  flats: ["Block of flats"],
+  block: ["Block of flats", "Building"],
+  flats: ["Block of flats", "Building"],
   nursery: ["Nursery"],
   gym: ["Gym"],
   garage: ["Garage", "Petrol station"],
@@ -162,4 +162,18 @@ export function typesForQuery(query: string, knownTypes: ReadonlySet<string>): s
     if (syn) return syn.filter((t) => knownTypes.has(t));
   }
   return [];
+}
+
+/** A force's name at the start of a station's ("Metropolitan Police Coldharbour Ward Office"). */
+const FORCE_PREFIX = /^(metropolitan police( service)?|city of london police|british transport police|met police)\b[\s:–-]*/i;
+
+/**
+ * A police station by its own name only, never a force's: BlueRoute is
+ * independent, and the stores treat a force's name as a claim of endorsement.
+ * "Metropolitan Police Coldharbour Ward Office" → "Coldharbour Ward Office".
+ */
+export function stationName(name: string, type: string): string {
+  if (type !== "Police station") return name;
+  const own = name.replace(FORCE_PREFIX, "").trim();
+  return own.length >= 3 ? own.replace(/^./, (c) => c.toUpperCase()) : name;
 }

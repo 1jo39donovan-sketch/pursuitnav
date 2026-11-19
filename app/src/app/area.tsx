@@ -22,6 +22,10 @@ import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import { colors, fonts } from "../theme";
 import type { ServiceType } from "../vehicles";
+import { useThemed, useColors } from "../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../components/ScreenError";
+import { offeredStation } from "../area/serviceSites";
 
 /** The stations each service wants listed, by OpenStreetMap place type. */
 const STATIONS: Record<ServiceType, { types: string[]; label: string }> = {
@@ -43,7 +47,14 @@ function go(title: string, lat: number, lng: number) {
   router.navigate({ pathname: "/search", params: { lat: String(lat), lng: String(lng), title, q: "", from: `area-${Date.now()}` } });
 }
 
+/** Instead of a crash: try again, with the rest of the app still there. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ScreenError {...props} />;
+}
+
 export default function AreaScreen() {
+  const palette = useColors();
+  const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ code?: string }>();
   const { boroughs, service } = useSession();
@@ -81,7 +92,8 @@ export default function AreaScreen() {
     const taken = new Set(custody.flatMap((c) => (c.place ? [c.place] : [])));
     return {
       custody,
-      stations: all.filter((p) => stationKind.types.includes(p.type) && !taken.has(p)),
+      // Stations with a front counter only (ward bases stay on the map, with their card).
+      stations: all.filter((p) => stationKind.types.includes(p.type) && !taken.has(p) && offeredStation(p)),
       aes: all.filter(isAE),
     };
   }, [data, bcu, places.status, police, stationKind]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -219,7 +231,7 @@ export default function AreaScreen() {
           onBlur={saveNow}
           multiline
           placeholder={`Anything you want to hand for this ${unitWord}`}
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={palette.muted}
           style={styles.notes}
         />
       </ScrollView>
@@ -228,6 +240,7 @@ export default function AreaScreen() {
 }
 
 function GoButton({ label, onPress, text = "Go" }: { label: string; onPress: () => void; text?: string }) {
+  const styles = useThemed(baseStyles);
   return (
     <Pressable
       accessibilityRole="button"
@@ -240,7 +253,7 @@ function GoButton({ label, onPress, text = "Go" }: { label: string; onPress: () 
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   back: { paddingHorizontal: 16, paddingVertical: 12, alignSelf: "flex-start" },
   backText: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 17 },

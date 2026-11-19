@@ -16,7 +16,11 @@ SAY_PREFIX="geocoder: "
 
 dir=${1:?Usage: geocoder-import.sh <folder under data/>}
 NAME=blue-route-geocoder-build
-[ -s data/osm/region.osm.pbf ] || { say "no map extract (data/osm/region.osm.pbf)"; exit 1; }
+# The extract house numbers come from: PBF_URL's alone when map-build.sh
+# merged others into the region (London, not Kent), else the region's.
+SRC=geocoder.osm.pbf
+[ -s data/osm/$SRC ] || SRC=region.osm.pbf
+[ -s data/osm/$SRC ] || { say "no map extract (data/osm/region.osm.pbf)"; exit 1; }
 # A street the new database must find. Set GEOCODER_CHECK in .env for a region other than London.
 CHECK=$(setting GEOCODER_CHECK)
 CHECK=${CHECK:-Caledonian Road, London}
@@ -30,7 +34,7 @@ trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
 start=$(date +%s)
 docker pull -q "$NOMINATIM_IMAGE" >/dev/null
 # GEOCODER_THREADS: more import threads on a bigger machine (GitHub's builds use 4).
-docker run -d --name "$NAME" --shm-size=1g --env-file nominatim.env ${GEOCODER_THREADS:+-e THREADS=$GEOCODER_THREADS} \
+docker run -d --name "$NAME" --shm-size=1g --env-file nominatim.env -e PBF_PATH=/osm/$SRC ${GEOCODER_THREADS:+-e THREADS=$GEOCODER_THREADS} \
   -v "$PWD/data/osm:/osm:ro" -v "$PWD/${dir#./}:/var/lib/postgresql/16/main" \
   "$NOMINATIM_IMAGE" >/dev/null
 

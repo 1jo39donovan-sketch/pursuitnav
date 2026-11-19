@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useSession } from "../session/SessionProvider";
 import { colors, fonts } from "../theme";
+import { useThemed } from "../textSize";
 
 const VIEW_LABEL = { heading: "▲", "3d": "3D", north: "N" } as const;
 const VIEW_NAME = { heading: "Direction of travel up", "3d": "Tilted 3D view", north: "North up" } as const;
@@ -31,6 +32,7 @@ export function MapButtons({
   /** With this, + and − buttons: +1 zooms in, −1 out. */
   onZoom?: (step: 1 | -1) => void;
 }) {
+  const styles = useThemed(baseStyles);
   const { mapTheme, setMapTheme, mapView, setMapView } = useSession();
   const next = mapView === "3d" ? "heading" : "3d";
   return (
@@ -69,7 +71,7 @@ export function MapButtons({
       )}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={mapTheme === "night" ? "Switch to day map" : "Switch to night map"}
+        accessibilityLabel={mapTheme === "night" ? "Switch to day: map and screens" : "Switch to night: map and screens"}
         onPress={() => setMapTheme(mapTheme === "night" ? "day" : "night")}
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
       >
@@ -103,11 +105,13 @@ export function MapButtons({
   );
 }
 
-const styles = StyleSheet.create({
-  column: { position: "absolute", right: 12, gap: 8 },
+const baseStyles = StyleSheet.create({
+  column: { position: "absolute", right: 12, gap: 10 },
   button: {
     width: 52,
-    height: 52,
+    // At least 52: grows with its caption (on an iPhone the caption ran under the compass).
+    minHeight: 52,
+    paddingVertical: 4,
     borderRadius: 10,
     backgroundColor: colors.panel,
     borderColor: colors.line,
@@ -124,7 +128,10 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     alignSelf: "center",
-    backgroundColor: "#ffffff",
+    // The buttons' own colour, so at night it isn't a bright white disc (PM review, P2).
+    backgroundColor: colors.panel,
+    borderColor: colors.line,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -152,7 +159,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 15,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    borderTopColor: "#9aa3b5",
+    borderTopColor: colors.muted,
   },
   label: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 18, lineHeight: 20 },
   zoom: { fontSize: 28, lineHeight: 30 },

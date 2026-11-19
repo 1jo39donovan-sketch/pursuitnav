@@ -13,8 +13,10 @@ import { AppState } from "react-native";
 import { DEMO_MODE } from "../config";
 import { demoFixNow } from "../demo/demoDrive";
 import { useSession } from "../session/SessionProvider";
+import { onDrivingFix } from "./drivingService";
 import { facing as facingFrom, isMoving } from "./facing";
 import { checkLocation, watchCompass, watchLocation } from "./locationSource";
+import { usePreciseWanted } from "./precision";
 
 export type LocationStatus =
   | "checking"
@@ -70,12 +72,22 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   // The last direction of travel, kept when the vehicle stops.
   const [lastCourse, setLastCourse] = useState<number | null>(null);
   const [compass, setCompass] = useState<number | null>(null);
+  // Fixes come from the app's watch and, while driving on Android, the
+  // foreground service too: keep only ones newer than the last.
+  const lastAt = useRef(0);
   const setFix = useCallback((f: Fix) => {
+    if (f.timestamp <= lastAt.current) return;
+    lastAt.current = f.timestamp;
+    remember(f);
     setGpsFix(f);
     if (isMoving(f)) setLastCourse(f.course);
   }, []);
   const [demoFix, setDemoFix] = useState<Fix | null>(null);
   const subscription = useRef<(() => void) | null>(null);
+  const asked = useRef(false);
+  // Full-precision GPS only while navigating or in Pursuit (PM, item 13).
+  // A change re-runs the permission effect below, which watches again at the new level.
+  const precise = usePreciseWanted();
 
   const stopWatching = useCallback(() => {
     subscription.current?.();
@@ -84,11 +96,16 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
   const startWatching = useCallback(async () => {
     if (subscription.current) return;
-    subscription.current = await watchLocation(setFix, () => {
-      stopWatching();
-      setStatus("denied");
-    });
-  }, [stopWatching, setFix]);
+    subscription.current = await watchLocation(
+      setFix,
+      () => {
+        stopWatching();
+        setStatus("denied");
+      },
+      precise,
+    );
+  }, [stopWatching, setFix, precise]);
+
 
   const refresh = useCallback(
     async (ask: boolean) => {
@@ -102,7 +119,11 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!simulated) return;
-    const tick = () => setDemoFix(demoFixNow());
+    const tick = () => {
+      const f = demoFixNow();
+      remember(f);
+      setDemoFix(f);
+    };
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [simulated]);
@@ -111,12 +132,16 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     if (simulated) return;
     // refresh() only sets state after awaiting the permission check, so this
     // subscribes to an external system rather than updating state in the effect.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh(true).catch(() => setStatus("denied"));
+    // Asks once a launch; when precision changes this runs again without asking.
+    refresh(!asked.current).catch(() => setStatus("denied"));
+    asked.current = true;
     // Coming back from Settings is the usual way a denied permission gets
     // fixed, so check again whenever the app returns to the foreground.
+    // In the background the app's own watch stops, saving battery; on
+    // Android while navigating, the foreground service carries on instead.
     const appState = AppState.addEventListener("change", (next) => {
       if (next === "active") refresh(false).catch(() => {});
+      else if (next === "background") stopWatching();
     });
     return () => {
       appState.remove();
@@ -142,6 +167,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     };
   }, [needCompass]);
 
+  useEffect(() => (simulated ? undefined : onDrivingFix(setFix)), [simulated, setFix]);
+
   const requestPermission = useCallback(() => refresh(true), [refresh]);
 
   const value = useMemo(
@@ -156,6 +183,20 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 }
 
 /** The fix as a route origin, with its direction of travel when moving. */
+// The last half-minute of fixes, in memory only: Pursuit starts from them, so
+// its first request can already be matched to a road (30 Oct: ~5 s to show it).
+const RECENT_MS = 30_000;
+let recent: Fix[] = [];
+function remember(f: Fix) {
+  if (recent.at(-1)?.timestamp === f.timestamp) return;
+  recent = [...recent.filter((r) => f.timestamp - r.timestamp <= RECENT_MS), f].slice(-10);
+}
+
+/** Fixes from the last 30 s, oldest first. */
+export function recentFixes(now = Date.now()): Fix[] {
+  return recent.filter((r) => now - r.timestamp <= RECENT_MS);
+}
+
 export function routeOrigin(fix: Fix): { lat: number; lng: number; heading?: number } {
   return isMoving(fix) ? { lat: fix.lat, lng: fix.lng, heading: Math.round(fix.course!) % 360 } : { lat: fix.lat, lng: fix.lng };
 }

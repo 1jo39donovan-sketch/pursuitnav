@@ -3,7 +3,7 @@
 // ones are OS Names (osNames.ts) and OpenStreetMap through our own Nominatim
 // (nominatim.ts), combined in addressSearch.ts. Keys stay on the server;
 // results are never stored on disk or logged.
-import { LONDON_CUSTODIANS } from "./boroughs.js";
+import { AREA_CUSTODIANS } from "./boroughs.js";
 
 export type AddressSource = "os-places" | "os-names" | "osm";
 /** How exactly the point is the place asked for: the door, a postcode's centre, a point on the road, a named place. */
@@ -123,7 +123,7 @@ export class OsPlacesClient implements PlacesClient {
     const data = (await res.json()) as PlacesResponse;
 
     return (data.results ?? []).flatMap(({ DPA: r }) => {
-      const borough = r && LONDON_CUSTODIANS[Number(r.LOCAL_CUSTODIAN_CODE)];
+      const borough = r && AREA_CUSTODIANS[Number(r.LOCAL_CUSTODIAN_CODE)];
       if (!r || !borough || typeof r.LAT !== "number" || typeof r.LNG !== "number") return [];
       return [
         {

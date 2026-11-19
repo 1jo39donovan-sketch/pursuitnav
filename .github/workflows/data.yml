@@ -1,4 +1,4 @@
-# Builds London's map and search data each week on GitHub's machines (free
+# Builds London, Kent and Essex's map and search data each week on GitHub's machines (free
 # for a public repository, and far bigger than the server) and publishes them
 # as a release, data-YYYYMMDD-HHMM. Servers download the newest one daily
 # (server/scripts/fetch-data.sh) instead of building it themselves: minutes
@@ -8,7 +8,8 @@
 #   - the routing map: Valhalla tiles with travel speeds (map-build.sh)
 #   - the places and named-roads lists the app keeps offline (map-build.sh)
 #   - the map phones keep for no signal: tiles, styles, fonts (offline-map.sh)
-#   - the house-number search: a Nominatim database (geocoder-import.sh)
+#   - the house-number search: a Nominatim database (geocoder-import.sh),
+#     London only for now (Kent's and Essex's would need a bigger server)
 # All of it is OpenStreetMap data (© OpenStreetMap contributors, ODbL),
 # already public; no officer or search data is involved.
 name: Map data
@@ -20,7 +21,8 @@ on:
   workflow_dispatch:
   # A change to this workflow on main builds and publishes at once, so it's
   # tried for real. Only main: a branch (a Dependabot update, a pull request)
-  # mustn't publish data that servers then download.
+  # mustn't publish data that servers then download. Run by hand on a branch
+  # (workflow_dispatch), it builds everything and publishes nothing.
   push:
     branches: [main]
     paths: [".github/workflows/data.yml"]
@@ -62,10 +64,29 @@ jobs:
           du -sh data/valhalla-next data/places-next
 
       - name: Offline map for phones
+        id: offline
+        # It downloads coastline and water shapes from outside servers, which
+        # can be down (3 Nov: "No route to host" twice). The routing map and
+        # places must still go out: last week's offline map is used instead.
+        continue-on-error: true
         run: |
           start=$(date +%s)
           bash scripts/offline-map.sh
           echo "OFFLINE_MINUTES=$(( ($(date +%s) - start + 59) / 60 ))" >> "$GITHUB_ENV"
+          echo "OFFLINE_MB=$(python3 -c 'import json; print(round(json.load(open("data/places-next/offline/manifest.json"))["bytes"] / 1e6))')" >> "$GITHUB_ENV"
+
+      - name: Last week's offline map, if this week's couldn't be built
+        if: steps.offline.outcome == 'failure'
+        run: |
+          prev=$(gh release list --limit 20 --json tagName --jq '.[].tagName' | grep '^data-' | sort -r | head -1)
+          [ -n "$prev" ] || { echo "No earlier data release to take the offline map from"; exit 1; }
+          echo "Taking the offline map from $prev"
+          rm -rf "$RUNNER_TEMP/prev" && sudo rm -rf data/places-next/offline && mkdir -p "$RUNNER_TEMP/prev"
+          gh release download "$prev" --pattern 'places.tar.zst.part*' --dir "$RUNNER_TEMP/prev"
+          # The map build's folder belongs to root (its container wrote it).
+          cat "$RUNNER_TEMP"/prev/places.tar.zst.part* | sudo tar --zstd -x -C data/places-next ./offline
+          test -s data/places-next/offline/map.pmtiles
+          echo "OFFLINE_MINUTES=0 (last week's, from $prev)" >> "$GITHUB_ENV"
           echo "OFFLINE_MB=$(python3 -c 'import json; print(round(json.load(open("data/places-next/offline/manifest.json"))["bytes"] / 1e6))')" >> "$GITHUB_ENV"
 
       - name: House-number search
@@ -79,22 +100,51 @@ jobs:
           sudo bash scripts/data-package.sh ./data/nominatim/a data/release "$RUNNER_TEMP/geocoder.json"
           ls -la data/release
 
+      - name: What's in it
+        run: |
+          # Rows per region (area numbers: London 0–32, Kent 33–45, Essex 46–59), so a build that lost one shows.
+          for f in places roads; do
+            sudo zcat "data/places-next/$f.txt.gz" | tail -n +2 | python3 -c "
+          import sys
+          col = 4 if '$f' == 'places' else 1
+          n = [0, 0, 0]
+          for line in sys.stdin:
+              a = int(line.split('|')[col])
+              n[0 if a < 33 else 1 if a < 46 else 2] += 1
+          print('$f: London', n[0], 'Kent', n[1], 'Essex', n[2])
+          assert all(n), 'a region has no rows'
+          "
+          done
+          echo "lines: $(sudo zcat data/places-next/lines.txt.gz 2>/dev/null | tail -n +2 | cut -d'|' -f1 | sort -u | wc -l) lines, $(sudo zcat data/places-next/lines.txt.gz 2>/dev/null | tail -n +2 | wc -l) stretches"
+
       - name: Publish
+        if: github.ref == 'refs/heads/main'
         run: |
           tag="data-$(date -u +%Y%m%d-%H%M)"
           {
-            echo "London map and search data built $(date -u '+%d %b %Y %H:%M') UTC for BlueRoute servers."
+            echo "London, Kent and Essex map data built $(date -u '+%d %b %Y %H:%M') UTC for BlueRoute servers."
             echo
             echo "Servers download this themselves (server/scripts/fetch-data.sh); there's nothing to install by hand."
             echo "Map build: ${MAP_MINUTES} min. Offline map: ${OFFLINE_MB} MB in ${OFFLINE_MINUTES} min. House-number search: $(cat "$RUNNER_TEMP/geocoder.json")"
             echo
             echo "Map data © OpenStreetMap contributors, under the Open Database License."
           } > "$RUNNER_TEMP/notes.md"
-          gh release create "$tag" data/release/* --title "Map data $(date -u +%Y-%m-%d)" \
-            --notes-file "$RUNNER_TEMP/notes.md" --prerelease --latest=false
-          echo "Published $tag"
+          # GitHub's API now and then answers 500 (4 Nov): try again rather than lose
+          # a 40-minute build, removing any half-made release first.
+          for try in 1 2 3 4; do
+            if gh release create "$tag" data/release/* --title "Map data $(date -u +%Y-%m-%d)" \
+              --notes-file "$RUNNER_TEMP/notes.md" --prerelease --latest=false; then
+              echo "Published $tag"
+              exit 0
+            fi
+            echo "Publishing failed (try $try); trying again shortly"
+            gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+            sleep $((try * 30))
+          done
+          exit 1
 
       - name: Keep the newest three
+        if: github.ref == 'refs/heads/main'
         run: |
           gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^data-' | sort -r | tail -n +4 |
             while read -r old; do gh release delete "$old" --yes --cleanup-tag; echo "Deleted $old"; done

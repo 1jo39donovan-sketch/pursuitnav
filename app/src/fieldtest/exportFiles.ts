@@ -52,7 +52,6 @@ export const TRIP_COLUMNS = [
   "taps_ignored",
   "no_signal_s",
   "no_answer_s",
-  "blue_light_maps_eta_min",
   "google_apple_eta_min",
 ];
 
@@ -95,7 +94,6 @@ export function tripsCsv(trips: readonly TripRecord[]): string {
       s.tapsIgnored,
       Math.round(s.noSignalS),
       Math.round(s.noAnswerS),
-      others.blueLightMaps,
       others.googleApple,
     ]),
   ]);

@@ -57,6 +57,15 @@ function open(): SQLiteDatabase {
   return db;
 }
 
+/** A stored row's JSON, or nothing if it's damaged: one bad row mustn't stop the rest showing. */
+function parsed<T>(text: string): T[] {
+  try {
+    return [JSON.parse(text) as T];
+  } catch {
+    return [];
+  }
+}
+
 export const store: Store = {
   getSetting(key) {
     return open().getFirstSync<{ value: string }>("SELECT value FROM settings WHERE key = ?", key)?.value ?? null;
@@ -125,12 +134,12 @@ export const store: Store = {
   listTrips() {
     return open()
       .getAllSync<{ record: string }>("SELECT record FROM trips ORDER BY started_at DESC")
-      .map((r) => JSON.parse(r.record) as TripRecord);
+      .flatMap((r) => parsed<TripRecord>(r.record));
   },
   tripEvents(id) {
     return open()
       .getAllSync<{ data: string }>("SELECT data FROM trip_events WHERE trip_id = ? ORDER BY seq", id)
-      .map((r) => JSON.parse(r.data) as TripEvent);
+      .flatMap((r) => parsed<TripEvent>(r.data));
   },
   deleteTrips() {
     const d = open();

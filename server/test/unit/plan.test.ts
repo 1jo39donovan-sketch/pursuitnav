@@ -111,3 +111,25 @@ describe("planRoutes", () => {
     expect(seen.sort()).toEqual([POLICE.costing, STANDARD.costing].sort());
   });
 });
+
+describe("starting the way the car is facing", () => {
+  it("tries again in any direction when the heading leaves no route", async () => {
+    const { ValhallaError } = await import("../../src/valhalla.js");
+    const calls: (number | undefined)[] = [];
+    const router: Router = {
+      async route(req: RouteRequest) {
+        calls.push(req.from.heading);
+        if (req.from.heading !== undefined) throw new ValhallaError("No path could be found", 400, 442);
+        if (req.distanceOnly) return { ...route(0), distanceM: 1 };
+        return route(200);
+      },
+      async traceEdges() {
+        return edges;
+      },
+    };
+    const plan = await planRoutes(router, shape[0]!, shape[10]!, { ...options, standardOnly: true }, 90);
+    expect(plan.standard.durationS).toBe(200);
+    expect(calls[0]).toBe(90);
+    expect(calls.at(-1)).toBeUndefined();
+  });
+});

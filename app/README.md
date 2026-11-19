@@ -42,7 +42,11 @@ npm run lint
 
 - `src/app/` — screens (Expo Router). `(tabs)/` holds Session, Search, Pursuit, Log.
 - `src/location/LocationProvider.tsx` — the app's single GPS subscription.
-- `src/components/LiveMap.tsx` — dark map that follows the phone's position.
+- `src/components/LiveMap.tsx` (and `.web.tsx`) — the map that follows the phone's position.
+- `src/components/mapLooks.ts` — the map styles (Standard, Clear, Plain, OS map, Satellite), day and night.
+- `src/components/mapTransport.ts` — Tube, Overground, DLR, tram and rail lines (in their colours from the weekly `lines` file, `transportLines.ts`), stations and bus stations.
+- `src/components/mapServices.ts` — police (custody marked), fire, ambulance, A&E, courts and prisons as badges; a tap opens a card with who runs it.
+- `src/area/custody.ts` — custody suites in London, Kent and Essex, and their sources.
 - `src/config.ts` — region settings (London for v1), map style URL and routing server URL.
 - `src/api/routes.ts` — client for the server's routes API.
 - `src/components/RoutePanel.tsx` — the standard and police routes side by side.

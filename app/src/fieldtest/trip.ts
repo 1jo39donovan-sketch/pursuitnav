@@ -66,6 +66,8 @@ export type TripEvent = { t: number } & (
   | ({ type: "off-route"; offByM: number } & Pos)
   | { type: "reroute"; trigger: RerouteTrigger; startedAt: number; ms: number; outcome: RerouteOutcome; kindBefore: string; kindAfter: string }
   | { type: "speech"; text: string }
+  /** What the phone did with a prompt: started it, finished it, or cut it off. */
+  | { type: "speech-state"; state: "start" | "done" | "stopped"; text: string }
   | { type: "signal"; state: "no-signal" | "no-answer" | "online" }
   | ({ type: "mark"; tag: MarkTag } & Pos)
   | { type: "eta"; etaS: number }
@@ -74,7 +76,6 @@ export type TripEvent = { t: number } & (
 
 /** Typed in by the operator: what the other apps said, in minutes. */
 export interface OtherEtas {
-  blueLightMaps: number | null;
   googleApple: number | null;
 }
 

@@ -1,9 +1,11 @@
 import { ScrollView, StyleSheet, Text } from "react-native";
 
 import { colors, fonts } from "../theme";
+import { useThemed } from "../textSize";
 
 /** Holding screen for tabs whose feature lands in a later build step. */
 export function Placeholder({ title, body }: { title: string; body: string }) {
+  const styles = useThemed(baseStyles);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>{title}</Text>
@@ -12,7 +14,7 @@ export function Placeholder({ title, body }: { title: string; body: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, gap: 8 },
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26 },

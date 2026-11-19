@@ -12,7 +12,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MAP_STYLES, region } from "../config";
-import { useMapStyle } from "./mapLooks";
+import { useImageryOffered } from "./imagery";
+import { useTransportLines } from "./transportLines";
+import { SERVICES_BADGE_LAYER } from "./mapServices";
+import { useSearch } from "../search/SearchProvider";
+import { lookToDraw, useMapStyle } from "./mapLooks";
 import { useOfflineMap } from "../offline/OfflineMapProvider";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
@@ -48,7 +52,9 @@ import {
   MARKER_MIN_ZOOM,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
-  pointGeoJSON,
+  destinationGeoJSON,
+  DESTINATION_NUMBER_LAYOUT,
+  DESTINATION_NUMBER_PAINT,
   pointsGeoJSON,
   RESTRICTION_CIRCLE_PAINT,
   RESTRICTION_LABEL_LAYOUT,
@@ -59,7 +65,9 @@ import {
   VEHICLE_IMAGE,
   vehicleFeature,
 } from "./mapShared";
+import { useGlide } from "./glide";
 import { MapButtons } from "./MapButtons";
+import { useThemed } from "../textSize";
 
 /**
  * Map (night or day style) that follows the phone's GPS position. Panning the map stops
@@ -73,6 +81,9 @@ export function LiveMap({
   autoZoom = false,
   zoomControl = false,
   roadNames = false,
+  houseNumbers = true,
+  doorNumbers = false,
+  destinationNumber = null,
   labels,
   team,
   vehicleArrow = false,
@@ -89,16 +100,26 @@ export function LiveMap({
   fitTo,
   markers,
   onMarkerPress,
+  onTeamPress,
+  snapTo,
 }: LiveMapProps) {
+  const styles = useThemed(baseStyles);
   const { fix, facing } = useLocation();
-  const { mapTheme, mapLook } = useSession();
+  const { mapTheme, mapLook, transport, services: servicesOn } = useSession();
+  const { services } = useSearch();
   // The map kept on the phone, once downloaded: draws with no signal.
   const offlineStyles = useOfflineMap().styles;
+  const imagery = useImageryOffered();
+  const lines = useTransportLines(transport);
   const mapStyle = useMapStyle(
     offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme],
-    mapLook,
+    lookToDraw(mapLook, imagery),
     mapTheme,
     offlineStyles?.day ?? MAP_STYLES.day,
+    houseNumbers,
+    transport,
+    lines,
+    servicesOn ? services : null,
   );
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
@@ -136,11 +157,14 @@ export function LiveMap({
   }, [fitTo, overlayTop, overlayBottom]);
   const [mapFailed, setMapFailed] = useState(false);
 
-  const position: LngLat | null = fix ? [fix.lng, fix.lat] : null;
+  // Where the vehicle is drawn: on the route while navigating (snapTo), else the
+  // GPS fix; gliding from one to the next rather than jumping once a second.
+  const pose = useGlide(snapTo ?? (fix ? { lng: fix.lng, lat: fix.lat, course: facing } : null));
+  const position: LngLat | null = pose ? [pose.lng, pose.lat] : null;
 
-  const lng = fix?.lng;
-  const lat = fix?.lat;
-  const course = facing;
+  const lng = pose?.lng;
+  const lat = pose?.lat;
+  const course = pose?.course ?? null;
   const puck = useMemo<GeoJSON.Feature | null>(
     () => (lng != null && lat != null ? vehicleFeature(lng, lat, course) : null),
     [lng, lat, course],
@@ -155,11 +179,12 @@ export function LiveMap({
       ? {
           center: position,
           zoom: followAt,
-          ...cameraFor(view, facing),
+          ...cameraFor(view, course),
           // Navigating with the map turned: the vehicle sits low, showing the road ahead.
           padding: { top: ahead + overlayTop / 2, bottom: overlayBottom / 2, left: 0, right: 0 },
-          duration: 800,
-          easing: "ease" as const,
+          // Short, even steps that follow the gliding vehicle frame by frame.
+          duration: 120,
+          easing: "linear" as const,
         }
       : {};
 
@@ -183,8 +208,24 @@ export function LiveMap({
           const tappedAt = Date.now();
           const { point } = e.nativeEvent;
           const r = HOUSE_NUMBER_TAP_PX;
-          setTimeout(() => {
-            if (markerPressedAt.current >= tappedAt - 50 || !onPress) return;
+          setTimeout(async () => {
+            if (markerPressedAt.current >= tappedAt - 50) return;
+            // A police, fire or A&E badge (drawn in the style): its card, with who runs it and custody.
+            const badge = await mapRef.current
+              ?.queryRenderedFeatures(
+                [
+                  [point[0] - 14, point[1] - 14],
+                  [point[0] + 14, point[1] + 14],
+                ],
+                { layers: [SERVICES_BADGE_LAYER] },
+              )
+              .then((fs) => fs[0])
+              .catch(() => undefined);
+            if (badge?.geometry.type === "Point" && badge.properties && onMarkerPress) {
+              onMarkerPress(badge.properties as MarkerProperties, badge.geometry.coordinates as LngLat);
+              return;
+            }
+            if (!onPress) return;
             // The house number drawn nearest the tap: the one the crew can see they tapped.
             void (mapRef.current
               ?.queryRenderedFeatures(
@@ -258,15 +299,17 @@ export function LiveMap({
           />
         </GeoJSONSource>
         {/* Under the road names, so a street name always wins the space. */}
-        <Layer
-          type="symbol"
-          id={HOUSE_NUMBER_LAYER}
-          source={ROAD_NAME_SOURCE}
-          source-layer={HOUSE_NUMBER_SOURCE_LAYER}
-          minzoom={HOUSE_NUMBER_MIN_ZOOM}
-          layout={houseNumberLayout}
-          paint={houseNumberPaint(mapTheme)}
-        />
+        {(houseNumbers || doorNumbers) && (
+          <Layer
+            type="symbol"
+            id={HOUSE_NUMBER_LAYER}
+            source={ROAD_NAME_SOURCE}
+            source-layer={HOUSE_NUMBER_SOURCE_LAYER}
+            minzoom={HOUSE_NUMBER_MIN_ZOOM}
+            layout={houseNumberLayout}
+            paint={houseNumberPaint(mapTheme)}
+          />
+        )}
         {roadNames && (
           <Layer
             type="symbol"
@@ -281,7 +324,17 @@ export function LiveMap({
         <GeoJSONSource id="labels" data={labels ?? EMPTY_COLLECTION}>
           <Layer type="symbol" id="block-labels" minzoom={15} layout={LABEL_LAYOUT} paint={labelPaint(mapTheme)} />
         </GeoJSONSource>
-        <GeoJSONSource id="team" data={team ?? EMPTY_COLLECTION}>
+        <GeoJSONSource
+          id="team"
+          data={team ?? EMPTY_COLLECTION}
+          hitbox={{ top: 16, right: 16, bottom: 16, left: 16 }}
+          onPress={(e) => {
+            const id = e.nativeEvent.features[0]?.properties?.id;
+            if (typeof id !== "string" || !onTeamPress) return;
+            markerPressedAt.current = Date.now();
+            onTeamPress(id);
+          }}
+        >
           <Layer type="circle" id="team-dot" paint={TEAM_CIRCLE_PAINT} />
           <Layer type="symbol" id="team-label" layout={TEAM_LABEL_LAYOUT} paint={teamLabelPaint(mapTheme)} />
         </GeoJSONSource>
@@ -294,7 +347,7 @@ export function LiveMap({
             paint={RESTRICTION_LABEL_PAINT}
           />
         </GeoJSONSource>
-        <GeoJSONSource id="destination" data={pointGeoJSON(destination)}>
+        <GeoJSONSource id="destination" data={destinationGeoJSON(destination, destinationNumber)}>
           <Layer
             type="circle"
             id="destination-dot"
@@ -305,6 +358,7 @@ export function LiveMap({
               "circle-stroke-width": 3,
             }}
           />
+          <Layer type="symbol" id="destination-number" layout={DESTINATION_NUMBER_LAYOUT} paint={DESTINATION_NUMBER_PAINT} />
         </GeoJSONSource>
         {puck && (
           <GeoJSONSource id="me" data={puck}>
@@ -332,8 +386,8 @@ export function LiveMap({
       </Map>
 
       {mapFailed && (
-        // Below whatever floats over the top of the map (Search's box), not hidden under it.
-        <View style={[styles.failed, { top: 16 + overlayTop }]} pointerEvents="none">
+        // Low on the map, above what floats at the bottom: at the top it covered PLACES (30 Oct).
+        <View style={[styles.failed, { bottom: 16 + overlayBottom }]} pointerEvents="none">
           <Text style={styles.failedTitle}>Map couldn’t load</Text>
           <Text style={styles.failedBody}>No connection to the map server. GPS is still running.</Text>
         </View>
@@ -359,7 +413,7 @@ export function LiveMap({
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, overflow: "hidden" },
   recentre: {
     position: "absolute",
@@ -374,8 +428,7 @@ const styles = StyleSheet.create({
   failed: {
     position: "absolute",
     left: 16,
-    right: 16,
-    top: 16,
+    right: 72,
     backgroundColor: colors.panel,
     borderColor: colors.amber,
     borderWidth: 1,

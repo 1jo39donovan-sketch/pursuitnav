@@ -1,9 +1,8 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { router } from "expo-router";
 import { useNetworkState } from "expo-network";
-import * as Speech from "expo-speech";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchRoutes, restrictionPoints, type RoutePlan } from "../api/routes";
@@ -16,6 +15,8 @@ import { LiveMap } from "../components/LiveMap";
 import type { MapRoute } from "../components/mapShared";
 import { ExternalLinks } from "../components/RoutePanel";
 import { formatDistance, formatMinutes, roadLabel } from "../format";
+import { useDrivingService } from "../location/drivingService";
+import { usePrecise } from "../location/precision";
 import { routeOrigin, useLocation } from "../location/LocationProvider";
 import { useNavigation, type RouteKind } from "../navigation/NavigationProvider";
 import {
@@ -27,7 +28,11 @@ import {
   type LastReroute,
   type RerouteFailure,
 } from "../navigation/reroute";
+import { hush, onSpeech, say } from "../navigation/speaker";
+import { speakable } from "../navigation/spokenText";
 import { arrivalSide, instructionWithPlace, nextCallout } from "../navigation/voice";
+import { noteTurnCard } from "../navigation/timings";
+import { store } from "../storage/store";
 import { recordEvent } from "../usage/usage";
 import { demoDriveStartedAt, setDemoPath } from "../demo/demoDrive";
 import { recorder, useRecorder } from "../fieldtest/instance";
@@ -50,16 +55,28 @@ import {
   comingUp,
   upcomingInstruction,
   OFF_ROUTE_FIXES,
+  briefInstruction,
+  thenText,
+  repeatTurn,
+  REPEAT_AFTER_GO_MS,
+  courseDiff,
   offRouteCount,
   prepare,
+  pointAlong,
   progressAt,
   type PreparedRoute,
   type Progress,
 } from "../navigation/progress";
 import { colors, fonts } from "../theme";
-import { reportUrl } from "../feedback";
+import { flagRoute } from "../flags";
 import { loadNotes, noteNear } from "../search/blockNotes";
 import { useTextStyles } from "../textSize";
+import type { ErrorBoundaryProps } from "expo-router";
+import { ScreenError } from "../components/ScreenError";
+import { TeamMessageCard } from "../components/TeamMessageCard";
+import { routeToMessage } from "../team/routeToMessage";
+import { useStopped } from "../navigation/stopped";
+import { doorNumberOf } from "../components/mapShared";
 
 const DEMO_GRACE_MS = 5000;
 const ARRIVAL_GRACE_MS = 10_000;
@@ -78,6 +95,49 @@ function flushTiming(t: Timing, next: PreparedRoute | null): Timing {
 }
 
 /** Turn-by-turn guidance, readable at a glance by the operator. */
+/** Degrees between the car's course and the route's direction where it is; null when not moving. */
+function headingOff(prepared: PreparedRoute, progress: Progress, fix: { course: number | null; speed: number | null }) {
+  // From about 3 mph: the 30 Oct missed turns were all made crawling in traffic.
+  if (fix.course == null || fix.speed == null || fix.speed < COURSE_FROM_MS) return null;
+  const here = pointAlong(prepared, progress.along);
+  return here ? courseDiff(fix.course, here.course) : null;
+}
+
+/** A phone's course is steady enough to compare from this speed, m/s. */
+const COURSE_FROM_MS = 1.4;
+
+/** Drawn on the route line when GPS puts the vehicle within this of it, metres. */
+const SNAP_DRAW_M = 30;
+
+/**
+ * Instead of a crash mid-drive: try again, or carry on in Google Maps or
+ * Waze to the same place, or end. The crew is never left with nothing.
+ */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <NavigateError {...props} />;
+}
+
+function NavigateError(props: ErrorBoundaryProps) {
+  const { active, stop } = useNavigation();
+  const dest = active?.destination;
+  return (
+    <ScreenError {...props}>
+      {dest && <ExternalLinks lat={dest.lat} lng={dest.lng} prominent />}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          stop("end");
+          if (router.canGoBack()) router.back();
+          else router.replace("/search");
+        }}
+        style={({ pressed }) => [{ minHeight: 52, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.8 }]}
+      >
+        <Text style={{ color: "#ff8a8d", fontSize: 18, fontWeight: "700" }}>End navigation</Text>
+      </Pressable>
+    </ScreenError>
+  );
+}
+
 export default function NavigateScreen() {
   const styles = useTextStyles(baseStyles);
   // Screen stays on while navigating. Ending quickly can release the lock
@@ -88,22 +148,36 @@ export default function NavigateScreen() {
       deactivateKeepAwake("navigate").catch(() => {});
     };
   }, []);
-  const { active, replan, rerouteNow, stop } = useNavigation();
+  const { active, replan, rerouteNow, stop, resumable, resume, dismissResume } = useNavigation();
   // Usage counts: one navigation session per time this screen opens.
   useEffect(() => recordEvent("navigation"), []);
+  // The turn card is on screen from the first render: GO took this long (Session → Testing).
+  useEffect(() => noteTurnCard(), []);
   const { fix: lastFix, simulated, facing } = useLocation();
+  // Directions and voice carry on with the screen locked (Android).
+  useDrivingService("navigate", !simulated);
+  usePrecise("navigate", !simulated);
   // When this screen opened. On a demo drive, a fix from before then is from
   // the patrol, not the route the car is about to be put on: not used.
   const [openedAt] = useState(() => Date.now());
   const fix = simulated && lastFix && lastFix.timestamp < openedAt ? null : lastFix;
+  // Stopped: door numbers on the map, to find the door (they crowd the road while moving).
+  const stopped = useStopped(fix);
   const { blockLabels } = useSearch();
   const { vehicle, voice: voiceOn, setVoice, mapView, roads, learning, demoDrive, policeRoutes, mapLook } = useSession();
   const { mapPoints: teamMap } = useTeam();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
+  // A small phone held upright: a tighter turn card, so the map keeps half the screen.
+  const compact = !landscape && height < 760;
+  // Too narrow for the route badge beside the arrival time: it goes under the road.
+  // Sideways, the panel is the side column (42% of the width), not the whole screen.
+  const narrow = (width > height ? width * 0.42 : width) < 400;
 
   const prepared = useMemo(() => (active ? prepare(active.route) : null), [active]);
+  // Whether the last new route came from a quiet refresh (no "Re-routing", no "New route").
+  const replanQuiet = useRef(false);
   // The crew's own note on the block they're going to, if they wrote one (Search).
   const destLat = active?.destination.lat;
   const destLng = active?.destination.lng;
@@ -141,10 +215,24 @@ export default function NavigateScreen() {
       offCount:
         fresh || (simulated && fix.timestamp - demoDriveStartedAt() < DEMO_GRACE_MS)
           ? 0
-          : offRouteCount(track.offCount, progress.offRouteBy, fix.accuracy),
+          : offRouteCount(
+              track.offCount,
+              progress.offRouteBy,
+              fix.accuracy,
+              headingOff(prepared, progress, fix),
+              progress.nearTurnM,
+            ),
     });
   }
   const progress = track.prepared === prepared ? track.progress : null;
+  // Until the first fix on this screen (on the demo drive, the car's next
+  // tick), the card shows the first turn from the route's start, which is
+  // where the phone was when the route was planned: no "Waiting for GPS…".
+  const startCard = useMemo(() => {
+    const first = prepared?.route.shape[0];
+    return prepared && first ? progressAt(prepared, { lng: first[0], lat: first[1] }) : null;
+  }, [prepared]);
+  const card = progress ?? startCard;
   const offRoute = track.prepared === prepared && track.offCount >= OFF_ROUTE_FIXES;
 
   // Signal. Guidance carries on without it (the route is on the phone); only
@@ -238,10 +326,12 @@ export default function NavigateScreen() {
     // tries, every 10 s, in case the phone's network state is behind).
     const canReroute = mayAnnounceReroute(linkRef.current.link);
     if (!quiet && canReroute) setRerouting(true);
+    // A quiet refresh keeps going without a word; a real re-route says "New route…" with its first turn.
+    replanQuiet.current = quiet;
     if (voiceOn && !quiet && canReroute) {
-      Speech.stop();
-      Speech.speak("Re-routing", { language: "en-GB" });
-      recorder.event({ type: "speech", text: "Re-routing" });
+      // Short, and the new route's first prompt waits for it to finish.
+      say("Re-routing.");
+      recorder.event({ type: "speech", text: "Re-routing." });
     }
     const current = () => inFlight.current === controller && !controller.signal.aborted;
     // Field-test recording: why, how long, how it went, and the route before and after.
@@ -318,11 +408,21 @@ export default function NavigateScreen() {
     const reason = progress?.arrived ? "arrived" : "end";
     recorder.end(reason);
     stop(reason);
-    router.back();
+    // Opened straight from its address (web), there's nothing to go back to.
+    if (router.canGoBack()) router.back();
+    else router.replace("/search");
   };
 
   // Quick actions: one tap each, no second End tap needed.
   const [sheet, setSheet] = useState(false);
+  // "Flag route": noted on the phone, sent after END (Search offers it), so
+  // nothing takes the crew out of navigation mid-drive.
+  const [flagged, setFlagged] = useState(false);
+  useEffect(() => {
+    if (!flagged) return;
+    const t = setTimeout(() => setFlagged(false), 4000);
+    return () => clearTimeout(t);
+  }, [flagged]);
   // Field test: one-tap marks while recording ("Wrong instruction", …).
   const { recording } = useRecorder();
   const [marking, setMarking] = useState(false);
@@ -342,29 +442,83 @@ export default function NavigateScreen() {
   // Remembered between routes (and set on Session), so a muted app stays muted.
   const toggleVoice = () => {
     setVoice(!voiceOn);
-    if (voiceOn) Speech.stop();
+    if (voiceOn) {
+      hush();
+      return;
+    }
+    // Turned on mid-route: say the next turn straight away. Useful, and on an
+    // iPhone in Safari it's what lets speech play at all: Safari only speaks
+    // after speaking in answer to a tap (9 Nov drive: voice turned on after
+    // GO stayed silent for the rest of the route).
+    const next = card?.next;
+    say(
+      next ? speakable(instructionWithPlace(next, active?.destination.title)).replace(/\.?$/, ".") : "Voice on.",
+      "urgent",
+    );
   };
-  const said = useRef<{ route: unknown; keys: Set<string> }>({ route: null, keys: new Set() });
+  // Calls come earlier when faster. Changes with each fix, as progress does.
+  const speedMs = lastFix?.speed ?? null;
+  const said = useRef<{ route: unknown; keys: Set<string>; routes: number }>({
+    route: null,
+    keys: new Set(),
+    routes: 0,
+  });
   useEffect(() => {
     if (!progress || !prepared || offRoute) return;
     // A new route (after a re-route) starts its callouts afresh.
-    if (said.current.route !== prepared) said.current = { route: prepared, keys: new Set() };
-    const callout = nextCallout(progress, said.current.keys, active?.destination.title);
+    if (said.current.route !== prepared) {
+      const first = said.current.routes === 0;
+      // A quiet refresh mid-drive doesn't start again with "Head along…".
+      said.current = {
+        route: prepared,
+        keys: new Set(!first && replanQuiet.current ? ["start"] : []),
+        routes: said.current.routes + 1,
+      };
+    }
+    const callout = nextCallout(progress, said.current.keys, active?.destination.title, {
+      rerouted: said.current.routes > 1,
+      // Faster, the calls come earlier: seconds ahead, not a fixed distance.
+      speedMs,
+    });
     if (!callout) return;
     said.current.keys.add(callout.key);
+    callout.covers?.forEach((k) => said.current.keys.add(k));
     if (voiceOn) {
-      Speech.stop();
-      Speech.speak(callout.text, { language: "en-GB" });
+      say(callout.text, callout.priority);
       recorder.event({ type: "speech", text: callout.text });
     }
-  }, [progress, prepared, offRoute, voiceOn, active?.destination.title]);
-  useEffect(() => () => void Speech.stop(), []);
+  }, [progress, prepared, offRoute, voiceOn, active?.destination.title, speedMs]);
+  // Every GO starts silent and clean: anything still queued or being said
+  // from before (a route popup, the last route) is dropped first. And the
+  // recorder hears what the phone actually did with each prompt.
+  useEffect(() => {
+    hush();
+    onSpeech((state, text) => recorder.event({ type: "speech-state", state, text }));
+    return () => {
+      onSpeech(null);
+      hush();
+    };
+  }, []);
+
+  // The next turn repeated under the map for the first seconds after GO (and
+  // close to each turn), in case a notification covers the card at the top.
+  const [justStarted, setJustStarted] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setJustStarted(false), REPEAT_AFTER_GO_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const [focusTip, setFocusTip] = useState(() => store.getSetting("focusTipSeen") !== "1");
+  const closeFocusTip = () => {
+    store.setSetting("focusTipSeen", "1");
+    setFocusTip(false);
+  };
 
   // Ending takes a second tap, so a bump on the way doesn't drop the route.
   const [confirmEnd, setConfirmEnd] = useState(false);
   useEffect(() => {
     if (!confirmEnd) return;
-    const t = setTimeout(() => setConfirmEnd(false), 3000);
+    // Long enough to look back at the road and still tap again (30 Oct test).
+    const t = setTimeout(() => setConfirmEnd(false), 5000);
     return () => clearTimeout(t);
   }, [confirmEnd]);
 
@@ -372,8 +526,26 @@ export default function NavigateScreen() {
   if (!active || !prepared) {
     return (
       <View style={[styles.screen, styles.empty]}>
-        <Text style={styles.emptyText}>No route chosen.</Text>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.endButton}>
+        {resumable && !active ? (
+          <>
+            <Text style={styles.emptyText}>The app was closed during a route.</Text>
+            <Pressable accessibilityRole="button" onPress={resume} style={styles.resumeButton}>
+              <Text style={styles.resumeText} numberOfLines={2}>
+                Resume route to {resumable.destination.title}
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={dismissResume} hitSlop={12}>
+              <Text style={styles.emptyText}>Not now</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Text style={styles.emptyText}>No route chosen.</Text>
+        )}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/search"))}
+          style={styles.endButton}
+        >
           <Text style={styles.endText}>Back</Text>
         </Pressable>
       </View>
@@ -390,6 +562,13 @@ export default function NavigateScreen() {
   const offRouteMsg = offRouteText(failed, RETRY_AFTER_FAILURE_MS / 1000, reroutingFor);
   // The off-route panel also shows while a re-route asked for on the line is worked out.
   const showOff = offRoute || rerouting;
+  // On the route, the arrow is drawn on the route line (GPS a few metres to the
+  // side put it on the pavement or the buildings); off it, where GPS says. Within
+  // less than the off-route distance, so a missed turn shows within a few seconds.
+  const snapTo =
+    progress && !showOff && !progress.arrived && progress.offRouteBy <= SNAP_DRAW_M
+      ? pointAlong(prepared, progress.along)
+      : null;
   const banner = linkBanner(linkState.link);
   // Off the line with no signal: no new route is coming, so show the way back.
   const back =
@@ -398,9 +577,9 @@ export default function NavigateScreen() {
       : null;
   const turnPanel = (
     <View style={[styles.turn, showOff && styles.turnOff]}>
-      {!progress ? (
+      {!card ? (
         <Text style={styles.instruction}>Waiting for GPS…</Text>
-      ) : progress.arrived ? (
+      ) : card.arrived ? (
         <>
           <Text style={styles.distance}>⚑ Arrived</Text>
           <Text style={styles.instruction}>{active.destination.title}</Text>
@@ -434,20 +613,31 @@ export default function NavigateScreen() {
       ) : (
         <>
           <View style={styles.turnRow}>
-            <Text style={styles.arrow}>{maneuverArrow(progress.next?.type ?? 4)}</Text>
-            <Text style={styles.distance}>{formatDistance(progress.distanceToNextM)}</Text>
+            <Text style={[styles.arrow, compact && styles.arrowCompact]}>{maneuverArrow(card.next?.type ?? 4)}</Text>
+            <Text style={[styles.distance, compact && styles.distanceCompact]}>
+              {/* At the junction "0 yd" read like a fault: say it's now. */}
+              {card.distanceToNextM < 15 ? "Now" : formatDistance(card.distanceToNextM)}
+            </Text>
           </View>
-          <Text style={styles.instruction} numberOfLines={3}>
-            {progress.next ? instructionWithPlace(progress.next, active.destination.title) : "Continue to your destination."}
+          <Text style={[styles.instruction, compact && styles.instructionCompact]} numberOfLines={compact ? 2 : 3}>
+            {card.next
+              ? briefInstruction(instructionWithPlace(card.next, active.destination.title))
+              : "Continue to your destination."}
           </Text>
-          {progress.after && (
-            <Text style={styles.then} numberOfLines={2}>
-              Then {maneuverArrow(progress.after.type)} {instructionWithPlace(progress.after, active.destination.title)}
+          {card.after && (
+            <Text style={styles.then} numberOfLines={compact ? 1 : 2}>
+              Then {maneuverArrow(card.after.type)}{" "}
+              {thenText(card.after, instructionWithPlace(card.after, active.destination.title), card.next?.streetNames)}
             </Text>
           )}
         </>
       )}
       {active.note && <Text style={styles.note}>{active.note}</Text>}
+      {flagged && (
+        <Text accessibilityRole="alert" style={styles.linkBanner}>
+          Route flagged. Send it after you end, from Search.
+        </Text>
+      )}
       {banner && !back && (
         <Text accessibilityRole="alert" style={styles.linkBanner}>
           {banner}
@@ -456,37 +646,68 @@ export default function NavigateScreen() {
     </View>
   );
 
+  const routeBadge = (
+    <Text style={[styles.badge, narrow && styles.badgeUnder, { color: routeColor, borderColor: routeColor }]}>
+      {isPolice
+        ? `BLUE LIGHT · ${"restrictions" in active.route ? active.route.restrictions.length : 0}`
+        : "STANDARD"}
+    </Text>
+  );
   // Two rows, so nothing has to squeeze: arrival time and road, then the buttons.
   const etaPanel = (
     <View style={[styles.bottom, { paddingBottom: insets.bottom + 10 }]}>
+      {/* Near the thumb in portrait; sideways the turn card is just above it, so it's left out
+          (on a small phone on its side it pushed the turn itself out of sight, 17 Nov). */}
+      {!landscape && card?.next && !card.arrived && !showOff && repeatTurn(justStarted, card.distanceToNextM) && (
+        <View style={styles.repeat} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Text style={styles.repeatArrow}>{maneuverArrow(card.next.type)}</Text>
+          <Text style={styles.repeatDistance}>
+            {card.distanceToNextM < 15 ? "Now" : formatDistance(card.distanceToNextM)}
+          </Text>
+          <Text style={styles.repeatRoad} numberOfLines={1}>
+            {thenText(card.next, instructionWithPlace(card.next, active.destination.title))}
+          </Text>
+          {!voiceOn && <Text style={styles.repeatMuted}>Voice off</Text>}
+        </View>
+      )}
+      {/* The one-off tip waits for portrait: sideways there's no room for it. */}
+      {focusTip && !landscape && (
+        <View style={styles.focusTip}>
+          <Text style={styles.focusTipText}>
+            {Platform.OS === "android"
+              ? "Tip: turn on Do Not Disturb (or Driving mode) so notifications don’t cover your directions."
+              : "Tip: turn on Driving Focus (Control Centre → Focus) so notifications don’t cover your directions."}
+          </Text>
+          <Pressable accessibilityRole="button" onPress={closeFocusTip} hitSlop={10} style={styles.focusTipOk}>
+            <Text style={styles.focusTipOkText}>OK</Text>
+          </Pressable>
+        </View>
+      )}
       <View style={styles.etaRow}>
         <Text style={styles.etaClock} numberOfLines={1}>
-          {progress
-            ? new Date(track.fixAt + progress.remainingS * 1000).toLocaleTimeString("en-GB", {
+          {card
+            ? new Date((progress ? track.fixAt : openedAt) + card.remainingS * 1000).toLocaleTimeString("en-GB", {
                 hour: "2-digit",
                 minute: "2-digit",
               })
             : "—"}
         </Text>
         <View style={styles.eta}>
-          <Text style={styles.etaMeta} numberOfLines={2}>
-            {progress ? `${formatMinutes(progress.remainingS)} · ${formatDistance(progress.remainingM)}` : ""}
+          <Text style={styles.etaMeta} numberOfLines={1}>
+            {card ? `${formatMinutes(card.remainingS)} · ${formatDistance(card.remainingM)}` : ""}
           </Text>
-          <Text style={styles.road} numberOfLines={2}>
-            On {(progress && roadLabel(progress.current.streetNames)) ?? "—"}
+          <Text style={styles.road} numberOfLines={narrow ? 1 : 2}>
+            On {(card && roadLabel(card.current.streetNames)) ?? "—"}
           </Text>
+          {narrow && routeBadge}
           {/* The crew's note on the block, as they get close. */}
-          {blockNote && progress && !progress.arrived && progress.remainingM < NOTE_WITHIN_M && (
+          {blockNote && card && !card.arrived && card.remainingM < NOTE_WITHIN_M && (
             <Text style={styles.blockNote} numberOfLines={2}>
               ✎ {blockNote}
             </Text>
           )}
         </View>
-        <Text style={[styles.badge, { color: routeColor, borderColor: routeColor }]}>
-          {isPolice
-            ? `BLUE LIGHT · ${"restrictions" in active.route ? active.route.restrictions.length : 0}`
-            : "STANDARD"}
-        </Text>
+        {!narrow && routeBadge}
       </View>
       <View style={styles.buttons}>
         <Pressable
@@ -531,9 +752,24 @@ export default function NavigateScreen() {
     </View>
   );
 
+  // GPS warnings float on the map just under the turn card: never over it, never moving it (3 Nov).
+  const gpsFloat = (
+    <View style={[styles.gpsFloat, { top: landscape ? 8 : turnHeight }]} pointerEvents="box-none">
+      <GpsStatus onRoute />
+      {/* A team message mid-route: Route here ends this route and plans the new one. */}
+      <TeamMessageCard
+        onRoute={(m) => {
+          recorder.end("new-destination");
+          stop("new-destination");
+          if (router.canGoBack()) router.back();
+          routeToMessage(m);
+        }}
+      />
+    </View>
+  );
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }]}>
-      <GpsStatus />
       {landscape ? (
         <View style={styles.row}>
           <View style={styles.landscapeSide}>
@@ -559,6 +795,7 @@ export default function NavigateScreen() {
           </View>
           <View style={styles.map}>
             <LiveMap
+              snapTo={snapTo}
               lookAhead
               team={teamMap}
               view={mapView}
@@ -566,6 +803,9 @@ export default function NavigateScreen() {
               zoomControl
               autoZoom
               roadNames
+              houseNumbers={false}
+              doorNumbers={stopped}
+              destinationNumber={doorNumberOf(active.destination.title)}
               vehicleArrow
               followZoom={16.5}
               routes={routes}
@@ -574,6 +814,7 @@ export default function NavigateScreen() {
               labels={blockLabels}
               compact
             />
+            {gpsFloat}
           </View>
         </View>
       ) : (
@@ -581,6 +822,7 @@ export default function NavigateScreen() {
           {/* The map fills the screen; the next turn floats over its top. */}
           <View style={styles.map}>
             <LiveMap
+              snapTo={snapTo}
               lookAhead
               overlayTop={turnHeight}
               overlayBottom={18}
@@ -590,6 +832,9 @@ export default function NavigateScreen() {
               zoomControl
               autoZoom
               roadNames
+              houseNumbers={false}
+              doorNumbers={stopped}
+              destinationNumber={doorNumberOf(active.destination.title)}
               vehicleArrow
               followZoom={16.5}
               routes={routes}
@@ -605,6 +850,7 @@ export default function NavigateScreen() {
             >
               {turnPanel}
             </View>
+            {gpsFloat}
           </View>
           {etaPanel}
         </>
@@ -637,20 +883,19 @@ export default function NavigateScreen() {
             rerouteNow();
           }}
           destination={active.destination}
-          onReport={() => {
+          onFlag={() => {
             setSheet(false);
             const r = active.route;
-            void Linking.openURL(
-              reportUrl({
-                kind: active.kind,
-                vehicle,
-                roads,
-                mapLook,
-                distanceM: r.distanceM,
-                durationS: r.durationS,
-                restrictions: "restrictions" in r ? r.restrictions.length : undefined,
-              }),
-            ).catch(() => {});
+            flagRoute({
+              kind: active.kind,
+              vehicle,
+              roads,
+              mapLook,
+              distanceM: r.distanceM,
+              durationS: r.durationS,
+              restrictions: "restrictions" in r ? r.restrictions.length : undefined,
+            });
+            setFlagged(true);
           }}
           bottomInset={insets.bottom}
         />
@@ -707,7 +952,7 @@ function RouteSheet({
   onSwitch,
   onRerouteNow,
   destination,
-  onReport,
+  onFlag,
   bottomInset,
 }: {
   kind: RouteKind;
@@ -717,7 +962,7 @@ function RouteSheet({
   onSwitch: (kind: "standard" | "police") => void;
   onRerouteNow: () => void;
   destination: { lat: number; lng: number };
-  onReport: () => void;
+  onFlag: () => void;
   bottomInset: number;
 }) {
   const styles = useTextStyles(baseStyles);
@@ -739,11 +984,12 @@ function RouteSheet({
         {/* Follow-in keeps to the colleague's way in, so there's nothing to switch to. */}
         {kind === "police" && action("Switch to standard", () => onSwitch("standard"))}
         {kind === "standard" && blueLightOn && action("Switch to blue light", () => onSwitch("police"))}
-        {action("Re-route now", onRerouteNow)}
         {/* Handing over to another app leaves this navigation running underneath. */}
         <ExternalLinks lat={destination.lat} lng={destination.lng} onOpen={onClose} />
-        {/* An email in the tester's own mail app, with nothing about the call in it. */}
-        {action("Report a problem with this route", onReport)}
+        {/* One tap, and navigation carries on: it's sent after END, from Search. */}
+        {action("Flag route", onFlag)}
+        {/* Nearest the thumb: the one most needed in a hurry. */}
+        {action("Re-route now", onRerouteNow)}
         {action("Cancel", onClose, styles.sheetCancel)}
       </View>
     </View>
@@ -762,7 +1008,18 @@ const baseStyles = StyleSheet.create({
   blockNote: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 16, lineHeight: 21 },
   screen: { flex: 1, backgroundColor: colors.bg },
   empty: { alignItems: "center", justifyContent: "center", gap: 16 },
-  emptyText: { color: colors.muted, fontFamily: fonts.body, fontSize: 16 },
+  emptyText: { color: colors.muted, fontFamily: fonts.body, fontSize: 16, textAlign: "center" },
+  resumeButton: {
+    backgroundColor: colors.amber,
+    borderRadius: 10,
+    minHeight: 64,
+    paddingHorizontal: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "stretch",
+    marginHorizontal: 24,
+  },
+  resumeText: { color: "#1a1200", fontFamily: fonts.displayBold, fontSize: 20, textAlign: "center" },
   row: { flex: 1, flexDirection: "row" },
   landscapeSide: { width: "42%", borderRightColor: colors.line, borderRightWidth: StyleSheet.hairlineWidth },
   map: { flex: 1 },
@@ -782,6 +1039,7 @@ const baseStyles = StyleSheet.create({
   turnOff: { backgroundColor: "#2a1d0a" },
   turnRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   arrow: { color: colors.amber, fontSize: 56, lineHeight: 64, fontWeight: "700" },
+  arrowCompact: { fontSize: 42, lineHeight: 48 },
   distance: {
     color: colors.fg,
     fontFamily: fonts.displayBold,
@@ -789,6 +1047,7 @@ const baseStyles = StyleSheet.create({
     lineHeight: 58,
     fontVariant: ["tabular-nums"],
   },
+  distanceCompact: { fontSize: 42, lineHeight: 48 },
   noSignal: { color: colors.amber },
   smallArrow: { color: colors.amber, fontSize: 26, fontWeight: "700" },
   linkBanner: {
@@ -803,8 +1062,28 @@ const baseStyles = StyleSheet.create({
     overflow: "hidden",
   },
   instruction: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 26, lineHeight: 30 },
-  then: { color: colors.muted, fontFamily: fonts.body, fontSize: 15 },
+  instructionCompact: { fontSize: 22, lineHeight: 26 },
+  // Text colour, not muted grey: grey was the weakest line on light screens (30 Oct).
+  then: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
+  repeat: { flexDirection: "row", alignItems: "center", gap: 10 },
+  repeatArrow: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 30 },
+  repeatDistance: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 24 },
+  repeatRoad: { flex: 1, color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 18 },
+  repeatMuted: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 13 },
+  focusTip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+  },
+  focusTipText: { flex: 1, color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
+  focusTipOk: { minWidth: 48, minHeight: 40, alignItems: "center", justifyContent: "center" },
+  focusTipOkText: { color: colors.blue, fontFamily: fonts.bodySemiBold, fontSize: 16 },
+  gpsFloat: { position: "absolute", left: 8, right: 64, gap: 8 },
   bottom: {
     paddingHorizontal: 12,
     paddingTop: 8,
@@ -833,6 +1112,7 @@ const baseStyles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
+  badgeUnder: { alignSelf: "flex-start", marginTop: 4 },
   buttons: { flexDirection: "row", gap: 8, alignItems: "stretch" },
   voiceButton: {
     width: 56,
@@ -880,6 +1160,8 @@ const baseStyles = StyleSheet.create({
   },
   sheetButton: {
     minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.blue,
@@ -895,6 +1177,9 @@ const baseStyles = StyleSheet.create({
     color: colors.fg,
     fontFamily: fonts.displayBold,
     fontSize: 22,
+    lineHeight: 26,
+    // Big text may wrap a label onto two lines; it never clips.
+    textAlign: "center",
     letterSpacing: 1,
     textTransform: "uppercase",
   },

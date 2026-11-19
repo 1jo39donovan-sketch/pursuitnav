@@ -1,18 +1,26 @@
-// London's custody suites, from the Independent Custody Visitors' public list
-// (24/7 suites and contingency suites, Met, BTP and Border Force). Each is
+// Custody suites. London's from the Independent Custody Visitors' public list
+// (24/7 suites and contingency suites, Met, BTP and Border Force). Kent's six
+// after Maidstone closed on 15 October 2025 (the Kent PCC's count; names from
+// the Legal Aid Agency's closure notice and defence guides; confirmed by the
+// PM's team, 19 Nov 2026). Essex's four open suites (checked 19 Nov 2026):
+// Basildon closed in March 2024 (Essex PCC, January 2025) and Clacton on
+// 21 April 2025 (Legal Aid Agency, Essex Police); Grays closed for a time
+// from 20 January 2025 with no word that it has reopened, so it's left out
+// until that's confirmed rather than send a crew to a closed suite. Each is
 // found on the map among OpenStreetMap's police stations in its borough by
 // the words in `match`; one that isn't mapped as a police station is searched
 // for by name instead, so the app never guesses a building.
 import type { Borough } from "../search/boroughs";
 import type { PointOfInterest } from "../search/places";
 import { normalise } from "../search/text";
+import { policeSite } from "./serviceSites";
 
 export interface CustodySuite {
   name: string;
   /** Where the building is (not always the borough whose panel lists it). */
   borough: Borough;
   kind: "24/7" | "contingency";
-  agency: "MPS" | "BTP" | "UKBF";
+  agency: "MPS" | "BTP" | "UKBF" | "Kent" | "Essex";
   /** Words a police station's name must contain to be this suite. */
   match: string;
   /** …and must not contain (to tell Wembley from Wembley Park). */
@@ -69,6 +77,18 @@ export const CUSTODY_SUITES: CustodySuite[] = [
   s("Charing Cross", "Westminster", "24/7", "MPS", "charing cross"),
   s("West End Central", "Westminster", "contingency", "MPS", "west end central"),
   s("Ebury Bridge", "Westminster", "contingency", "BTP", "ebury"),
+  // Kent
+  s("Medway", "Medway", "24/7", "Kent", "medway"),
+  s("North Kent (Northfleet)", "Gravesham", "24/7", "Kent", "north kent", "North Kent police station Northfleet"),
+  s("Canterbury", "Canterbury", "24/7", "Kent", "canterbury"),
+  s("Tonbridge", "Tonbridge and Malling", "24/7", "Kent", "tonbridge"),
+  s("Folkestone", "Folkestone and Hythe", "24/7", "Kent", "folkestone"),
+  s("Margate", "Thanet", "24/7", "Kent", "margate"),
+  // Essex
+  s("Chelmsford", "Chelmsford", "24/7", "Essex", "chelmsford"),
+  s("Colchester", "Colchester", "24/7", "Essex", "colchester"),
+  s("Harlow", "Harlow", "24/7", "Essex", "harlow"),
+  s("Southend", "Southend-on-Sea", "24/7", "Essex", "southend"),
 ];
 
 /** The police station on the map that is this suite, or null if none clearly is. */
@@ -76,12 +96,14 @@ export function custodyStation(suite: CustodySuite, places: readonly PointOfInte
   const words = normalise(suite.match).split(" ");
   const not = suite.not ? normalise(suite.not) : null;
   const found = places.filter((p) => {
-    if (p.type !== "Police station" || p.borough !== suite.borough) return false;
+    if (p.type !== "Police station" || p.borough !== suite.borough || policeSite(p.name) === "not-police") return false;
     const name = ` ${normalise(p.name)} `;
     return words.every((w) => name.includes(` ${w} `)) && !(not && name.includes(` ${not} `));
   });
-  // More than one (an old and a new building, say): the plainest name.
-  return found.sort((a, b) => a.name.length - b.name.length)[0] ?? null;
+  // More than one (an old and a new building, say): one named for its custody
+  // ("Croydon Custody Centre"), else the plainest name.
+  const custody = (p: PointOfInterest) => (/custody/i.test(p.name) ? 0 : 1);
+  return found.sort((a, b) => custody(a) - custody(b) || a.name.length - b.name.length)[0] ?? null;
 }
 
 /** Custody suites in these boroughs: 24/7 first, then contingency. */

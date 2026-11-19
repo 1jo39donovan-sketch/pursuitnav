@@ -22,6 +22,8 @@ export interface MarkerProperties {
   address: string;
   borough: string;
   color: string;
+  /** More to say, a line each (who runs it, custody…): police, fire, A&E badges. */
+  notes?: string;
 }
 
 export interface LiveMapProps {
@@ -39,6 +41,16 @@ export interface LiveMapProps {
   zoomControl?: boolean;
   /** Bigger, brighter road names than the map style's own. */
   roadNames?: boolean;
+  /** House numbers close in (off while navigating, where they crowded the road). */
+  houseNumbers?: boolean;
+  /**
+   * With houseNumbers off: our own door numbers (road-names source) shown
+   * close in, without remaking the map. Navigation turns them on when the
+   * car has stopped, to find the door (PM review, P2).
+   */
+  doorNumbers?: boolean;
+  /** The destination's door number, drawn on its pin ("54"). */
+  destinationNumber?: string | null;
   /** Show the vehicle as an arrow pointing the way it's going (navigation, pursuit). */
   vehicleArrow?: boolean;
   /** Named blocks and estates to label (points with a "name"), when zoomed in. */
@@ -70,6 +82,29 @@ export interface LiveMapProps {
   /** Place markers (points with MarkerProperties). */
   markers?: GeoJSON.FeatureCollection | null;
   onMarkerPress?: (marker: MarkerProperties, point: LngLat) => void;
+  /**
+   * Where to draw the vehicle instead of the raw GPS fix: its point on the route
+   * while navigating, so the arrow sits on the road. Null: the GPS fix.
+   */
+  snapTo?: { lng: number; lat: number; course: number } | null;
+  /** A tap on a colleague's dot: their member ID. */
+  onTeamPress?: (memberId: string) => void;
+}
+
+/** The destination as GeoJSON, its door number (if any) with it for the pin's label. */
+export function destinationGeoJSON(point: LngLat | null | undefined, number?: string | null): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: point
+      ? [{ type: "Feature", geometry: { type: "Point", coordinates: point }, properties: number ? { number } : {} }]
+      : [],
+  };
+}
+
+/** The door number at the start of an address: "54" from "Flat 3, 54 Caledonian Road" or "54A Caledonian Road". */
+export function doorNumberOf(title: string | null | undefined): string | null {
+  const m = /^(?:(?:flat|apartment|unit)\s+\w+,?\s+)?(\d{1,4}[A-Za-z]?)(?:-\d{1,4}[A-Za-z]?)?,?\s+\D/i.exec((title ?? "").trim());
+  return m ? m[1] : null;
 }
 
 /** Glyph font for marker labels; OpenFreeMap's styles serve Noto Sans. */
@@ -86,6 +121,22 @@ export const MARKER_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
   "circle-stroke-color": "#0c1220",
   "circle-stroke-width": 1.5,
   "circle-opacity": 0.95,
+};
+
+/** The door number above the destination pin. */
+export const DESTINATION_NUMBER_LAYOUT: SymbolLayerSpecification["layout"] = {
+  "text-field": ["get", "number"],
+  "text-font": ["Noto Sans Bold"],
+  "text-size": 16,
+  "text-anchor": "bottom",
+  "text-offset": [0, -0.9],
+  "text-allow-overlap": true,
+  "text-ignore-placement": true,
+};
+export const DESTINATION_NUMBER_PAINT: SymbolLayerSpecification["paint"] = {
+  "text-color": "#0c1220",
+  "text-halo-color": "#ffb627",
+  "text-halo-width": 3,
 };
 
 export const MARKER_LABEL_LAYOUT: SymbolLayerSpecification["layout"] = {
@@ -160,6 +211,16 @@ export function cameraFor(view: MapView, course: number | null): { bearing: numb
   return { bearing: course, pitch: view === "3d" ? 55 : 0 };
 }
 
+/**
+ * One frame's step of the map's turn towards `to`, the short way round: at a
+ * junction the map swings round over a second or so rather than snapping with
+ * the vehicle's course (30 Oct drive, 1:27).
+ */
+export function easeBearing(from: number, to: number, f = 0.04): number {
+  const diff = ((to - from + 540) % 360) - 180;
+  return Math.abs(diff) < 0.5 ? to : (from + diff * f + 360) % 360;
+}
+
 export const RESTRICTION_RED = "#e5484d";
 
 export const RESTRICTION_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
@@ -192,11 +253,10 @@ export function pointsGeoJSON(points: LngLat[] | undefined): GeoJSON.FeatureColl
  */
 export function speedZoom(speedMs: number | null): number {
   if (speedMs == null) return 0;
+  // A smooth slope rather than steps: in stop-start traffic the speed hovers
+  // round a step, and the map zoomed in and out every few seconds.
   const mph = speedMs * 2.23694;
-  if (mph < 10) return 1;
-  if (mph < 25) return 0.5;
-  if (mph < 45) return 0;
-  return -1;
+  return Math.max(-1, Math.min(1, 1 - ((mph - 10) / 35) * 2));
 }
 
 /**
@@ -280,10 +340,14 @@ export function labelPaint(theme: "night" | "day"): SymbolLayerSpecification["pa
 // Colleagues: a green dot with their callsign beside it, never hidden by other labels.
 export const TEAM_COLOR = "#22c55e";
 export const TEAM_CIRCLE_PAINT: CircleLayerSpecification["paint"] = {
-  "circle-color": TEAM_COLOR,
-  "circle-radius": 7,
+  // A team caution (a message with a place) is amber; colleagues are green.
+  "circle-color": ["case", ["boolean", ["get", "caution"], false], "#ffb627", TEAM_COLOR],
+  "circle-radius": 9,
   "circle-stroke-color": "#ffffff",
   "circle-stroke-width": 2,
+  // A rough position (a phone without a good fix) is drawn faint.
+  "circle-opacity": ["case", ["boolean", ["get", "rough"], false], 0.45, 1],
+  "circle-stroke-opacity": ["case", ["boolean", ["get", "rough"], false], 0.45, 1],
 };
 export const TEAM_LABEL_LAYOUT: SymbolLayerSpecification["layout"] = {
   "text-field": ["get", "name"],

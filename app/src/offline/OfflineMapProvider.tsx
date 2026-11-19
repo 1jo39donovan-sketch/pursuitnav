@@ -172,9 +172,15 @@ export function OfflineMapProvider({ children }: { children: ReactNode }) {
           const onProgress = ({ bytesWritten }: { bytesWritten: number }) =>
             !me.stopped && setState({ status: "downloading", manifest: m, doneBytes: done + bytesWritten });
           let task: DownloadTask;
-          const resumable = saved ? (JSON.parse(saved) as { url: string }) : null;
+          // A damaged note of a half-finished download starts it again rather than failing.
+          let resumable: { url: string } | null = null;
+          try {
+            resumable = saved ? (JSON.parse(saved) as { url: string }) : null;
+          } catch {
+            resumable = null;
+          }
           if (resumable?.url === url) {
-            task = DownloadTask.fromSavable(JSON.parse(saved!), { onProgress });
+            task = DownloadTask.fromSavable(resumable as never, { onProgress });
           } else {
             if (target.exists) target.delete();
             task = File.createDownloadTask(url, target, { onProgress });

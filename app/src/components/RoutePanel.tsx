@@ -6,7 +6,7 @@ import type { PointOfInterest } from "../search/places";
 import { formatDistance, formatDuration, formatMinutes } from "../format";
 import { recorder, useRecorder } from "../fieldtest/instance";
 import { RETRYING_WHEN_BACK } from "../navigation/connectivity";
-import { planningText } from "../navigation/planning";
+import { planningText, STILL_PLANNING_MS } from "../navigation/planning";
 import {
   cardSlots,
   createTapGuard,
@@ -19,10 +19,11 @@ import {
 import { colors, fonts } from "../theme";
 import { ROUTE_ALT } from "./mapShared";
 import { useElapsed } from "./useElapsed";
-import { useTextStyles } from "../textSize";
+import { useTextStyles, useColors } from "../textSize";
 
 export type PlanState =
-  | { status: "loading" }
+  /** quiet: routes being freshened after End; nothing said unless it's slow. */
+  | { status: "loading"; quiet?: boolean }
   /** waitingForFix: refused for want of a GPS position; routes when the first fix arrives. */
   /** noSignal: the network failed; the card offers the hand-offs and retries when signal is back. */
   /** serverDown: the server is down or didn't answer; the hand-offs come first, big. */
@@ -96,6 +97,7 @@ export function RoutePanel({
   onGo,
   onOpenExternal,
 }: Props) {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const { lat, lng } = destination;
   // A slow answer reads as "still planning", never as a fault.
@@ -138,7 +140,7 @@ export function RoutePanel({
             onPress={onToggleFavourite}
             hitSlop={12}
           >
-            <Text style={[styles.close, favourite && { color: colors.amber }]}>{favourite ? "★" : "☆"}</Text>
+            <Text style={[styles.close, favourite && { color: palette.amber }]}>{favourite ? "★" : "☆"}</Text>
           </Pressable>
         )}
         <Pressable accessibilityRole="button" accessibilityLabel="Clear destination" onPress={onClose} hitSlop={12}>
@@ -152,7 +154,9 @@ export function RoutePanel({
       )}
       {onSaveNote && <BlockNoteLine key={noteKey} note={blockNote} onSave={onSaveNote} />}
       {ageText && <Text style={styles.age}>{`${ageText} · Go updates it from here`}</Text>}
-      {state.status === "loading" && <Text style={styles.status}>{planningText("routes", waited)}</Text>}
+      {state.status === "loading" && (!state.quiet || waited >= STILL_PLANNING_MS) && (
+        <Text style={styles.status}>{planningText("routes", waited)}</Text>
+      )}
       {state.status === "error" && (
         <View style={styles.errorBox}>
           <Text style={[styles.status, styles.error]}>{state.message}</Text>
@@ -233,37 +237,30 @@ export function RoutePanel({
  * typed before Go or later on the Log. Skippable.
  */
 function OtherEtas() {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
-  const [blm, setBlm] = useState("");
-  const [google, setGoogle] = useState("");
+  const [other, setOther] = useState("");
   const minutes = (v: string) => (/^\d{1,3}$/.test(v.trim()) ? Number(v.trim()) : null);
-  const field = (label: string, value: string, onChange: (v: string) => void) => (
-    <View style={styles.otherField}>
-      <Text style={styles.otherLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        keyboardType="number-pad"
-        maxLength={3}
-        placeholder="min"
-        placeholderTextColor={colors.muted}
-        style={styles.otherInput}
-        accessibilityLabel={`${label} ETA in minutes`}
-      />
-    </View>
-  );
   return (
     <View style={styles.others}>
-      <Text style={styles.otherTitle}>Other apps’ ETA (optional)</Text>
+      <Text style={styles.otherTitle}>Another app’s ETA (optional)</Text>
       <View style={styles.otherRow}>
-        {field("Blue Light Maps", blm, (v) => {
-          setBlm(v);
-          recorder.setOthers({ blueLightMaps: minutes(v), googleApple: minutes(google) });
-        })}
-        {field("Google/Apple", google, (v) => {
-          setGoogle(v);
-          recorder.setOthers({ blueLightMaps: minutes(blm), googleApple: minutes(v) });
-        })}
+        <View style={styles.otherField}>
+          <Text style={styles.otherLabel}>Google/Apple/Waze</Text>
+          <TextInput
+            value={other}
+            onChangeText={(v) => {
+              setOther(v);
+              recorder.setOthers({ googleApple: minutes(v) });
+            }}
+            keyboardType="number-pad"
+            maxLength={3}
+            placeholder="min"
+            placeholderTextColor={palette.muted}
+            style={styles.otherInput}
+            accessibilityLabel="Another app's ETA in minutes"
+          />
+        </View>
       </View>
     </View>
   );
@@ -271,6 +268,7 @@ function OtherEtas() {
 
 /** The crew's note on the block: shown when there is one, written or changed with a tap. */
 function BlockNoteLine({ note, onSave }: { note?: string; onSave: (text: string) => void }) {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   const [editing, setEditing] = useState<string | null>(null);
   if (editing !== null) {
@@ -286,7 +284,7 @@ function BlockNoteLine({ note, onSave }: { note?: string; onSave: (text: string)
           autoFocus
           multiline
           placeholder="e.g. Entrance round the back, lift to 4th floor, flats 1–24"
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={palette.muted}
           accessibilityLabel="Note for this block, kept on this phone"
           style={styles.noteInput}
         />
@@ -335,6 +333,7 @@ function StandardRow({
   swatch: string;
   onGo: () => void;
 }) {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   return (
     <View style={[styles.row, fastest && styles.rowFastest]}>
@@ -347,12 +346,24 @@ function StandardRow({
           {formatDistance(route.distanceM)}
         </Text>
         <TrafficLine route={route} />
+        <PrivateLine route={route} />
       </View>
-      <Text style={styles.eta} numberOfLines={1}>
-        {formatMinutes(route.durationS)}
-      </Text>
-      <GoButton onPress={onGo} color={colors.blue} label="Go on the standard route" />
+      <Eta seconds={route.durationS} />
+      <GoButton onPress={onGo} color={palette.blue} label="Go on the standard route" />
     </View>
+  );
+}
+
+/** The journey time, the number big and "min" smaller, so "12 min" fits beside Go on a narrow phone. */
+function Eta({ seconds }: { seconds: number }) {
+  const styles = useTextStyles(baseStyles);
+  const text = formatMinutes(seconds);
+  const unit = text.endsWith(" min") ? " min" : "";
+  return (
+    <Text style={styles.eta} numberOfLines={1}>
+      {text.slice(0, text.length - unit.length)}
+      {unit ? <Text style={styles.etaUnit}>{unit}</Text> : null}
+    </Text>
   );
 }
 
@@ -384,6 +395,22 @@ function TrafficLine({ route }: { route: Route }) {
   return null;
 }
 
+/**
+ * A private gate or road the route has to use, because there's no other way
+ * in: the crew may need a code or key. Nothing when there are none.
+ */
+function PrivateLine({ route }: { route: Route }) {
+  const styles = useTextStyles(baseStyles);
+  const bits = route.privateAccess ?? [];
+  if (!bits.length) return null;
+  return (
+    <Text style={styles.traffic} numberOfLines={2}>
+      🔒 {bits[0]!.description}
+      {bits.length > 1 ? ` (+${bits.length - 1})` : ""}. Only way in: may need a code or key.
+    </Text>
+  );
+}
+
 /** TfL writes street names in capitals: "[A23] PURLEY WAY (CR0)" → "[A23] Purley Way (CR0)". */
 function titleCase(street: string): string {
   return street.replace(/\b([A-Z])([A-Z']+)\b/g, (m, a: string, b: string) =>
@@ -404,6 +431,7 @@ function PoliceRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const palette = useColors();
   const styles = useTextStyles(baseStyles);
   if (slot.state !== "route") {
     return (
@@ -426,18 +454,17 @@ function PoliceRow({
   return (
     <View style={[styles.rowWrap, styles.rowPolice]}>
       <View style={styles.rowInner}>
-        <View style={[styles.swatch, { backgroundColor: colors.blue }]} />
+        <View style={[styles.swatch, { backgroundColor: palette.blue }]} />
         <View style={styles.rowText}>
           <Text style={styles.rowTitle} numberOfLines={1}>Blue light</Text>
           <Text style={[styles.meta, styles.saving]} numberOfLines={1}>
             Saves {formatDuration(route.savingS)}
           </Text>
           <TrafficLine route={route} />
+          <PrivateLine route={route} />
         </View>
-        <Text style={styles.eta} numberOfLines={1}>
-        {formatMinutes(route.durationS)}
-      </Text>
-        <GoButton onPress={onGo} color={colors.amber} label="Go on the blue-light route" />
+        <Eta seconds={route.durationS} />
+        <GoButton onPress={onGo} color={palette.amber} label="Go on the blue-light route" />
       </View>
       {/* Always says how many it relies on; tap for the list (they're on the map too). */}
       <Pressable
@@ -528,11 +555,11 @@ function ClosuresLine({ closures }: { closures: RoutePlan["closures"] }) {
   if (closures.ignored) {
     return (
       <Text style={[styles.closures, styles.closuresWarn]}>
-        ⚠ No way round a TfL road closure: this route may go through one.
+        ⚠ No way round a road closure: this route may go through one.
       </Text>
     );
   }
-  if (!closures.updatedAt) return <Text style={styles.closures}>Live TfL closures unavailable right now.</Text>;
+  if (!closures.updatedAt) return <Text style={styles.closures}>Live road closures unavailable right now.</Text>;
   return null;
 }
 
@@ -681,6 +708,7 @@ const baseStyles = StyleSheet.create({
     fontSize: 28,
     fontVariant: ["tabular-nums"],
   },
+  etaUnit: { fontFamily: fonts.displaySemiBold, fontSize: 17 },
   meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
   saving: { color: colors.amber, fontFamily: fonts.bodySemiBold },
   traffic: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 13, lineHeight: 17, marginTop: 2 },

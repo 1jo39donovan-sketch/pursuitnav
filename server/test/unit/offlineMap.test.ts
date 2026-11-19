@@ -88,7 +88,7 @@ describe("offline map", () => {
     const lib = readFileSync(join(__dirname, "../../scripts/lib.sh"), "utf8");
     const config = readFileSync(join(__dirname, "../../src/config.ts"), "utf8");
     const shell = /DEFAULT_REGION_BOUNDS=(\S+)/.exec(lib)![1]!.split(",").map(Number);
-    const ts = JSON.parse(/LONDON_BOUNDS: ServerConfig\["bounds"\] = (\[[^\]]+\])/.exec(config)![1]!);
+    const ts = JSON.parse(/DEFAULT_BOUNDS: ServerConfig\["bounds"\] = (\[[^\]]+\])/.exec(config)![1]!);
     expect(shell).toEqual(ts);
   });
 });

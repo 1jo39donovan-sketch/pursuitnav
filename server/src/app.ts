@@ -8,11 +8,13 @@ import Fastify, { LogController, type FastifyInstance, type FastifyReply, type F
 import type { ClosureAwareRoute, ClosureFeed } from "./closures.js";
 import type { ServerConfig } from "./config.js";
 import { BANDS, type LearningStore, type Sample } from "./learning.js";
+import { RateLimiter } from "./rateLimit.js";
 import { ROAD_CHOICES, VEHICLE_TYPES, type RoadChoice, type VehicleType } from "./costing.js";
 import type { LngLat } from "./geo.js";
 import type { NearestDoor, WhereIs } from "./nominatim.js";
 import { AbandonedError, planContext } from "./planContext.js";
 import { entranceFinder } from "./entrances.js";
+import { imageryRoutes } from "./imagery.js";
 import { osMapsRoutes } from "./osMaps.js";
 import { offlineMapRoutes } from "./offlineMap.js";
 import { privacyPage, supportPage, termsPage } from "./pages.js";
@@ -21,7 +23,15 @@ import { PlacesError, type PlacesClient } from "./places.js";
 import { FollowWrongWayError, planFollow } from "./follow.js";
 import { NoSafeRouteError, planRoutes } from "./plan.js";
 import { pursuitInfo } from "./pursuit.js";
-import { MAX_BLOB_CHARS, NoSuchTeamError, TeamFullError, TeamStore, TeamTokenError } from "./teams.js";
+import {
+  MAX_BLOB_CHARS,
+  MAX_MESSAGE_CHARS,
+  MESSAGE_MAX_MS,
+  NoSuchTeamError,
+  TeamFullError,
+  TeamStore,
+  TeamTokenError,
+} from "./teams.js";
 import { APP_EVENTS, type UsageStore } from "./usage.js";
 import { ValhallaError, type Matcher, type Router } from "./valhalla.js";
 
@@ -97,6 +107,20 @@ const teamParams = {
 } as const;
 const token = { type: "string", minLength: 32, maxLength: 64 } as const;
 
+
+/** How long a pursuit answer waits for the house number once the road is known, ms. */
+const DOOR_WAIT_MS = 500;
+/** Where the web app is served (own domain and GitHub Pages) and local development. */
+export const DEFAULT_ORIGINS = [
+  "https://bluerouteapp.com",
+  "https://www.bluerouteapp.com",
+  "https://1jo39donovan-sketch.github.io",
+  "http://localhost:8081",
+  "http://localhost:19006",
+];
+/** Requests a minute from one address. */
+export const RATE_LIMIT_PER_MINUTE = 600;
+
 export function buildApp(
   config: ServerConfig,
   router: Router,
@@ -117,6 +141,9 @@ export function buildApp(
   // Requests carry officers' positions and control-room addresses, so the
   // API never logs requests or bodies; only failures, without their payloads.
   const app = Fastify({
+    // Requests reach the API only through Caddy on Docker's private network:
+    // trust the address it forwards, and only from there.
+    trustProxy: "loopback,uniquelocal",
     logger: { level: "warn" },
     logController: new LogController({ disableRequestLogging: true }),
   });
@@ -128,7 +155,34 @@ export function buildApp(
   // an extra round trip every time. Browsers cap this (Safari at 10 minutes,
   // Chrome at 2 hours).
   // ETag readable from the web app, so it re-downloads the places file only when it has changed.
-  app.register(cors, { origin: true, methods: ["GET", "POST", "PUT", "DELETE"], maxAge: 86_400, exposedHeaders: ["etag"] });
+  // Only our own web pages may call from a browser (PM, item 15).
+  const origins = new Set(config.corsOrigins ?? DEFAULT_ORIGINS);
+  app.register(cors, {
+    origin: (origin, cb) => cb(null, !origin || origins.has(origin)),
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    maxAge: 86_400,
+    exposedHeaders: ["etag"],
+  });
+
+  // A limit per address, so one misbehaving client (or a scraper) can't
+  // starve the crews. Generous: phones on mobile data can share an address,
+  // and Pursuit alone asks once a second. Kept in memory only; addresses are
+  // never logged or stored.
+  const perMinute = config.rateLimitPerMinute ?? RATE_LIMIT_PER_MINUTE;
+  if (perMinute > 0) {
+    const limiter = new RateLimiter(perMinute);
+    app.addHook("onRequest", async (req, reply) => {
+      if (req.url === "/health" || req.method === "OPTIONS") return;
+      // Behind Cloudflare, the visitor's own address; else the one Caddy saw.
+      const key = (req.headers["cf-connecting-ip"] as string | undefined) ?? req.ip;
+      if (!limiter.allow(key)) {
+        return reply
+          .code(429)
+          .header("retry-after", "60")
+          .send({ error: "rate-limited", message: "Too many requests from this connection. Try again in a minute." });
+      }
+    });
+  }
 
   // Answers that mean "this feature isn't set up here" (no OS Places key, map
   // data not built yet). Deliberate, so not counted as server errors.
@@ -179,7 +233,10 @@ export function buildApp(
       addresses,
       learning: Boolean(learning),
       osMaps: Boolean(config.osMapsKey),
+      imagery: config.imagery !== false,
       ...(closures ? { closures: closures.summary().active } : {}),
+      // Which feeds are being read (TfL, National Highways): null if one hasn't answered in the last hour.
+      ...(closures?.summary().sources ? { closureSources: closures.summary().sources } : {}),
       ...(config.version ? { version: config.version } : {}),
       ...(await dataRelease(config.placesFile).then((data) => (data ? { data } : {}))),
     };
@@ -304,13 +361,16 @@ export function buildApp(
       if (!points.every(inBounds)) {
         return reply.code(422).send({ error: "outside-area", message: "Outside the area BlueRoute covers." });
       }
+      const started = performance.now();
       try {
         const here = points[points.length - 1]!;
-        // Both at once: the house number never holds up the road and limit.
-        const [info, near] = await Promise.all([
-          pursuitInfo(matcher, points.map((p) => [p.lng, p.lat] as LngLat), heading),
-          nearestDoor ? nearestDoor(here.lat, here.lng).catch(() => null) : Promise.resolve(null),
-        ]);
+        // Both at once, and the house number never holds up the road and limit:
+        // it gets as long as they take, or half a second, then the answer goes
+        // without it (the next one, a second later, has it).
+        const door = nearestDoor ? nearestDoor(here.lat, here.lng).catch(() => null) : Promise.resolve(null);
+        const info = await pursuitInfo(matcher, points.map((p) => [p.lng, p.lat] as LngLat), heading);
+        const near = await Promise.race([door, new Promise<null>((done) => setTimeout(() => done(null), DOOR_WAIT_MS))]);
+        reply.header("server-timing", `pursuit;dur=${Math.round(performance.now() - started)}`);
         return { ...info, near };
       } catch (err) {
         if (err instanceof ValhallaError) {
@@ -361,6 +421,7 @@ export function buildApp(
     };
   app.get("/v1/places-data", dataFile(config.placesFile, "places-not-ready", "Place data"));
   app.get("/v1/roads-data", dataFile(config.roadsFile, "roads-not-ready", "The road list"));
+  app.get("/v1/lines-data", dataFile(config.linesFile, "lines-not-ready", "The transport lines"));
 
   // The ways into buildings by a door the crew picked (OpenStreetMap
   // entrances): the route can end at the right one. Like every request, the
@@ -383,6 +444,7 @@ export function buildApp(
   );
   offlineMapRoutes(app, config.offlineMapDir);
   osMapsRoutes(app, config.osMapsKey, config.bounds, (req) => notSetUp.add(req));
+  imageryRoutes(app, config.imagery !== false, config.imageryKey, config.bounds, (req) => notSetUp.add(req));
 
   // Follow-in: the way a colleague drove, from here. Their track comes from the
   // phone (decrypted there) and, like every request, isn't logged or kept.
@@ -566,6 +628,69 @@ export function buildApp(
         teams.remove(req.params.teamId, req.params.memberId, req.body.token);
         return { ok: true };
       } catch (err) {
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  // Team messages: sealed on the sender's phone, so the server can't read
+  // them; posted only by a member, withdrawn only by its sender, deleted
+  // after at most 12 hours. Nothing about them is logged.
+  app.post<{ Params: { teamId: string }; Body: { memberId: string; token: string; blob: string; keepMs?: number } }>(
+    "/v1/teams/:teamId/messages",
+    {
+      bodyLimit: MAX_MESSAGE_CHARS + 1000,
+      schema: {
+        params: { type: "object", required: ["teamId"], properties: { teamId } },
+        body: {
+          type: "object",
+          required: ["memberId", "token", "blob"],
+          additionalProperties: false,
+          properties: {
+            memberId: teamId,
+            token,
+            blob: { type: "string", minLength: 1, maxLength: MAX_MESSAGE_CHARS },
+            keepMs: { type: "integer", minimum: 60_000, maximum: MESSAGE_MAX_MS },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const b = req.body;
+        return teams.postMessage(req.params.teamId, b.memberId, b.token, b.blob, b.keepMs);
+      } catch (err) {
+        if (err instanceof NoSuchTeamError) return reply.code(404).send({ error: "no-team", message: err.message });
+        if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-in-team", message: err.message });
+        throw err;
+      }
+    },
+  );
+
+  app.delete<{ Params: { teamId: string; messageId: string }; Body: { memberId: string; token: string } }>(
+    "/v1/teams/:teamId/messages/:messageId",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["teamId", "messageId"],
+          properties: { teamId, messageId: { type: "string", pattern: "^[0-9a-f]{24}$" } },
+        },
+        body: {
+          type: "object",
+          required: ["memberId", "token"],
+          additionalProperties: false,
+          properties: { memberId: teamId, token },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        teams.deleteMessage(req.params.teamId, req.params.messageId, req.body.memberId, req.body.token);
+        return { ok: true };
+      } catch (err) {
+        if (err instanceof NoSuchTeamError) return reply.code(404).send({ error: "no-team", message: err.message });
         if (err instanceof TeamTokenError) return reply.code(403).send({ error: "not-yours", message: err.message });
         throw err;
       }

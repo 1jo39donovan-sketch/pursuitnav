@@ -60,6 +60,20 @@ It stays off on the server, and the app hides the switch, until `LEARNING=1` is 
 | Offline data | London roads bundled in the app | Downloaded per area on first use and kept, so the app stays small. |
 | Places | London extract | The same code on the bigger extract, split per area for download. |
 
+### Kent pilot (November 2026)
+
+Kent's 12 districts and Medway are added on the current server, as a first step outside London:
+
+- **Routing and places:** the weekly build downloads Geofabrik's Kent extract (about 54 MB) beside London's (about 130 MB), and merges the two, so routes cross the border.
+- **Areas:** Kent's districts are picked on Session like boroughs, under their own "Kent" heading with North, East and West Kent as big areas. The boundaries are the ONS December 2024 district boundaries (Open Government Licence).
+- **Search:** roads, postcodes and named places from OS Names and OpenStreetMap. House numbers stay London only: the house-number database is the heavy part (3.6 GB for London), and Kent's would not fit beside it on a 4 GB server.
+- **Custody suites:** Kent's six (Medway, North Kent (Northfleet), Canterbury, Tonbridge, Folkestone, Margate) and Essex's four open ones (Chelmsford, Colchester, Harlow, Southend), added November 2026. Basildon and Clacton have closed; Grays is left out until it's confirmed open (checked by the PM's team, 19 November 2026).
+- **Not yet in Kent:** TfL closures (TfL covers London only), and the offline road list bundled in the app (Kent's roads come from the server's road list instead, kept on the phone once downloaded).
+
+### Essex pilot (November 2026)
+
+Added the same way as Kent, on the same server: Essex's 12 districts, Southend-on-Sea and Thurrock, under an "Essex" heading with North, Mid and West, and South Essex as big areas. Geofabrik's Essex extract is about 50 MB. House numbers stay London only.
+
 ### Order of work
 
 1. **Regions as data.** The server publishes its regions (name, bounds, areas and data files) and the app downloads them instead of bundling London. This is the main code change; everything else is data.
