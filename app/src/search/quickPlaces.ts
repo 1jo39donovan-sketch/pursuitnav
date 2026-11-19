@@ -1,6 +1,7 @@
 // One tap from Search: the nearest A&E, and for the crew's service the
 // nearest custody suite (police) or station, from where the phone is now.
 import { CUSTODY_SUITES, custodyStation } from "../area/custody";
+import { aeNote } from "../area/emergencyDepartments";
 import { offeredStation } from "../area/serviceSites";
 import { distanceM } from "../geo";
 import type { ServiceType } from "../vehicles";
@@ -11,6 +12,8 @@ export interface QuickPlace {
   label: string;
   place: PointOfInterest;
   metres: number;
+  /** What the crew should know first ("Adults only: no children's A&E here."). */
+  note?: string;
 }
 
 const STATION: Record<ServiceType, { types: string[]; label: string }> = {
@@ -65,10 +68,20 @@ export function quickPlaces(
     const n = nearest(from, list);
     if (n) out.push({ label, ...n });
   };
-  const ae = nearest(from, pois.filter(isAE));
+  const aes = pois.filter(isAE);
+  const ae = nearest(from, aes);
   if (ae) {
     const place = aeDestination(ae.place, pois);
-    out.push({ label: "Nearest A&E", place, metres: distanceM(from, place) });
+    const note = aeNote(ae.place);
+    out.push({ label: "Nearest A&E", place, metres: distanceM(from, place), ...(note ? { note } : {}) });
+    // The nearest is adults only (Ealing): the nearest that takes children too.
+    if (note) {
+      const forChildren = nearest(from, aes.filter((p) => !aeNote(p)));
+      if (forChildren) {
+        const to = aeDestination(forChildren.place, pois);
+        out.push({ label: "Nearest A&E for children", place: to, metres: distanceM(from, to) });
+      }
+    }
   }
   // Police, and installs from before the service choice.
   if (service === "police" || service === null) {

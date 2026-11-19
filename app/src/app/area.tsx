@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { custodyIn, custodyStation, type CustodySuite } from "../area/custody";
 import { formatDistance } from "../format";
+import { aeNote } from "../area/emergencyDepartments";
 import { aeDestination, isAE } from "../search/quickPlaces";
 import { distanceM } from "../geo";
 import { useLocation } from "../location/LocationProvider";
@@ -136,6 +137,7 @@ export default function AreaScreen() {
           <Text style={styles.meta}>
             {[badge, p.address || p.borough, d !== null ? formatDistance(d) : null].filter(Boolean).join(" · ")}
           </Text>
+          {p.type === "Hospital with A&E" && aeNote(p) && <Text style={styles.warnNote}>{aeNote(p)}</Text>}
         </View>
         <GoButton
           label={`Route to ${p.name}`}
@@ -285,6 +287,7 @@ const baseStyles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0, gap: 2 },
   name: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 17 },
   meta: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
+  warnNote: { color: colors.amber, fontFamily: fonts.body, fontSize: 14 },
   go: { backgroundColor: colors.blue, borderRadius: 10, minWidth: 64, minHeight: 48, alignItems: "center", justifyContent: "center" },
   goText: { color: "#0c1220", fontFamily: fonts.displayBold, fontSize: 18 },
   find: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.line },
