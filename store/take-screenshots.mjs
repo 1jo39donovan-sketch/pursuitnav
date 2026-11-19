@@ -68,8 +68,15 @@ const TAB_PATH = { Session: "", Search: "search", Pursuit: "pursuit" };
 const tab = async (page, name) => {
   try {
     await page.getByText(name, exact()).last().click({ timeout: 5_000 });
-  } catch {
+  } catch (e) {
+    // Say what blocked it, for fixing the app if it's the app's fault.
+    console.log(`  (tab ${name} tap blocked: ${e.message.split("\n").filter((l) => /intercept|not visible|not stable|disabled|outside/i.test(l)).slice(0, 2).join(" | ")})`);
     await page.goto(new URL(TAB_PATH[name] ?? "", url).href, { waitUntil: "networkidle" });
+    // Reopened on Session with a shift set up, the app goes on to Search (by design): tap back.
+    if (name === "Session") {
+      await page.waitForTimeout(1500);
+      await page.getByText("Session", exact()).last().click({ timeout: 10_000 }).catch(() => {});
+    }
   }
   await page.waitForTimeout(1500);
 };
