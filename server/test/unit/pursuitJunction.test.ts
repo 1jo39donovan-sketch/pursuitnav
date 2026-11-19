@@ -23,9 +23,10 @@ describe("Pursuit's next junction (19 Nov, Holloway Road)", () => {
     const asked: (number | undefined)[] = [];
     const matcher: Matcher = {
       matchRoad: async () => ({ names: ["A1", "Holloway Road"], speedLimitKph: 32 }) as never,
-      locate: async (point, heading) => {
+      locate: async (point, heading, options) => {
         asked.push(heading);
-        if (heading !== undefined) return []; // the miss seen on the live map
+        // The miss seen on the live map: the nearest road is a service road.
+        if (heading !== undefined && !options?.publicRoads && point[0] < -0.1155) return [];
         const atCar = point[0] < -0.1155;
         return atCar
           ? [road({}), road({ heading: 320, shape: [[-0.115, 51.5544], [-0.116, 51.555]] })]
@@ -38,13 +39,14 @@ describe("Pursuit's next junction (19 Nov, Holloway Road)", () => {
     ]);
     expect(info.road).toBe("Holloway Road / A1");
     expect(info.nextJunction?.name).toBe("Seven Sisters Road");
-    expect(asked.slice(0, 2)).toEqual([expect.any(Number), undefined]);
+    // Asked with the direction, then again on public roads within 30 m.
+    expect(asked.slice(0, 2)).toEqual([expect.any(Number), expect.any(Number)]);
   });
 
   it("never takes the other carriageway, running against the car", async () => {
     const matcher: Matcher = {
       matchRoad: async () => ({ names: ["Holloway Road"], speedLimitKph: 32 }) as never,
-      locate: async (_p, heading) => (heading !== undefined ? [] : [road({ heading: 320 })]),
+      locate: async () => [road({ heading: 320 })],
     };
     const info = await pursuitInfo(matcher, [
       [-0.1165, 51.5556],

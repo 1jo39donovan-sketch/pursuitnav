@@ -36,10 +36,15 @@ export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: n
     trace.length >= 2 ? matcher.matchRoad(trace) : Promise.resolve(null),
     dir !== undefined ? matcher.locate(here, dir) : Promise.resolve([] as LocatedEdge[]),
   ]);
-  // Asked with the car's direction, Valhalla can return nothing by a bend or
-  // a side road (Holloway Road, 19 Nov): then no junction was ever looked
-  // for. Ask again without it, and take the edge running the car's way.
-  const located = ahead.some((e) => e.car) || dir === undefined ? ahead : await matcher.locate(here);
+  // Valhalla snaps to the nearest road only: by an unnamed service road (on
+  // Holloway Road, 19 Nov) the car's direction then matched nothing, and no
+  // junction was ever looked for. Look again within 30 m on public roads,
+  // then without the direction, and take the edge running the car's way.
+  let located = ahead;
+  if (dir !== undefined && !located.some((e) => e.car)) {
+    located = await matcher.locate(here, dir, { radiusM: 30, publicRoads: true });
+    if (!located.some((e) => e.car)) located = await matcher.locate(here, undefined, { radiusM: 30, publicRoads: true });
+  }
   const current = pickEdge(located, matched?.names, dir);
 
   const names = matched?.names ?? current?.names ?? [];
