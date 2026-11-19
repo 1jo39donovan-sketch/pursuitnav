@@ -47,8 +47,11 @@ export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: n
   }
   const current = pickEdge(located, matched?.names, dir);
 
-  const names = matched?.names ?? current?.names ?? [];
-  const limitKph = matched ? matched.speedLimitKph : current?.speedLimitKph;
+  // Matching can come back with no road (a fix between roads): then the road
+  // found under the car, so the road shows and isn't named as its own junction.
+  const useMatched = !!matched?.names.length;
+  const names = useMatched ? matched!.names : (current?.names ?? []);
+  const limitKph = useMatched ? matched!.speedLimitKph : current?.speedLimitKph;
   return {
     road: roadLabel(names),
     speedLimitMph: limitKph ? kphToMph(limitKph) : null,

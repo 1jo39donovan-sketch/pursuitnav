@@ -84,4 +84,25 @@ describe("Pursuit's next junction (19 Nov, Holloway Road)", () => {
     ]);
     expect(info.nextJunction?.name).toBe("Tollington Road");
   });
+
+  it("with no matched road, uses the road under the car (not named as its own junction)", async () => {
+    const matcher: Matcher = {
+      matchRoad: async () => ({ names: [], speedLimitKph: undefined }) as never,
+      locate: async (p) =>
+        p[0] < -0.1155
+          ? [road({ names: ["Upper Street", "A1"] })]
+          : [
+              road({ names: ["Upper Street", "A1"], percentAlong: 1 }),
+              road({ names: ["Upper Street", "A1"], percentAlong: 0, shape: [[-0.115, 51.5544], [-0.1145, 51.554]] }),
+              road({ names: ["Islington Green"], heading: 60, percentAlong: 0, shape: [[-0.115, 51.5544], [-0.1145, 51.555]] }),
+            ],
+    };
+    const info = await pursuitInfo(matcher, [
+      [-0.1165, 51.5556],
+      [-0.1157, 51.555],
+    ]);
+    expect(info.road).toBe("Upper Street / A1");
+    expect(info.nextJunction?.name).toBe("Islington Green");
+  });
 });
+
