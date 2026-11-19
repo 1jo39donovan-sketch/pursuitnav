@@ -7,13 +7,15 @@ import { pursuitInfo } from "../src/pursuit.js";
 import { ValhallaClient } from "../src/valhalla.js";
 
 const valhalla = new ValhallaClient(process.env.VALHALLA_URL ?? "http://localhost:8002");
-const drives: Record<string, LngLat[]> = JSON.parse(process.argv[2] ?? "{}");
+const arg = process.argv[2] ?? "{}";
+// The drives as JSON, or a file of them (the survey's misses).
+const drives: Record<string, LngLat[]> = JSON.parse(arg.trim().startsWith("{") ? arg : (await import("node:fs")).readFileSync(arg, "utf8"));
 const brief = (e: { names: string[]; use: string; car: boolean; heading: number; percentAlong: number; lengthM: number }) =>
   `${e.names.join("/") || "(no name)"} use=${e.use} car=${e.car} hdg=${Math.round(e.heading)} along=${e.percentAlong.toFixed(2)} len=${Math.round(e.lengthM)}`;
 
 for (const [label, trace] of Object.entries(drives)) {
   console.log(`\n=== ${label}`);
-  console.log("pursuitInfo:", JSON.stringify({ ...(await pursuitInfo(valhalla, trace)), roadShape: undefined }));
+  console.log("pursuitInfo:", JSON.stringify({ ...(await pursuitInfo(valhalla, trace, undefined, (l) => console.log("  junction search:", l))), roadShape: undefined }));
   const here = trace.at(-1)!;
   const dir = bearingDeg(trace.at(-2)!, here);
   const matched = await valhalla.matchRoad(trace);

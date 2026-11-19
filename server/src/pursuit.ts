@@ -18,15 +18,37 @@ export interface PursuitInfo {
 
 // Look this far ahead for a junction with another named road.
 const MAX_LOOKAHEAD_M = 2000;
-const MAX_STEPS = 12;
+// Roads are drawn in short pieces (a crossing, a bus stop, a change of
+// surface each start a new one): Crowndale Road took 12 in its first 130 m.
+const MAX_STEPS = 40;
 // Roads that count as junctions; driveways, car-park aisles and paths don't.
 const JUNCTION_USES = new Set(["road", "ramp", "turn_channel", "bus", "busway", "living_street"]);
 
 export const kphToMph = (kph: number) => Math.round(kph / 1.609344);
 
-const sameRoad = (a: string[], b: string[]) => a.some((n) => b.includes(n));
+/** A road number such as A1, A503, B550, M25 or A40(M): OSM gives it alongside the name, in either order. */
+const ROAD_NUMBER = /^[ABM]\d+(\(M\))?$/i;
 
-export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: number): Promise<PursuitInfo> {
+/**
+ * Whether two lists of names are the same road. By name when both have one:
+ * different roads share a number (City Road and Old Street Roundabout are
+ * both A501, Crowndale Road and Pancras Road both A5202), and a shared
+ * number hid the junction (19 Nov). By number only when one has no name.
+ */
+const sameRoad = (a: string[], b: string[]) => {
+  const named = (x: string[]) => x.filter((n) => !ROAD_NUMBER.test(n.trim()));
+  const [na, nb] = [named(a), named(b)];
+  if (na.length && nb.length) return na.some((n) => nb.includes(n));
+  return a.some((n) => b.includes(n));
+};
+
+export async function pursuitInfo(
+  matcher: Matcher,
+  trace: LngLat[],
+  heading?: number,
+  /** Says each step of the junction search (the debug script only). */
+  log?: (line: string) => void,
+): Promise<PursuitInfo> {
   const here = trace[trace.length - 1]!;
   // Direction: the phone's GPS course, else the bearing over the last stretch.
   const prev = trace.length >= 2 ? trace[trace.length - 2]! : undefined;
@@ -55,7 +77,7 @@ export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: n
   return {
     road: roadLabel(names),
     speedLimitMph: limitKph ? kphToMph(limitKph) : null,
-    nextJunction: current ? await findJunction(matcher, current, names) : null,
+    nextJunction: current ? await findJunction(matcher, current, names, log) : null,
     // Only an edge on the matched road: a side road's shape would pull the arrow off.
     roadShape:
       current && (!matched || sameRoad(current.names, matched.names))
@@ -63,9 +85,6 @@ export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: n
         : null,
   };
 }
-
-/** A road number such as A1, A503, B550, M25 or A40(M): OSM gives it alongside the name, in either order. */
-const ROAD_NUMBER = /^[ABM]\d+(\(M\))?$/i;
 
 /** The road's name rather than its number, when it has one: "Holloway Road", not "A1". */
 export function streetName(names: readonly string[]): string | null {
@@ -104,6 +123,7 @@ async function findJunction(
   matcher: Matcher,
   start: LocatedEdge,
   roadNames: string[],
+  log: (line: string) => void = () => {},
 ): Promise<{ name: string; distanceM: number } | null> {
   let edge = start;
   let distance = start.lengthM * (1 - start.percentAlong);
@@ -115,12 +135,27 @@ async function findJunction(
     // stretch it can answer for the node behind (Holloway Road, 19 Nov), and
     // the search went round in circles. Then look a little further on instead.
     const startsHere = atNode.filter((e) => e.percentAlong < 0.01 && e.shape.length >= 2 && near(e.shape[0]!, node));
+    log(
+      `step ${step} node ${node[1].toFixed(5)},${node[0].toFixed(5)} at ${Math.round(distance)} m, arriving ${Math.round(arriving)}: ` +
+        atNode
+          .map((e) => `${e.names.join("/") || "-"}[${e.use}${e.car ? "" : ",no car"} hdg ${Math.round(e.heading)} along ${e.percentAlong.toFixed(2)}${startsHere.includes(e) ? " starts" : ""}]`)
+          .join(" "),
+    );
     if (!startsHere.length) {
       const beyond = await matcher.locate(projectM(node, arriving, SNAP_STEP_M), arriving);
       const next = beyond
-        .filter((e) => e.car && e.shape.length >= 2 && (!roadNames.length || sameRoad(e.names, roadNames)))
-        .sort((a, b) => Math.abs(turnAngle(arriving, a.heading)) - Math.abs(turnAngle(arriving, b.heading)))[0];
+        .filter((e) => e.car && e.shape.length >= 2)
+        .sort(
+          (a, b) =>
+            Number(!roadNames.length || sameRoad(b.names, roadNames)) - Number(!roadNames.length || sameRoad(a.names, roadNames)) ||
+            Math.abs(turnAngle(arriving, a.heading)) - Math.abs(turnAngle(arriving, b.heading)),
+        )[0];
       if (!next || Math.abs(turnAngle(arriving, next.heading)) >= 60) return null;
+      // The road ahead under another name (Crowndale Road into Pancras Road): that's the junction.
+      if (roadNames.length && !sameRoad(next.names, roadNames)) {
+        if (!next.names.length || !JUNCTION_USES.has(next.use)) return null;
+        return { name: streetName(next.names)!, distanceM: Math.round(distance) };
+      }
       edge = next;
       distance += next.lengthM * (1 - next.percentAlong);
       continue;

@@ -2,6 +2,7 @@
 // real routes: plans each route on the local Valhalla, samples a point every
 // 100 m (with a few metres of GPS-like scatter), and asks Pursuit as the
 // phone would. Prints the share found and where it failed. Test routes only.
+import { writeFileSync } from "node:fs";
 import { bearingDeg, distanceM, type LngLat } from "../src/geo.js";
 import { pursuitInfo } from "../src/pursuit.js";
 import { standardFor } from "../src/costing.js";
@@ -38,6 +39,7 @@ const jitter = (p: LngLat): LngLat => {
   return [p[0] + (Math.cos(a) * r) / Math.cos((p[1] * Math.PI) / 180), p[1] + Math.sin(a) * r];
 };
 
+const missTraces: Record<string, LngLat[]> = {};
 let all = 0, roads = 0, limits = 0, junctions = 0;
 for (const [label, [from, to]] of Object.entries(ROUTES)) {
   const route = await valhalla.route({ costing, from: { point: from }, to: { point: to } });
@@ -53,12 +55,17 @@ for (const [label, [from, to]] of Object.entries(ROUTES)) {
     if (info.road) r++;
     if (info.speedLimitMph) l++;
     if (info.nextJunction) j++;
-    else misses.push(`${m} m: ${info.road ?? "(no road)"} at ${trace.at(-1)![1].toFixed(5)},${trace.at(-1)![0].toFixed(5)}`);
+    else {
+      missTraces[`${label} ${m} m`] = trace;
+      misses.push(`${m} m: ${info.road ?? "(no road)"} at ${trace.at(-1)![1].toFixed(5)},${trace.at(-1)![0].toFixed(5)}`);
+    }
   }
   console.log(`\n=== ${label}: ${(length / 1000).toFixed(1)} km, ${n} points`);
   console.log(`road ${r}/${n} · limit ${l}/${n} · junction ${j}/${n}`);
   for (const miss of misses.slice(0, 12)) console.log("  no junction:", miss);
   all += n; roads += r; limits += l; junctions += j;
 }
+// For the debug script, step by step.
+writeFileSync(process.env.SURVEY_MISSES ?? "survey-misses.json", JSON.stringify(missTraces));
 const pc = (x: number) => `${Math.round((100 * x) / all)}%`;
 console.log(`\nALL: ${all} points · road ${pc(roads)} · limit ${pc(limits)} · junction ${pc(junctions)}`);

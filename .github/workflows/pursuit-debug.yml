@@ -54,3 +54,6 @@ jobs:
       - name: How often Pursuit knows road, limit and junction along real routes
         working-directory: server
         run: npx tsx scripts/pursuit-survey.ts
+      - name: Each survey miss, step by step
+        working-directory: server
+        run: npx tsx scripts/pursuit-debug.ts survey-misses.json
