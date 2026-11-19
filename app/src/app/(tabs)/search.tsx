@@ -827,7 +827,7 @@ export default function SearchScreen() {
             ))}
           </View>
         )}
-        {!destination && !showResults && !tapped && recent.length === 0 && (
+        {!destination && !showResults && !tapped && recent.length === 0 && !(navigation.resumable && !navigation.active) && (
           <View style={styles.hint} pointerEvents="none">
             <Text style={styles.hintText}>Type an address above, or press and hold on the map.</Text>
           </View>
