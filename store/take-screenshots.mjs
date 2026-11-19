@@ -82,7 +82,7 @@ for (const device of DEVICES) {
   await shot(page, device, "3-routes", async () => {
     await search(page, "54 Caledonian Road");
     // The result row, not the search box (which holds the same words).
-    await page.getByText("54 Caledonian Road", exact()).last().click();
+    await page.getByText(/^54 Caledonian Road/).first().click();
     await page.getByLabel("Go on the standard route").last().waitFor({ timeout: 30_000 });
   });
 

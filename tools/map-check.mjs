@@ -101,7 +101,7 @@ for (const [name, viewport] of [
     const box = page.getByLabel("Address from the control room").last();
     await box.fill("54 Caledonian Road");
     await page.waitForTimeout(2500);
-    await page.getByText("54 Caledonian Road", exact()).last().click();
+    await page.getByText(/^54 Caledonian Road/).first().click();
     await page.getByLabel("Go on the standard route").last().click({ timeout: 30_000 });
     await page.waitForTimeout(8000);
     await page.screenshot({ path: `${out}/${name}.png` });
