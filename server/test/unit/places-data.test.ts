@@ -60,3 +60,16 @@ describe("GET /v1/roads-data", () => {
     expect(res.statusCode).toBe(503);
   });
 });
+
+describe("GET /v1/lines-data", () => {
+  it("serves the gzipped transport lines", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "lines-"));
+    const file = join(dir, "lines.txt.gz");
+    const text = "#blueroute-lines v1 2026-11-17 1\nVictoria line|#0098d4|subway|1|-12000,5155000 -11000,5156000\n";
+    writeFileSync(file, gzipSync(text));
+    const app = buildApp({ bounds: [-0.8, 51.2, 0.6, 51.8], placesFile: "/nope", linesFile: file } as ServerConfig, {} as Router);
+    const res = await app.inject({ method: "GET", url: "/v1/lines-data" });
+    expect(res.statusCode).toBe(200);
+    expect(gunzipSync(res.rawPayload).toString()).toBe(text);
+  });
+});

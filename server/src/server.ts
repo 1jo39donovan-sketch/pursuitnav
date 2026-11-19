@@ -1,5 +1,6 @@
 import { buildApp } from "./app.js";
 import { avoidingClosures, ClosureFeed } from "./closures.js";
+import { combinedFeed, HighwaysFeed } from "./highwaysClosures.js";
 import { loadConfig } from "./config.js";
 import { LearningStore } from "./learning.js";
 import { UsageStore } from "./usage.js";
@@ -22,8 +23,16 @@ if (config.osPlacesKey)
   providers.push({ source: "os-places", client: new OsPlacesClient(config.osPlacesKey), cacheable: false });
 const places = providers.length ? new AddressSearch(providers) : undefined;
 const valhalla = new ValhallaClient(config.valhallaUrl);
-const closures = config.tflClosures ? new ClosureFeed(undefined, config.tflAppKey) : undefined;
-closures?.start();
+const tfl = config.tflClosures ? new ClosureFeed(undefined, config.tflAppKey) : undefined;
+tfl?.start();
+// Motorways and major A-roads (Kent and Essex, and London's), once there's a key.
+const highways = config.highwaysKey
+  ? new HighwaysFeed(config.highwaysKey, config.bounds, undefined, undefined, (status) =>
+      console.warn(`National Highways closures: ${status}`),
+    )
+  : undefined;
+highways?.start();
+const closures = tfl || highways ? combinedFeed(tfl, highways) : undefined;
 const router = closures ? avoidingClosures(valhalla, closures) : valhalla;
 const learning = config.learning ? new LearningStore(`${config.learnedDir}/totals.json`) : undefined;
 await learning?.load();

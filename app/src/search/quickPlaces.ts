@@ -1,6 +1,7 @@
 // One tap from Search: the nearest A&E, and for the crew's service the
 // nearest custody suite (police) or station, from where the phone is now.
 import { CUSTODY_SUITES, custodyStation } from "../area/custody";
+import { offeredStation } from "../area/serviceSites";
 import { distanceM } from "../geo";
 import type { ServiceType } from "../vehicles";
 import { stationName, type PointOfInterest } from "./places";
@@ -83,7 +84,14 @@ export function quickPlaces(
   add(
     station.label,
     pois
-      .filter((p) => station.types.includes(p.type) && !listed.has(`${p.lat},${p.lng}`))
+      .filter(
+        (p) =>
+          station.types.includes(p.type) &&
+          !listed.has(`${p.lat},${p.lng}`) &&
+          // A police station with a front counter (not a ward office or patrol base, nor another
+          // agency); the brigade's or the NHS's own (not an airport's, the RAF's or St John's).
+          offeredStation(p),
+      )
       .map((p) => ({ ...p, name: stationName(p.name, p.type) })),
   );
   return out;

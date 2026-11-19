@@ -171,8 +171,14 @@ export interface Neighbour {
 
 /** Neighbours this far apart are on different stretches of the road (or across a junction). */
 const NEIGHBOURS_WITHIN_M = 250;
-/** Numbers asked for either side of an unmapped one: 2, 4 and 6 away, same side of the road. */
-export const NEIGHBOUR_STEPS = [2, 4, 6];
+/**
+ * Numbers asked for either side of an unmapped one, same side of the road.
+ * Up to 12 away: on 18 Nov "54 Caledonian Road" found 50 but not 62, and
+ * routed to the middle of the road. Local Nominatim answers in milliseconds.
+ */
+export const NEIGHBOUR_STEPS = [2, 4, 6, 8, 10, 12];
+/** With a door on one side only: used as "next to" up to this many numbers away. */
+const NEXT_TO_WITHIN = 4;
 
 /**
  * Where an unmapped house number is, from mapped doors on the same side of
@@ -191,7 +197,11 @@ export function estimateDoor(
     const t = (wanted - lo.number) / (hi.number - lo.number);
     return { lat: lo.lat + (hi.lat - lo.lat) * t, lng: lo.lng + (hi.lng - lo.lng) * t, between: [lo.number, hi.number], nextTo: null };
   }
-  const next = same.find((n) => Math.abs(n.number - wanted) === 2);
+  // Doors both sides but far apart: a different stretch of road, so no estimate.
+  if (lo && hi) return null;
+  const next = same
+    .filter((n) => Math.abs(n.number - wanted) <= NEXT_TO_WITHIN)
+    .sort((a, b) => Math.abs(a.number - wanted) - Math.abs(b.number - wanted))[0];
   return next ? { lat: next.lat, lng: next.lng, between: null, nextTo: next.number } : null;
 }
 
@@ -216,7 +226,7 @@ export class NominatimClient implements PlacesClient {
     return found;
   }
 
-  /** The doors 2, 4 and 6 numbers either side, mapped in OSM, and the estimate from them. */
+  /** The doors up to 12 numbers either side, mapped in OSM, and the estimate from them. */
   private async estimate(asked: ParsedQuery): Promise<Address | null> {
     const wanted = parseInt(asked.number!, 10);
     if (!Number.isFinite(wanted)) return null;

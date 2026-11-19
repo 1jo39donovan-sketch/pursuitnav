@@ -93,6 +93,18 @@ const NEAR_ROAD_KM = 0.6;
 const ON_ROAD_BONUS = 15;
 const NEAR_ROAD_BONUS = 5;
 const OFFICE_PENALTY = 12;
+// Areas "Generally towards" can name; towns and villages are looked for further ahead.
+const TOWN_TYPES = new Set(["City", "Town", "Village"]);
+const AREA_TYPES = new Set(["Area", "Neighbourhood", ...TOWN_TYPES]);
+/**
+ * Between equally good matches: a road before a business (officers search
+ * roads far more often), and the officer's own boroughs before those just
+ * over the boundary. Smaller than a step in match quality (90 → 80), so a
+ * much better match still wins ("Salt" the shop over "Salterton Road").
+ */
+const BUSINESS_PENALTY = 5;
+const BUSINESS_GROUPS = new Set<PlaceGroup | undefined>(["food", "shop", "services", "stay", "other"]);
+const OWN_BOROUGH_BONUS = 4;
 
 /** The parts of the query that aren't the road or place itself. */
 interface Prefix {
@@ -171,6 +183,11 @@ export class SearchIndex {
   }
 
   /** Named places in the given boroughs and groups, for map markers. */
+  /** Places of these types anywhere in the region (police stations, A&E…). */
+  pointsOfInterestOfType(types: ReadonlySet<string>): PointOfInterest[] {
+    return this.pois.filter((p) => types.has(p.item.type)).map((p) => p.item);
+  }
+
   pointsOfInterestIn(boroughs: ReadonlySet<Borough>, groups: ReadonlySet<PlaceGroup>): PointOfInterest[] {
     if (!boroughs.size || !groups.size) return [];
     return this.pois.filter((p) => boroughs.has(p.item.borough) && groups.has(p.item.group)).map((p) => p.item);
@@ -237,9 +254,28 @@ export class SearchIndex {
     return best;
   }
 
-  /** Every named block and estate, for labelling the maps at street zoom. */
+  /**
+   * Every named block and estate, for labelling the maps at street zoom. Not
+   * a "block" that shares its name with a place drawn otherwise within
+   * 150 m (a police station, prison or station building mapped as a building
+   * too: "British Transport Police", "HM Prison Pentonville", 18 Nov).
+   */
   allHousing(): PointOfInterest[] {
-    return this.pois.filter((p) => p.item.group === "housing").map((p) => p.item);
+    const others = new Map<string, PointOfInterest[]>();
+    for (const { item, norms } of this.pois) {
+      if (item.group === "housing" || !norms[0]) continue;
+      const list = others.get(norms[0]) ?? [];
+      list.push(item);
+      others.set(norms[0], list);
+    }
+    return this.pois
+      .filter(
+        (p) =>
+          p.item.group === "housing" &&
+          !(others.get(p.norms[0] ?? "") ?? []).some((o) => distanceKm(o, p.item) <= 0.15) &&
+          !/\b(station|police|prison)\b/i.test(p.item.name),
+      )
+      .map((p) => p.item);
   }
 
   /** Named blocks and estates within `metres` of a point, nearest first (for map labels). */
@@ -274,10 +310,16 @@ export class SearchIndex {
    * Stockwell), then neighbourhoods as "minor". Localities and squares are left
    * out: OSM calls a cricket ground's gates and a block's courtyard localities.
    */
-  namedAreas(): { name: string; lat: number; lng: number; minor: boolean }[] {
+  namedAreas(): { name: string; lat: number; lng: number; minor: boolean; town: boolean }[] {
     return this.pois
-      .filter((p) => p.item.group === "area" && (p.item.type === "Area" || p.item.type === "Neighbourhood"))
-      .map(({ item }) => ({ name: item.name, lat: item.lat, lng: item.lng, minor: item.type !== "Area" }));
+      .filter((p) => p.item.group === "area" && AREA_TYPES.has(p.item.type))
+      .map(({ item }) => ({
+        name: item.name,
+        lat: item.lat,
+        lng: item.lng,
+        minor: item.type === "Neighbourhood",
+        town: TOWN_TYPES.has(item.type),
+      }));
   }
 
   get pointOfInterestCount(): number {
@@ -360,9 +402,11 @@ export class SearchIndex {
     const hits = [...this.collect(raw, area), ...listed.inArea];
     const limit = parseQuery(raw).outwardCode || types.length ? MAX_LIST_RESULTS : MAX_RESULTS;
 
+    const rank = (h: SearchResult) =>
+      h.score - (h.kind === "poi" && BUSINESS_GROUPS.has(h.placeGroup) ? BUSINESS_PENALTY : 0) + (area.has(h.borough) ? OWN_BOROUGH_BONUS : 0);
     const seen = new Set<string>();
     const unique = hits
-      .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
+      .sort((a, b) => rank(b) - rank(a) || a.label.localeCompare(b.label))
       .filter((h) => {
         const k = h.kind === "poi" ? h.key : `${h.label}|${h.borough}`;
         if (seen.has(k)) return false;
@@ -560,7 +604,8 @@ export class SearchIndex {
     return {
       key: `road:${r.name}|${r.borough}|${label}`,
       label,
-      detail: `${r.borough} · ${r.outcodes.join(" ")}`,
+      // A number typed but only the road known: say the pin is the road, not the door.
+      detail: `${r.borough} · ${r.outcodes.join(" ")}${prefix.number ? " · estimated: road, not door" : ""}`,
       borough: r.borough,
       lat: r.lat,
       lng: r.lng,

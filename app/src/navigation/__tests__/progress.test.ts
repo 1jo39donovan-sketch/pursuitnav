@@ -81,6 +81,9 @@ describe("offRouteCount", () => {
   it("allows for poor GPS accuracy", () => {
     expect(offRouteCount(0, 60, 50)).toBe(0); // 60 m off with ±50 m accuracy isn't conclusive
     expect(offRouteCount(0, 90, 50)).toBe(1);
+    // However poor the GPS, 70 m off is another street.
+    expect(offRouteCount(0, 65, 120)).toBe(0);
+    expect(offRouteCount(0, 75, 120)).toBe(1);
     // Gone past a turn: a little off the line and driving across the route counts double.
     expect(offRouteCount(0, 25, 8, 90)).toBe(2);
     expect(offRouteCount(2, 30, 8, 85)).toBe(4);

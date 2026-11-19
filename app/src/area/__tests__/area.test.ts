@@ -76,6 +76,23 @@ describe("generallyTowards", () => {
     ).toBe("Brixton");
   });
 
+  it("names a town further ahead in the country (Kent and Essex), but a near suburb first", () => {
+    // Mid-Kent, inside one district, heading east: a village 4.5 km ahead.
+    const at = { lat: 51.27, lng: 0.6 };
+    const town = projectAhead(at.lat, at.lng, 90, 4500);
+    expect(generallyTowards(at.lat, at.lng, 90, [{ name: "Lenham", ...town, town: true }])).toBe("Lenham");
+    // An area as far out isn't named: in London they're close together.
+    expect(generallyTowards(at.lat, at.lng, 90, [{ name: "Far Area", ...town }])).toBeNull();
+    // With a suburb 1.5 km ahead too, the suburb wins.
+    const near = projectAhead(at.lat, at.lng, 90, 1500);
+    expect(
+      generallyTowards(at.lat, at.lng, 90, [
+        { name: "Lenham", ...town, town: true },
+        { name: "Near Suburb", ...near },
+      ]),
+    ).toBe("Near Suburb");
+  });
+
   it("says so when there's nothing to name", () => {
     expect(generallyTowards(51.372, -0.1, 0, [])).toBeNull();
   });

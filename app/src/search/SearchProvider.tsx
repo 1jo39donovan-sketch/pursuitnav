@@ -12,6 +12,8 @@ import postcodesAsset from "../../assets/data/postcodes.dat";
 import roadsAsset from "../../assets/data/roads.dat";
 import { nearBoroughs } from "../area/area";
 import { namedPoints } from "../components/mapShared";
+import { withAeCorrections } from "../area/emergencyDepartments";
+import { SERVICE_SOURCE_TYPES, servicePoints } from "../components/mapServices";
 import { useSession } from "../session/SessionProvider";
 import { store } from "../storage/store";
 import type { SavedPlace } from "../storage/types";
@@ -39,6 +41,8 @@ interface SearchContextValue {
    * which, as on Ordnance Survey maps.
    */
   blockLabels: GeoJSON.FeatureCollection | null;
+  /** Police stations (custody marked), fire, ambulance, A&E, courts and prisons, for the maps. */
+  services: GeoJSON.FeatureCollection | null;
   /** The officer's boroughs, and anywhere just over their boundaries. */
   area: AreaFilter;
   savedPlaces: SavedPlace[];
@@ -115,7 +119,8 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       if (!text || cancelled) return;
       try {
         const file = parsePlacesFile(text);
-        await data.index.setPointsOfInterest(file.places);
+        // OpenStreetMap's A&E marks corrected where the audit found them wrong (area/emergencyDepartments.ts).
+        await data.index.setPointsOfInterest(withAeCorrections(file.places));
         if (!cancelled) setPlaces({ status: "ready", count: file.places.length, builtOn: file.builtOn });
       } catch {
         // A bad file is ignored; search carries on with roads and addresses.
@@ -164,9 +169,18 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     [data, places],
   );
 
+  // Police stations, custody, fire, ambulance, A&E, courts, prisons: on every map.
+  const services = useMemo(
+    () =>
+      data.status === "ready" && places.status === "ready"
+        ? servicePoints(data.index.pointsOfInterestOfType(SERVICE_SOURCE_TYPES))
+        : null,
+    [data, places],
+  );
+
   const value = useMemo(
-    () => ({ data, places, search, blockLabels, area, savedPlaces, addPlace, deletePlace }),
-    [data, places, search, blockLabels, area, savedPlaces, addPlace, deletePlace],
+    () => ({ data, places, search, blockLabels, services, area, savedPlaces, addPlace, deletePlace }),
+    [data, places, search, blockLabels, services, area, savedPlaces, addPlace, deletePlace],
   );
   return <SearchContext.Provider value={value}>{children}</SearchContext.Provider>;
 }

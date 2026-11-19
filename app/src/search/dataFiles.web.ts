@@ -4,7 +4,7 @@
 import { serverRequest } from "../api/http";
 import { API_URL } from "../config";
 
-export type DataKind = "places" | "roads";
+export type DataKind = "places" | "roads" | "lines";
 
 const CACHE = "blueroute-data";
 const urlFor = (kind: DataKind) => `${API_URL}/v1/${kind}-data`;

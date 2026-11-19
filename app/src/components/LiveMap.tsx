@@ -12,7 +12,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MAP_STYLES, region } from "../config";
-import { useMapStyle } from "./mapLooks";
+import { useImageryOffered } from "./imagery";
+import { useTransportLines } from "./transportLines";
+import { SERVICES_BADGE_LAYER } from "./mapServices";
+import { useSearch } from "../search/SearchProvider";
+import { lookToDraw, useMapStyle } from "./mapLooks";
 import { useOfflineMap } from "../offline/OfflineMapProvider";
 import { useLocation } from "../location/LocationProvider";
 import { useSession } from "../session/SessionProvider";
@@ -48,7 +52,9 @@ import {
   MARKER_MIN_ZOOM,
   MARKER_LABEL_LAYOUT,
   MARKER_LABEL_PAINT,
-  pointGeoJSON,
+  destinationGeoJSON,
+  DESTINATION_NUMBER_LAYOUT,
+  DESTINATION_NUMBER_PAINT,
   pointsGeoJSON,
   RESTRICTION_CIRCLE_PAINT,
   RESTRICTION_LABEL_LAYOUT,
@@ -76,6 +82,8 @@ export function LiveMap({
   zoomControl = false,
   roadNames = false,
   houseNumbers = true,
+  doorNumbers = false,
+  destinationNumber = null,
   labels,
   team,
   vehicleArrow = false,
@@ -97,15 +105,21 @@ export function LiveMap({
 }: LiveMapProps) {
   const styles = useThemed(baseStyles);
   const { fix, facing } = useLocation();
-  const { mapTheme, mapLook } = useSession();
+  const { mapTheme, mapLook, transport, services: servicesOn } = useSession();
+  const { services } = useSearch();
   // The map kept on the phone, once downloaded: draws with no signal.
   const offlineStyles = useOfflineMap().styles;
+  const imagery = useImageryOffered();
+  const lines = useTransportLines(transport);
   const mapStyle = useMapStyle(
     offlineStyles?.[mapTheme] ?? MAP_STYLES[mapTheme],
-    mapLook,
+    lookToDraw(mapLook, imagery),
     mapTheme,
     offlineStyles?.day ?? MAP_STYLES.day,
     houseNumbers,
+    transport,
+    lines,
+    servicesOn ? services : null,
   );
   const view = viewProp ?? (headingUp ? "heading" : "north");
   // The +/− buttons nudge the following zoom; auto-zoom adds the speed's.
@@ -194,8 +208,24 @@ export function LiveMap({
           const tappedAt = Date.now();
           const { point } = e.nativeEvent;
           const r = HOUSE_NUMBER_TAP_PX;
-          setTimeout(() => {
-            if (markerPressedAt.current >= tappedAt - 50 || !onPress) return;
+          setTimeout(async () => {
+            if (markerPressedAt.current >= tappedAt - 50) return;
+            // A police, fire or A&E badge (drawn in the style): its card, with who runs it and custody.
+            const badge = await mapRef.current
+              ?.queryRenderedFeatures(
+                [
+                  [point[0] - 14, point[1] - 14],
+                  [point[0] + 14, point[1] + 14],
+                ],
+                { layers: [SERVICES_BADGE_LAYER] },
+              )
+              .then((fs) => fs[0])
+              .catch(() => undefined);
+            if (badge?.geometry.type === "Point" && badge.properties && onMarkerPress) {
+              onMarkerPress(badge.properties as MarkerProperties, badge.geometry.coordinates as LngLat);
+              return;
+            }
+            if (!onPress) return;
             // The house number drawn nearest the tap: the one the crew can see they tapped.
             void (mapRef.current
               ?.queryRenderedFeatures(
@@ -269,7 +299,7 @@ export function LiveMap({
           />
         </GeoJSONSource>
         {/* Under the road names, so a street name always wins the space. */}
-        {houseNumbers && (
+        {(houseNumbers || doorNumbers) && (
           <Layer
             type="symbol"
             id={HOUSE_NUMBER_LAYER}
@@ -317,7 +347,7 @@ export function LiveMap({
             paint={RESTRICTION_LABEL_PAINT}
           />
         </GeoJSONSource>
-        <GeoJSONSource id="destination" data={pointGeoJSON(destination)}>
+        <GeoJSONSource id="destination" data={destinationGeoJSON(destination, destinationNumber)}>
           <Layer
             type="circle"
             id="destination-dot"
@@ -328,6 +358,7 @@ export function LiveMap({
               "circle-stroke-width": 3,
             }}
           />
+          <Layer type="symbol" id="destination-number" layout={DESTINATION_NUMBER_LAYOUT} paint={DESTINATION_NUMBER_PAINT} />
         </GeoJSONSource>
         {puck && (
           <GeoJSONSource id="me" data={puck}>

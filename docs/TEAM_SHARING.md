@@ -9,6 +9,7 @@ How a phone in a team session decides whether to share its position. Written 28 
 | **Always** | BlueRoute is open | ✅ |
 | **Navigating** | navigating to a job (or following a colleague in) | |
 | **On scene** | within 150 m of the place last navigated to, during or after navigating | |
+| **Never (desk)** | never: for someone in the office, on the browser version or a phone. They still see the team and send and receive messages | |
 
 **Battery saver** (a switch): shares only while navigating, whatever the choice, and once a minute when standing still.
 
@@ -67,3 +68,38 @@ Not shipped.
 2. One phone on "Navigating": it drops off the other's map until it starts navigating.
 3. Walk into a police station car park: the phone drops off within about 15 s, and the box says "Not sharing: you're at a police station". Walk 150 m away: it comes back.
 4. Lock one phone for 6 minutes: the other shows it as last updated 6 min ago, in amber.
+
+## Team messages (16 November 2026)
+
+Asked for by an officer: someone in the office, in the team on the browser version, sends information to a callsign out on the ground.
+
+**What can be sent** (from Search, Send to team on a place, or Session → Team → Send a note):
+
+| Kind | Arrives as | Then |
+|---|---|---|
+| **Go here** | a card with the place and any note, spoken | Route here: plans the route (ends the current one if navigating) |
+| **Caution here** | an amber card and an amber pin on the maps, spoken | said again within 150 m of it, once a launch |
+| **Note** | a card, spoken | |
+
+To **one callsign or everyone**. The "To" list includes members not sharing their position (a desk).
+
+**Safeguards:**
+
+- **Encryption:** sealed on the sender's device with the team key (XChaCha20-Poly1305, as positions): the server can't read it.
+- **Who can send:** only a member, checked by their member token.
+- **Who can withdraw:** only the sender.
+- **How long it's kept:** in server memory only, at most **12 hours**, which the server enforces whatever the phone asks. It's deleted sooner if withdrawn or when the team ends. Phones don't save messages; they show them until they run out.
+- **Who can read it:** everyone with the team code can read every message. "To" only decides whose screen it pops up on. This is said plainly on the send sheet and in the terms.
+- **Not a radio:**
+  - the send sheet says so;
+  - the terms (section 6) put responsibility for content on the sender and tell them to follow force policy;
+  - messages only arrive while BlueRoute is open, with no push notifications;
+  - they are not an emergency or officer-safety system.
+- **Lock screen:** no message content appears on it.
+- **Callsigns aren't checked.** They're typed in by each person, so anyone with the code can send under any callsign. The terms say to confirm anything that matters by radio or with control. Verified identities would need accounts, which v1 deliberately doesn't have.
+
+Code:
+- `server/src/teams.ts` (`postMessage`, `deleteMessage`);
+- `app/src/team/messages.ts` (rules, tested);
+- `app/src/team/TeamProvider.tsx`;
+- `app/src/components/SendToTeam.tsx` and `TeamMessageCard.tsx`.
