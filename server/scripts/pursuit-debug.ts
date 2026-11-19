@@ -29,8 +29,15 @@ for (const [label, trace] of Object.entries(drives)) {
     const e = await valhalla.locate(p, dir);
     console.log(`  ${m} m on, with direction:`, e.slice(0, 3).map(brief).join(" ; ") || "(none)");
   }
+  const r1 = await valhalla.locate(here, dir, { radiusM: 30, publicRoads: true });
+  for (const e of r1.slice(0, 6)) console.log("  30 m public, with direction:", brief(e));
+  if (!r1.length) console.log("  30 m public, with direction: (none)");
+  const r2 = await valhalla.locate(here, undefined, { radiusM: 30, publicRoads: true });
+  for (const e of r2.slice(0, 6)) console.log("  30 m public, no direction:", brief(e), `turn=${Math.round(turnAngle(dir, e.heading))}`);
+  if (!r2.length) console.log("  30 m public, no direction: (none)");
   const names = matched?.names ?? [];
-  let edge = ahead
+  const start = ahead.some((e) => e.car) ? ahead : r1.some((e) => e.car) ? r1 : r2;
+  let edge = start
     .filter((e) => e.car && e.shape.length >= 2)
     .sort((a, b) => Number(b.names.some((n) => names.includes(n))) - Number(a.names.some((n) => names.includes(n))) || Math.abs(turnAngle(dir, a.heading)) - Math.abs(turnAngle(dir, b.heading)))[0];
   for (let step = 0; edge && step < 12; step++) {
