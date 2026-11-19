@@ -35,22 +35,5 @@ for (const [label, trace] of Object.entries(drives)) {
   const r2 = await valhalla.locate(here, undefined, { radiusM: 30, publicRoads: true });
   for (const e of r2.slice(0, 6)) console.log("  30 m public, no direction:", brief(e), `turn=${Math.round(turnAngle(dir, e.heading))}`);
   if (!r2.length) console.log("  30 m public, no direction: (none)");
-  const names = matched?.names ?? [];
-  const start = ahead.some((e) => e.car) ? ahead : r1.some((e) => e.car) ? r1 : r2;
-  let edge = start
-    .filter((e) => e.car && e.shape.length >= 2)
-    .sort((a, b) => Number(b.names.some((n) => names.includes(n))) - Number(a.names.some((n) => names.includes(n))) || Math.abs(turnAngle(dir, a.heading)) - Math.abs(turnAngle(dir, b.heading)))[0];
-  for (let step = 0; edge && step < 12; step++) {
-    const node = edge.shape.at(-1)!;
-    const arriving = bearingDeg(edge.shape.at(-2)!, node);
-    const atNode = await valhalla.locate(node, undefined, { exactNode: true });
-    console.log(` step ${step}: on ${brief(edge)} -> node ${node[1].toFixed(5)},${node[0].toFixed(5)} arriving ${Math.round(arriving)}`);
-    for (const e of atNode.slice(0, 10)) console.log("    at node:", brief(e), `turn=${Math.round(turnAngle(arriving, e.heading))}`);
-    edge = atNode
-      .filter((e) => e.car && e.percentAlong < 0.01 && e.shape.length >= 2 && (!names.length || e.names.some((n) => names.includes(n))))
-      .filter((e) => !(Math.abs(e.shape.at(-1)![0] - node[0]) < 1e-6 && Math.abs(e.shape.at(-1)![1] - node[1]) < 1e-6))
-      .filter((e) => Math.abs(turnAngle(arriving, e.heading)) < 60)
-      .sort((a, b) => Math.abs(turnAngle(arriving, a.heading)) - Math.abs(turnAngle(arriving, b.heading)))[0];
-    if (!edge) console.log("    (no onward edge on the same road: the search stops here)");
-  }
+
 }

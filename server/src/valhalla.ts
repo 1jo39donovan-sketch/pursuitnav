@@ -159,12 +159,6 @@ export interface LocatedEdge {
 export interface LocateOptions {
   radiusM?: number;
   publicRoads?: boolean;
-  /**
-   * The point is a node itself: no snapping to another one nearby (Valhalla
-   * snaps within 5 m, so a 5 m stretch's far end read as its near end and the
-   * junction search went round in circles on Holloway Road, 19 Nov).
-   */
-  exactNode?: boolean;
 }
 
 export interface Matcher {
@@ -373,7 +367,6 @@ export class ValhallaClient implements Router, Matcher {
           ...(options.radiusM ? { radius: options.radiusM } : {}),
           // Valhalla's lowest road class searched: residential leaves out service roads and driveways.
           ...(options.publicRoads ? { search_filter: { min_road_class: "residential" } } : {}),
-          ...(options.exactNode ? { node_snap_tolerance: 0 } : {}),
         },
       ],
       costing: "auto",

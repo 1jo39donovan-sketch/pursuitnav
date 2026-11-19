@@ -107,7 +107,21 @@ async function findJunction(
   for (let step = 0; step < MAX_STEPS && distance <= MAX_LOOKAHEAD_M; step++) {
     const node = edge.shape[edge.shape.length - 1]!;
     const arriving = bearingDeg(edge.shape[edge.shape.length - 2]!, node);
-    const atNode = await matcher.locate(node, undefined, { exactNode: true });
+    const atNode = await matcher.locate(node);
+    // Valhalla snaps a point within 5 m to a node: at the end of a very short
+    // stretch it can answer for the node behind (Holloway Road, 19 Nov), and
+    // the search went round in circles. Then look a little further on instead.
+    const startsHere = atNode.filter((e) => e.percentAlong < 0.01 && e.shape.length >= 2 && near(e.shape[0]!, node));
+    if (!startsHere.length) {
+      const beyond = await matcher.locate(projectM(node, arriving, SNAP_STEP_M), arriving);
+      const next = beyond
+        .filter((e) => e.car && e.shape.length >= 2 && (!roadNames.length || sameRoad(e.names, roadNames)))
+        .sort((a, b) => Math.abs(turnAngle(arriving, a.heading)) - Math.abs(turnAngle(arriving, b.heading)))[0];
+      if (!next || Math.abs(turnAngle(arriving, next.heading)) >= 60) return null;
+      edge = next;
+      distance += next.lengthM * (1 - next.percentAlong);
+      continue;
+    }
     const others = [
       ...new Set(
         atNode
@@ -118,11 +132,8 @@ async function findJunction(
     if (others.length) return { name: others.slice(0, 2).join(" / "), distanceM: Math.round(distance) };
 
     // No other road here: carry on along this one, the way the car is going.
-    const same = (a: LngLat, b: LngLat) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
-    const onward = atNode
-      .filter((e) => e.car && e.percentAlong < 0.01 && e.shape.length >= 2 && (!roadNames.length || sameRoad(e.names, roadNames)))
-      // Always forward: never a stretch that ends where the car's search already is.
-      .filter((e) => !same(e.shape[e.shape.length - 1]!, node))
+    const onward = startsHere
+      .filter((e) => e.car && (!roadNames.length || sameRoad(e.names, roadNames)))
       .filter((e) => Math.abs(turnAngle(arriving, e.heading)) < 60)
       .sort((a, b) => Math.abs(turnAngle(arriving, a.heading)) - Math.abs(turnAngle(arriving, b.heading)))[0];
     if (!onward) return null; // dead end, or the road ends here
@@ -130,4 +141,16 @@ async function findJunction(
     distance += onward.lengthM;
   }
   return null;
+}
+
+/** Past Valhalla's 5 m node snapping, to read the stretch beyond a very short one. */
+const SNAP_STEP_M = 8;
+const near = (a: LngLat, b: LngLat) => Math.abs(a[0] - b[0]) < 2e-6 && Math.abs(a[1] - b[1]) < 2e-6;
+
+/** The point `m` metres on from `p` at bearing `deg`. */
+function projectM(p: LngLat, deg: number, m: number): LngLat {
+  const r = (deg * Math.PI) / 180;
+  const dLat = (Math.cos(r) * m) / 111_320;
+  const dLng = (Math.sin(r) * m) / (111_320 * Math.cos((p[1] * Math.PI) / 180));
+  return [p[0] + dLng, p[1] + dLat];
 }

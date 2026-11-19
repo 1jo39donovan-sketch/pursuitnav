@@ -30,7 +30,11 @@ describe("Pursuit's next junction (19 Nov, Holloway Road)", () => {
         const atCar = point[0] < -0.1155;
         return atCar
           ? [road({}), road({ heading: 320, shape: [[-0.115, 51.5544], [-0.116, 51.555]] })]
-          : [road({ percentAlong: 1 }), road({ names: ["Seven Sisters Road"], heading: 30, percentAlong: 0 })];
+          : [
+              road({ percentAlong: 1 }),
+              // Starts at the junction node.
+              road({ names: ["Seven Sisters Road"], heading: 30, percentAlong: 0, shape: [[-0.115, 51.5544], [-0.1145, 51.555]] }),
+            ];
       },
     };
     const info = await pursuitInfo(matcher, [
@@ -54,5 +58,30 @@ describe("Pursuit's next junction (19 Nov, Holloway Road)", () => {
     ]);
     expect(info.nextJunction).toBeNull();
     expect(info.roadShape).toBeNull();
+  });
+
+  it("steps past a stretch too short for Valhalla to tell its ends apart", async () => {
+    // A 5 m stretch after the car's: asked about its far end, Valhalla answers
+    // for the near one (no edge starting there), so look 8 m further on.
+    const A: [number, number] = [-0.115, 51.5544];
+    const B: [number, number] = [-0.11496, 51.55436]; // ~5 m on
+    const C: [number, number] = [-0.1143, 51.5539];
+    const matcher: Matcher = {
+      matchRoad: async () => ({ names: ["Holloway Road"], speedLimitKph: 32 }) as never,
+      locate: async (p, heading) => {
+        const at = (q: [number, number]) => Math.abs(p[0] - q[0]) < 1e-6 && Math.abs(p[1] - q[1]) < 1e-6;
+        if (at([-0.1157, 51.555])) return [road({ shape: [[-0.116, 51.555], A], percentAlong: 0.5 })];
+        if (at(A)) return [road({ shape: [A, B], percentAlong: 0, lengthM: 5 })];
+        if (at(B)) return [road({ shape: [A, B], percentAlong: 0, lengthM: 5 })]; // snapped back to A
+        if (heading !== undefined) return [road({ shape: [B, C], percentAlong: 0.1, lengthM: 90 })]; // 8 m past B
+        if (at(C)) return [road({ shape: [B, C], percentAlong: 1 }), road({ names: ["Tollington Road"], heading: 60, percentAlong: 0, shape: [C, [-0.1135, 51.5542]] })];
+        return [];
+      },
+    };
+    const info = await pursuitInfo(matcher, [
+      [-0.1165, 51.5556],
+      [-0.1157, 51.555],
+    ]);
+    expect(info.nextJunction?.name).toBe("Tollington Road");
   });
 });
