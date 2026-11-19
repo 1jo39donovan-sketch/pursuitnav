@@ -8,6 +8,10 @@ name: Store screenshots
 on:
   # Also when the script or this file changes, so a new version runs straight away.
   push:
+    # Not on Dependabot's branches: a commit pushed there by this workflow
+    # holds the update's CI until someone approves it (#85, #59, 19 Nov).
+    branches-ignore:
+      - "dependabot/**"
     paths:
       - store/take-screenshots.mjs
       - .github/workflows/store-screenshots.yml
