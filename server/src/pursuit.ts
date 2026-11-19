@@ -26,7 +26,13 @@ export const kphToMph = (kph: number) => Math.round(kph / 1.609344);
 
 const sameRoad = (a: string[], b: string[]) => a.some((n) => b.includes(n));
 
-export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: number): Promise<PursuitInfo> {
+export async function pursuitInfo(
+  matcher: Matcher,
+  trace: LngLat[],
+  heading?: number,
+  /** Says each step of the junction search (the debug script only). */
+  log?: (line: string) => void,
+): Promise<PursuitInfo> {
   const here = trace[trace.length - 1]!;
   // Direction: the phone's GPS course, else the bearing over the last stretch.
   const prev = trace.length >= 2 ? trace[trace.length - 2]! : undefined;
@@ -55,7 +61,7 @@ export async function pursuitInfo(matcher: Matcher, trace: LngLat[], heading?: n
   return {
     road: roadLabel(names),
     speedLimitMph: limitKph ? kphToMph(limitKph) : null,
-    nextJunction: current ? await findJunction(matcher, current, names) : null,
+    nextJunction: current ? await findJunction(matcher, current, names, log) : null,
     // Only an edge on the matched road: a side road's shape would pull the arrow off.
     roadShape:
       current && (!matched || sameRoad(current.names, matched.names))
@@ -104,6 +110,7 @@ async function findJunction(
   matcher: Matcher,
   start: LocatedEdge,
   roadNames: string[],
+  log: (line: string) => void = () => {},
 ): Promise<{ name: string; distanceM: number } | null> {
   let edge = start;
   let distance = start.lengthM * (1 - start.percentAlong);
@@ -115,6 +122,12 @@ async function findJunction(
     // stretch it can answer for the node behind (Holloway Road, 19 Nov), and
     // the search went round in circles. Then look a little further on instead.
     const startsHere = atNode.filter((e) => e.percentAlong < 0.01 && e.shape.length >= 2 && near(e.shape[0]!, node));
+    log(
+      `step ${step} node ${node[1].toFixed(5)},${node[0].toFixed(5)} at ${Math.round(distance)} m, arriving ${Math.round(arriving)}: ` +
+        atNode
+          .map((e) => `${e.names.join("/") || "-"}[${e.use}${e.car ? "" : ",no car"} hdg ${Math.round(e.heading)} along ${e.percentAlong.toFixed(2)}${startsHere.includes(e) ? " starts" : ""}]`)
+          .join(" "),
+    );
     if (!startsHere.length) {
       const beyond = await matcher.locate(projectM(node, arriving, SNAP_STEP_M), arriving);
       const next = beyond
