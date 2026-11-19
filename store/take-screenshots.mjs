@@ -62,7 +62,17 @@ async function shot(page, device, file, steps) {
   }
 }
 
-const tab = (page, name) => page.getByText(name, exact()).last().click();
+// A tab: tapped, or if something covers it (a sheet left open), opened by its
+// address instead; settings live in the browser, so nothing is lost.
+const TAB_PATH = { Session: "", Search: "search", Pursuit: "pursuit" };
+const tab = async (page, name) => {
+  try {
+    await page.getByText(name, exact()).last().click({ timeout: 5_000 });
+  } catch {
+    await page.goto(new URL(TAB_PATH[name] ?? "", url).href, { waitUntil: "networkidle" });
+    await page.waitForTimeout(1500);
+  }
+};
 const search = async (page, text) => {
   const box = page.getByLabel("Address from the control room").last();
   await box.fill("");
