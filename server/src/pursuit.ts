@@ -18,13 +18,29 @@ export interface PursuitInfo {
 
 // Look this far ahead for a junction with another named road.
 const MAX_LOOKAHEAD_M = 2000;
-const MAX_STEPS = 12;
+// Roads are drawn in short pieces (a crossing, a bus stop, a change of
+// surface each start a new one): Crowndale Road took 12 in its first 130 m.
+const MAX_STEPS = 40;
 // Roads that count as junctions; driveways, car-park aisles and paths don't.
 const JUNCTION_USES = new Set(["road", "ramp", "turn_channel", "bus", "busway", "living_street"]);
 
 export const kphToMph = (kph: number) => Math.round(kph / 1.609344);
 
-const sameRoad = (a: string[], b: string[]) => a.some((n) => b.includes(n));
+/** A road number such as A1, A503, B550, M25 or A40(M): OSM gives it alongside the name, in either order. */
+const ROAD_NUMBER = /^[ABM]\d+(\(M\))?$/i;
+
+/**
+ * Whether two lists of names are the same road. By name when both have one:
+ * different roads share a number (City Road and Old Street Roundabout are
+ * both A501, Crowndale Road and Pancras Road both A5202), and a shared
+ * number hid the junction (19 Nov). By number only when one has no name.
+ */
+const sameRoad = (a: string[], b: string[]) => {
+  const named = (x: string[]) => x.filter((n) => !ROAD_NUMBER.test(n.trim()));
+  const [na, nb] = [named(a), named(b)];
+  if (na.length && nb.length) return na.some((n) => nb.includes(n));
+  return a.some((n) => b.includes(n));
+};
 
 export async function pursuitInfo(
   matcher: Matcher,
@@ -69,9 +85,6 @@ export async function pursuitInfo(
         : null,
   };
 }
-
-/** A road number such as A1, A503, B550, M25 or A40(M): OSM gives it alongside the name, in either order. */
-const ROAD_NUMBER = /^[ABM]\d+(\(M\))?$/i;
 
 /** The road's name rather than its number, when it has one: "Holloway Road", not "A1". */
 export function streetName(names: readonly string[]): string | null {
