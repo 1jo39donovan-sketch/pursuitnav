@@ -62,7 +62,17 @@ async function shot(page, device, file, steps) {
   }
 }
 
-const tab = (page, name) => page.getByText(name, exact()).last().click();
+// A tab: tapped (the app no longer bounces a first tap on Session back to
+// Search after a reload, 19 Nov), or opened by its address if covered.
+const TAB_PATH = { Session: "", Search: "search", Pursuit: "pursuit" };
+const tab = async (page, name) => {
+  try {
+    await page.getByText(name, exact()).last().click({ timeout: 5_000 });
+  } catch {
+    await page.goto(new URL(TAB_PATH[name] ?? "", url).href, { waitUntil: "networkidle" });
+  }
+  await page.waitForTimeout(1500);
+};
 const search = async (page, text) => {
   const box = page.getByLabel("Address from the control room").last();
   await box.fill("");
@@ -82,7 +92,7 @@ for (const device of DEVICES) {
   await shot(page, device, "3-routes", async () => {
     await search(page, "54 Caledonian Road");
     // The result row, not the search box (which holds the same words).
-    await page.getByText("54 Caledonian Road", exact()).last().click();
+    await page.getByText(/^54 Caledonian Road/).first().click();
     await page.getByLabel("Go on the standard route").last().waitFor({ timeout: 30_000 });
   });
 

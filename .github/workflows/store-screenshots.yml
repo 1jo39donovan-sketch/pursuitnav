@@ -28,7 +28,7 @@ jobs:
   shots:
     # Playwright's browsers support Ubuntu 24.04, not yet the newer "latest".
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
