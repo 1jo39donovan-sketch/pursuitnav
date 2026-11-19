@@ -82,6 +82,45 @@ jobs:
             gh issue close "$open" --comment "Fresh map data is in: checked at $now."
           fi
 
+      # Live closures come from TfL and National Highways. A feed not read for
+      # an hour (a revoked key, a feed that's stopped, or new charges) means
+      # routes stop avoiding those closures, though they still work.
+      - name: Check both closures feeds are being read
+        id: closures
+        if: vars.SERVER_DOMAIN != '' && steps.check.outcome == 'success'
+        continue-on-error: true
+        env:
+          DOMAIN: ${{ vars.SERVER_DOMAIN }}
+        run: |
+          sources=$(curl -fsS --max-time 20 "https://$DOMAIN/health" | jq -c '.closureSources // empty')
+          [ -n "$sources" ] || { echo "The server doesn't report its closures feeds: nothing to check."; exit 0; }
+          echo "Closures by feed: $sources"
+          down=$(echo "$sources" | jq -r 'to_entries | map(select(.value == null) | .key) | join(", ")')
+          [ -z "$down" ] || { echo "::warning::Not read in the last hour: $down"; echo "down=$down" >> "$GITHUB_OUTPUT"; exit 1; }
+
+      - name: Open or close the "Closures feed down" issue
+        if: steps.closures.outcome == 'success' || steps.closures.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OUTCOME: ${{ steps.closures.outcome }}
+          DOWN: ${{ steps.closures.outputs.down }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create closures-down --color FBCA04 --description "Opened and closed by the uptime check" >/dev/null 2>&1 || true
+          open=$(gh issue list --state open --label closures-down --json number --jq '.[0].number // empty')
+          now=$(date -u +'%d %b %Y %H:%M UTC')
+          if [ "$OUTCOME" = failure ] && [ -z "$open" ]; then
+            name=$(echo "$DOWN" | sed 's/tfl/TfL/; s/highways/National Highways/')
+            gh issue create --label closures-down --title "Closures feed not read: $name" --body "At $now the server hadn't read the $name closures feed for over an hour. Routes still work, but don't avoid that feed's closures.
+
+          For National Highways: check the key on the developer portal (expired, revoked, or subscription changed) and the api container's logs on the server (docker compose logs api, look for National Highways). For TfL: check api.tfl.gov.uk is up. Details: $RUN_URL
+
+          This issue closes by itself when both feeds are read again."
+          elif [ "$OUTCOME" = success ] && [ -n "$open" ]; then
+            gh issue close "$open" --comment "Both closures feeds are being read again: checked at $now."
+          fi
+
       # One open issue while the server is down; closed when it's back.
       - name: Open or close the "Server down" issue
         if: vars.SERVER_DOMAIN != ''
