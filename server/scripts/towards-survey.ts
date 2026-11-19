@@ -43,7 +43,8 @@ for (const [label, [from, to]] of Object.entries(ROUTES)) {
   let length = 0;
   for (let i = 1; i < shape.length; i++) length += distanceM(shape[i - 1]!, shape[i]!);
   const notes: string[] = [];
-  for (let m = 100; m < length - 100; m += 100) {
+  // Not near the end: the road carries on where the planned route stops, so what's ahead isn't known.
+  for (let m = 100; m + LOOK_M + SLACK_M <= length; m += 100) {
     const here = along(shape, m);
     const heading = bearingDeg(along(shape, m - 20), here);
     const said = generallyTowards(here[1], here[0], heading);
