@@ -146,5 +146,26 @@ describe("Pursuit's next junction (19 Nov, Holloway Road)", () => {
     ]);
     expect(info.nextJunction).toEqual({ name: "Pancras Road", distanceM: 195 });
   });
+
+  it("names the road ahead when it changes name just past a very short stretch (Crowndale Road into Pancras Road)", async () => {
+    const A: [number, number] = [-0.1325, 51.53549];
+    const B: [number, number] = [-0.13248, 51.53545]; // ~5 m on
+    const matcher: Matcher = {
+      matchRoad: async () => ({ names: ["Crowndale Road", "A5202"], speedLimitKph: 32 }) as never,
+      locate: async (p, heading) => {
+        const at = (q: [number, number]) => Math.abs(p[0] - q[0]) < 1e-6 && Math.abs(p[1] - q[1]) < 1e-6;
+        const crowndale = (o: Partial<LocatedEdge>) => road({ names: ["Crowndale Road", "A5202"], heading: 160, ...o });
+        if (at(A) || at(B)) return [crowndale({ shape: [A, B], percentAlong: 0, lengthM: 5 })]; // B snaps back to A
+        if (heading !== undefined && p[1] < B[1])
+          return [road({ names: ["Pancras Road", "A5202"], heading: 124, percentAlong: 0.1, lengthM: 50, shape: [B, [-0.1321, 51.53533]] })];
+        return [crowndale({ shape: [[-0.1327, 51.5356], A], percentAlong: 0.5, lengthM: 20 })];
+      },
+    };
+    const info = await pursuitInfo(matcher, [
+      [-0.1328, 51.53565],
+      [-0.1326, 51.53555],
+    ]);
+    expect(info.nextJunction).toEqual({ name: "Pancras Road", distanceM: 15 });
+  });
 });
 

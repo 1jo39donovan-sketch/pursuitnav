@@ -144,9 +144,18 @@ async function findJunction(
     if (!startsHere.length) {
       const beyond = await matcher.locate(projectM(node, arriving, SNAP_STEP_M), arriving);
       const next = beyond
-        .filter((e) => e.car && e.shape.length >= 2 && (!roadNames.length || sameRoad(e.names, roadNames)))
-        .sort((a, b) => Math.abs(turnAngle(arriving, a.heading)) - Math.abs(turnAngle(arriving, b.heading)))[0];
+        .filter((e) => e.car && e.shape.length >= 2)
+        .sort(
+          (a, b) =>
+            Number(!roadNames.length || sameRoad(b.names, roadNames)) - Number(!roadNames.length || sameRoad(a.names, roadNames)) ||
+            Math.abs(turnAngle(arriving, a.heading)) - Math.abs(turnAngle(arriving, b.heading)),
+        )[0];
       if (!next || Math.abs(turnAngle(arriving, next.heading)) >= 60) return null;
+      // The road ahead under another name (Crowndale Road into Pancras Road): that's the junction.
+      if (roadNames.length && !sameRoad(next.names, roadNames)) {
+        if (!next.names.length || !JUNCTION_USES.has(next.use)) return null;
+        return { name: streetName(next.names)!, distanceM: Math.round(distance) };
+      }
       edge = next;
       distance += next.lengthM * (1 - next.percentAlong);
       continue;
