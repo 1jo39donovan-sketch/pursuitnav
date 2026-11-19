@@ -10,6 +10,7 @@ on:
     paths:
       - server/scripts/pursuit-debug.ts
       - server/scripts/pursuit-survey.ts
+      - server/scripts/towards-survey.ts
       - .github/workflows/pursuit-debug.yml
 
 permissions:
@@ -57,3 +58,6 @@ jobs:
       - name: Each survey miss, step by step
         working-directory: server
         run: npx tsx scripts/pursuit-debug.ts survey-misses.json
+      - name: How well "Generally towards" names the next borough along real routes
+        working-directory: server
+        run: npx tsx scripts/towards-survey.ts
