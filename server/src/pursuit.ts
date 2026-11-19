@@ -107,7 +107,7 @@ async function findJunction(
   for (let step = 0; step < MAX_STEPS && distance <= MAX_LOOKAHEAD_M; step++) {
     const node = edge.shape[edge.shape.length - 1]!;
     const arriving = bearingDeg(edge.shape[edge.shape.length - 2]!, node);
-    const atNode = await matcher.locate(node);
+    const atNode = await matcher.locate(node, undefined, { exactNode: true });
     const others = [
       ...new Set(
         atNode
@@ -118,8 +118,11 @@ async function findJunction(
     if (others.length) return { name: others.slice(0, 2).join(" / "), distanceM: Math.round(distance) };
 
     // No other road here: carry on along this one, the way the car is going.
+    const same = (a: LngLat, b: LngLat) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
     const onward = atNode
       .filter((e) => e.car && e.percentAlong < 0.01 && e.shape.length >= 2 && (!roadNames.length || sameRoad(e.names, roadNames)))
+      // Always forward: never a stretch that ends where the car's search already is.
+      .filter((e) => !same(e.shape[e.shape.length - 1]!, node))
       .filter((e) => Math.abs(turnAngle(arriving, e.heading)) < 60)
       .sort((a, b) => Math.abs(turnAngle(arriving, a.heading)) - Math.abs(turnAngle(arriving, b.heading)))[0];
     if (!onward) return null; // dead end, or the road ends here

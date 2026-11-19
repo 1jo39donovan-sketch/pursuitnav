@@ -43,11 +43,12 @@ for (const [label, trace] of Object.entries(drives)) {
   for (let step = 0; edge && step < 12; step++) {
     const node = edge.shape.at(-1)!;
     const arriving = bearingDeg(edge.shape.at(-2)!, node);
-    const atNode = await valhalla.locate(node);
+    const atNode = await valhalla.locate(node, undefined, { exactNode: true });
     console.log(` step ${step}: on ${brief(edge)} -> node ${node[1].toFixed(5)},${node[0].toFixed(5)} arriving ${Math.round(arriving)}`);
     for (const e of atNode.slice(0, 10)) console.log("    at node:", brief(e), `turn=${Math.round(turnAngle(arriving, e.heading))}`);
     edge = atNode
       .filter((e) => e.car && e.percentAlong < 0.01 && e.shape.length >= 2 && (!names.length || e.names.some((n) => names.includes(n))))
+      .filter((e) => !(Math.abs(e.shape.at(-1)![0] - node[0]) < 1e-6 && Math.abs(e.shape.at(-1)![1] - node[1]) < 1e-6))
       .filter((e) => Math.abs(turnAngle(arriving, e.heading)) < 60)
       .sort((a, b) => Math.abs(turnAngle(arriving, a.heading)) - Math.abs(turnAngle(arriving, b.heading)))[0];
     if (!edge) console.log("    (no onward edge on the same road: the search stops here)");
