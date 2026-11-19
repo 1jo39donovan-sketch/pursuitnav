@@ -20,6 +20,15 @@ for (const [label, trace] of Object.entries(drives)) {
   console.log(`dir=${Math.round(dir)} matched=${JSON.stringify(matched?.names)}`);
   const ahead = await valhalla.locate(here, dir);
   for (const e of ahead.slice(0, 8)) console.log("  at car:", brief(e));
+  const anyWay = await valhalla.locate(here);
+  for (const e of anyWay.slice(0, 8)) console.log("  at car, no direction:", brief(e), `turn=${Math.round(turnAngle(dir, e.heading))}`);
+  // A little along the line too, in case the car's point is between two roads.
+  for (const m of [15, 30]) {
+    const f = m / 111_320;
+    const p: LngLat = [here[0] + Math.sin((dir * Math.PI) / 180) * f / Math.cos((here[1] * Math.PI) / 180), here[1] + Math.cos((dir * Math.PI) / 180) * f];
+    const e = await valhalla.locate(p, dir);
+    console.log(`  ${m} m on, with direction:`, e.slice(0, 3).map(brief).join(" ; ") || "(none)");
+  }
   const names = matched?.names ?? [];
   let edge = ahead
     .filter((e) => e.car && e.shape.length >= 2)
