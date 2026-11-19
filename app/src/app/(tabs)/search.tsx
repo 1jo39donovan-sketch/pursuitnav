@@ -664,6 +664,27 @@ export default function SearchScreen() {
             />
           </View>
         )}
+        {navigation.resumable && !navigation.active && !destination && !showResults && !tapped && (
+          // Closed or reloaded mid-route: the route back in one tap, never restarted silently.
+          <View style={styles.resumeCard}>
+            <Text style={styles.resumeNote}>The app was closed during a route.</Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.resumeButton}
+              onPress={() => {
+                navigation.resume();
+                router.push("/navigate");
+              }}
+            >
+              <Text style={styles.resumeText} numberOfLines={2}>
+                Resume route to {navigation.resumable.destination.title}
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={navigation.dismissResume} hitSlop={12}>
+              <Text style={styles.resumeNote}>Not now</Text>
+            </Pressable>
+          </View>
+        )}
         {tapped && !destination && !showResults && (
           <MarkerCard
             marker={tapped.marker}
@@ -1011,6 +1032,30 @@ function offered(r: Route | PoliceRoute) {
 }
 
 const baseStyles = StyleSheet.create({
+  resumeCard: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    backgroundColor: colors.panel,
+    borderColor: colors.amber,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    alignItems: "center",
+  },
+  resumeNote: { color: colors.muted, fontFamily: fonts.body, fontSize: 15, textAlign: "center" },
+  resumeButton: {
+    backgroundColor: colors.amber,
+    borderRadius: 10,
+    minHeight: 60,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "stretch",
+  },
+  resumeText: { color: "#1a1200", fontFamily: fonts.displayBold, fontSize: 19, textAlign: "center" },
   screen: { flex: 1, backgroundColor: colors.bg },
   // The search box floats over the map, as a rounded bar with a shadow.
   floating: { position: "absolute", left: 10, right: 10, gap: 6 },

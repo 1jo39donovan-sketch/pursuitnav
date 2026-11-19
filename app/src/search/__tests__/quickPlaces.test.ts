@@ -75,12 +75,17 @@ describe("custody outside London", () => {
   it("knows Kent's and Essex's suites, matched to their police stations", async () => {
     const { CUSTODY_SUITES, custodyStation } = await import("../../area/custody");
     const margate = CUSTODY_SUITES.find((c) => c.name === "Margate")!;
-    const grays = CUSTODY_SUITES.find((c) => c.name === "Grays")!;
-    expect([margate.borough, grays.borough]).toEqual(["Thanet", "Thurrock"]);
+    const southend = CUSTODY_SUITES.find((c) => c.name === "Southend")!;
+    expect([margate.borough, southend.borough]).toEqual(["Thanet", "Southend-on-Sea"]);
     const station = poi("Margate Police Station", "Police station", "Thanet", 51.385, 1.381);
     expect(custodyStation(margate, [station])).toBe(station);
     // Not a building in the wrong district.
-    expect(custodyStation(grays, [poi("Grays Inn Road Police Office", "Police station", "Camden", 51.52, -0.12)])).toBeNull();
+    expect(custodyStation(southend, [poi("Southend Road Police Office", "Police station", "Havering", 51.57, 0.18)])).toBeNull();
+    // Essex's open suites only (checked 19 Nov 2026): Basildon and Clacton
+    // closed, Grays not confirmed open.
+    const essex = CUSTODY_SUITES.filter((c) => c.agency === "Essex").map((c) => c.name);
+    expect(essex).toEqual(["Chelmsford", "Colchester", "Harlow", "Southend"]);
+    expect(CUSTODY_SUITES.filter((c) => c.agency === "Kent").map((c) => c.name)).toContain("North Kent (Northfleet)");
   });
 });
 

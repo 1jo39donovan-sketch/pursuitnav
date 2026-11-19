@@ -27,7 +27,7 @@ export const AE_CORRECTIONS: readonly AeCorrection[] = [
   { match: "queen elizabeth the queen mother", borough: "Thanet", set: "Hospital with A&E", why: "24/7 emergency department (QEQM, Margate)" },
   // Marked as A&E but aren't.
   { match: "nuffield", borough: "Tunbridge Wells", set: "Hospital", why: "private hospital, no emergency department" },
-  { match: "estuary view", borough: "Canterbury", set: "Hospital", why: "medical centre with a minor injuries unit" },
+  { match: "estuary view", borough: "Canterbury", set: "Hospital", why: "urgent treatment centre, not an A&E" },
   { match: "central middlesex", borough: "Brent", set: "Hospital", why: "A&E closed in 2014; urgent treatment centre" },
   // Specialist emergency departments: shown, but not offered as Nearest A&E.
   { match: "moorfields", borough: "Islington", set: "Eye A&E", why: "eye emergencies only" },
@@ -45,4 +45,19 @@ export function withAeCorrections(pois: readonly PointOfInterest[]): PointOfInte
     const rule = rules.find((r) => r.borough === p.borough && r.words.every((w) => name.includes(` ${w} `)));
     return rule && rule.set !== p.type ? { ...p, type: rule.set } : p;
   });
+}
+
+/**
+ * What a crew should know about an A&E before taking someone there, shown on
+ * its card. Ealing has no children's A&E (NHS.uk, checked by the PM's team,
+ * 19 Nov 2026); the app doesn't know who the patient is, so it says so.
+ */
+const AE_NOTES: readonly { match: string; borough: Borough; note: string }[] = [
+  { match: "ealing hospital", borough: "Ealing", note: "Adults only: no children's A&E here." },
+];
+
+export function aeNote(p: { name: string; borough?: string }): string | null {
+  const name = ` ${normalise(p.name)} `;
+  const hit = AE_NOTES.find((n) => n.borough === p.borough && normalise(n.match).split(" ").every((w) => name.includes(` ${w} `)));
+  return hit?.note ?? null;
 }

@@ -10,6 +10,7 @@
 import type { StyleSpecification } from "@maplibre/maplibre-react-native";
 
 import type { MapTheme } from "../session/SessionProvider";
+import { hideBaseLabels } from "./baseLabels";
 
 type Layer = StyleSpecification["layers"][number];
 
@@ -261,7 +262,9 @@ export function withTransport(
     },
   ];
 
-  const kept = style.layers
+  // Their station names in the general place layers too (class railway): the
+  // app's ring names each station once ("Caledonian Road & Barnsbury", 19 Nov).
+  const kept = hideBaseLabels(style, ["railway"]).layers
     .filter((l) => !isOurs(l))
     .map((l) =>
       l.type === "symbol" && sourceLayer(l) === "poi" && THEIR_STATIONS.test(l.id)

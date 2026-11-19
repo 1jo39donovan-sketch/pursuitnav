@@ -16,7 +16,7 @@ Since 18 November the app corrects all of the below itself when it loads the
 places (`app/src/area/emergencyDepartments.ts`), so Nearest A&E and the map
 are right now. Fixing OpenStreetMap is still worth doing: other apps use it,
 and once it's fixed the app's entry does nothing and can be removed. The list
-needs checking by an officer or paramedic before launch.
+was checked against NHS.uk and the ICBs' pages by the PM's team on 19 November 2026.
 
 ## Missing: real emergency departments not marked as A&E
 
@@ -39,7 +39,7 @@ specialist department, keep it and add `healthcare:speciality`, see below).
 | Place | Area | Why it's wrong |
 |---|---|---|
 | Tunbridge Wells Nuffield Hospital | Tunbridge Wells | Private hospital, no emergency department. |
-| Estuary View Medical Centre, Whitstable | Canterbury | A medical centre with a minor injuries unit, not an A&E. |
+| Estuary View Medical Centre, Whitstable | Canterbury | An urgent treatment centre, not an A&E. |
 | Central Middlesex Hospital, Park Royal | Brent | Its A&E closed in 2014; it has an urgent treatment centre. |
 
 ## Specialist emergency departments
@@ -50,6 +50,11 @@ Real, but not where to take most casualties. BlueRoute shows them as A&E.
 |---|---|---|
 | Moorfields Eye Hospital (City Road) | Islington | Eye A&E only. Tagging `healthcare:speciality=ophthalmology` on it would let BlueRoute tell it apart. |
 | Evelina London Children's Hospital | Lambeth | Children's A&E, beside St Thomas' (which has the adult A&E). |
+
+## Notes on cards
+
+Ealing Hospital has no children's A&E: its card says "Adults only: no
+children's A&E here." (the app doesn't know who the patient is).
 
 ## Checked and right
 

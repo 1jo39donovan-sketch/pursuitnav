@@ -4,6 +4,8 @@
 // beside it closer in. From the places file on the phone, so offline too.
 import type { StyleSpecification } from "@maplibre/maplibre-react-native";
 
+import { aeNote } from "../area/emergencyDepartments";
+import { hideBaseLabels } from "./baseLabels";
 import { CUSTODY_SUITES, custodyStation, type CustodySuite } from "../area/custody";
 import { regionOf, type Borough } from "../search/boroughs";
 import { ambulanceSite, fireSite, policeSite, type ServiceSite } from "../area/serviceSites";
@@ -101,6 +103,8 @@ function describe(kind: ServiceKind, p: PointOfInterest, suite: CustodySuite | n
           ? "Children's emergencies only: not a general A&E."
           : "Emergency department (A&E).",
     );
+    const note = aeNote(p);
+    if (note) lines.push(note);
   }
   if (kind === "court") {
     if (/crown/i.test(p.name)) lines.push("Crown Court");
@@ -124,6 +128,9 @@ const SERVICE_LABEL: Record<ServiceKind, string> = {
   court: "Court",
   prison: "Prison",
 };
+
+/** The base map's classes of place that always have a badge here (OpenMapTiles' poi classes). */
+const BADGED_CLASSES = ["police", "prison", "fire_station"];
 
 /** The place types drawn as services. */
 export const SERVICE_TYPES: ReadonlySet<string> = new Set(Object.keys(KIND_OF_TYPE));
@@ -204,6 +211,8 @@ export function withServices(
 ): StyleSpecification {
   const kept = style.layers.filter((l) => !l.id.startsWith(SERVICES_PREFIX));
   if (!points || points.features.length === 0) return { ...style, layers: kept };
+  // The base map's own labels for what has a badge here: one label each.
+  const base = hideBaseLabels({ ...style, layers: kept }, BADGED_CLASSES).layers;
   const night = theme === "night";
   const font = boldFont(style);
   const layers: Layer[] = [
@@ -258,6 +267,6 @@ export function withServices(
   return {
     ...style,
     sources: { ...style.sources, [SERVICES_SOURCE]: { type: "geojson", data: points } },
-    layers: [...kept, ...layers],
+    layers: [...base, ...layers],
   };
 }
