@@ -70,7 +70,8 @@ const tab = async (page, name) => {
     await page.getByText(name, exact()).last().click({ timeout: 5_000 });
   } catch (e) {
     // Say what blocked it, for fixing the app if it's the app's fault.
-    console.log(`  (tab ${name} tap blocked: ${e.message.split("\n").filter((l) => /intercept|not visible|not stable|disabled|outside/i.test(l)).slice(0, 2).join(" | ")})`);
+    // The browser's own account, for telling whether the app is at fault.
+    console.log(`  (tab ${name} tap blocked: ${e.message.split("\n").slice(-6).join(" | ").slice(0, 600)})`);
     await page.goto(new URL(TAB_PATH[name] ?? "", url).href, { waitUntil: "networkidle" });
     // Reopened on Session with a shift set up, the app goes on to Search (by design): tap back.
     if (name === "Session") {
