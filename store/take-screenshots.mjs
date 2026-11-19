@@ -62,13 +62,16 @@ async function shot(page, device, file, steps) {
   }
 }
 
-// A tab, opened by its address: tapping the tab bar in the test browser
-// sometimes left the screen behind in front (19 Nov). Settings live in the
-// browser, so nothing is lost.
+// A tab: tapped (the app no longer bounces a first tap on Session back to
+// Search after a reload, 19 Nov), or opened by its address if covered.
 const TAB_PATH = { Session: "", Search: "search", Pursuit: "pursuit" };
 const tab = async (page, name) => {
-  await page.goto(new URL(TAB_PATH[name] ?? "", url).href, { waitUntil: "networkidle" });
-  await page.waitForTimeout(2000);
+  try {
+    await page.getByText(name, exact()).last().click({ timeout: 5_000 });
+  } catch {
+    await page.goto(new URL(TAB_PATH[name] ?? "", url).href, { waitUntil: "networkidle" });
+  }
+  await page.waitForTimeout(1500);
 };
 const search = async (page, text) => {
   const box = page.getByLabel("Address from the control room").last();

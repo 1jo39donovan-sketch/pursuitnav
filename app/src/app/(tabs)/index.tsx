@@ -1,3 +1,4 @@
+import { launchedOnSession } from "../../navigation/launch";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
@@ -148,7 +149,8 @@ export default function SessionScreen() {
   useEffect(() => {
     if (openedThisLaunch) return;
     openedThisLaunch = true;
-    if (callsign && boroughs.length > 0) router.navigate("/search");
+    // Only when the app opened here: not on a first visit after reopening on another tab.
+    if (callsign && boroughs.length > 0 && launchedOnSession()) router.navigate("/search");
     // Only on launch: later edits to the session shouldn't jump screens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
