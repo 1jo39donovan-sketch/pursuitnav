@@ -148,7 +148,7 @@ export default function NavigateScreen() {
       deactivateKeepAwake("navigate").catch(() => {});
     };
   }, []);
-  const { active, replan, rerouteNow, stop } = useNavigation();
+  const { active, replan, rerouteNow, stop, resumable, resume, dismissResume } = useNavigation();
   // Usage counts: one navigation session per time this screen opens.
   useEffect(() => recordEvent("navigation"), []);
   // The turn card is on screen from the first render: GO took this long (Session → Testing).
@@ -526,7 +526,21 @@ export default function NavigateScreen() {
   if (!active || !prepared) {
     return (
       <View style={[styles.screen, styles.empty]}>
-        <Text style={styles.emptyText}>No route chosen.</Text>
+        {resumable && !active ? (
+          <>
+            <Text style={styles.emptyText}>The app was closed during a route.</Text>
+            <Pressable accessibilityRole="button" onPress={resume} style={styles.resumeButton}>
+              <Text style={styles.resumeText} numberOfLines={2}>
+                Resume route to {resumable.destination.title}
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={dismissResume} hitSlop={12}>
+              <Text style={styles.emptyText}>Not now</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Text style={styles.emptyText}>No route chosen.</Text>
+        )}
         <Pressable
           accessibilityRole="button"
           onPress={() => (router.canGoBack() ? router.back() : router.replace("/search"))}
@@ -994,7 +1008,18 @@ const baseStyles = StyleSheet.create({
   blockNote: { color: colors.amber, fontFamily: fonts.bodySemiBold, fontSize: 16, lineHeight: 21 },
   screen: { flex: 1, backgroundColor: colors.bg },
   empty: { alignItems: "center", justifyContent: "center", gap: 16 },
-  emptyText: { color: colors.muted, fontFamily: fonts.body, fontSize: 16 },
+  emptyText: { color: colors.muted, fontFamily: fonts.body, fontSize: 16, textAlign: "center" },
+  resumeButton: {
+    backgroundColor: colors.amber,
+    borderRadius: 10,
+    minHeight: 64,
+    paddingHorizontal: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "stretch",
+    marginHorizontal: 24,
+  },
+  resumeText: { color: "#1a1200", fontFamily: fonts.displayBold, fontSize: 20, textAlign: "center" },
   row: { flex: 1, flexDirection: "row" },
   landscapeSide: { width: "42%", borderRightColor: colors.line, borderRightWidth: StyleSheet.hairlineWidth },
   map: { flex: 1 },

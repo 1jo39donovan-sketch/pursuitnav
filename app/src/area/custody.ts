@@ -1,8 +1,12 @@
 // Custody suites. London's from the Independent Custody Visitors' public list
 // (24/7 suites and contingency suites, Met, BTP and Border Force). Kent's six
 // after Maidstone closed on 15 October 2025 (the Kent PCC's count; names from
-// the Legal Aid Agency's closure notice and defence guides). Essex's seven
-// from Essex Police's FOI list and HMICFRS's 2024 inspection. Each is
+// the Legal Aid Agency's closure notice and defence guides; confirmed by the
+// PM's team, 19 Nov 2026). Essex's four open suites (checked 19 Nov 2026):
+// Basildon closed in March 2024 (Essex PCC, January 2025) and Clacton on
+// 21 April 2025 (Legal Aid Agency, Essex Police); Grays closed for a time
+// from 20 January 2025 with no word that it has reopened, so it's left out
+// until that's confirmed rather than send a crew to a closed suite. Each is
 // found on the map among OpenStreetMap's police stations in its borough by
 // the words in `match`; one that isn't mapped as a police station is searched
 // for by name instead, so the app never guesses a building.
@@ -75,17 +79,14 @@ export const CUSTODY_SUITES: CustodySuite[] = [
   s("Ebury Bridge", "Westminster", "contingency", "BTP", "ebury"),
   // Kent
   s("Medway", "Medway", "24/7", "Kent", "medway"),
-  s("North Kent", "Gravesham", "24/7", "Kent", "north kent", "North Kent police station Northfleet"),
+  s("North Kent (Northfleet)", "Gravesham", "24/7", "Kent", "north kent", "North Kent police station Northfleet"),
   s("Canterbury", "Canterbury", "24/7", "Kent", "canterbury"),
   s("Tonbridge", "Tonbridge and Malling", "24/7", "Kent", "tonbridge"),
   s("Folkestone", "Folkestone and Hythe", "24/7", "Kent", "folkestone"),
   s("Margate", "Thanet", "24/7", "Kent", "margate"),
   // Essex
-  s("Basildon", "Basildon", "24/7", "Essex", "basildon"),
   s("Chelmsford", "Chelmsford", "24/7", "Essex", "chelmsford"),
-  s("Clacton", "Tendring", "24/7", "Essex", "clacton"),
   s("Colchester", "Colchester", "24/7", "Essex", "colchester"),
-  s("Grays", "Thurrock", "24/7", "Essex", "grays"),
   s("Harlow", "Harlow", "24/7", "Essex", "harlow"),
   s("Southend", "Southend-on-Sea", "24/7", "Essex", "southend"),
 ];

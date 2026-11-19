@@ -50,6 +50,15 @@ describe("services on the map", () => {
     expect(c.notes).toBe("Kent Fire and Rescue Service");
   });
 
+  it("says on Ealing Hospital's card that it has no children's A&E", () => {
+    const [ealing, royalFree] = servicePoints([
+      poi("Ealing Hospital", "Hospital with A&E", "Ealing"),
+      poi("Royal Free Hospital", "Hospital with A&E", "Camden"),
+    ]).features.map((f) => f.properties!);
+    expect(ealing.notes).toContain("Adults only: no children's A&E here.");
+    expect(royalFree.notes).not.toContain("children");
+  });
+
   it("leaves out what isn't police, and marks bases with no counter", () => {
     const f = servicePoints([
       poi("Former smallest police station of England", "Police station", "Westminster"),
