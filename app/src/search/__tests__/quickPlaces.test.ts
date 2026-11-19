@@ -71,6 +71,23 @@ describe("favourites", () => {
   });
 });
 
+describe("Nearest A&E that isn't for children (Ealing, checked 19 Nov)", () => {
+  it("says so, and adds the nearest A&E that takes children", async () => {
+    const { quickPlaces } = await import("../quickPlaces");
+    const ealing = poi("Ealing Hospital", "Hospital with A&E", "Ealing", 51.5079, -0.3452);
+    const northwick = poi("Northwick Park Hospital", "Hospital with A&E", "Harrow", 51.5755, -0.3218);
+    const q = quickPlaces("ambulance", { lat: 51.51, lng: -0.34 }, [ealing, northwick]);
+    expect(q[0]).toMatchObject({ label: "Nearest A&E", note: "Adults only: no children's A&E here." });
+    expect(q[0]!.place.name).toBe("Ealing Hospital");
+    expect(q[1]).toMatchObject({ label: "Nearest A&E for children" });
+    expect(q[1]!.place.name).toBe("Northwick Park Hospital");
+    // Elsewhere, one A&E line and no note.
+    const there = quickPlaces("ambulance", { lat: 51.575, lng: -0.32 }, [ealing, northwick]);
+    expect(there.filter((x) => x.label.startsWith("Nearest A&E"))).toHaveLength(1);
+    expect(there[0]!.note).toBeUndefined();
+  });
+});
+
 describe("custody outside London", () => {
   it("knows Kent's and Essex's suites, matched to their police stations", async () => {
     const { CUSTODY_SUITES, custodyStation } = await import("../../area/custody");

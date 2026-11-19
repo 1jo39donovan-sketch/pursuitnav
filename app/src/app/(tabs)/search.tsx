@@ -776,16 +776,19 @@ export default function SearchScreen() {
               <Pressable
                 key={q.label}
                 accessibilityRole="button"
-                accessibilityLabel={`${q.label}: ${q.place.name}, ${formatDistance(q.metres)}`}
+                accessibilityLabel={`${q.label}: ${q.place.name}, ${formatDistance(q.metres)}${q.note ? `. ${q.note}` : ""}`}
                 onPress={() => {
                   setQuery(q.place.name);
                   choose({ point: [q.place.lng, q.place.lat], title: q.place.name }, "", q.place.borough);
                 }}
                 style={({ pressed }) => [styles.recentRow, pressed && { opacity: 0.7 }]}
               >
-                <Text style={styles.recentText} numberOfLines={1}>
-                  ➜ {q.label}: {q.place.name}
-                </Text>
+                <View style={styles.recentText}>
+                  <Text style={styles.recentName} numberOfLines={1}>
+                    ➜ {q.label}: {q.place.name}
+                  </Text>
+                  {q.note && <Text style={styles.recentNote}>{q.note}</Text>}
+                </View>
                 <Text style={styles.recentMeta}>{formatDistance(q.metres)}</Text>
               </Pressable>
             ))}
@@ -1032,6 +1035,8 @@ function offered(r: Route | PoliceRoute) {
 }
 
 const baseStyles = StyleSheet.create({
+  recentName: { color: colors.fg, fontFamily: fonts.bodySemiBold, fontSize: 17 },
+  recentNote: { color: colors.amber, fontFamily: fonts.body, fontSize: 14 },
   resumeCard: {
     position: "absolute",
     left: 12,
