@@ -49,6 +49,20 @@ jobs:
           curl -fsS "https://$DOMAIN/health" | python3 -c "import json,sys; h=json.load(sys.stdin); print('server data:', h.get('data'), '· version', h.get('version'), '· closures avoided now:', h.get('closures'), h.get('closureSources'), '· addresses:', h.get('addresses'))" || true
           curl -fsS --compressed "https://$DOMAIN/v1/places-data" -o places.txt || true
           head -1 places.txt || true
+          # Pursuit: three short drives (fixed test points, not anyone's position).
+          for drive in \
+            "Holloway Road SE (demo drive)|51.5556,-0.1165 51.5550,-0.1157 51.5544,-0.1149" \
+            "Caledonian Road S|51.5480,-0.1185 51.5465,-0.1182 51.5450,-0.1179" \
+            "Upper Street S (demo drive)|51.5410,-0.1028 51.5400,-0.1029 51.5390,-0.1030"; do
+            label=${drive%%|*}; pts=${drive#*|}
+            body=$(python3 -c "import json,sys; print(json.dumps({'points': [{'lat': float(a), 'lng': float(b)} for a, b in (p.split(',') for p in sys.argv[1].split())]}))" "$pts")
+            echo "--- pursuit: $label"
+            curl -fsS -X POST -H 'content-type: application/json' --data "$body" "https://$DOMAIN/v1/pursuit" | python3 -c "
+          import json, sys
+          r = json.load(sys.stdin)
+          print({k: r.get(k) for k in ('road', 'speedLimitMph', 'nextJunction')})
+          " || echo "(pursuit failed)"
+          done
           IFS=';' read -ra addrs <<< "$ADDRESS"
           for one in "${addrs[@]}"; do
             echo "--- address search: $one"

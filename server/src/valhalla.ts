@@ -155,9 +155,15 @@ export interface LocatedEdge {
   speedLimitKph?: number;
 }
 
+/** How widely to look: within radiusM, and public roads only (no service roads or driveways). */
+export interface LocateOptions {
+  radiusM?: number;
+  publicRoads?: boolean;
+}
+
 export interface Matcher {
   matchRoad(points: LngLat[]): Promise<MatchedRoad | null>;
-  locate(point: LngLat, heading?: number): Promise<LocatedEdge[]>;
+  locate(point: LngLat, heading?: number, options?: LocateOptions): Promise<LocatedEdge[]>;
 }
 
 const location = (w: Waypoint) => ({
@@ -353,9 +359,16 @@ export class ValhallaClient implements Router, Matcher {
   }
 
   /** Road edges at a point; with a heading, only those running that way. */
-  async locate(point: LngLat, heading?: number): Promise<LocatedEdge[]> {
+  async locate(point: LngLat, heading?: number, options: LocateOptions = {}): Promise<LocatedEdge[]> {
     const data = await this.post<ValhallaLocateResponse[]>("/locate", {
-      locations: [location({ point, heading })],
+      locations: [
+        {
+          ...location({ point, heading }),
+          ...(options.radiusM ? { radius: options.radiusM } : {}),
+          // Valhalla's lowest road class searched: residential leaves out service roads and driveways.
+          ...(options.publicRoads ? { search_filter: { min_road_class: "residential" } } : {}),
+        },
+      ],
       costing: "auto",
       costing_options: { auto: { ignore_oneways: true } },
       verbose: true,
