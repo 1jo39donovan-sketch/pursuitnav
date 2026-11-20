@@ -47,7 +47,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
 | **Pursuit**: speed, limit roundel, road, heading, borough, next junction, generally towards, heading-up mini map, ≥1 s, portrait and landscape, screen awake | ✅ | Plus nearest house number. Survey on the published map (19 Nov, 183 points over three north London routes): road, limit and next junction known at every point |
 | **Log**: time, typed text, address chosen, route type; never auto-clear; manual clear with confirmation | ✅ | |
 | **Live road closures**: TfL every 5 min, closed roads avoided, Serious/Severe holdups routed round when cheap | ✅ | `closures.test.ts`, `delays.test.ts`. Plus National Highways carriageway closures (motorways and major A-roads, so Kent and Essex too), live since 17 Nov: 24 beside TfL's 19 on 19 Nov. Credited as their terms require |
-| **Team sessions**: opt-in, code, end-to-end encrypted, in memory, a week at most, follow-in with restrictions and one-way refusal | 🟡 | `teams.test.ts`; also team messages ("Caution here"). Needs two phones on the drive to try for real |
+| **Team sessions**: opt-in, code, end-to-end encrypted, in memory, a week at most, follow-in with restrictions and one-way refusal | 🟡 | `teams.test.ts`; also team messages. Desk-to-crew **Go here** checked end to end on 20 Nov with two browsers on a local server: the desk (sharing off) sends an address to a callsign, the crew gets the card with the note and "to you", **Route here** opens it on Search with both routes, and a crew whose app was closed gets it on reopening. Still to try on two phones, including with the screen locked |
 | **Offline map**: weekly PMTiles, Wi-Fi only unless allowed, used with no signal | ✅ | |
 | **Building entrances** (route to the door of a block) | 🟡 | Built and in the weekly data; A&E entrances also mark hospitals OpenStreetMap doesn't. Still to see on the drive: a route to a block of flats ends at an entrance |
 | **Data handling**: no request logs with addresses or positions, HTTPS, daily usage totals with salted hashes, OTA updates only | ✅ | `usage.test.ts`, privacy policy updated 25 October |
@@ -74,7 +74,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
    - the log is still there after closing the app fully and opening it again (must-pass 8), and "Resume route to …" after closing it mid-route
    - a route to a block of flats ends at an entrance
    - no signal: navigation carries on along the route (download the offline map on Wi-Fi first)
-   - a team session between two phones, team messages and follow-in
+   - a team session between two phones, team messages (the desk sends **Go here** to a callsign; the crew taps **Route here**) and follow-in
    - after 21:00 in Kent or Essex, a route round an overnight motorway closure
    - Field-test recording on, so any problem can be replayed afterwards
 
