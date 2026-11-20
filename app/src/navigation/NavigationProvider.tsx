@@ -12,7 +12,13 @@ export interface ActiveNavigation {
   /** What the operator chose. Re-routes keep to it where they can. */
   kind: RouteKind;
   route: Route | PoliceRoute;
-  destination: { lat: number; lng: number; title: string };
+  destination: {
+    lat: number;
+    lng: number;
+    title: string;
+    /** From the team message that sent the crew here ("DESK1: rear entrance"): shown while navigating. */
+    teamNote?: string;
+  };
   /** Shown under the turn panel, e.g. why a re-route fell back to standard. */
   note?: string;
   /** For follow-in: whose way in, and their track, to re-route along it. */

@@ -54,6 +54,8 @@ interface Props {
   onToggleFavourite?: () => void;
   /** A caution about the destination, e.g. that it's a postcode, not the door. */
   note?: string;
+  /** From the team message that sent the crew here ("DESK1: rear entrance"). */
+  teamNote?: string;
   onClose: () => void;
   /** Try again after an error, to the same destination. */
   onRetry?: () => void;
@@ -90,6 +92,7 @@ export function RoutePanel({
   onSaveNote,
   noteKey,
   note,
+  teamNote,
   blocks,
   onPickBlock,
   onClose,
@@ -150,6 +153,11 @@ export function RoutePanel({
       {note && (
         <Text style={styles.note} numberOfLines={2}>
           {note}
+        </Text>
+      )}
+      {teamNote && (
+        <Text style={styles.teamNote} accessibilityLabel={`Team message: ${teamNote}`}>
+          ✉ {teamNote}
         </Text>
       )}
       {onSaveNote && <BlockNoteLine key={noteKey} note={blockNote} onSave={onSaveNote} />}
@@ -597,6 +605,7 @@ const baseStyles = StyleSheet.create({
   title: { color: colors.fg, fontFamily: fonts.displaySemiBold, fontSize: 21, lineHeight: 24 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 13, lineHeight: 17 },
   blockNote: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15, lineHeight: 20 },
+  teamNote: { color: colors.blue, fontFamily: fonts.bodySemiBold, fontSize: 16, lineHeight: 21 },
   addNote: { color: colors.blue, fontFamily: fonts.bodyMedium, fontSize: 14 },
   noteEdit: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
   noteInput: {

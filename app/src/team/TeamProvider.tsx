@@ -185,7 +185,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [mapPoints, setMapPoints] = useState<GeoJSON.FeatureCollection>(NO_POINTS);
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [contacts, setContacts] = useState<TeamContact[]>([]);
-  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
+  // Messages put away, kept on the phone: one dealt with doesn't pop up again
+  // after a reload or restart (two-browser check, 20 Nov).
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => loadDismissed());
+  useEffect(() => saveDismissed(dismissed), [dismissed]);
   // Messages already announced, and cautions already warned of nearby (this launch).
   const announced = useRef(new Set<string>());
   const warned = useRef(new Set<string>());
@@ -525,4 +528,25 @@ export const roughFix = (accuracy: number | null) => accuracy != null && accurac
 /** "±40 m", "±13 km". */
 export function accuracyText(m: number): string {
   return m < 1000 ? `±${Math.round(m)} m` : `±${Math.round(m / 1000)} km`;
+}
+
+const DISMISSED_KEY = "teamDismissed";
+/** Message ids put away; more than a day's worth would be old (messages last 12 hours). */
+const DISMISSED_MAX = 300;
+
+function loadDismissed(): ReadonlySet<string> {
+  try {
+    const ids = JSON.parse(store.getSetting(DISMISSED_KEY) ?? "[]") as unknown;
+    return new Set(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissed(ids: ReadonlySet<string>) {
+  try {
+    store.setSetting(DISMISSED_KEY, JSON.stringify([...ids].slice(-DISMISSED_MAX)));
+  } catch {
+    // Storage blocked: they're put away for this visit only.
+  }
 }
