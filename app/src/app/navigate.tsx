@@ -633,6 +633,11 @@ export default function NavigateScreen() {
         </>
       )}
       {active.note && <Text style={styles.note}>{active.note}</Text>}
+      {active.destination.teamNote && (
+        <Text style={styles.teamNote} numberOfLines={2} accessibilityLabel={`Team message: ${active.destination.teamNote}`}>
+          ✉ {active.destination.teamNote}
+        </Text>
+      )}
       {flagged && (
         <Text accessibilityRole="alert" style={styles.linkBanner}>
           Route flagged. Send it after you end, from Search.
@@ -1066,6 +1071,7 @@ const baseStyles = StyleSheet.create({
   // Text colour, not muted grey: grey was the weakest line on light screens (30 Oct).
   then: { color: colors.fg, fontFamily: fonts.bodyMedium, fontSize: 15 },
   note: { color: colors.amber, fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
+  teamNote: { color: colors.blue, fontFamily: fonts.bodySemiBold, fontSize: 16, marginTop: 4 },
   repeat: { flexDirection: "row", alignItems: "center", gap: 10 },
   repeatArrow: { color: colors.amber, fontFamily: fonts.displayBold, fontSize: 30 },
   repeatDistance: { color: colors.fg, fontFamily: fonts.displayBold, fontSize: 24 },

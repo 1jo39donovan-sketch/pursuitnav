@@ -8,6 +8,13 @@ export function routeToMessage(m: TeamMessage) {
   if (!m.place) return;
   router.navigate({
     pathname: "/search",
-    params: { lat: String(m.place.lat), lng: String(m.place.lng), title: m.place.label, from: `msg-${m.id}` },
+    params: {
+      lat: String(m.place.lat),
+      lng: String(m.place.lng),
+      title: m.place.label,
+      from: `msg-${m.id}`,
+      // The sender's note ("rear entrance"), shown with the route and while navigating.
+      ...(m.text ? { note: `${m.cs}: ${m.text}` } : {}),
+    },
   });
 }

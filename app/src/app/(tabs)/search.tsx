@@ -343,13 +343,16 @@ export default function SearchScreen() {
 
   // "Route there again" from the Log, or a place picked on the BCU screen,
   // arrives as params: a point to route to, or (q) something to search for.
-  const params = useLocalSearchParams<{ lat?: string; lng?: string; title?: string; q?: string; from?: string }>();
+  const params = useLocalSearchParams<{ lat?: string; lng?: string; title?: string; q?: string; from?: string; note?: string }>();
   const handledParams = useRef<string | null>(null);
+  // A team message's note for its place ("DESK1: rear entrance"), shown while that place is the destination.
+  const [teamNote, setTeamNote] = useState<{ key: string; text: string } | null>(null);
   useEffect(() => {
     if (!params.from || !params.lat || !params.lng || handledParams.current === params.from) return;
     handledParams.current = params.from;
     const title = params.title ?? "Destination";
     setQuery(title);
+    setTeamNote(params.note ? { key: `${Number(params.lng)},${Number(params.lat)}`, text: params.note.slice(0, 320) } : null);
     choose(
       { point: [Number(params.lng), Number(params.lat)], title },
       "",
@@ -357,7 +360,7 @@ export default function SearchScreen() {
     );
     // choose() is recreated each render; only new params should trigger this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.from, params.lat, params.lng, params.title]);
+  }, [params.from, params.lat, params.lng, params.title, params.note]);
 
   const pick = (r: SearchResult) => {
     noteTap();
@@ -615,6 +618,9 @@ export default function SearchScreen() {
   const mate = mateId ? (teamMembers.find((m) => m.memberId === mateId) ?? null) : null;
   const followIn = useFollowIn();
   const now = useNow();
+
+  const destTeamNote =
+    destination && teamNote?.key === `${destination.point[0]},${destination.point[1]}` ? teamNote.text : undefined;
 
   return (
     <View style={styles.screen}>
@@ -968,6 +974,7 @@ export default function SearchScreen() {
             })
           }
           note={destination.note}
+          teamNote={destTeamNote}
           noteKey={`${destination.point[0]},${destination.point[1]}`}
           blockNote={noteNear(notes, { lat: destination.point[1], lng: destination.point[0] })?.note}
           onSaveNote={
@@ -1004,7 +1011,12 @@ export default function SearchScreen() {
             navigation.start(
               kind,
               shown.plan,
-              { lat: destination.point[1], lng: destination.point[0], title: destination.title ?? "Destination" },
+              {
+                lat: destination.point[1],
+                lng: destination.point[0],
+                title: destination.title ?? "Destination",
+                ...(destTeamNote ? { teamNote: destTeamNote } : {}),
+              },
               undefined,
               stale,
             );
