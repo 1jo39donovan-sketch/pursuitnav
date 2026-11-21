@@ -80,6 +80,26 @@ jobs:
           # expo-updates' build plugin, and Gradle then hangs; the runner has 16 GB.
           sed -i '/^org.gradle.jvmargs=/d; /^kotlin.daemon.jvmargs=/d' android/gradle.properties
           printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8\nkotlin.daemon.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g\n' >> android/gradle.properties
+          # Downloads: retry more, and wait longer between tries. One failed
+          # download makes Gradle drop the whole repository for the build
+          # ("Repository MavenRepo is disabled"), as on 19 and 20 Nov.
+          printf 'systemProp.org.gradle.internal.repository.max.tentatives=6\nsystemProp.org.gradle.internal.repository.initial.backoff=2000\nsystemProp.org.gradle.internal.http.connectionTimeout=60000\nsystemProp.org.gradle.internal.http.socketTimeout=60000\n' >> android/gradle.properties
+          # expo-updates asks for bouncycastle as a range ([1.81,1.82)), so every
+          # build fetched Maven Central's version list, the download that failed.
+          # The one version in that range, asked for exactly: nothing to list.
+          cat >> android/build.gradle <<'GRADLE'
+
+          allprojects {
+              configurations.configureEach {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == "org.bouncycastle" && details.requested.name == "bcprov-jdk15to18") {
+                          details.useVersion "1.81"
+                          details.because "a fixed version: the range made every build list Maven Central's versions"
+                      }
+                  }
+              }
+          }
+          GRADLE
 
       # Updates only install over the previous version if they're signed with
       # the same key. The key lives encrypted (with ANDROID_KEYSTORE_PASSWORD)
@@ -112,6 +132,10 @@ jobs:
           else
             echo "No signing key yet (the first build on main creates it); this test build uses the development key."
           fi
+
+      - name: Which bouncycastle the APK takes (fixed, not looked up)
+        working-directory: app/android
+        run: ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency bcprov-jdk15to18 --no-daemon -q | grep -E -A8 "^org.bouncycastle:bcprov" | head -24
 
       - name: Build the APK
         working-directory: app/android
