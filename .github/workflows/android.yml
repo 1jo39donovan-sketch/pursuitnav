@@ -135,7 +135,7 @@ jobs:
 
       - name: Which bouncycastle the APK takes (fixed, not looked up)
         working-directory: app/android
-        run: ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency bcprov-jdk15to18 --no-daemon -q | head -20
+        run: ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency bcprov-jdk15to18 --no-daemon -q | grep -E -A8 "^org.bouncycastle:bcprov" | head -24
 
       - name: Build the APK
         working-directory: app/android
