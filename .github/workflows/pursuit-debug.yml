@@ -11,6 +11,7 @@ on:
       - server/scripts/pursuit-debug.ts
       - server/scripts/pursuit-survey.ts
       - server/scripts/towards-survey.ts
+      - server/scripts/g1-spots.ts
       - .github/workflows/pursuit-debug.yml
 
 permissions:
@@ -61,3 +62,6 @@ jobs:
       - name: How well "Generally towards" names the next borough along real routes
         working-directory: server
         run: npx tsx scripts/towards-survey.ts
+      - name: Where the blue-light route appears (spots for checking gate G1)
+        working-directory: server
+        run: npx tsx scripts/g1-spots.ts
