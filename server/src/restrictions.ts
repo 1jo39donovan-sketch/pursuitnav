@@ -65,7 +65,24 @@ const SLACK_METRES = 25;
 // miles, which is no restriction at all.
 const MAX_MANOEUVRE_METRES = 400;
 
-const streetName = (edge: TraceEdge) => edge.names[0] ?? "unnamed road";
+/** A road number such as A10, B512, M25 or A40(M). */
+const ROAD_NUMBER = /^[ABM]\d+(\(M\))?$/i;
+
+/** The road as the operator knows it: its name ("Shoreditch High Street") over its number ("A10"). */
+export function roadName(names: readonly string[]): string {
+  return names.find((n) => !ROAD_NUMBER.test(n.trim())) ?? names[0] ?? "unnamed road";
+}
+
+const streetName = (edge: TraceEdge) => roadName(edge.names);
+
+/**
+ * The line for a banned turn. A turn from a road back onto itself (between
+ * the two carriageways, or where it turns at a junction) is "on" that road:
+ * "into Bethnal Green Road" from Bethnal Green Road read as nonsense (21 Nov).
+ */
+export function turnDescription(from: string, to: string, angle: number): string {
+  return from === to ? `${turnPhrase(angle)} on ${from}` : `${turnPhrase(angle)}: ${from} into ${to}`;
+}
 
 function turnPhrase(angle: number): string {
   const a = Math.abs(angle);
@@ -181,10 +198,10 @@ export async function detectRestrictions(
     }
     record(`turn:${i}`, i, j, {
       kind: "turn",
-      description: `${turnPhrase(angle)}: ${from} into ${to}`,
+      description: turnDescription(from, to, angle),
       location: { lat: at[1], lng: at[0] },
       locations: [],
-      streets: [from, to],
+      streets: from === to ? [from] : [from, to],
       excludePoints: [],
     });
   }
