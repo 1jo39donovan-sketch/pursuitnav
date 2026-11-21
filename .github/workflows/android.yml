@@ -133,6 +133,21 @@ jobs:
             echo "No signing key yet (the first build on main creates it); this test build uses the development key."
           fi
 
+      # Gradle installs the NDK itself, in one try; a corrupted download
+      # stopped a build in November. Installed here first, with retries.
+      - name: The NDK, with retries
+        run: |
+          ndk=$(sed -n 's/^ndkVersion *= *"\(.*\)"/\1/p' app/node_modules/react-native/gradle/libs.versions.toml)
+          [ -n "$ndk" ] || { echo "No NDK version in React Native's catalog: Gradle will install it."; exit 0; }
+          sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          [ -f "$sdk/ndk/$ndk/source.properties" ] && { echo "NDK $ndk already installed."; exit 0; }
+          for i in 1 2 3; do
+            rm -rf "$sdk/ndk/$ndk"
+            yes | "$sdk/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$ndk" >/dev/null && [ -f "$sdk/ndk/$ndk/source.properties" ] && { echo "NDK $ndk installed."; exit 0; }
+            echo "NDK download failed (try $i); trying again."; sleep $((i * 20))
+          done
+          echo "::warning::Couldn't install NDK $ndk; Gradle will try."
+
       - name: Which bouncycastle the APK takes (fixed, not looked up)
         working-directory: app/android
         run: ./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency bcprov-jdk15to18 --no-daemon -q | grep -E -A8 "^org.bouncycastle:bcprov" | head -24
