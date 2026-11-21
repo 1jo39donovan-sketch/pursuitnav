@@ -137,7 +137,7 @@ jobs:
       # stopped a build in November. Installed here first, with retries.
       - name: The NDK, with retries
         run: |
-          ndk=$(sed -n 's/^ndkVersion *= *"\(.*\)"/\1/p' app/node_modules/react-native/gradle/libs.versions.toml)
+          ndk=$(sed -n 's/^ndkVersion *= *"\(.*\)"/\1/p' node_modules/react-native/gradle/libs.versions.toml)
           [ -n "$ndk" ] || { echo "No NDK version in React Native's catalog: Gradle will install it."; exit 0; }
           sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
           [ -f "$sdk/ndk/$ndk/source.properties" ] && { echo "NDK $ndk already installed."; exit 0; }
