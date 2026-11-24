@@ -84,7 +84,7 @@ After that, every change to `app/` merged into `main` runs **App update**: it ch
 ## 7. Run it
 
 1. **Actions → Deploy server → Run workflow.** It rents the server, points the domain at it, installs everything and waits until `https://SERVER_DOMAIN` answers, with house-number search: about 10–15 minutes, as it downloads the map and search data GitHub builds each week (if there's no data release yet, run **Actions → Map data** first, about an hour; otherwise the server builds its own in about two hours). Run it once: from then on the server takes each change merged to `main` by itself within about 5 minutes, checks it works, and goes back to the last good version if not (server/README.md, "Updates").
-2. **Actions → Android app → Run workflow.** About 20–30 minutes. Then open the **Android app** release page (Code → Releases) on the phone and install `blue-route.apk`.
+2. **Actions → Android app → Run workflow.** About 20–30 minutes. Then open the **Android app** release page (Code → Releases) on the phone and install `blue-route.apk`. Testers without a GitHub login open `https://SERVER_DOMAIN/android` instead: the server keeps a copy of the newest APK there, taken within the hour (`server/scripts/fetch-apk.sh`).
 
 ## 8. Try it on any phone (optional, free)
 
@@ -98,7 +98,7 @@ The web version runs in a phone's browser (Safari on iPhone too) with real GPS, 
 
 - Map and places refresh from OpenStreetMap every Sunday night.
 - The server picks up new code from `main` within about 5 minutes (server/README.md, "Updates").
-- Every change to the app on `main` builds a new APK on the same release page; install it over the old one and the log is kept. With `EXPO_TOKEN` set (section 5), phones also get the change over the air without installing anything.
+- Every change to the app on `main` builds a new APK on the same release page (and the server's copy at `/android` within the hour); install it over the old one and the log is kept. With `EXPO_TOKEN` set (section 5), phones also get the change over the air without installing anything.
 - Dependabot opens pull requests on Mondays when a library BlueRoute uses has a new version (`.github/dependabot.yml`). Merge them once CI is green; the Expo SDK, Valhalla and Nominatim are upgraded by hand.
 
 Changing the OS key later: update the secret, then run **Deploy server** with **recreate** ticked. Nothing officers rely on is stored on the server, so a fresh one is safe.
@@ -113,3 +113,18 @@ Moving the server to your own domain (e.g. from DuckDNS to `api.example.org` on 
 A website on your own domain (a public front page at `/` with App Store and Google Play buttons; the browser test version unlisted at `/app/`): set the variable `WEB_DOMAIN` (e.g. `bluerouteapp.com`), point the domain at GitHub Pages (A records `185.199.108.153`, `.109.153`, `.110.153`, `.111.153`, and AAAA `2606:50c0:8000::153`, `8001::153`, `8002::153`, `8003::153`, DNS only; `www` as a CNAME to `<owner>.github.io`), enter it under Settings → Pages → Custom domain with Enforce HTTPS, and run **Web app**. Once the store listings are live, set `APP_STORE_URL` and `PLAY_STORE_URL` and run it again. See site/README.md.
 
 Putting the app on the App Store and Google Play: see STORE.md.
+
+## Making the repository private
+
+BlueRoute is proprietary (`LICENSE`). To stop anyone reading or downloading the code, make the repository private. Do the steps in this order, or the server stops taking updates and map data, and the website goes down.
+
+1. **GitHub Pro** (about $4 a month), on the account that owns the repository: Settings → Billing and plans. A free account can't publish GitHub Pages (the website and the browser test app) from a private repository. Pro also includes 3,000 minutes a month of GitHub Actions for private repositories; public ones are free. The workflows used about 4,000 minutes from 26 October to 24 November 2026 (Android app about 1,300, CI 700, Map data 600), so expect a small overage or trim them (for example the Android build on pull requests, or the uptime check). Under Billing → Spending limits, Actions stop when the limit is reached; set one you're happy with.
+2. **A read-only key for the server.** GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token. Name it "BlueRoute server", choose an expiry (and a reminder to renew it), Repository access: **Only select repositories** → `pursuitnav`, Permissions → Repository → **Contents: Read-only**. Nothing else. Copy it.
+3. **Give the key to the server.** Log in (`ssh root@SERVER_DOMAIN`), add the line `GITHUB_READ_TOKEN=<the key>` to `/opt/blue-route/server/.env`, and save. Nothing needs restarting: the update check (every 5 minutes), the map data download (03:15) and the APK copy (hourly) read it each time (`server/scripts/github-auth.sh`). Also save it in GitHub as the secret `GITHUB_READ_TOKEN`, so **Deploy server** can set up a new server from the private repository.
+4. Check the server has the code from this change: `https://SERVER_DOMAIN/health` shows the version, and `https://SERVER_DOMAIN/android` downloads the APK.
+5. **Make it private:** the repository's Settings → General → Danger Zone → Change visibility → Private.
+6. Afterwards: check Settings → Pages still shows the custom domain, open the website and `/app/`, and the next morning check `/health` shows the newest data release.
+
+The key is never written into git's settings; it's passed to git and curl only while a script runs. When it expires, make a new one and replace both copies (step 3).
+
+The app and the website still ship their compiled code to phones and browsers, as every app does; making the repository private stops the source, history and documents being read.

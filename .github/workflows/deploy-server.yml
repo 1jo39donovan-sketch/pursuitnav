@@ -40,6 +40,8 @@ jobs:
       IMAGERY_KEY: ${{ secrets.IMAGERY_KEY }}
       NATIONAL_HIGHWAYS_KEY: ${{ secrets.NATIONAL_HIGHWAYS_KEY }}
       SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+      # Read-only key for a private repository (DEPLOY.md); empty while it's public.
+      GITHUB_READ_TOKEN: ${{ secrets.GITHUB_READ_TOKEN }}
       DOMAIN: ${{ vars.SERVER_DOMAIN }}
       # Optional: other names the server also answers on, space-separated (e.g.
       # the old DuckDNS name while apps move to a new domain).
@@ -101,7 +103,7 @@ jobs:
             # OS keys (and contact email) go to the server; the DuckDNS token stays here.
             {
               echo '#!/bin/bash'
-              printf 'export DOMAIN=%q ALSO_SERVE=%q OS_NAMES_KEY=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q TFL_APP_KEY=%q STATS_TOKEN=%q IMAGERY_KEY=%q NATIONAL_HIGHWAYS_KEY=%q BRANCH=%q\n' "$DOMAIN" "$ALSO_SERVE" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$TFL_APP_KEY" "$STATS_TOKEN" "$IMAGERY_KEY" "$NATIONAL_HIGHWAYS_KEY" "$BRANCH"
+              printf 'export DOMAIN=%q ALSO_SERVE=%q OS_NAMES_KEY=%q OS_PLACES_KEY=%q CONTACT_EMAIL=%q TFL_APP_KEY=%q STATS_TOKEN=%q IMAGERY_KEY=%q NATIONAL_HIGHWAYS_KEY=%q GITHUB_READ_TOKEN=%q BRANCH=%q\n' "$DOMAIN" "$ALSO_SERVE" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$TFL_APP_KEY" "$STATS_TOKEN" "$IMAGERY_KEY" "$NATIONAL_HIGHWAYS_KEY" "$GITHUB_READ_TOKEN" "$BRANCH"
               printf 'URL=%q\n' "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/server/scripts/install.sh"
               # Download first, then run: piping curl into bash ran an empty
               # script, and reported success, whenever the download failed
@@ -109,7 +111,8 @@ jobs:
               cat <<'BOOT'
           LOG=/var/log/blue-route-install.log
           for attempt in $(seq 1 30); do
-            curl -fsSL -o /root/blue-route-install.sh "$URL" >>"$LOG" 2>&1 && break
+            # A private repository's files need the read-only key.
+            curl -fsSL ${GITHUB_READ_TOKEN:+-H "Authorization: token $GITHUB_READ_TOKEN"} -o /root/blue-route-install.sh "$URL" >>"$LOG" 2>&1 && break
             echo "== couldn't download the installer (attempt $attempt); retrying in 10 s" >>"$LOG"
             sleep 10
           done

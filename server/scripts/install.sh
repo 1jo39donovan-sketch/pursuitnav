@@ -91,6 +91,18 @@ if [ -z "${NATIONAL_HIGHWAYS_KEY:-}" ] && [ -f "$DIR/server/.env" ]; then
   NATIONAL_HIGHWAYS_KEY=$(grep -E '^NATIONAL_HIGHWAYS_KEY=' "$DIR/server/.env" | cut -d= -f2- || true)
 fi
 NATIONAL_HIGHWAYS_KEY=${NATIONAL_HIGHWAYS_KEY:-}
+# Read-only key for a private repository (scripts/github-auth.sh, DEPLOY.md);
+# empty while it's public.
+if [ -z "${GITHUB_READ_TOKEN:-}" ] && [ -f "$DIR/server/.env" ]; then
+  GITHUB_READ_TOKEN=$(grep -E '^GITHUB_READ_TOKEN=' "$DIR/server/.env" | cut -d= -f2- || true)
+fi
+GITHUB_READ_TOKEN=${GITHUB_READ_TOKEN:-}
+if [ -n "$GITHUB_READ_TOKEN" ]; then
+  # Given to git through the environment, never written into .git/config.
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+  GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_READ_TOKEN" | base64 | tr -d '\n')"
+  export GIT_CONFIG_VALUE_0
+fi
 
 say "Installing Docker and basics"
 apt-get update -qq
@@ -146,7 +158,7 @@ cd "$DIR/server"
 [ -f docker-compose.yml ] || fail "No server code on branch $BRANCH. Merge the pull request into main first, or run with BRANCH=<branch>."
 
 umask 077
-printf 'DOMAIN=%s\nALSO_SERVE=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\nIMAGERY_KEY=%s\nNATIONAL_HIGHWAYS_KEY=%s\nBRANCH=%s\nVERSION=%s\n' "$DOMAIN" "$ALSO_SERVE" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" "$IMAGERY_KEY" "$NATIONAL_HIGHWAYS_KEY" "$BRANCH" "$(git -C "$DIR" rev-parse --short HEAD)" >.env
+printf 'DOMAIN=%s\nALSO_SERVE=%s\nOS_NAMES_KEY=%s\nOS_PLACES_KEY=%s\nCONTACT_EMAIL=%s\nPBF_URL=%s\nTFL_APP_KEY=%s\nSTATS_TOKEN=%s\nIMAGERY_KEY=%s\nNATIONAL_HIGHWAYS_KEY=%s\nGITHUB_READ_TOKEN=%s\nBRANCH=%s\nVERSION=%s\n' "$DOMAIN" "$ALSO_SERVE" "$OS_NAMES_KEY" "$OS_PLACES_KEY" "$CONTACT_EMAIL" "$PBF_URL" "$TFL_APP_KEY" "$STATS_TOKEN" "$IMAGERY_KEY" "$NATIONAL_HIGHWAYS_KEY" "$GITHUB_READ_TOKEN" "$BRANCH" "$(git -C "$DIR" rev-parse --short HEAD)" >.env
 [ -n "$GEOCODER_SETTINGS" ] && printf '%s\n' "$GEOCODER_SETTINGS" >>.env
 umask 022
 

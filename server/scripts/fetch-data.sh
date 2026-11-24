@@ -16,7 +16,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/lib.sh
+. scripts/github-auth.sh
 SAY_PREFIX="data: "
+github_auth .env
 
 DEFAULT_PBF_URL=https://download.geofabrik.de/europe/united-kingdom/england/greater-london-latest.osm.pbf
 slug=$( (git remote get-url origin 2>/dev/null || true) | sed -E 's#^.*github\.com[:/]##; s#\.git$##')
@@ -33,7 +35,7 @@ mkdir -p data
 exec 9>data/.fetch-data.lock
 flock -n 9 || { say "already fetching"; exit 0; }
 
-releases=$(curl -fsSL --retry 3 "$API") || { say "can't reach GitHub's release list"; exit 1; }
+releases=$(curl -fsSL --retry 3 "${GH_CURL_AUTH[@]}" "$API") || { say "can't reach GitHub's release list"; exit 1; }
 release=$(python3 -c '
 import json, sys
 tags = [r["tag_name"] for r in json.load(sys.stdin) if r["tag_name"].startswith("data-") and not r.get("draft")]
@@ -50,7 +52,25 @@ rm -rf "$dl"
 mkdir -p "$dl"
 trap 'rm -rf "$dl"' EXIT
 say "downloading $release"
-curl -fsSL --retry 5 -o "$dl/manifest.json" "$DOWNLOAD/$release/manifest.json"
+# A private repository's files come through the API, by asset, with the
+# server's key (github-auth.sh); a public one's from the plain download links.
+python3 -c '
+import json, sys
+for r in json.load(sys.stdin):
+    if r["tag_name"] == sys.argv[1]:
+        for a in r.get("assets", []):
+            print(a["name"], a["url"])' "$release" <<<"$releases" >"$dl/assets"
+get() {
+  if [ "$GH_TOKEN_SET" = 1 ]; then
+    local url
+    url=$(awk -v n="$1" '$1 == n {print $2}' "$dl/assets")
+    [ -n "$url" ] || { say "$release has no $1"; return 1; }
+    curl -fsSL --retry 5 -C - "${GH_CURL_AUTH[@]}" -H "Accept: application/octet-stream" -o "$2" "$url"
+  else
+    curl -fsSL --retry 5 -C - -o "$2" "$DOWNLOAD/$release/$1"
+  fi
+}
+get manifest.json "$dl/manifest.json"
 # name, sha256 and parts of each file, one line each.
 python3 -c '
 import json, sys
@@ -58,7 +78,7 @@ for f in json.load(open(sys.argv[1]))["files"]:
     print(f["name"], f["sha256"], *f["parts"])' "$dl/manifest.json" >"$dl/files"
 while read -r name sum parts; do
   for part in $parts; do
-    curl -fsSL --retry 5 -C - -o "$dl/$part" "$DOWNLOAD/$release/$part"
+    get "$part" "$dl/$part"
   done
   # shellcheck disable=SC2086
   (cd "$dl" && cat $parts >"$name" && rm -f $parts)

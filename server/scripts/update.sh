@@ -27,6 +27,12 @@ flock -n 9 || exit 0
 # change takes it on its next run).
 bash server/scripts/cron.sh || say "couldn't update the schedule"
 
+# A private repository needs the server's read-only key (github-auth.sh).
+if [ -f server/scripts/github-auth.sh ]; then
+  . server/scripts/github-auth.sh
+  github_auth server/.env
+fi
+
 BRANCH=${BRANCH:-main}
 if ! git fetch -q origin "$BRANCH" 2>/dev/null; then
   # A server set to follow a pull request's branch carries on from main once
