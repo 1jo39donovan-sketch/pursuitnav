@@ -28,7 +28,7 @@ Charging officers nothing is fine on both stores: list it as a free app.
 - **Don't use Met or police branding.** Don't use the Met name, crest or logos, and don't say "official". The listing below says it's independent and lists the police route as needing the user's declaration. Apple and Google both reject apps that look as if they're from an organisation they aren't.
 - **The name.** "BlueRoute" may already be taken on one of the stores. If it is, use "BlueRoute Patrol" (only the name on the store changes).
 - **The server is up** at `api.bluerouteapp.com`, and the privacy, support and terms pages the stores ask for are at `https://bluerouteapp.com/privacy`, `/support` and `/terms`.
-- **Contact address.** Google emails the listing's contact address. `support@bluerouteapp.com` receives mail (checked 26 October: it forwards to the hello@ inbox at Purelymail), and it's the app's "Report a problem" address too. To show it on the privacy and support pages, add the GitHub variable `CONTACT_EMAIL` and run **Deploy server** with **recreate** ticked. Without it, the pages point to GitHub issues.
+- **Contact address.** Google emails the listing's contact address. `support@bluerouteapp.com` is BlueRoute's only email address (since 24 November): the listing's contact, the site's, and the app's "Report a problem" address. To show it on the privacy and support pages, add the GitHub variable `CONTACT_EMAIL` and run **Deploy server** with **recreate** ticked. Without it, the pages point to GitHub issues.
 
 ## One-off setup
 
@@ -110,7 +110,7 @@ Updated 17 November 2026 for the Kent and Essex pilots and the features since (t
 | **Privacy policy URL** | `https://bluerouteapp.com/privacy` | `https://bluerouteapp.com/privacy` |
 | **Support URL** | `https://bluerouteapp.com/support` | Website: `https://bluerouteapp.com` |
 | **Marketing URL** (optional) | leave blank | |
-| **Contact email** | | `hello@bluerouteapp.com` (shown publicly, and Google emails it: check it receives mail) |
+| **Contact email** | | `support@bluerouteapp.com` (shown publicly, and Google emails it) |
 | **Seller / copyright** | © 2026 OPSVALE (must match the developer account's legal name) | |
 | **Bundle ID / package** | `com.blueroute.patrol` | `com.blueroute.patrol` |
 
@@ -200,7 +200,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 > BlueRoute is independent. It is not made, approved or endorsed by any police force or other public service, and is not affiliated with one. Police stations are shown by their own name only.
 >
 > CONTACT
-> hello@bluerouteapp.com · Privacy: https://bluerouteapp.com/privacy · Support: https://bluerouteapp.com/support
+> support@bluerouteapp.com · Privacy: https://bluerouteapp.com/privacy · Support: https://bluerouteapp.com/support
 
 ### Other questions in the forms
 
@@ -311,7 +311,7 @@ Everything here must be done before **Submit for Review** on either store. Statu
 | 4 | iPhone (browser version for now): spoken directions with the silent switch on; download a Premium voice | Josh | Not done |
 | 5 | Decide whether OPSVALE is a legal entity, then open **organisation** accounts (D-U-N-S number first) or personal ones | Josh | Open |
 | 6 | Decide the store name: "BlueRoute – Patrol Sat Nav" or with "Response" | Josh | Open |
-| 7 | Check `hello@bluerouteapp.com` receives mail; add the GitHub variable `CONTACT_EMAIL` and redeploy so the pages show it | Josh | Open |
+| 7 | Set the GitHub variable `CONTACT_EMAIL` to `support@bluerouteapp.com` and redeploy so the privacy and support pages show it | Josh | Open |
 | 8 | Confirm the Kent and Essex area groupings and council codes | Josh | Open |
 | 9 | Run the **Store screenshots** workflow on the commit you'll submit, and check the eight shots | Claude runs, Josh checks | Ready to run |
 | 10 | Paste the listing, reviewer notes, age rating, data safety and privacy answers above | Josh | Ready |
