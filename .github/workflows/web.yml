@@ -98,7 +98,9 @@ jobs:
               fs.writeFileSync(`../site-out/${page}/index.html`,
                 `<!doctype html><meta charset="utf-8"><title>BlueRoute</title><link rel="canonical" href="${url}">` +
                 `<meta http-equiv="refresh" content="0; url=${url}"><body style="background:#0c1220;color:#e8edf6;font-family:sans-serif">` +
-                `<p><a style="color:#ffb627" href="${url}">Open the BlueRoute ${page} page</a></p>`);
+                `<p><a style="color:#ffb627" href="${url}">Open the BlueRoute ${page} page</a></p>` +
+                // The one contact address, here too, for a browser that doesn't follow the redirect.
+                `<p>Contact: <a style="color:#ffb627" href="mailto:support@${e.WEB_DOMAIN}">support@${e.WEB_DOMAIN}</a></p>`);
             }
             // The test app: unlisted, so search engines leave it out.
             const screens = fs.readdirSync("../site-out/app", { withFileTypes: true })
