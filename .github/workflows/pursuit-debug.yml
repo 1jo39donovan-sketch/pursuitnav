@@ -12,6 +12,7 @@ on:
       - server/scripts/pursuit-survey.ts
       - server/scripts/towards-survey.ts
       - server/scripts/g1-spots.ts
+      - server/scripts/ae-reach.ts
       - .github/workflows/pursuit-debug.yml
 
 permissions:
@@ -65,3 +66,10 @@ jobs:
       - name: Where the blue-light route appears (spots for checking gate G1)
         working-directory: server
         run: npx tsx scripts/g1-spots.ts
+      - name: Can a crew route to every A&E now
+        working-directory: server
+        run: |
+          tag=$(gh release list -R "$GITHUB_REPOSITORY" --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("data-"))][0].tagName')
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" -p 'places.tar.zst*' -D places-dl
+          cat places-dl/places.tar.zst* | tar --zstd -xO ./places.txt.gz | gunzip > places.txt
+          npx tsx scripts/ae-reach.ts places.txt
