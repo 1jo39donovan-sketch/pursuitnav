@@ -55,6 +55,9 @@ async function newPage(browser, device, callsign) {
   await page.evaluate(() => {
     const s = JSON.parse(localStorage.getItem("blueroute:settings") ?? "{}");
     s.focusTipSeen = "1";
+    // Always the dark look (the brand's): by default it follows the sun, so
+    // runs in the day and in the evening didn't match.
+    s.dayNight = "dark";
     localStorage.setItem("blueroute:settings", JSON.stringify(s));
   });
   await page.reload({ waitUntil: "networkidle" });
@@ -150,6 +153,14 @@ for (const device of DEVICES) {
   // just to draw a frame, so a route kept there says nothing about phones; the
   // Android size is the check that counts (26 Nov).
   console.log(`  ${device.name} route kept after END: ${await kept()}`);
+  // If one is (see above), clear it now, so "Resume route" isn't in any later shot.
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem("blueroute:settings") ?? "{}");
+    if (!s.resumeRoute) return false;
+    s.resumeRoute = "";
+    localStorage.setItem("blueroute:settings", JSON.stringify(s));
+    return true;
+  }).then(async (cleared) => cleared && (await page.reload({ waitUntil: "networkidle" }), await page.waitForTimeout(2500)));
 
   await shot(page, device, "5-pursuit", async () => {
     // The demo drive, so Pursuit shows a moving car at a legal speed.
