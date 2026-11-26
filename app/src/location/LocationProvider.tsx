@@ -17,6 +17,7 @@ import { onDrivingFix } from "./drivingService";
 import { facing as facingFrom, isMoving } from "./facing";
 import { checkLocation, watchCompass, watchLocation } from "./locationSource";
 import { usePreciseWanted } from "./precision";
+import { onTermsAccepted, termsAccepted } from "../legal/termsState";
 
 export type LocationStatus =
   | "checking"
@@ -133,8 +134,16 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     // refresh() only sets state after awaiting the permission check, so this
     // subscribes to an external system rather than updating state in the effect.
     // Asks once a launch; when precision changes this runs again without asking.
-    refresh(!asked.current).catch(() => setStatus("denied"));
-    asked.current = true;
+    // Not before the terms are agreed to: the question would pop up over them.
+    // Until then, only check (without asking), and ask the moment they're agreed.
+    const mayAsk = termsAccepted();
+    refresh(mayAsk && !asked.current).catch(() => setStatus("denied"));
+    if (mayAsk) asked.current = true;
+    const stopListening = onTermsAccepted(() => {
+      if (asked.current) return;
+      asked.current = true;
+      refresh(true).catch(() => setStatus("denied"));
+    });
     // Coming back from Settings is the usual way a denied permission gets
     // fixed, so check again whenever the app returns to the foreground.
     // In the background the app's own watch stops, saving battery; on
@@ -145,6 +154,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       appState.remove();
+      stopListening();
       stopWatching();
     };
   }, [simulated, refresh, stopWatching]);

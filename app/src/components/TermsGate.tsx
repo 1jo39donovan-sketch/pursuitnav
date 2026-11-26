@@ -7,13 +7,12 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-na
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { API_URL } from "../config";
-import { store } from "../storage/store";
 import { colors, fonts } from "../theme";
 import { useThemed } from "../textSize";
+import { acceptTerms, termsAccepted } from "../legal/termsState";
 
 /** The terms' date (server/src/pages.ts, UPDATED): a new date asks again. */
-export const TERMS_VERSION = "16 November 2026";
-const KEY = "termsAccepted";
+export { TERMS_VERSION } from "../legal/termsState";
 
 const POINTS = [
   "BlueRoute is an independent navigation aid. It is not made or approved by any police, ambulance or fire service, and doesn’t replace your training, control room, radio or your service’s policies.",
@@ -26,11 +25,11 @@ const POINTS = [
 export function TermsGate() {
   const styles = useThemed(baseStyles);
   const insets = useSafeAreaInsets();
-  const [accepted, setAccepted] = useState(() => store.getSetting(KEY) === TERMS_VERSION);
+  const [accepted, setAccepted] = useState(termsAccepted);
   if (accepted) return null;
 
   const agree = () => {
-    store.setSetting(KEY, TERMS_VERSION);
+    acceptTerms();
     setAccepted(true);
   };
 
