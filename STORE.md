@@ -111,7 +111,7 @@ Updated 17 November 2026 for the Kent and Essex pilots and the features since (t
 | **Support URL** | `https://bluerouteapp.com/support` | Website: `https://bluerouteapp.com` |
 | **Marketing URL** (optional) | leave blank | |
 | **Contact email** | | `support@bluerouteapp.com` (shown publicly, and Google emails it) |
-| **Seller / copyright** | © 2026 OPSVALE (must match the developer account's legal name) | |
+| **Seller / copyright** | © 2026 OPSVALE (use the company's registered name exactly, e.g. OPSVALE LTD, to match the developer account) | |
 | **Bundle ID / package** | `com.blueroute.patrol` | `com.blueroute.patrol` |
 
 The name under the icon on the phone stays **BlueRoute**. "Response" is left out of the store name until OPSVALE decides: the Launch Manager flags it as the one word Apple could read as emergency response (guideline 5.1.5). With it, the name is "BlueRoute – Response Sat Nav" (28).
@@ -309,7 +309,7 @@ Everything here must be done before **Submit for Review** on either store. Statu
 | 2 | Real drive on the Android build: spoken directions keep going with the screen locked; the log is still there after closing and reopening the app | Josh | Not done |
 | 3 | Record the short Play foreground-service video on that drive: start a route, lock the screen, show the "directions on" notification and the voice carrying on | Josh | Not done |
 | 4 | iPhone (browser version for now): spoken directions with the silent switch on; download a Premium voice | Josh | Not done |
-| 5 | Decide whether OPSVALE is a legal entity, then open **organisation** accounts (D-U-N-S number first) or personal ones | Josh | Open |
+| 5 | Once OPSVALE is formed, open **organisation** accounts in its name (D-U-N-S number first). Decided 26 November: both store accounts are OPSVALE's, so BlueRoute and every later app publish as OPSVALE | Josh | Waiting for OPSVALE |
 | 6 | Decide the store name: "BlueRoute – Patrol Sat Nav" or with "Response" | Josh | Open |
 | 7 | Set the GitHub variable `CONTACT_EMAIL` to `support@bluerouteapp.com` and redeploy so the privacy and support pages show it | Josh | Open |
 | 8 | Confirm the Kent and Essex area groupings and council codes | Josh | Open |
