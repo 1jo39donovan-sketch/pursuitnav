@@ -166,6 +166,7 @@ for (const device of DEVICES) {
     await page.waitForTimeout(4000);
     const code = (await page.getByLabel(/^Team code /).last().getAttribute("aria-label")).replace("Team code ", "");
     const desk = await newPage(browser, device, "CONTROL-2");
+    try {
     await tab(desk, "Session");
     await desk.getByText("Team", exact()).last().click();
     await desk.getByText("Join with a code", exact()).last().click();
@@ -181,7 +182,13 @@ for (const device of DEVICES) {
     await desk.getByLabel("Message").last().fill("Dog loose in the rear garden. Approach from the front.");
     await desk.getByText("Send", exact()).last().click();
     await desk.waitForTimeout(2500);
-    await desk.context().close();
+    } catch (e) {
+      // The desk's own screen: where this shot goes wrong, not the officer's.
+      await desk.screenshot({ path: `${out}/debug-${device.name}-7-desk.png` }).catch(() => {});
+      throw e;
+    } finally {
+      await desk.context().close();
+    }
     await tab(page, "Search");
     await page.waitForTimeout(18_000);
   });

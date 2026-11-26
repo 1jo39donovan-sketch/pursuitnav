@@ -49,9 +49,31 @@ jobs:
       - name: Strip the alpha channel (both stores refuse it) and check the sizes
         run: |
           sudo apt-get install -y -qq imagemagick >/dev/null
+          # Pictures of a failed shot: shown in the log, never committed.
+          mkdir -p debug-shots
+          mv store/screenshots/debug-*.png debug-shots/ 2>/dev/null || true
           cd store/screenshots
           for f in *.png; do mogrify -alpha off -strip "$f"; echo "$f $(identify -format '%wx%h' "$f")"; done
-      - name: Commit them to this branch
+      - name: Show any failed shot (small copies)
+        if: always()
+        run: |
+          for f in debug-shots/*.png; do
+            [ -f "$f" ] || continue
+            echo "=== IMAGE $(basename "$f" .png)"
+            convert "$f" -resize 500x -quality 70 jpg:- | base64
+            echo
+            echo "=== END"
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: failed-shots
+          path: debug-shots
+          if-no-files-found: ignore
+      - name: Commit them (main only)
+        # On a pull request's branch the shots are only checked: a commit
+        # pushed here by a bot holds that branch's CI for approval.
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
