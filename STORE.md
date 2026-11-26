@@ -316,7 +316,7 @@ Everything here must be done before **Submit for Review** on either store. Statu
 | 6 | Decide the store name: "BlueRoute – Patrol Sat Nav" or with "Response" | Josh | Open |
 | 7 | Set the GitHub variable `CONTACT_EMAIL` to `support@bluerouteapp.com` and redeploy so the privacy and support pages show it | Josh | Open |
 | 8 | Confirm the Kent and Essex area groupings and council codes | Josh | Open |
-| 9 | Run the **Store screenshots** workflow on the commit you'll submit, and check the eight shots | Claude runs, Josh checks | Ready to run |
+| 9 | Run the **Store screenshots** workflow on the commit you'll submit, and check the eight shots | Claude runs, Josh checks | Taken 26 November (all 16 in `store/screenshots/`, dark look; the route shot shows both routes). Josh to check; retake if the app changes before submitting |
 | 10 | Paste the listing, reviewer notes, age rating, data safety and privacy answers above | Josh | Ready |
 | 11 | Play Console: the foreground-service declaration (wording above) with the video from 3 | Josh | Ready once 3 is done |
 | 12 | Optional: a solicitor's read of the terms and privacy policy, especially section 6 (team messages) | Josh | Your call |
