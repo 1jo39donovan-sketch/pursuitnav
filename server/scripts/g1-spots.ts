@@ -19,6 +19,24 @@ const PAIRS: Record<string, [LngLat, LngLat]> = {
   "Euston station → Holborn station": [[-0.1337, 51.5282], [-0.1199, 51.5174]],
   "Angel → Highbury Corner": [[-0.1057, 51.5322], [-0.1035, 51.5463]],
   "Camden Town station → King's Cross": [[-0.1426, 51.5392], [-0.1240, 51.5308]],
+  // From where the store screenshots start (Holloway Road by Seven Sisters Road).
+  "Holloway Road → 54 Caledonian Road": [[-0.1154, 51.5532], [-0.12009, 51.53224]],
+  "Holloway Road → King's Cross station": [[-0.1154, 51.5532], [-0.1238, 51.5302]],
+  "Holloway Road → Angel station": [[-0.1154, 51.5532], [-0.1057, 51.5322]],
+  "Holloway Road → Highbury Corner": [[-0.1154, 51.5532], [-0.1035, 51.5463]],
+  "Holloway Road → Camden Town station": [[-0.1154, 51.5532], [-0.1426, 51.5392]],
+  "Holloway Road → Finsbury Park station": [[-0.1154, 51.5532], [-0.1065, 51.5643]],
+  "Holloway Road → Euston station": [[-0.1154, 51.5532], [-0.1337, 51.5282]],
+  "Holloway Road → Whittington Hospital": [[-0.1154, 51.5532], [-0.1383, 51.5658]],
+  // To 54 Caledonian Road (the screenshots' address) from round about.
+  "Angel station → 54 Caledonian Road": [[-0.1057, 51.5322], [-0.12009, 51.53224]],
+  "Highbury Corner → 54 Caledonian Road": [[-0.1035, 51.5463], [-0.12009, 51.53224]],
+  "Old Street station → 54 Caledonian Road": [[-0.0877, 51.5257], [-0.12009, 51.53224]],
+  "Euston station → 54 Caledonian Road": [[-0.1337, 51.5282], [-0.12009, 51.53224]],
+  "Camden Town station → 54 Caledonian Road": [[-0.1426, 51.5392], [-0.12009, 51.53224]],
+  "Russell Square → 54 Caledonian Road": [[-0.1246, 51.5231], [-0.12009, 51.53224]],
+  "Farringdon station → 54 Caledonian Road": [[-0.1053, 51.5203], [-0.12009, 51.53224]],
+  "Caledonian Road station → 54 Caledonian Road": [[-0.1185, 51.5481], [-0.12009, 51.53224]],
 };
 
 // Routes leave "now": what's offered can change with the hour (timed bus lanes, school streets).
