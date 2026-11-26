@@ -194,7 +194,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 > Location is used only while the app is in use (When In Use permission). Turn-by-turn guidance and the pursuit screen need the current position; on Android they keep going with the screen locked, with a notification showing, until you finish. Nothing is tracked when the app is closed.
 >
 > DATA
-> No accounts, ads or third-party analytics. Route and search requests are processed and not kept. Each request carries a random install ID and the app version, used only to count daily totals; the install ID can be reset, or switched off in Session > Privacy and data ("Count my usage"). Team sessions (positions and team messages) are optional, need a shared team code, and are end-to-end encrypted; the server deletes messages within 12 hours and teams within a week.
+> No accounts, ads or third-party analytics. Route requests are processed and not kept. Search text is held in memory on the server for up to 24 hours to speed up repeat searches, with no ID, IP address or position. Map tiles come from OpenFreeMap, which sees which part of the map is shown. Each request carries a random install ID and the app version, used only to count daily totals; the install ID can be reset, or switched off in Session > Privacy and data ("Count my usage"). Team sessions (positions and team messages) are optional, need a shared team code, and are end-to-end encrypted; the server deletes messages within 12 hours and teams within a week.
 >
 > INDEPENDENCE
 > BlueRoute is independent. It is not made, approved or endorsed by any police force or other public service, and is not affiliated with one. Police stations are shown by their own name only.
@@ -242,7 +242,7 @@ Order and captions, both stores (the first six from the Launch Manager's list of
 
 ## Privacy answers (ready to paste)
 
-What leaves the phone, checked against the code on 25 October 2026:
+What leaves the phone, checked against the code on 26 November 2026:
 
 | Data | Where to | Kept? | Counts as |
 |---|---|---|---|
@@ -253,12 +253,13 @@ What leaves the phone, checked against the code on 25 October 2026:
 | Team sessions: callsign, position, track | Other team members, through the server | Sealed, in memory, up to a week | Not collected: end-to-end encrypted, the server can't read it |
 | Team messages: a place, a caution, a note | Other team members, through the server | Sealed, in memory, 12 hours at most | Not collected: end-to-end encrypted, the server can't read it |
 | Learning: per-road timings | BlueRoute server | Totals per road | **Not yet**: switched off on the server (`LEARNING` not set). See below |
+| Map tiles: which part of the map is shown (so roughly where), and the phone's IP address | OpenFreeMap, a free public map service (not under contract to us) | OpenFreeMap's own policy | **Shared** (Approximate location), to be safe: see Google below. Not if the map is served from the BlueRoute server instead |
 | Report a problem | The user's own mail app | | Not collected by the app: the user sends the email |
-| Log, callsign, boroughs, notes, favourites, field-test trips | Phone only | | Not collected |
+| Log, callsign, boroughs, notes, favourites, field-test trips, saved spots (Where am I, last five) | Phone only | | Not collected |
 
 ### Apple: App Privacy
 
-**Data collection**: "Yes, we collect data from this app". Then tick these four, and for each answer **Linked to the user's identity: No** and **Used for tracking: No**:
+**Data collection**: "Yes, we collect data from this app". Then tick these five, and for each answer **Linked to the user's identity: No** and **Used for tracking: No**:
 
 | Data type | Purposes |
 |---|---|
@@ -266,10 +267,11 @@ What leaves the phone, checked against the code on 25 October 2026:
 | **Usage Data → Product Interaction** | Analytics |
 | **Diagnostics → Other Diagnostic Data** | Analytics |
 | **Search History** | App Functionality |
+| **Location → Coarse Location** | App Functionality |
 
-Don't tick Location. Positions are only processed in real time to answer each request and aren't kept, which Apple doesn't count as collection, and team-session positions are end-to-end encrypted so neither you nor the server can read them.
+Tick **Location → Coarse Location** too (App Functionality; not linked; not tracking), to be safe: the map tiles come straight from OpenFreeMap, which sees which part of the map is shown (see the table). Don't tick Precise Location: positions are only processed in real time to answer each request and aren't kept, which Apple doesn't count as collection, and team-session positions are end-to-end encrypted so neither you nor the server can read them.
 
-The label will then say **"Data Not Linked to You"** with those four, and nothing under "Data Used to Track You".
+The label will then say **"Data Not Linked to You"** with those five, and nothing under "Data Used to Track You".
 
 ### Google: Data safety
 
@@ -285,17 +287,17 @@ The label will then say **"Data Not Linked to You"** with those four, and nothin
 | Data type | Collected / shared | Processed ephemerally? | Required or optional? | Purposes |
 |---|---|---|---|---|
 | **Location → Precise location** | Collected, not shared | **Yes** | Required | App functionality |
-| **Location → Approximate location** | Collected, not shared | **Yes** | Required | App functionality |
+| **Location → Approximate location** | Collected **and shared** | **Yes** | Required | App functionality |
 | **App activity → In-app search history** | Collected, not shared | **No** (24-hour cache) | Required | App functionality |
 | **App activity → Other actions** | Collected, not shared | No | Required | Analytics |
 | **App info and performance → Diagnostics** | Collected, not shared | No | Required | Analytics |
 | **Device or other IDs** | Collected, not shared | No | Required | Analytics |
 
-"Not shared" is right for all of them: Ordnance Survey and Expo act for us as service providers, which Google doesn't count as sharing. Team-session data is end-to-end encrypted, which Google doesn't count as collected.
+"Not shared" is right for the rest: Ordnance Survey and Expo act for us as service providers, which Google doesn't count as sharing. Approximate location is marked shared because the map tiles come straight from OpenFreeMap, a free public service with no agreement with us: it sees which part of the map is shown and the phone's IP address (the privacy page says so). Team-session data is end-to-end encrypted, which Google doesn't count as collected.
 
 ### If the answers need to change
 
-- **Turning learning on** (`LEARNING=1` on the server): add Apple **Location → Coarse Location** (App Functionality, not linked) and Google **Location → Approximate location** with processed ephemerally **No** and **Optional**. Update both before turning it on.
+- **Turning learning on** (`LEARNING=1` on the server): Apple's **Location → Coarse Location** is already ticked for the map tiles (App Functionality, not linked), so nothing to add there; and Google **Location → Approximate location** with processed ephemerally **No** and **Optional**. Update both before turning it on.
 - **Dropping the search cache** would take Search history off both labels, at the cost of repeat searches taking a few hundred milliseconds longer. Your call; the answers above assume the cache stays.
 - **Adding a subscription**: see "Later: a subscription" below.
 
