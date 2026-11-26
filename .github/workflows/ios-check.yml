@@ -117,7 +117,10 @@ jobs:
           for f in ios-check/*.png; do
             [ -f "$f" ] || continue
             echo "=== IMAGE $(basename "$f" .png)"
-            sips -Z 600 -s format jpeg -s formatOptions 70 "$f" --out /tmp/small.jpg >/dev/null && base64 -i /tmp/small.jpg
+            # sips varies between macOS versions: a small JPEG, else a small PNG, else the original.
+            if sips -Z 600 -s format jpeg -s formatOptions 70 "$f" --out /tmp/small.jpg >/dev/null 2>&1; then base64 -i /tmp/small.jpg
+            elif sips -Z 600 "$f" --out /tmp/small.png >/dev/null 2>&1; then base64 -i /tmp/small.png
+            else base64 -i "$f"; fi
             echo
             echo "=== END"
           done
