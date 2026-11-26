@@ -27,11 +27,12 @@ for (const [label, [from, to]] of Object.entries(PAIRS)) {
   try {
     const plan = await planRoutes(valhalla, from, to, opts);
     const std = Math.round(plan.standard.durationS / 60);
+    const near = plan.endsNearby ? " (ends at the nearest road open now)" : "";
     if (!plan.police) {
-      console.log(`\n· ${label}: standard ${std} min; no blue-light route (${plan.noPoliceReason ?? "not faster"})`);
+      console.log(`\n· ${label}: standard ${std} min${near}; no blue-light route (${plan.noPoliceReason ?? "not faster"})`);
       continue;
     }
-    console.log(`\n✓ ${label}: standard ${std} min; blue light saves ${Math.round(plan.police.savingS)} s`);
+    console.log(`\n✓ ${label}: standard ${std} min${near}; blue light saves ${Math.round(plan.police.savingS)} s`);
     for (const r of plan.police.restrictions) console.log(`    ${r.description}  (${r.location.lat.toFixed(5)}, ${r.location.lng.toFixed(5)})`);
   } catch (e) {
     console.log(`\n✗ ${label}: ${(e as Error).message}`);

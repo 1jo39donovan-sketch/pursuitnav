@@ -973,7 +973,11 @@ export default function SearchScreen() {
               borough: boroughAt(destination.point[1], destination.point[0]),
             })
           }
-          note={destination.note}
+          note={
+            [destination.note, plan?.endsNearby ? "Closed to cars at this hour: the route ends at the nearest open road." : null]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           teamNote={destTeamNote}
           noteKey={`${destination.point[0]},${destination.point[1]}`}
           blockNote={noteNear(notes, { lat: destination.point[1], lng: destination.point[0] })?.note}

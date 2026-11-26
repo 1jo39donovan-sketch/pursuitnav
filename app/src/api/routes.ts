@@ -86,6 +86,8 @@ export interface RoutePlan {
   noPoliceReason?: NoPoliceReason;
   /** Live TfL full closures the routes keep clear of (absent if the server doesn't check). */
   closures?: { active: number; updatedAt?: string; ignored: boolean };
+  /** The exact place is on a road closed to cars at this hour: the routes end at the nearest open road. Older servers leave it out. */
+  endsNearby?: boolean;
 }
 
 export class RouteError extends Error {}

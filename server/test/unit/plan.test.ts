@@ -133,3 +133,31 @@ describe("starting the way the car is facing", () => {
     expect(calls.at(-1)).toBeUndefined();
   });
 });
+
+describe("a destination on a road closed at this hour (Bank at midday, 26 Nov)", () => {
+  it("routes to the nearest road open now, and says so, rather than finding no route", async () => {
+    const { ValhallaError } = await import("../../src/valhalla.js");
+    const asked: (number | undefined)[] = [];
+    const router: Router = {
+      async route(req: RouteRequest) {
+        asked.push(req.to.radiusM);
+        // The exact point has no way for any vehicle now; with leeway, a road close by does.
+        if (req.to.radiusM === undefined) throw new ValhallaError("No path could be found for input", 400, 442);
+        if (req.distanceOnly) return { ...route(0), distanceM: 1 };
+        return req.costing === POLICE ? route(100) : route(200);
+      },
+      async traceEdges() {
+        return edges;
+      },
+    };
+    const plan = await planRoutes(router, [0, 51], [0, 51.01], options, 0);
+    expect(plan.endsNearby).toBe(true);
+    expect(plan.standard.durationS).toBe(200);
+    expect(asked).toContain(150);
+  });
+
+  it("doesn't say so when the exact point can be reached", async () => {
+    const plan = await planRoutes(fakeRouter({ carAlwaysDetours: false }), [0, 51], [0, 51.01], options);
+    expect(plan.endsNearby).toBeUndefined();
+  });
+});
