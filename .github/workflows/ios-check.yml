@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   ios:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     defaults:
       run:
@@ -54,8 +54,11 @@ jobs:
         run: |
           export EXPO_PUBLIC_API_URL="https://${SERVER_DOMAIN:-api.bluerouteapp.com}"
           export EXPO_PUBLIC_BUILD_ID="${GITHUB_SHA::7} ios-check"
-          CI=1 npx expo prebuild --platform ios --no-install
+          # The newest Xcode on the machine: Expo's own App Store builds use a current one.
+          newest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$newest" ] && sudo xcode-select -s "$newest"
           xcodebuild -version
+          CI=1 npx expo prebuild --platform ios --no-install
 
       - name: CocoaPods
         working-directory: app/ios
@@ -68,10 +71,15 @@ jobs:
           ws=$(ls -d *.xcworkspace | head -1)
           scheme=$(basename "$ws" .xcworkspace)
           echo "Workspace $ws, scheme $scheme"
-          set -o pipefail
-          xcodebuild -workspace "$ws" -scheme "$scheme" -configuration Release \
+          if ! xcodebuild -workspace "$ws" -scheme "$scheme" -configuration Release \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -40
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build > build.log 2>&1; then
+            # The lines that say what went wrong, not the end of a long log.
+            grep -n -E "error:|ERROR|fatal|failed" build.log | grep -v "Disabling previews" | head -40
+            grep -n -B3 -A25 "Build ExpoModulesJSI" build.log | grep -v "^[0-9]*-note:" | head -80
+            exit 1
+          fi
+          tail -5 build.log
 
       - name: Open it on a simulated iPhone
         working-directory: app/ios
