@@ -78,6 +78,11 @@
         border-radius: 12px;
       }
       .button.quiet { background: transparent; border: 1.5px solid var(--line); color: var(--fg); }
+      .button.online { background: var(--amber); color: #1a1200; font-size: 19px; padding: 15px 26px; }
+      .online-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin: 18px 0 6px; }
+      .online-row p { margin: 0; color: var(--muted); font-size: 15px; max-width: 34rem; }
+      .steps { margin: 8px 0 14px; padding-left: 20px; }
+      .steps li { margin: 6px 0; }
       .small { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
       .safety {
         background: rgba(255, 182, 39, 0.08);
@@ -116,7 +121,26 @@
         BlueRoute is an independent app. It is not made, endorsed or supplied by any police, ambulance or fire service.
       </p>
 
+      <div class="online-row">
+        <a class="button online" href="/app/">Use online</a>
+        <p>
+          Open BlueRoute in your browser: on a desk PC to start or join a team session and send places to crews, or on a
+          phone before the app is in the stores.
+        </p>
+      </div>
+
       <div class="ctas">
+        <div class="cta">
+          <h3>For desks and control rooms</h3>
+          <p>Run the team session from a PC: no app to install.</p>
+          <ol class="steps">
+            <li><a href="/app/">Use online</a>, agree to the terms and set up (pick your area and a callsign).</li>
+            <li>Session → <b>Team</b> → <b>Start a team</b>, and share the code with the crews. Or <b>Join with a code</b> a crew has shared.</li>
+            <li>Under <b>Share my position</b>, choose <b>Never (desk)</b>.</li>
+            <li>Search an address, then <b>Send this place to the team</b>: <b>Go here</b> or <b>Caution here</b>, to a callsign or everyone.</li>
+          </ol>
+          <a class="button" href="/app/">Use online</a>
+        </div>
         <div class="cta">
           <h3>For crews</h3>
           <p>Free, with no account. Coming to iPhone and Android.</p>
@@ -186,6 +210,7 @@
 
       <footer>
         <nav>
+          <a href="/app/">Use online</a>
           <a href="/privacy">Privacy</a>
           <a href="/support">Support</a>
           <a href="/terms">Terms of use</a>
