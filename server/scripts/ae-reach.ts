@@ -42,7 +42,11 @@ for (const h of hospitals) {
       if (notes.length) problems.push(`${to.name} (${h.borough}) from the ${side}: ${notes.join("; ")}`);
       else ok++;
     } catch (e) {
-      problems.push(`${to.name} (${h.borough}) from the ${side}: NO ROUTE (${(e as Error).message}); A&E point ${to.lat.toFixed(5)},${to.lng.toFixed(5)}, from ${from[1].toFixed(5)},${from[0].toFixed(5)}`);
+      // From 300 m to the side: tells a test point with no way out (a
+      // pedestrian street) from an A&E that can't be reached.
+      const aside: LngLat = [from[0] + 0.0043, from[1]];
+      const fromAside = await planRoutes(valhalla, aside, target, opts).then(() => true, () => false);
+      problems.push(`${fromAside ? "(test point only: fine from 300 m east) " : ""}` +`${to.name} (${h.borough}) from the ${side}: NO ROUTE (${(e as Error).message}); A&E point ${to.lat.toFixed(5)},${to.lng.toFixed(5)}, from ${from[1].toFixed(5)},${from[0].toFixed(5)}`);
     }
   }
 }
