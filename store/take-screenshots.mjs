@@ -138,6 +138,21 @@ for (const device of DEVICES) {
   const onCon = (m) => m.type() === "error" && !/Failed to load resource/.test(m.text()) && errs.push(`console ${m.text()}`.slice(0, 300));
   page.on("pageerror", onErr);
   page.on("console", onCon);
+  // Which element each touch lands on, as the page sees it.
+  await page.evaluate(() => {
+    window.__touches = [];
+    for (const type of ["touchstart", "touchend", "pointerdown", "pointerup", "click"]) {
+      document.addEventListener(
+        type,
+        (e) => {
+          const el = e.target instanceof Element ? e.target : null;
+          const labelled = el?.closest("[aria-label]");
+          window.__touches.push(`${type}:${labelled?.getAttribute("aria-label") ?? el?.tagName ?? "?"}${e.defaultPrevented ? "(prevented)" : ""}`);
+        },
+        true,
+      );
+    }
+  });
   await where("before END");
   // Touch taps, as on a phone: a mouse-style click on a touch page can arrive
   // twice or not at all, which looked like END misbehaving (26 Nov).
@@ -153,6 +168,7 @@ for (const device of DEVICES) {
   await page.waitForURL((u) => !u.pathname.endsWith("/navigate"), { timeout: 15_000 }).catch(() => {});
   await page.waitForTimeout(1000);
   await where(`after the second END tap (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+  console.log(`  ${device.name} touches seen: ${await page.evaluate(() => (window.__touches ?? []).join(" ")).catch(() => "(page gone)")}`);
   page.off("pageerror", onErr);
   page.off("console", onCon);
   console.log(`  ${device.name} errors around END: ${errs.length ? errs.join(" || ") : "none"}`);
