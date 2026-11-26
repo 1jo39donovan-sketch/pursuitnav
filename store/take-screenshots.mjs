@@ -133,12 +133,20 @@ for (const device of DEVICES) {
       `  ${device.name} ${what}: ${new URL(page.url()).pathname}, End buttons ${await page.getByLabel("End navigation", exact()).count()}, ` +
         `"Tap again" ${await page.getByLabel("Tap again to end navigation", exact()).count()}, turn card ${await page.getByText(/^Then /).count()}`,
     );
+  const errs = [];
+  const onErr = (e) => errs.push(`pageerror ${e.message}`.slice(0, 300));
+  const onCon = (m) => m.type() === "error" && !/Failed to load resource/.test(m.text()) && errs.push(`console ${m.text()}`.slice(0, 300));
+  page.on("pageerror", onErr);
+  page.on("console", onCon);
   await where("before END");
   await page.getByLabel("End navigation", exact()).last().click();
   await where("after the first END tap");
   await page.getByLabel("Tap again to end navigation", exact()).last().click();
   await page.waitForTimeout(1500);
   await where("after the second END tap");
+  page.off("pageerror", onErr);
+  page.off("console", onCon);
+  console.log(`  ${device.name} errors around END: ${errs.length ? errs.join(" || ") : "none"}`);
   await page.context().setGeolocation(HOLLOWAY);
   // A route kept for "Resume route" should be gone once it's ended: say if not.
   const kept = () =>
