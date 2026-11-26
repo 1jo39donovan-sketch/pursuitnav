@@ -515,7 +515,12 @@ export default function NavigateScreen() {
 
   // Ending takes a second tap, so a bump on the way doesn't drop the route.
   const [confirmEnd, setConfirmEnd] = useState(false);
+  // Also in a ref, read by the tap itself: on the live app the screen redraws
+  // every second, and on an iPhone-sized screen the second tap could still
+  // see "not armed" and only arm it again, so END never ended (26 Nov).
+  const armed = useRef(false);
   useEffect(() => {
+    armed.current = confirmEnd;
     if (!confirmEnd) return;
     // Long enough to look back at the road and still tap again (30 Oct test).
     const t = setTimeout(() => setConfirmEnd(false), 5000);
@@ -748,7 +753,13 @@ export default function NavigateScreen() {
           accessibilityRole="button"
           accessibilityLabel={confirmEnd ? "Tap again to end navigation" : "End navigation"}
           accessibilityHint="Tap twice to end navigation"
-          onPress={() => (confirmEnd || progress?.arrived ? end() : setConfirmEnd(true))}
+          onPress={() => {
+            if (armed.current || progress?.arrived) end();
+            else {
+              armed.current = true;
+              setConfirmEnd(true);
+            }
+          }}
           style={[styles.endButton, confirmEnd && styles.endConfirm]}
         >
           <Text style={styles.endText}>{confirmEnd ? "Tap to end" : "End"}</Text>
