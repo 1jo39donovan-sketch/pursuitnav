@@ -21,6 +21,8 @@ const PAIRS: Record<string, [LngLat, LngLat]> = {
   "Camden Town station → King's Cross": [[-0.1426, 51.5392], [-0.1240, 51.5308]],
 };
 
+// Routes leave "now": what's offered can change with the hour (timed bus lanes, school streets).
+console.log(`Planned at ${new Date().toISOString().slice(11, 16)} UTC on ${new Date().toISOString().slice(0, 10)}`);
 for (const [label, [from, to]] of Object.entries(PAIRS)) {
   try {
     const plan = await planRoutes(valhalla, from, to, opts);
