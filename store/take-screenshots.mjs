@@ -126,52 +126,17 @@ for (const device of DEVICES) {
     await page.getByLabel("Go on the standard route").last().click();
     await page.waitForTimeout(5000);
   });
-  // End the route: one tap arms END, the second ends it.
+  // End the route: one tap arms END, the second ends it. Touch taps, as on a
+  // phone. The second follows at a person's pace: not within 0.35 s (the app
+  // takes that as the same tap), and well inside the 5 s END stays armed.
+  // Nothing in between: at the iPhone size this runner draws the map in
+  // software so slowly that checks between the taps let END disarm (26 Nov).
   // (Shown in capitals, but the words underneath are "End", so go by the label.)
-  const where = async (what) =>
-    console.log(
-      `  ${device.name} ${what}: ${new URL(page.url()).pathname}, End buttons ${await page.getByLabel("End navigation", exact()).count()}, ` +
-        `"Tap again" ${await page.getByLabel("Tap again to end navigation", exact()).count()}, turn card ${await page.getByText(/^Then /).count()}`,
-    );
-  const errs = [];
-  const onErr = (e) => errs.push(`pageerror ${e.message}`.slice(0, 300));
-  const onCon = (m) => m.type() === "error" && !/Failed to load resource/.test(m.text()) && errs.push(`console ${m.text()}`.slice(0, 300));
-  page.on("pageerror", onErr);
-  page.on("console", onCon);
-  // Which element each touch lands on, as the page sees it.
-  await page.evaluate(() => {
-    window.__touches = [];
-    for (const type of ["touchstart", "touchend", "pointerdown", "pointerup", "click"]) {
-      document.addEventListener(
-        type,
-        (e) => {
-          const el = e.target instanceof Element ? e.target : null;
-          const labelled = el?.closest("[aria-label]");
-          window.__touches.push(`${type}:${labelled?.getAttribute("aria-label") ?? el?.tagName ?? "?"}${e.defaultPrevented ? "(prevented)" : ""}`);
-        },
-        true,
-      );
-    }
-  });
-  await where("before END");
-  // Touch taps, as on a phone: a mouse-style click on a touch page can arrive
-  // twice or not at all, which looked like END misbehaving (26 Nov).
   await page.getByLabel("End navigation", exact()).last().tap();
-  await where("after the first END tap");
-  // A person's second tap: not straight after the first (the app ignores a
-  // press within 0.35 s of arming as the same tap).
   await page.waitForTimeout(800);
   await page.getByLabel("Tap again to end navigation", exact()).last().tap();
-  // The runner draws the map in software, slowly at the iPhone size: give the
-  // tap time to be handled before judging it (26 Nov).
-  const t0 = Date.now();
   await page.waitForURL((u) => !u.pathname.endsWith("/navigate"), { timeout: 15_000 }).catch(() => {});
   await page.waitForTimeout(1000);
-  await where(`after the second END tap (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
-  console.log(`  ${device.name} touches seen: ${await page.evaluate(() => (window.__touches ?? []).join(" ")).catch(() => "(page gone)")}`);
-  page.off("pageerror", onErr);
-  page.off("console", onCon);
-  console.log(`  ${device.name} errors around END: ${errs.length ? errs.join(" || ") : "none"}`);
   await page.context().setGeolocation(HOLLOWAY);
   // A route kept for "Resume route" should be gone once it's ended: say if not.
   const kept = () =>
