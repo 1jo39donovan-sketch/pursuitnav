@@ -452,7 +452,10 @@ export class ValhallaClient implements Router, Matcher {
       shape: shape.map(([lon, lat]) => ({ lat, lon })),
       costing: costing.costing,
       costing_options: { [costing.costing]: costing.options },
-      shape_match: "edge_walk",
+      // The exact walk first; where it can't follow the shape (Homerton and
+      // St Mary's A&E, 26 Nov: "edge_walk algorithm failed"), map matching,
+      // rather than no route at all.
+      shape_match: "walk_or_snap",
       filters: {
         attributes: [
           "edge.names",
