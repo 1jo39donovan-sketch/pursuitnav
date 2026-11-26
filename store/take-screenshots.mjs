@@ -128,9 +128,17 @@ for (const device of DEVICES) {
   });
   // End the route: one tap arms END, the second ends it.
   // (Shown in capitals, but the words underneath are "End", so go by the label.)
+  const where = async (what) =>
+    console.log(
+      `  ${device.name} ${what}: ${new URL(page.url()).pathname}, End buttons ${await page.getByLabel("End navigation", exact()).count()}, ` +
+        `"Tap again" ${await page.getByLabel("Tap again to end navigation", exact()).count()}, turn card ${await page.getByText(/^Then /).count()}`,
+    );
+  await where("before END");
   await page.getByLabel("End navigation", exact()).last().click();
+  await where("after the first END tap");
   await page.getByLabel("Tap again to end navigation", exact()).last().click();
   await page.waitForTimeout(1500);
+  await where("after the second END tap");
   await page.context().setGeolocation(HOLLOWAY);
   // A route kept for "Resume route" should be gone once it's ended: say if not.
   const kept = () =>
