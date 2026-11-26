@@ -70,6 +70,8 @@ under “Usage counts” below.</p>
   <li>Your callsign, the boroughs you pick, and your settings.</li>
   <li>Blocks and estates you save, and your notes for a BCU or borough.</li>
   <li>The log of your searches and the routes you picked.</li>
+  <li>Spots you save from Where am I (the last five): the time, the address and the position. Sent only if you share
+    one yourself.</li>
 </ul>
 <p>None of this is sent anywhere. It stays until you clear the log in the app or uninstall it.</p>
 
