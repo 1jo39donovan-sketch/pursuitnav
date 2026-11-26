@@ -42,7 +42,7 @@ for (const h of hospitals) {
       if (notes.length) problems.push(`${to.name} (${h.borough}) from the ${side}: ${notes.join("; ")}`);
       else ok++;
     } catch (e) {
-      problems.push(`${to.name} (${h.borough}) from the ${side}: NO ROUTE (${(e as Error).message})`);
+      problems.push(`${to.name} (${h.borough}) from the ${side}: NO ROUTE (${(e as Error).message}); A&E point ${to.lat.toFixed(5)},${to.lng.toFixed(5)}, from ${from[1].toFixed(5)},${from[0].toFixed(5)}`);
     }
   }
 }
