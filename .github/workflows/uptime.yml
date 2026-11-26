@@ -1,10 +1,13 @@
-# Checks the live server every 10 minutes: /health, a London route and
+# Checks the live server (asked for every 10 minutes): /health, a London route and
 # address search (server/scripts/check-server.sh). If a check fails, this
 # run fails and opens a "Server down" issue (one at a time), which GitHub
 # sends to the repo owner by email and as a GitHub app notification; when
 # the server is back, the issue is closed with a note. So a broken server is
-# noticed before an officer finds it. (GitHub runs schedules late when busy,
-# so "every 10 minutes" is often every 30–60 in practice.)
+# noticed before an officer finds it. But GitHub runs schedules late, or
+# skips them, on a quiet repository: from 31 October to 26 November it ran
+# 97 times, 6½ hours apart typically and up to 11½. An outage can go
+# unseen for hours: an outside monitor would see it in minutes (a decision in
+# docs/V1_CHECKLIST.md). Run it from the Actions tab any time.
 # It also checks the server's map data is under 9 days old (the weekly build
 # can fail, or the server miss the download): a separate "Map data out of
 # date" issue, opened and closed the same way.
