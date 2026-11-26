@@ -83,6 +83,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
 - **54 Caledonian Road / flats:** accept the estimated door for v1, or pay for OS Places (Premium) for exact doors and flats.
 - **Store accounts:** Apple (£79 a year) and Google ($25 once). The listing and privacy answers are ready in STORE.md.
 - **Learning:** leave off for v1, or turn on (update the store privacy answers first).
+- **Uptime monitor:** GitHub's scheduled check runs every few hours, not every 10 minutes (typically 6½ hours apart in November), so an outage can go unseen for hours. A free outside monitor (UptimeRobot, say) checking `https://api.bluerouteapp.com/health` every 5 minutes and emailing support@ would close the gap; it needs an account in OPSVALE's name.
 - **Solicitor review** of the terms and privacy policy, if you want one before the public listing.
 
 ## Known small items
