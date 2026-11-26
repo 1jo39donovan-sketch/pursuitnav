@@ -142,7 +142,7 @@ The live server runs only `main`. The deploy workflow's `branch` input is for a 
 
 **Sizing:** `GET /stats` (with `STATS_TOKEN`) includes `server`: the machine's memory and swap in use. Each data release's `manifest.json` records the house-number import's time, memory and database size.
 
-**Uptime check** (`.github/workflows/uptime.yml`): GitHub runs `check-server.sh` against the live server; a failure fails the run and GitHub emails about it. It's set for every 10 minutes, but GitHub runs it only every few hours in practice (typically 6½, up to 11½, in November), so a monitor outside GitHub is needed to hear of an outage quickly.
+**Uptime check** (`.github/workflows/uptime.yml`): GitHub runs `check-server.sh` against the live server; a failure fails the run and GitHub emails about it. It's set for every 10 minutes, but GitHub runs it only every few hours in practice (typically 6½, up to 11½, in November), so UptimeRobot also checks `/health` every 5 minutes (since 26 November) and emails support@bluerouteapp.com when it fails and when it recovers.
 
 **Compatibility:** `test/unit/contract.test.ts` pins what app versions already on phones read from the server. Phones don't all update at once, so CI fails a server change that would break them.
 
