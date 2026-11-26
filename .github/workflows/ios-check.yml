@@ -1,0 +1,130 @@
+# iOS check: builds the native iPhone app for the simulator (no Apple
+# account or signing needed), installs it on a simulated iPhone, opens it
+# and takes screenshots. The App Store build itself goes through Expo once
+# Apple's developer account exists (STORE.md); this finds anything that
+# doesn't build or start on iOS before then. GitHub's Mac runners are free
+# for a public repository.
+# Runs when the app's native setup changes, weekly, and from the Actions tab.
+name: iOS check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - app/package.json
+      - app/package-lock.json
+      - app/app.json
+      - .github/workflows/ios-check.yml
+  pull_request:
+    paths:
+      - app/package.json
+      - app/package-lock.json
+      - app/app.json
+      - .github/workflows/ios-check.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: app
+    env:
+      SERVER_DOMAIN: ${{ vars.SERVER_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci --no-audit --no-fund
+
+      - name: Generate the iOS project
+        run: |
+          export EXPO_PUBLIC_API_URL="https://${SERVER_DOMAIN:-api.bluerouteapp.com}"
+          export EXPO_PUBLIC_BUILD_ID="${GITHUB_SHA::7} ios-check"
+          # The newest Xcode on the machine: Expo's own App Store builds use a current one.
+          newest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$newest" ] && sudo xcode-select -s "$newest"
+          xcodebuild -version
+          CI=1 npx expo prebuild --platform ios --no-install
+
+      - name: CocoaPods
+        working-directory: app/ios
+        run: |
+          for i in 1 2 3; do pod install && exit 0; echo "pod install failed (try $i)"; sleep 30; done; exit 1
+
+      - name: Build for the simulator
+        working-directory: app/ios
+        run: |
+          ws=$(ls -d *.xcworkspace | head -1)
+          scheme=$(basename "$ws" .xcworkspace)
+          echo "Workspace $ws, scheme $scheme"
+          if ! xcodebuild -workspace "$ws" -scheme "$scheme" -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build > build.log 2>&1; then
+            # The lines that say what went wrong, not the end of a long log.
+            grep -n -E "error:|ERROR|fatal|failed" build.log | grep -v "Disabling previews" | head -40
+            grep -n -B3 -A25 "Build ExpoModulesJSI" build.log | grep -v "^[0-9]*-note:" | head -80
+            exit 1
+          fi
+          tail -5 build.log
+
+      - name: Open it on a simulated iPhone
+        working-directory: app/ios
+        run: |
+          app=$(find build/Build/Products -maxdepth 2 -name '*.app' | head -1)
+          echo "App: $app"
+          device=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          phones = [x for rt, xs in d.items() if "iOS" in rt for x in xs if x["name"].startswith("iPhone")]
+          print(phones[-1]["udid"])')
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          # Islington, so the app has a position (a public place, not anyone's).
+          xcrun simctl location "$device" set 51.5465,-0.1058 || true
+          xcrun simctl privacy "$device" grant location com.blueroute.patrol || true
+          xcrun simctl install "$device" "$app"
+          mkdir -p ../../ios-check
+          xcrun simctl launch "$device" com.blueroute.patrol
+          sleep 40
+          xcrun simctl io "$device" screenshot ../../ios-check/1-first-screen.png
+          # Still running (didn't crash on start)?
+          if xcrun simctl spawn "$device" launchctl list | grep -q com.blueroute.patrol; then
+            echo "BlueRoute is running after 40 s."
+          else
+            echo "::error::BlueRoute isn't running 40 s after launch (crashed on start?)"
+            xcrun simctl spawn "$device" log show --last 2m --predicate 'process == "BlueRoute"' --style compact | tail -60 || true
+            exit 1
+          fi
+
+      - name: Print a small copy of the screenshot
+        if: always()
+        working-directory: .
+        run: |
+          for f in ios-check/*.png; do
+            [ -f "$f" ] || continue
+            echo "=== IMAGE $(basename "$f" .png)"
+            sips -Z 600 -s format jpeg -s formatOptions 70 "$f" --out /tmp/small.jpg >/dev/null && base64 -i /tmp/small.jpg
+            echo
+            echo "=== END"
+          done
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ios-check
+          path: ios-check
+          if-no-files-found: ignore
