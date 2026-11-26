@@ -28,6 +28,7 @@ Charging officers nothing is fine on both stores: list it as a free app.
 - **Don't use Met or police branding.** Don't use the Met name, crest or logos, and don't say "official". The listing below says it's independent and lists the police route as needing the user's declaration. Apple and Google both reject apps that look as if they're from an organisation they aren't.
 - **The name.** "BlueRoute" may already be taken on one of the stores. If it is, use "BlueRoute Patrol" (only the name on the store changes).
 - **The server is up** at `api.bluerouteapp.com`, and the privacy, support and terms pages the stores ask for are at `https://bluerouteapp.com/privacy`, `/support` and `/terms`.
+- **The company.** OPSVALE LTD, registered in England and Wales, company number 17605107, registered office 128 City Road, London EC1V 2NX (https://opsvale.co.uk/). Use exactly this name in both developer accounts and for the D-U-N-S number. The website and the privacy, support and terms pages show these details, as UK law asks.
 - **Contact address.** Google emails the listing's contact address. `support@bluerouteapp.com` is BlueRoute's only email address (since 24 November): the listing's contact, the site's, and the app's "Report a problem" address. To show it on the privacy and support pages, add the GitHub variable `CONTACT_EMAIL` and run **Deploy server** with **recreate** ticked. Without it, the pages point to GitHub issues.
 
 ## One-off setup
@@ -111,7 +112,7 @@ Updated 17 November 2026 for the Kent and Essex pilots and the features since (t
 | **Support URL** | `https://bluerouteapp.com/support` | Website: `https://bluerouteapp.com` |
 | **Marketing URL** (optional) | leave blank | |
 | **Contact email** | | `support@bluerouteapp.com` (shown publicly, and Google emails it) |
-| **Seller / copyright** | © 2026 OPSVALE (use the company's registered name exactly, e.g. OPSVALE LTD, to match the developer account) | |
+| **Seller / copyright** | © 2026 OPSVALE LTD (the registered name exactly, to match the developer accounts) | |
 | **Bundle ID / package** | `com.blueroute.patrol` | `com.blueroute.patrol` |
 
 The name under the icon on the phone stays **BlueRoute**. "Response" is left out of the store name until OPSVALE decides: the Launch Manager flags it as the one word Apple could read as emergency response (guideline 5.1.5). With it, the name is "BlueRoute – Response Sat Nav" (28).
@@ -311,7 +312,7 @@ Everything here must be done before **Submit for Review** on either store. Statu
 | 2 | Real drive on the Android build: spoken directions keep going with the screen locked; the log is still there after closing and reopening the app | Josh | Not done |
 | 3 | Record the short Play foreground-service video on that drive: start a route, lock the screen, show the "directions on" notification and the voice carrying on | Josh | Not done |
 | 4 | iPhone (browser version for now): spoken directions with the silent switch on; download a Premium voice | Josh | Not done |
-| 5 | Once OPSVALE is formed, open **organisation** accounts in its name (D-U-N-S number first). Decided 26 November: both store accounts are OPSVALE's, so BlueRoute and every later app publish as OPSVALE | Josh | Waiting for OPSVALE |
+| 5 | Open **organisation** accounts in the name of OPSVALE LTD (company 17605107, formed November 2026): ask Dun & Bradstreet for its free D-U-N-S number first (Apple needs it; it can take one to two weeks). Both store accounts are OPSVALE's, so BlueRoute and every later app publish as OPSVALE LTD | Josh | Ready: start with the D-U-N-S number |
 | 6 | Decide the store name: "BlueRoute – Patrol Sat Nav" or with "Response" | Josh | Open |
 | 7 | Set the GitHub variable `CONTACT_EMAIL` to `support@bluerouteapp.com` and redeploy so the privacy and support pages show it | Josh | Open |
 | 8 | Confirm the Kent and Essex area groupings and council codes | Josh | Open |

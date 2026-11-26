@@ -80,6 +80,8 @@ import { doorNumberOf } from "../components/mapShared";
 
 /** A second END press sooner than this after arming is the same tap arriving twice. */
 const SAME_TAP_MS = 350;
+/** How long a tap takes to finish: END waits this long so the tap doesn't land on the screen behind. */
+const TAP_DONE_MS = 400;
 const DEMO_GRACE_MS = 5000;
 const ARRIVAL_GRACE_MS = 10_000;
 
@@ -522,6 +524,24 @@ export default function NavigateScreen() {
   // runs): a second press this soon after arming is that same tap, ignored,
   // so it takes two real taps; any later press within the 5 s ends the route.
   const armedAt = useRef<number | null>(null);
+  const ending = useRef(false);
+  const pressedInAt = useRef<number | null>(null);
+  /** One END tap: the first arms it, a second (not the same tap arriving twice) ends the route. */
+  const endTap = () => {
+    const later = () => {
+      if (ending.current) return;
+      // Once this tap is over: ended at once, the rest of the tap landed on
+      // what was under the finger next, the Pursuit tab.
+      ending.current = true;
+      setTimeout(end, TAP_DONE_MS);
+    };
+    if (progress?.arrived) return later();
+    const since = armedAt.current === null ? null : Date.now() - armedAt.current;
+    if (since === null) {
+      armedAt.current = Date.now();
+      setConfirmEnd(true);
+    } else if (since >= SAME_TAP_MS) later();
+  };
   useEffect(() => {
     if (!confirmEnd) armedAt.current = null;
     if (!confirmEnd) return;
@@ -756,13 +776,16 @@ export default function NavigateScreen() {
           accessibilityRole="button"
           accessibilityLabel={confirmEnd ? "Tap again to end navigation" : "End navigation"}
           accessibilityHint="Tap twice to end navigation"
+          // On touch-down, not release: on the live app a press was lost when the
+          // screen redrew or re-routed before the finger lifted, so END's second
+          // tap often did nothing (store-screenshot runs, 26 Nov).
+          onPressIn={() => {
+            pressedInAt.current = Date.now();
+            endTap();
+          }}
+          // A screen reader activates with onPress alone (no touch-down): the same.
           onPress={() => {
-            if (progress?.arrived) return end();
-            const since = armedAt.current === null ? null : Date.now() - armedAt.current;
-            if (since === null) {
-              armedAt.current = Date.now();
-              setConfirmEnd(true);
-            } else if (since >= SAME_TAP_MS) end();
+            if (Date.now() - (pressedInAt.current ?? 0) > 1000) endTap();
           }}
           style={[styles.endButton, confirmEnd && styles.endConfirm]}
         >

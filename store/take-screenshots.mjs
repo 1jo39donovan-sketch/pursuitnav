@@ -139,12 +139,14 @@ for (const device of DEVICES) {
   page.on("pageerror", onErr);
   page.on("console", onCon);
   await where("before END");
-  await page.getByLabel("End navigation", exact()).last().click();
+  // Touch taps, as on a phone: a mouse-style click on a touch page can arrive
+  // twice or not at all, which looked like END misbehaving (26 Nov).
+  await page.getByLabel("End navigation", exact()).last().tap();
   await where("after the first END tap");
   // A person's second tap: not straight after the first (the app ignores a
   // press within 0.35 s of arming as the same tap).
   await page.waitForTimeout(800);
-  await page.getByLabel("Tap again to end navigation", exact()).last().click();
+  await page.getByLabel("Tap again to end navigation", exact()).last().tap();
   await page.waitForTimeout(1500);
   await where("after the second END tap");
   page.off("pageerror", onErr);

@@ -81,7 +81,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
 ## Decisions for OPSVALE
 
 - **54 Caledonian Road / flats:** accept the estimated door for v1, or pay for OS Places (Premium) for exact doors and flats.
-- **Store accounts:** Apple (£79 a year) and Google ($25 once). The listing and privacy answers are ready in STORE.md.
+- **Store accounts:** OPSVALE LTD is formed (company 17605107, 26 November). Open Apple's and Google's developer accounts as an organisation in its name; Apple needs the free D-U-N-S number first. STORE.md has the steps.
 - **Learning:** leave off for v1, or turn on (update the store privacy answers first).
 - **Uptime monitor:** done 26 November. UptimeRobot (free plan, account under support@bluerouteapp.com) checks `https://api.bluerouteapp.com/health` every 5 minutes for `"ok":true` and emails support@ when it's missing and when it's back. GitHub's own check runs only every few hours.
 - **Making the repository private:** later, once BlueRoute has users and customers: it needs GitHub Pro. PR #136 has the preparation and stays unmerged until then (Josh, 26 November).
