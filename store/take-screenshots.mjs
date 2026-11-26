@@ -134,7 +134,9 @@ for (const device of DEVICES) {
   // (Shown in capitals, but the words underneath are "End", so go by the label.)
   await page.getByLabel("End navigation", exact()).last().tap();
   await page.waitForTimeout(800);
-  await page.getByLabel("Tap again to end navigation", exact()).last().tap();
+  // Straight away (force): waiting for the button to hold still for two drawn
+  // frames took longer than END stays armed at the iPhone size here.
+  await page.getByLabel("Tap again to end navigation", exact()).last().tap({ force: true });
   await page.waitForURL((u) => !u.pathname.endsWith("/navigate"), { timeout: 15_000 }).catch(() => {});
   await page.waitForTimeout(1000);
   await page.context().setGeolocation(HOLLOWAY);
