@@ -80,7 +80,9 @@ jobs:
           git add store/screenshots
           git diff --cached --quiet && { echo "No changes."; exit 0; }
           git commit -m "Store screenshots from ${{ inputs.url || 'https://bluerouteapp.com/app/' }}"
-          git push
+          # Another run (a merge sets one off) may have pushed meanwhile.
+          for i in 1 2 3; do git push && exit 0; git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" || git rebase --abort; done
+          exit 1
       - name: Fail if a shot failed
         if: steps.take.outcome == 'failure'
         run: exit 1
