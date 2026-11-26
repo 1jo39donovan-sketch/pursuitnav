@@ -146,6 +146,9 @@ for (const device of DEVICES) {
       const r = JSON.parse(localStorage.getItem("blueroute:settings") ?? "{}").resumeRoute;
       return r ? JSON.parse(r).destination?.title + " (saved " + new Date(JSON.parse(r).at).toISOString().slice(11, 19) + ")" : "none";
     });
+  // At the iPhone size this runner can take longer than END stays armed (5 s)
+  // just to draw a frame, so a route kept there says nothing about phones; the
+  // Android size is the check that counts (26 Nov).
   console.log(`  ${device.name} route kept after END: ${await kept()}`);
 
   await shot(page, device, "5-pursuit", async () => {
