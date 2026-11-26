@@ -147,8 +147,12 @@ for (const device of DEVICES) {
   // press within 0.35 s of arming as the same tap).
   await page.waitForTimeout(800);
   await page.getByLabel("Tap again to end navigation", exact()).last().tap();
-  await page.waitForTimeout(1500);
-  await where("after the second END tap");
+  // The runner draws the map in software, slowly at the iPhone size: give the
+  // tap time to be handled before judging it (26 Nov).
+  const t0 = Date.now();
+  await page.waitForURL((u) => !u.pathname.endsWith("/navigate"), { timeout: 15_000 }).catch(() => {});
+  await page.waitForTimeout(1000);
+  await where(`after the second END tap (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
   page.off("pageerror", onErr);
   page.off("console", onCon);
   console.log(`  ${device.name} errors around END: ${errs.length ? errs.join(" || ") : "none"}`);
