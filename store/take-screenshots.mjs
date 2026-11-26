@@ -67,7 +67,15 @@ async function newPage(browser, device, callsign) {
 
 async function shot(page, device, file, steps) {
   try {
-    await steps();
+    try {
+      await steps();
+    } catch (e) {
+      // Once more: this runner is slow at the iPhone size, and a tap can time out.
+      console.log(`  retrying ${device.name}-${file}: ${e.message.split("\n")[0].slice(0, 120)}`);
+      await page.goto(new URL("search", url).href, { waitUntil: "networkidle" });
+      await page.waitForTimeout(2500);
+      await steps();
+    }
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${out}/${device.name}-${file}.png` });
     console.log(`ok   ${device.name}-${file}`);
