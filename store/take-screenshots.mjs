@@ -16,6 +16,10 @@ const DEVICES = [
   { name: "android", width: 360, height: 720 }, // 1080 × 2160
 ];
 const HOLLOWAY = { latitude: 51.5532, longitude: -0.1154, accuracy: 8 };
+// The route shots start here: to Bank, the blue-light route is offered at any
+// hour (banned turns in the evening, bus-only Bishopsgate and Bank by day).
+// From Holloway Road no trip offers it reliably (G1 spots, 26 Nov).
+const SHOREDITCH = { latitude: 51.5236, longitude: -0.0776, accuracy: 8 };
 const JOB =
   "Concern for welfare: neighbour reports an elderly male not seen for two days at Flat 3, Smith House, 54 Caledonian Road N7 8LA";
 let failed = 0;
@@ -39,12 +43,21 @@ async function newPage(browser, device, callsign) {
   // First-launch set-up: police, London, two boroughs, car, a made-up callsign, blue light on.
   await page.getByText("Police", exact()).last().click();
   await page.getByRole("button", { name: /^London/ }).click();
-  for (const b of ["Islington", "Haringey"]) await page.getByText(b, exact()).last().click();
+  for (const b of ["Islington", "Haringey", "City of London"]) await page.getByText(b, exact()).last().click();
   await page.getByText("Next", exact()).last().click();
   await page.getByText("Car", exact()).last().click();
   await page.getByLabel("Callsign", exact()).last().fill(callsign);
   await page.getByText("Next", exact()).last().click();
   await page.getByText("Start", exact()).last().click();
+  await page.waitForTimeout(2500);
+  // The Driving Focus tip already seen, so it isn't in the navigation shot.
+  // The app reads its settings at start, so set it and reload.
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem("blueroute:settings") ?? "{}");
+    s.focusTipSeen = "1";
+    localStorage.setItem("blueroute:settings", JSON.stringify(s));
+  });
+  await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(2500);
   return page;
 }
@@ -98,10 +111,15 @@ for (const device of DEVICES) {
   });
 
   await shot(page, device, "3-routes", async () => {
-    await search(page, "54 Caledonian Road");
+    await page.context().setGeolocation(SHOREDITCH);
+    await page.waitForTimeout(3000);
+    await search(page, "Bank station");
     // The result row, not the search box (which holds the same words).
-    await page.getByText(/^54 Caledonian Road/).first().click();
+    await page.getByText(/^Bank/).first().click();
     await page.getByLabel("Go on the standard route").last().waitFor({ timeout: 30_000 });
+    // Both routes in the picture: wait for the blue-light one too.
+    await page.getByText(/Blue light/i).first().waitFor({ timeout: 30_000 }).catch(() => console.log("  (no blue-light route offered)"));
+    await page.waitForTimeout(2000);
   });
 
   await shot(page, device, "4-navigate", async () => {
@@ -113,6 +131,14 @@ for (const device of DEVICES) {
   await page.getByLabel("End navigation", exact()).last().click();
   await page.getByLabel("Tap again to end navigation", exact()).last().click();
   await page.waitForTimeout(1500);
+  await page.context().setGeolocation(HOLLOWAY);
+  // A route kept for "Resume route" should be gone once it's ended: say if not.
+  const kept = () =>
+    page.evaluate(() => {
+      const r = JSON.parse(localStorage.getItem("blueroute:settings") ?? "{}").resumeRoute;
+      return r ? JSON.parse(r).destination?.title + " (saved " + new Date(JSON.parse(r).at).toISOString().slice(11, 19) + ")" : "none";
+    });
+  console.log(`  ${device.name} route kept after END: ${await kept()}`);
 
   await shot(page, device, "5-pursuit", async () => {
     // The demo drive, so Pursuit shows a moving car at a legal speed.
@@ -153,6 +179,9 @@ for (const device of DEVICES) {
 
   await shot(page, device, "8-paste-job", async () => {
     await tab(page, "Search");
+    console.log(`  ${device.name} route kept before the paste-job shot: ${await kept()}`);
+    // Not part of this picture.
+    await page.getByText("Not now", exact()).last().click({ timeout: 2_000 }).catch(() => {});
     await search(page, JOB);
   });
 

@@ -219,7 +219,7 @@ Apple: no sign-in needed, so leave the demo account blank. Paste this in **Notes
 
 ### Screenshots
 
-Taken from the live web app at the store sizes by the **Store screenshots** workflow (Actions tab, `.github/workflows/store-screenshots.yml`), which commits them to `store/screenshots/` on the branch it runs on. They show a made-up callsign and areas, no force name or livery, no notifications, and no alpha channel, which both stores reject. Retake them after any visible change: run the workflow again.
+Taken from the live web app at the store sizes by the **Store screenshots** workflow (Actions tab, `.github/workflows/store-screenshots.yml`), which commits them to `store/screenshots/` when run on `main` (on other branches it only checks them). They show a made-up callsign and areas, no force name or livery, no notifications, and no alpha channel, which both stores reject. Retake them after any visible change: run the workflow again.
 
 | Store | Slot | Size (pixels) | How many |
 |---|---|---|---|
@@ -233,7 +233,7 @@ Order and captions, both stores (the first six from the Launch Manager's list of
 
 1. Search results for "stroud green rd": *Search the way control gives it*
 2. Session, start of shift with areas and vehicle: *Your areas first: the right Church Street*
-3. Route choice: *Routes sized to your vehicle*
+3. Route choice, Shoreditch to Bank, standard and blue light side by side: *Two routes, every restriction listed*
 4. Turn-by-turn: *Big, spoken turn-by-turn*
 5. Pursuit: *For the operator: road, limit, heading*
 6. The log, demo searches only: *Your log stays on your phone*
