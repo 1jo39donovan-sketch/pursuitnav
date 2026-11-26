@@ -1,8 +1,14 @@
 // The privacy policy and support pages the app stores ask for. Plain HTML,
 // served by the API so they live at the same address as the server.
 
-/** Who makes BlueRoute, as named on its pages. */
-const MAKER = "OPSVALE";
+/** Who makes BlueRoute, as named on its pages: the company's registered name. */
+const MAKER = "OPSVALE LTD";
+/**
+ * The company details UK law asks a company's website to show (Companies
+ * House, 26 Nov 2026), on every page.
+ */
+const COMPANY =
+  'OPSVALE LTD, registered in England and Wales, company number 17605107. Registered office: 128 City Road, London EC1V 2NX. <a href="https://opsvale.co.uk/">opsvale.co.uk</a>';
 const ISSUES_URL = "https://github.com/1jo39donovan-sketch/pursuitnav/issues";
 // Change TERMS_VERSION in app/src/components/TermsGate.tsx with it, so crews agree again.
 const UPDATED = "16 November 2026";
@@ -51,7 +57,7 @@ function page(title: string, body: string): string {
 <div class="brand">${LOGO}<span>Blue<b>Route</b></span></div>
 <h1>${title}</h1>
 ${body}
-<p class="muted">BlueRoute is an ${MAKER} product.</p>
+<p class="muted">BlueRoute is an ${MAKER} product. ${COMPANY}</p>
 </main></body>
 </html>`;
 }
@@ -64,6 +70,8 @@ export function privacyPage(email?: string): string {
 <p>BlueRoute is a navigation app for police, fire and ambulance crews, made by ${MAKER}. It’s independent: not a police
 force or emergency service system. It has no accounts and no third-party analytics. It counts how much it's used, in the way described
 under “Usage counts” below.</p>
+<p>${MAKER} is the data controller for the information this policy describes (see “Questions” below to reach us).
+${COMPANY}</p>
 
 <h2>Kept on your phone only</h2>
 <ul>
