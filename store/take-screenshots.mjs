@@ -141,6 +141,9 @@ for (const device of DEVICES) {
   await where("before END");
   await page.getByLabel("End navigation", exact()).last().click();
   await where("after the first END tap");
+  // A person's second tap: not straight after the first (the app ignores a
+  // press within 0.35 s of arming as the same tap).
+  await page.waitForTimeout(800);
   await page.getByLabel("Tap again to end navigation", exact()).last().click();
   await page.waitForTimeout(1500);
   await where("after the second END tap");

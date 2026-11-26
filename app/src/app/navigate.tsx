@@ -78,6 +78,8 @@ import { routeToMessage } from "../team/routeToMessage";
 import { useStopped } from "../navigation/stopped";
 import { doorNumberOf } from "../components/mapShared";
 
+/** A second END press sooner than this after arming is the same tap arriving twice. */
+const SAME_TAP_MS = 350;
 const DEMO_GRACE_MS = 5000;
 const ARRIVAL_GRACE_MS = 10_000;
 
@@ -515,12 +517,13 @@ export default function NavigateScreen() {
 
   // Ending takes a second tap, so a bump on the way doesn't drop the route.
   const [confirmEnd, setConfirmEnd] = useState(false);
-  // Also in a ref, read by the tap itself: on the live app the screen redraws
-  // every second, and on an iPhone-sized screen the second tap could still
-  // see "not armed" and only arm it again, so END never ended (26 Nov).
-  const armed = useRef(false);
+  // When END was armed, read by the tap itself. On the live app at an
+  // iPhone-sized screen one tap could arrive twice (26 Nov store-screenshot
+  // runs): a second press this soon after arming is that same tap, ignored,
+  // so it takes two real taps; any later press within the 5 s ends the route.
+  const armedAt = useRef<number | null>(null);
   useEffect(() => {
-    armed.current = confirmEnd;
+    if (!confirmEnd) armedAt.current = null;
     if (!confirmEnd) return;
     // Long enough to look back at the road and still tap again (30 Oct test).
     const t = setTimeout(() => setConfirmEnd(false), 5000);
@@ -754,11 +757,12 @@ export default function NavigateScreen() {
           accessibilityLabel={confirmEnd ? "Tap again to end navigation" : "End navigation"}
           accessibilityHint="Tap twice to end navigation"
           onPress={() => {
-            if (armed.current || progress?.arrived) end();
-            else {
-              armed.current = true;
+            if (progress?.arrived) return end();
+            const since = armedAt.current === null ? null : Date.now() - armedAt.current;
+            if (since === null) {
+              armedAt.current = Date.now();
               setConfirmEnd(true);
-            }
+            } else if (since >= SAME_TAP_MS) end();
           }}
           style={[styles.endButton, confirmEnd && styles.endConfirm]}
         >
