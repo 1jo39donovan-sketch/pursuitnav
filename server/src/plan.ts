@@ -53,6 +53,12 @@ export interface Plan {
   standard: Route;
   police: PoliceRoute | null;
   noPoliceReason?: NoPoliceReason;
+  /**
+   * The destination (or start) is on a road closed to this vehicle at this
+   * hour (Bank junction, buses only on weekdays): the routes end at the
+   * nearest road they can use, up to END_LEEWAY_M away. The app says so.
+   */
+  endsNearby?: boolean;
 }
 
 interface Along {
@@ -252,8 +258,22 @@ export async function planRoutes(
   // A point inside a park or an estate can snap to a little island of roads
   // that leads nowhere (Clapham Common, 3 Nov: 422). Snap both ends only to
   // roads well joined to the rest instead.
-  return planFrom(router, from, to, opts, undefined, vehicle, WELL_JOINED);
+  try {
+    return await planFrom(router, from, to, opts, undefined, vehicle, WELL_JOINED);
+  } catch (err) {
+    if (!noWay(err)) throw err;
+  }
+  // Routes leave now, so a road closed at this hour counts as closed: a
+  // search for Bank at midday on a weekday found no route at all (26 Nov).
+  // Let either end be any road close by, so the route stops at the nearest
+  // one open now, and say so.
+  const plan = await planFrom(router, from, to, opts, undefined, vehicle, undefined, [START_LEEWAY_M, END_LEEWAY_M]);
+  return { ...plan, endsNearby: true };
 }
+
+/** How far from the car, and from the destination, a route may start or end when the exact point has no way now. */
+const START_LEEWAY_M = 50;
+const END_LEEWAY_M = 150;
 
 /** Junctions a snapped road must reach on the retry: more than any island in a park or estate. */
 const WELL_JOINED = 500;
@@ -266,11 +286,13 @@ async function planFrom(
   heading: number | undefined,
   vehicle: VehicleType,
   reachability?: number,
+  /** Metres of leeway at the start and the end (see START_LEEWAY_M). */
+  leeway?: [number, number],
 ): Promise<Plan> {
   const STANDARD = standardFor(vehicle, opts.roads);
   const POLICE = policeFor(vehicle, opts.roads);
-  const start = { point: from, heading, reachability };
-  const end = { point: to, reachability };
+  const start = { point: from, heading, reachability, ...(leeway ? { radiusM: leeway[0] } : {}) };
+  const end = { point: to, reachability, ...(leeway ? { radiusM: leeway[1] } : {}) };
   const [firstStandard, firstPolice] = await Promise.all([
     router.route({ costing: STANDARD, from: start, to: end }),
     opts.standardOnly ? null : router.route({ costing: POLICE, from: start, to: end }),

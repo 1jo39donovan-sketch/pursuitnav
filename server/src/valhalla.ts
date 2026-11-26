@@ -12,6 +12,12 @@ export interface Waypoint {
    * an estate) that leads nowhere. Valhalla's default is 50.
    */
   reachability?: number;
+  /**
+   * Any road within this many metres will do: for a point on a road closed
+   * at this hour (Bank junction is buses only on weekdays), so the route
+   * reaches the nearest road it can use.
+   */
+  radiusM?: number;
 }
 
 export interface Maneuver {
@@ -171,6 +177,7 @@ const location = (w: Waypoint) => ({
   lon: w.point[0],
   ...(w.heading !== undefined ? { heading: Math.round(w.heading), heading_tolerance: 45 } : {}),
   ...(w.reachability !== undefined ? { minimum_reachability: w.reachability } : {}),
+  ...(w.radiusM !== undefined ? { radius: w.radiusM } : {}),
 });
 
 interface ValhallaRouteResponse {

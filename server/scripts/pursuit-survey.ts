@@ -42,7 +42,13 @@ const jitter = (p: LngLat): LngLat => {
 const missTraces: Record<string, LngLat[]> = {};
 let all = 0, roads = 0, limits = 0, junctions = 0;
 for (const [label, [from, to]] of Object.entries(ROUTES)) {
-  const route = await valhalla.route({ costing, from: { point: from }, to: { point: to } });
+  // Routes leave "now": a street closed at this hour (a market or school
+  // street) can leave no way from a test point. Say so and go on to the next.
+  const route = await valhalla.route({ costing, from: { point: from }, to: { point: to } }).catch((e: Error) => {
+    console.log(`\n=== ${label}: no route at ${new Date().toISOString().slice(11, 16)} UTC (${e.message}); skipped`);
+    return null;
+  });
+  if (!route) continue;
   const shape = route.shape as LngLat[];
   let length = 0;
   for (let i = 1; i < shape.length; i++) length += distanceM(shape[i - 1]!, shape[i]!);
