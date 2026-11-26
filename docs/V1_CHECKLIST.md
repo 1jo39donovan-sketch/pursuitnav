@@ -6,12 +6,12 @@ Every requirement in CLAUDE.md, how it's met, and what's still open. Checked 19 
 
 ## Summary
 
-All 8 "must pass" items are met in the code, and 7 have automated tests. The PM's team has run desk tests on the live web app (latest 19 November: every desk item passed or fixed). What hasn't happened is the **in-car test on a real phone**, including gate **G1**: no officer gets a link until Josh has seen a blue-light route work on his own phone. Nothing else stops sign-off.
+All 8 "must pass" items are met in the code, and 7 have automated tests. The PM's team has run desk tests on the live web app (latest 19 November: every desk item passed or fixed). What hasn't happened is the **in-car test on a real phone**, including gate **G1**: no officer gets a link until a blue-light route has been seen working on a real Android phone, checked by the PM's team and signed off by Josh from their screenshots (Josh, 26 November). Nothing else stops sign-off.
 
 | | |
 |---|---|
 | Must-pass items | 6 ✅, 2 🟡 (54 Caledonian Road is an estimated door without OS Places; the log surviving a restart is still to confirm on a phone) |
-| Launch gate | **G1**: a blue-light route working on Josh's phone. Not yet done |
+| Launch gate | **G1**: a blue-light route working on a real Android phone, checked by the PM's team, signed off by Josh. Not yet done |
 | Spec areas | 14 ✅, 5 🟡 (flats need OS Places; OS Places off; entrances and team sessions to see on the drive; learning off), 0 ❌ |
 | Still to do before calling v1 done | the real drive with G1 (build order step 6); the PM's field-test brief covers it |
 | Decisions for OPSVALE | OS Places key (paid), store accounts, turning learning on |
@@ -25,7 +25,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
 | 2 | `Bedminton Estate` finds Bemerton Estate | ✅ | Bemerton Estate is in the built-in estates list (on Caledonian Road), and search forgives misspellings. Officers' saved places work the same way | `search.test.ts` ("finds Bemerton Estate from 'Bedminton Estate'") |
 | 3 | `54 Caledonian Road` routes to that door, not the middle of the road | 🟡 | With an OS Places key: OS's exact door. Without one (as now), OpenStreetMap doesn't have number 54, so the server **estimates** the door from numbered doors on the same side and says so: "54 Caledonian Road (estimated between 50 and 62)". With no numbered doors nearby it says "road, not door" rather than guess (10 Holloway Road, checked 19 Nov) | `server/test/unit/nominatim.test.ts`; live smoke test `check_address` after every deploy. **Decision:** accept the estimate for v1, or add OS Places (paid) |
 | 4 | The police route never goes against a one-way street | ✅ | Valhalla `bus` costing with `ignore_oneways: false`; every route is checked | `server/test/integration/routes.test.ts` ("one-way streets", including a contraflow bus lane); live smoke test `check_one_ways` on real London one-ways |
-| 5 | The police route uses a bus gate or ignores a turn restriction where genuinely faster, and lists it | ✅ | Matched against the `auto` route; each restriction listed with its place, merged when repeated, and marked on the map | `routes.test.ts` ("bus gates", also with a van); live smoke test `check_bus_gate`; PM desk test at Bishopsgate: "No right turn: A1202 into A10", 2 min 35 s faster. **G1 on Josh's phone still to do** |
+| 5 | The police route uses a bus gate or ignores a turn restriction where genuinely faster, and lists it | ✅ | Matched against the `auto` route; each restriction listed with its place, merged when repeated, and marked on the map | `routes.test.ts` ("bus gates", also with a van); live smoke test `check_bus_gate`; PM desk test at Bishopsgate: "No right turn: A1202 into A10", 2 min 35 s faster. **G1 on a real phone still to do** |
 | 6 | Journey times are from the phone's current position | ✅ | Every route starts at the latest GPS fix; the ETA counts down from where the phone is | `app/src/api/__tests__/routes.test.ts`; PM QA rounds 2–4 |
 | 7 | Pursuit shows "—" rather than a guess when the limit is unknown | ✅ | Speed limit only from OSM `maxspeed` via map matching | `server/test/integration/pursuit.test.ts` ("shows no speed limit for a road without one") |
 | 8 | Search and route history survive closing and reopening | ✅ / 🟡 | SQLite on the phone (browser storage on the web app); never auto-cleared; "Clear log" asks first | PM checked on the web app. **Confirm on the phone** during the drive |
@@ -67,7 +67,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
 
 ## Still to do for v1
 
-1. **G1.** Josh sees a blue-light route work on his own Android phone (for example the Bishopsgate right turn the PM's desk test found).
+1. **G1.** The PM's team sees a blue-light route work on a real Android phone, at a spot where it appears on the current map (Shoreditch High Street station to Bank, or Angel to Highbury Corner; the **Pursuit debug** workflow lists them), and sends Josh the screenshots to sign off.
 2. **Drive it.** The PM's field-test brief (19 November) lists every check. The ones only a phone in a car can answer:
    - GPS, voice (screen locked on Android, silent switch on iPhone) and re-routing in traffic; the screen stays awake
    - Pursuit updates every second; the limit roundel and "—"; the next junction on Holloway Road, City Road to Old Street Roundabout, Crowndale Road and Midland Road
@@ -84,6 +84,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
 - **Store accounts:** Apple (£79 a year) and Google ($25 once). The listing and privacy answers are ready in STORE.md.
 - **Learning:** leave off for v1, or turn on (update the store privacy answers first).
 - **Uptime monitor:** GitHub's scheduled check runs every few hours, not every 10 minutes (typically 6½ hours apart in November), so an outage can go unseen for hours. A free outside monitor (UptimeRobot, say) checking `https://api.bluerouteapp.com/health` every 5 minutes and emailing support@ would close the gap; it needs an account in OPSVALE's name.
+- **Making the repository private:** later, once BlueRoute has users and customers: it needs GitHub Pro. PR #136 has the preparation and stays unmerged until then (Josh, 26 November).
 - **Solicitor review** of the terms and privacy policy, if you want one before the public listing.
 
 ## Known small items
