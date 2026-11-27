@@ -1,21 +1,21 @@
 # BlueRoute v1 checklist
 
-Every requirement in CLAUDE.md, how it's met, and what's still open. Checked 19 November 2026 against `main` and the live server (first written 25 October).
+Every requirement in CLAUDE.md, how it's met, and what's still open. Checked 27 November 2026 against `main` and the live server (first written 25 October).
 
 **Key:** ✅ met and tested · 🟡 met, with a limit or still to confirm · ⏳ waiting on something outside the code · ❌ not done
 
 ## Summary
 
-All 8 "must pass" items are met in the code, and 7 have automated tests. The PM's team has run desk tests on the live web app (latest 19 November: every desk item passed or fixed). What hasn't happened is the **in-car test on a real phone**, including gate **G1**: no officer gets a link until a blue-light route has been seen working on a real Android phone, checked by the PM's team and signed off by Josh from their screenshots (Josh, 26 November). Nothing else stops sign-off.
+All 8 "must pass" items are met in the code, and 7 have automated tests. The PM's team has run desk tests on the live web app (latest 19 November: every desk item passed or fixed). What hasn't happened is the **in-car test on a real phone**, including gate **G1**: no officer gets a link until a blue-light route has been seen working on a real Android phone, checked and signed off by Josh on his own drive (the PM's team can't do street work, so G1 is Josh's field test; step-by-step guide prepared 26 November). Nothing else stops sign-off.
 
 | | |
 |---|---|
 | Must-pass items | 6 ✅, 2 🟡 (54 Caledonian Road is an estimated door without OS Places; the log surviving a restart is still to confirm on a phone) |
-| Launch gate | **G1**: a blue-light route working on a real Android phone, checked by the PM's team, signed off by Josh. Not yet done |
+| Launch gate | **G1**: a blue-light route working on a real Android phone, on Josh's field test. Not yet done |
 | Spec areas | 14 ✅, 5 🟡 (flats need OS Places; OS Places off; entrances and team sessions to see on the drive; learning off), 0 ❌ |
-| Still to do before calling v1 done | the real drive with G1 (build order step 6); the PM's field-test brief covers it |
+| Still to do before calling v1 done | the real drive with G1 (build order step 6); the PM's field-test brief and Josh's G1 guide cover it |
 | Decisions for OPSVALE | OS Places key (paid), store accounts, turning learning on |
-| Automated tests | app 355, server 196 unit + 43 against a real Valhalla, Python tests for every data extract, plus the live smoke test after every deploy and the Pursuit survey on the published map |
+| Automated tests | app 362, server 201 unit + 43 against a real Valhalla, Python tests for every data extract, plus the live smoke test after every deploy and the Pursuit survey on the published map |
 
 ## Must pass before calling v1 done
 
@@ -67,7 +67,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
 
 ## Still to do for v1
 
-1. **G1.** The PM's team sees a blue-light route work on a real Android phone, at a spot where it appears on the current map (Shoreditch High Street station to Bank, or Angel to Highbury Corner; the **Pursuit debug** workflow lists them), and sends Josh the screenshots to sign off.
+1. **G1.** Josh sees a blue-light route work on a real Android phone, at a spot where it appears on the current map (Shoreditch High Street station to Bank, or Angel to Highbury Corner; the **Pursuit debug** workflow lists them), and keeps the screenshots as the record (Pursuit debug's **G1 spots** prints the pairs where it shows on the current map).
 2. **Drive it.** The PM's field-test brief (19 November) lists every check. The ones only a phone in a car can answer:
    - GPS, voice (screen locked on Android, silent switch on iPhone) and re-routing in traffic; the screen stays awake
    - Pursuit updates every second; the limit roundel and "—"; the next junction on Holloway Road, City Road to Old Street Roundabout, Crowndale Road and Midland Road
@@ -76,6 +76,7 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
    - no signal: navigation carries on along the route (download the offline map on Wi-Fi first)
    - a team session between two phones, team messages (the desk sends **Go here** to a callsign; the crew taps **Route here**) and follow-in
    - after 21:00 in Kent or Essex, a route round an overnight motorway closure
+   - Where am I → **Save spot**: the saved list (last 5, with time) is still there after reopening
    - Field-test recording on, so any problem can be replayed afterwards
 
 ## Decisions for OPSVALE
@@ -86,6 +87,15 @@ All 8 "must pass" items are met in the code, and 7 have automated tests. The PM'
 - **Uptime monitor:** done 26 November. UptimeRobot (free plan, account under support@bluerouteapp.com) checks `https://api.bluerouteapp.com/health` every 5 minutes for `"ok":true` and emails support@ when it's missing and when it's back. GitHub's own check runs only every few hours.
 - **Making the repository private:** later, once BlueRoute has users and customers: it needs GitHub Pro. PR #136 has the preparation and stays unmerged until then (Josh, 26 November).
 - **Solicitor review** of the terms and privacy policy, if you want one before the public listing.
+
+## Done since 19 November
+
+- Store screenshots retaken 26 November from the current build (16, both stores; blue-light route shown saving 4 min 20 s).
+- Native iPhone app: builds, installs and opens on a simulated iPhone every week (iOS check workflow), with no Apple account needed until the store build.
+- Terms, privacy policy, website and app name OPSVALE LTD (company 17605107) as maker and data controller; one contact address, support@bluerouteapp.com.
+- Desk use: "Use online" on the website and an "At a desk" setup choice (no position shared); Save spot on Where am I; Resume route after the app is closed.
+- Weekly map build hardened against Geofabrik outages (retries, a Monday catch-up, an issue opened if it fails); the 27 November data is published and the server takes it on its 03:15 update.
+- Library updates: maplibre-gl 5.24.1 and vitest 5.1.2 (#159, replacing Dependabot #85).
 
 ## Known small items
 
