@@ -491,6 +491,10 @@ function PoliceRow({
             • {r.description}
           </Text>
         ))}
+      {/* Bus gates and banned turns are exempt only where each road's order says so. */}
+      {expanded && route.restrictions.length > 0 && (
+        <Text style={styles.exemptNote}>Exemptions depend on each road’s local order: the driver decides.</Text>
+      )}
     </View>
   );
 }
@@ -724,6 +728,7 @@ const baseStyles = StyleSheet.create({
   trafficAvoided: { color: colors.muted, fontFamily: fonts.body, fontSize: 13, lineHeight: 17, marginTop: 2 },
   relies: { color: colors.amber, fontFamily: fonts.body, fontSize: 13, lineHeight: 18, paddingVertical: 4 },
   restriction: { color: colors.fg, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
+  exemptNote: { color: colors.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 17, marginTop: 4 },
   go: {
     borderRadius: 10,
     width: 76,
