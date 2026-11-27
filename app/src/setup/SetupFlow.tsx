@@ -17,6 +17,7 @@ import { colors, fonts } from "../theme";
 import { useColors, useThemed } from "../textSize";
 import { SERVICES, VEHICLES, vehiclesFor } from "../vehicles";
 import { SETUP_DONE_KEY, needsSetup, nextStep, previousStep, stepLabel, type SetupStep } from "./steps";
+import { useTeam } from "../team/TeamProvider";
 
 export function SetupFlow() {
   const styles = useThemed(baseStyles);
@@ -29,6 +30,9 @@ export function SetupFlow() {
     needsSetup({ done: store.getSetting(SETUP_DONE_KEY), service: session.service, areas: session.boroughs.length }),
   );
   const [step, setStep] = useState<SetupStep>("service");
+  // At a desk (a control room or office PC): no vehicle, position never shared.
+  const [desk, setDesk] = useState(false);
+  const team = useTeam();
   const here = fix ? boroughAt(fix.lat, fix.lng) : null;
   const [region, setRegion] = useState<RegionId>(() => (here ? regionOf(here).id : "london"));
   if (!show) return null;
@@ -38,7 +42,7 @@ export function SetupFlow() {
     setShow(false);
   };
   const forward = () => {
-    const next = nextStep(step);
+    const next = nextStep(step, { desk });
     if (next) setStep(next);
     else finish();
   };
@@ -142,16 +146,29 @@ export function SetupFlow() {
     case "vehicle":
       title = "What are you driving?";
       lead = "Routes avoid low bridges, narrow roads and weight limits it can’t take.";
-      body = VEHICLES.filter((v) => vehiclesFor(session.service).includes(v.id)).map((v) =>
-        big(v.label, () => {
-          session.setVehicle(v.id);
-          setStep("callsign");
-        }, { on: session.vehicle === v.id, detail: v.detail }),
+      body = (
+        <>
+          {VEHICLES.filter((v) => vehiclesFor(session.service).includes(v.id)).map((v) =>
+            big(v.label, () => {
+              setDesk(false);
+              session.setVehicle(v.id);
+              setStep("callsign");
+            }, { on: !desk && session.vehicle === v.id, detail: v.detail }),
+          )}
+          {big("At a desk", () => {
+            // A team's desk: it sends places and cautions, and isn't on the map itself.
+            setDesk(true);
+            team.setPolicy("never");
+            setStep("callsign");
+          }, { on: desk, detail: "Control room or office PC: no vehicle, and your position isn’t shared with a team" })}
+        </>
       );
       break;
     case "callsign":
       title = "Your callsign";
-      lead = "Optional. Shown at the top of the app; never sent anywhere.";
+      lead = desk
+        ? "Messages you send to crews go out under it, e.g. CONTROL-2. You can add it later on Session."
+        : "Optional. Shown at the top of the app; never sent anywhere.";
       body = (
         <TextInput
           accessibilityLabel="Callsign"
@@ -166,7 +183,7 @@ export function SetupFlow() {
           style={styles.input}
         />
       );
-      nextLabel = session.callsign.trim() ? "Next" : "Skip";
+      nextLabel = desk ? "Start" : session.callsign.trim() ? "Next" : "Skip";
       break;
     case "blueLight":
       title = "Blue-light routes";

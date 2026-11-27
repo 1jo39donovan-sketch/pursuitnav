@@ -17,7 +17,9 @@ export function needsSetup(saved: { done: string | null; service: string | null;
   return saved.done == null && saved.service == null && saved.areas === 0;
 }
 
-export function nextStep(step: SetupStep): SetupStep | null {
+/** The step after this one; at a desk, setup ends after the callsign (no blue-light question). */
+export function nextStep(step: SetupStep, opts: { desk?: boolean } = {}): SetupStep | null {
+  if (opts.desk && step === "callsign") return null;
   const i = SETUP_STEPS.indexOf(step);
   return SETUP_STEPS[i + 1] ?? null;
 }
