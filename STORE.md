@@ -367,7 +367,7 @@ Launch free, so the 14-day plan isn't held up and officers join the test. Add th
 - **Your details become public.**
   - Google has required sellers to show a physical address on the store listing. A PO box or virtual office may do; check the current Play Console rules.
   - Apple shows your address and phone number if you sell in the EU. Selling in the UK only avoids that.
-- **Tax.** Earnings go on a Self Assessment tax return. The first £1,000 a year is covered by the trading allowance.
+- **Tax.** Earnings are OPSVALE LTD's (the developer accounts are the company's), so they go in the company's accounts and Corporation Tax return; VAT registration only once its taxable turnover passes the threshold. Ask OPSVALE's accountant.
 - **If you're a serving officer, check with your force first.** Police Regulations require business interests to be declared, and selling an app to colleagues for use on duty is likely to count.
 
 ### Ideas for what it could unlock
