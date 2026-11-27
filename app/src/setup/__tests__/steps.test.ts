@@ -18,6 +18,9 @@ describe("first-launch setup", () => {
   it("moves forward and back one question at a time", () => {
     expect(nextStep("service")).toBe("region");
     expect(nextStep("blueLight")).toBeNull();
+    // At a desk: done after the callsign (no blue-light question).
+    expect(nextStep("callsign")).toBe("blueLight");
+    expect(nextStep("callsign", { desk: true })).toBeNull();
     expect(previousStep("service")).toBeNull();
     expect(previousStep("vehicle")).toBe("areas");
     expect(stepLabel("region")).toBe("Step 2 of 6");
