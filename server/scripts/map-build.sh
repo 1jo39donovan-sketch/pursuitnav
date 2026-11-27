@@ -29,14 +29,15 @@ EXTRA_PBF_URLS=${EXTRA_PBF_URLS:-$DEFAULT_EXTRA_PBF_URLS}
 mkdir -p data/osm
 rm -f data/osm/extra-*.osm.pbf
 say "downloading $PBF_URL"
-curl -fsSL --retry 3 -o data/osm/geocoder.osm.pbf.part "$PBF_URL"
+# Any error retried, a 404 too (Geofabrik answered 404 for London on 22 Nov 2026), for about 30 minutes.
+curl -fsSL --retry 6 --retry-delay 300 --retry-all-errors -o data/osm/geocoder.osm.pbf.part "$PBF_URL"
 mv data/osm/geocoder.osm.pbf.part data/osm/geocoder.osm.pbf
 extras=()
 n=0
 for url in $EXTRA_PBF_URLS; do
   n=$((n + 1))
   say "downloading $url"
-  curl -fsSL --retry 3 -o "data/osm/extra-$n.osm.pbf" "$url"
+  curl -fsSL --retry 6 --retry-delay 300 --retry-all-errors -o "data/osm/extra-$n.osm.pbf" "$url"
   extras+=("/data/osm/extra-$n.osm.pbf")
 done
 if [ ${#extras[@]} -gt 0 ]; then
