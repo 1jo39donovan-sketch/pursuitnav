@@ -2,7 +2,8 @@
 served from files): a new server gets its data put in place; a running one
 swaps in a new release and goes back to the old map if the checks fail; a
 damaged download is refused; a region GitHub doesn't build is left to the
-server. pytest server/scripts"""
+server; with a read-only key (a private repository) the files come through the
+API by asset. pytest server/scripts"""
 
 import json
 import os
@@ -11,7 +12,7 @@ import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SCRIPTS = ("lib.sh", "fetch-data.sh", "data-package.sh", "map-switch.sh", "geocoder-switch.sh")
+SCRIPTS = ("lib.sh", "github-auth.sh", "fetch-data.sh", "data-package.sh", "map-switch.sh", "geocoder-switch.sh")
 
 
 def make_server(tmp_path):
@@ -58,7 +59,9 @@ def publish(tmp_path, server, bin_, tag, content):
                    cwd=work, check=True, capture_output=True, env=env(tmp_path, bin_))
     out = tmp_path / "dl" / tag
     shutil.copytree(work / "data/release", out)
-    tags = [{"tag_name": tag, "draft": False}]
+    # Each file also as an API asset, the way a private repository's are fetched.
+    assets = [{"name": f.name, "url": f"file://{f}"} for f in sorted(out.iterdir())]
+    tags = [{"tag_name": tag, "draft": False, "assets": assets}]
     if (tmp_path / "releases.json").exists():
         tags += json.loads((tmp_path / "releases.json").read_text())
     (tmp_path / "releases.json").write_text(json.dumps(tags))
@@ -141,3 +144,21 @@ def test_leaves_other_regions_and_missing_releases_to_the_server(tmp_path):
     assert fetch(tmp_path, server, bin_).returncode == 2
     (server / ".env").write_text("DOMAIN=t\nPBF_URL=https://download.geofabrik.de/europe/ireland-and-northern-ireland-latest.osm.pbf\n")
     assert fetch(tmp_path, server, bin_).returncode == 2
+
+
+def test_a_private_repository_is_read_with_the_servers_key(tmp_path):
+    server, bin_ = make_server(tmp_path)
+    publish(tmp_path, server, bin_, "data-20261025-0100", "one")
+    (server / ".env").write_text("DOMAIN=test.example\nGITHUB_READ_TOKEN=github_pat_test\n")
+    # A curl that notes what it was asked, then does it.
+    real = shutil.which("curl")
+    (bin_ / "curl").write_text(f'#!/bin/sh\necho "$*" >> {tmp_path}/curl.log\nexec {real} "$@"\n')
+    (bin_ / "curl").chmod(0o755)
+    # The plain download links don't work for a private repository.
+    result = subprocess.run(["bash", str(server / "scripts/fetch-data.sh")], capture_output=True, text=True,
+                            env={**env(tmp_path, bin_), "DATA_DOWNLOAD_BASE": f"file://{tmp_path}/nowhere"})
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (server / "data/valhalla/valhalla_tiles.tar").read_text() == "tiles one"
+    calls = (tmp_path / "curl.log").read_text().splitlines()
+    assert calls and all("Authorization: Bearer github_pat_test" in c for c in calls)
+    assert all("nowhere" not in c for c in calls)

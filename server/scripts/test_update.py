@@ -32,6 +32,7 @@ def setup(tmp_path):
     scripts = work / "server/scripts"
     scripts.mkdir(parents=True)
     shutil.copy(HERE / "update.sh", scripts / "update.sh")
+    shutil.copy(HERE / "github-auth.sh", scripts / "github-auth.sh")
     for stub in ("cron.sh", "build-places.sh", "build-geocoder.sh", "valhalla-limits.sh"):
         (scripts / stub).write_text("exit 0\n")
     (work / ".gitignore").write_text("server/.env\nserver/data/\n")
@@ -103,3 +104,22 @@ def test_waits_while_the_weekly_map_build_runs(tmp_path):
     (server / "server/data/valhalla-next").mkdir()
     assert run_update(tmp_path, server, bin_).returncode == 0
     assert head(server) == good and docker_calls(tmp_path) == 0
+
+
+def test_a_private_repository_is_fetched_with_the_servers_key(tmp_path):
+    work, server, good, bin_ = setup(tmp_path)
+    (server / "server/.env").write_text("DOMAIN=test.example\nNOMINATIM_DATA=./x\nGITHUB_READ_TOKEN=github_pat_test\n")
+    # A git that notes the key it was given for github.com, then does as asked.
+    real = shutil.which("git")
+    (bin_ / "git").write_text(f'#!/bin/sh\necho "$GIT_CONFIG_KEY_0 $GIT_CONFIG_VALUE_0" >> {tmp_path}/git.log\n'
+                              f'exec {real} "$@"\n')
+    (bin_ / "git").chmod(0o755)
+    fixed = commit(work, True, "new")
+    result = run_update(tmp_path, server, bin_)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert head(server) == fixed
+    import base64
+    header = "AUTHORIZATION: basic " + base64.b64encode(b"x-access-token:github_pat_test").decode()
+    assert f"http.https://github.com/.extraheader {header}" in (tmp_path / "git.log").read_text()
+    # The key is never written into the server's git settings.
+    assert "github_pat_test" not in (server / ".git/config").read_text()

@@ -2,6 +2,8 @@
 
 Patrol and pursuit navigation for Met Police officers. An OPSVALE product. `CLAUDE.md` is the brief.
 
+**Proprietary.** Copyright © 2026 OPSVALE. All rights reserved: see `LICENSE`. No part may be copied or reused without written permission.
+
 - `app/`: the phone app (Expo / React Native, TypeScript). See `app/README.md`.
 - `server/`: Valhalla routing for London, the API, the places extractor, and Docker setup for one VPS. See `server/README.md`.
 - `DEPLOY.md`: one-off setup; then GitHub rents and sets up the server and builds the Android app.

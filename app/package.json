@@ -55,5 +55,6 @@
     "build:demo": "EXPO_PUBLIC_DEMO=1 expo export --platform web --clear --output-dir dist-demo && node scripts/build-demo-page.mjs dist-demo dist-demo/blue-route-demo.html",
     "test": "vitest run"
   },
-  "private": true
+  "private": true,
+  "license": "UNLICENSED"
 }

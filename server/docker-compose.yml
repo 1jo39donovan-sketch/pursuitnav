@@ -99,6 +99,8 @@ services:
       ACME_EMAIL: ${CONTACT_EMAIL:-certificates@blueroute.invalid}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The Android test app, served at /android (scripts/fetch-apk.sh).
+      - ./data/apk:/srv/apk:ro
       - caddy_data:/data
       - caddy_config:/config
 

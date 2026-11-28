@@ -169,8 +169,9 @@ jobs:
         if: env.PUBLISH == 'true'
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/blue-route.apk"
-          notes=$(printf 'Built from %s on %s UTC. Server: %s. Runtime: %s.\n\nTo install: open this page on the Android phone, tap blue-route.apk, and allow installing from your browser when asked.' \
-            "${GITHUB_SHA::7}" "$(date -u +'%d %b %Y %H:%M')" "${EXPO_PUBLIC_API_URL:-none}" "${RUNTIME_VERSION:-no over-the-air updates}")
+          notes=$(printf 'Built from %s on %s UTC. Server: %s. Runtime: %s.\n\nTo install: open this page on the Android phone, tap blue-route.apk, and allow installing from your browser when asked.%s' \
+            "${GITHUB_SHA::7}" "$(date -u +'%d %b %Y %H:%M')" "${EXPO_PUBLIC_API_URL:-none}" "${RUNTIME_VERSION:-no over-the-air updates}" \
+            "${SERVER_DOMAIN:+ Testers without a GitHub login: https://$SERVER_DOMAIN/android (the server copies this APK within the hour).}")
           if gh release view android-latest >/dev/null 2>&1; then
             gh release upload android-latest "$RUNNER_TEMP/blue-route.apk" --clobber
             gh release edit android-latest --notes "$notes"

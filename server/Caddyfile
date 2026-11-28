@@ -12,6 +12,17 @@
 # ALSO_SERVE (.env, optional): more names for the same server, space-separated,
 # e.g. the old address while apps move to a new one. Each gets its own certificate.
 {$DOMAIN} {$ALSO_SERVE} {
-	encode gzip
-	reverse_proxy api:3000
+	# The Android test app (scripts/fetch-apk.sh keeps the copy up to date):
+	# testers open /android on the phone and install it.
+	redir /android /android/blueroute.apk
+	handle_path /android/* {
+		root * /srv/apk
+		header Content-Type application/vnd.android.package-archive
+		header Cache-Control no-cache
+		file_server
+	}
+	handle {
+		encode gzip
+		reverse_proxy api:3000
+	}
 }
